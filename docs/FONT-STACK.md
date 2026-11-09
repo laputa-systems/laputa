@@ -78,13 +78,15 @@ To qualify another x86_64 archive on a Linux KVM host, run
 `qualification/ghostty-shared/run.sh /absolute/path/to/ghostty.tar.gz` from
 this checkout. Set `XSH_ROOT` if the XSH checkout is not the adjacent `xsh`
 directory. The command creates an isolated checkout under `.work/tmp`, hashes
-the supplied archive, applies the qualification recipe and proof, and runs
-`make profile-test`. It reuses the existing seed, source cache, and package
-artifact cache. The archive must contain the candidate executable named
-`ghostty`. The command does not publish or change the release package pin.
+the supplied archive, replaces the x86_64 release source and SHA-256 in the
+checked-in `ghostty-custom` recipe with the archive, and runs
+`make profile-test`. The checked-in recipe and proof are otherwise unchanged.
+It reuses the existing seed, source cache, and package artifact cache. The
+archive must contain the candidate executable named `ghostty`. The command
+does not publish or change the release package pin.
 
-The local qualification recipe declares the three font libraries as link
-dependencies and Hack and DejaVu Sans as runtime-only dependencies. Its
+The qualification recipe therefore declares FreeType, HarfBuzz, and
+rust-fontconfig as link dependencies, with Hack as a runtime-only font. Its
 package proof checks the font SONAMEs and absence of RPATH and RUNPATH. Both
 that package and the existing package passed `make profile-test` with Linux,
 KVM, Tinyland, virgl, keyboard input, screenshot, and session recovery. A
