@@ -112,7 +112,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # -crt-static selects the dynamic CRT (with an INTERP): the Laputa musl
   # package ships libc.so but no libc.a, so a fully static Rust link has no
   # static libc to close against.
-  let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={cc} -L native={libdir} -C link-arg=-static-libgcc -C link-arg=-Wl,--as-needed -C link-arg=-Wl,-rpath,/usr/lib"
+  let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={cc} -L native={libdir} -C link-arg=-static-libgcc -C link-arg=-Wl,--as-needed"
   let host_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={host_cc} -L native={host_libdir} -C link-arg=-static-libgcc -C link-arg=-Wl,--as-needed"
   let aarch64_rustflags = match target {
     types.Aarch64LinuxMusl => target_rustflags

@@ -103,7 +103,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   # build: a static-PIE binary must not carry DT_NEEDED entries, and the
   # proof's explicit-loader run is only sound for real dynamics.
   # KBVM is pure Rust; no native XKB link patching is needed.
-  let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={cc} -L native={libdir} -C link-arg=-static-libgcc -C link-arg=-Wl,--as-needed -C link-arg=-Wl,-rpath,/usr/lib"
+  let target_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={cc} -L native={libdir} -C link-arg=-static-libgcc -C link-arg=-Wl,--as-needed"
   let host_rustflags = f"-C panic=abort -C target-feature=-crt-static -C linker={host_cc} -L native={host_libdir} -C link-arg=-static-libgcc -C link-arg=-Wl,--as-needed"
   let aarch64_rustflags = match target {
     types.Aarch64LinuxMusl => target_rustflags

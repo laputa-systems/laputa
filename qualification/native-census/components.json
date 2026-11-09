@@ -104,7 +104,7 @@
       "package": "tinyland",
       "path": "usr/bin/tinyland",
       "needed": ["libseat.so.1", "libc.so"],
-      "runpath": "/usr/lib",
+      "runpath": "",
       "components": [
         {"name": "LLVM libunwind in Rust std", "language": "C++", "version": "Rust 1.99 target runtime", "origin": "the musl target's self-contained libunwind", "markers": ["libunwind: unsupported .eh_frame_hdr version"]}
       ],
