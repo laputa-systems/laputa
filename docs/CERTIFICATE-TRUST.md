@@ -283,6 +283,14 @@ through the fixture. Other packages have no TLS client (`dropbear`,
 with `--no-default-features`; the `rustic` network feature set was not
 inspected.
 
+The non-enforcing consumers are accepted as they are. Enforcing the policy in
+`ntpd-rs`, the only one built from source, needs the distrusted SPKI set at
+the point where rustls verifies the built path (`WebPkiServerVerifier`, which
+calls `verify_for_usage`); a wrapper around the presented chain would accept a
+server that omits the blocked intermediate. That means a `check_distrust` set
+in the `webpki` fork, a `rustls` fork change to pass it, a fork of
+`rustls-platform-verifier`, and new versions of all three in `mycrates`.
+
 Export `XSH_HOST` and `XSHT` as described in [development](DEVELOPMENT.md).
 Run the focused package fixtures with extracted package roots:
 
