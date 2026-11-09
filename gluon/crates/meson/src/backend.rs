@@ -502,11 +502,26 @@ impl NinjaBackend {
         let lang = self.detect_target_language(target);
         let compile_rule = format!("{}_COMPILER", lang);
         let mut gen_order: Vec<String> = Vec::new();
+        let mut gen_include_dirs: Vec<String> = Vec::new();
         for s in &target.sources {
-            if let Some(inner) = s.strip_prefix("<orderonly:").and_then(|v| v.strip_suffix('>')) {
-                gen_order.push(inner.to_string());
+            let generated = s
+                .strip_prefix("<orderonly:")
+                .or_else(|| s.strip_prefix("<genout:"))
+                .and_then(|v| v.strip_suffix('>'));
+            if let Some(inner) = generated {
+                if s.starts_with("<orderonly:") {
+                    gen_order.push(inner.to_string());
+                }
+                if let Some(parent) = Path::new(inner).parent() {
+                    let parent = parent.to_string_lossy();
+                    if !parent.is_empty() && parent != "." {
+                        gen_include_dirs.push(format!("{}/{}", self.build_root, parent));
+                    }
+                }
             }
         }
+        gen_include_dirs.sort();
+        gen_include_dirs.dedup();
 
         // Compile each source file
         for source in &target.sources {
@@ -555,6 +570,14 @@ impl NinjaBackend {
                 args.push(format!("-I{}/{}", self.source_root, inc));
                 args.push(format!("-I{}/{}", self.build_root, inc));
             }
+            if target.implicit_include_directories {
+                for dir in &gen_include_dirs {
+                    let arg = format!("-I{}", dir);
+                    if !args.contains(&arg) {
+                        args.push(arg);
+                    }
+                }
+            }
 
             // Language-specific args (per-file)
             if file_lang == "c" && !build_data.c_std.is_empty() && build_data.c_std != "none" {
@@ -589,7 +612,7 @@ impl NinjaBackend {
             writeln!(out).unwrap();
             writeln!(out, "  DEPFILE = {}", depfile).unwrap();
             if !args.is_empty() {
-                writeln!(out, "  ARGS = {}", args.join(" ")).unwrap();
+                writeln!(out, "  ARGS = {}", shell_escape_command(&args)).unwrap();
             }
             writeln!(out).unwrap();
 
@@ -830,7 +853,9 @@ impl NinjaBackend {
                     }
                 }
                 Object::File(f) => {
-                    if f.is_built {
+                    if Path::new(&f.path).is_absolute() {
+                        order_only.push(f.path.clone());
+                    } else if f.is_built {
                         let d = if f.subdir.is_empty() {
                             String::new()
                         } else {
@@ -868,7 +893,18 @@ impl NinjaBackend {
             cmd_with_env.push(format!("{}={}", k, v));
         }
         cmd_with_env.extend(command_parts.iter().cloned());
-        writeln!(out, "  COMMAND = {}", shell_escape_command(&cmd_with_env)).unwrap();
+        let mut command_line = shell_escape_command(&cmd_with_env);
+        if ct.feed {
+            if let Some(input) = inputs.first() {
+                command_line.push_str(&format!(" < {}", shell_escape_command(&[input.clone()])));
+            }
+        }
+        if ct.capture {
+            if let Some(output) = outputs.first() {
+                command_line.push_str(&format!(" > {}", shell_escape_command(&[output.clone()])));
+            }
+        }
+        writeln!(out, "  COMMAND = {}", command_line).unwrap();
         writeln!(out, "  DESC = Generating {}", ct.name).unwrap();
         if let Some(ref depfile) = ct.depfile {
             writeln!(out, "  DEPFILE = {}{}", target_dir, depfile).unwrap();

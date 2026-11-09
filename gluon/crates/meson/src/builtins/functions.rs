@@ -919,6 +919,16 @@ fn compute_output_name(
     }
 }
 
+fn is_compilable_source(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    lower.ends_with(".c")
+        || lower.ends_with(".cc")
+        || lower.ends_with(".cpp")
+        || lower.ends_with(".cxx")
+        || lower.ends_with(".m")
+        || lower.ends_with(".mm")
+}
+
 fn collect_sources(obj: &Object, sources: &mut Vec<String>) {
     match obj {
         Object::String(s) => sources.push(s.clone()),
@@ -953,7 +963,11 @@ fn collect_sources(obj: &Object, sources: &mut Vec<String>) {
         }
         Object::GeneratedList(data) => {
             for out in &data.outputs {
-                sources.push(format!("<genout:{}>", out));
+                if is_compilable_source(out) {
+                    sources.push(format!("<genout:{}>", out));
+                } else {
+                    sources.push(format!("<orderonly:{}>", out));
+                }
             }
             if data.outputs.is_empty() {
                 sources.push(format!("<generated:{}>", obj.to_display_string()));
@@ -966,14 +980,7 @@ fn collect_sources(obj: &Object, sources: &mut Vec<String>) {
                 format!("{}/", r.subdir)
             };
             for o in &r.outputs {
-                let lower = o.to_lowercase();
-                if lower.ends_with(".c")
-                    || lower.ends_with(".cc")
-                    || lower.ends_with(".cpp")
-                    || lower.ends_with(".cxx")
-                    || lower.ends_with(".m")
-                    || lower.ends_with(".mm")
-                {
+                if is_compilable_source(o) {
                     sources.push(format!("<genout:{}{}>", d, o));
                 } else {
                     sources.push(format!("<orderonly:{}{}>", d, o));
@@ -990,14 +997,7 @@ fn collect_sources(obj: &Object, sources: &mut Vec<String>) {
                 format!("{}/", r.subdir)
             };
             if let Some(o) = r.outputs.get(*idx) {
-                let lower = o.to_lowercase();
-                if lower.ends_with(".c")
-                    || lower.ends_with(".cc")
-                    || lower.ends_with(".cpp")
-                    || lower.ends_with(".cxx")
-                    || lower.ends_with(".m")
-                    || lower.ends_with(".mm")
-                {
+                if is_compilable_source(o) {
                     sources.push(format!("<genout:{}{}>", d, o));
                 } else {
                     sources.push(format!("<orderonly:{}{}>", d, o));
@@ -2069,6 +2069,165 @@ fn builtin_find_program(vm: &mut VM, args: &[CallArg]) -> Result<Object, String>
     }))
 }
 
+fn resolved_file_path(vm: &VM, f: &FileData) -> String {
+    if f.is_built {
+        if f.subdir.is_empty() {
+            format!("{}/{}", vm.build_root, f.path)
+        } else {
+            format!("{}/{}/{}", vm.build_root, f.subdir, f.path)
+        }
+    } else if f.subdir.is_empty() {
+        format!("{}/{}", vm.source_root, f.path)
+    } else {
+        format!("{}/{}/{}", vm.source_root, f.subdir, f.path)
+    }
+}
+
+fn target_output_path(root: &str, subdir: &str, output: &str) -> String {
+    if subdir.is_empty() {
+        format!("{}/{}", root, output)
+    } else {
+        format!("{}/{}/{}", root, subdir, output)
+    }
+}
+
+fn collect_command_parts(
+    vm: &VM,
+    obj: &Object,
+    command: &mut Vec<String>,
+    deps: &mut Vec<Object>,
+) {
+    match obj {
+        Object::Array(items) => {
+            for item in items {
+                collect_command_parts(vm, item, command, deps);
+            }
+        }
+        Object::File(f) => {
+            let path = resolved_file_path(vm, f);
+            deps.push(Object::File(FileData {
+                path: path.clone(),
+                subdir: String::new(),
+                is_built: false,
+            }));
+            command.push(path);
+        }
+        Object::ExternalProgram(p) => {
+            command.push(p.path.clone());
+            if std::path::Path::new(&p.path).is_absolute() {
+                deps.push(Object::File(FileData {
+                    path: p.path.clone(),
+                    subdir: String::new(),
+                    is_built: false,
+                }));
+            }
+        }
+        Object::BuildTarget(t) => {
+            let output = t.outputs.first().cloned().unwrap_or_else(|| t.name.clone());
+            deps.push(Object::File(FileData {
+                path: output.clone(),
+                subdir: t.subdir.clone(),
+                is_built: true,
+            }));
+            command.push(target_output_path(&vm.build_root, &t.subdir, &output));
+        }
+        Object::CustomTarget(r) => {
+            if let Some(output) = r.outputs.first() {
+                deps.push(Object::File(FileData {
+                    path: output.clone(),
+                    subdir: r.subdir.clone(),
+                    is_built: true,
+                }));
+                command.push(target_output_path(&vm.build_root, &r.subdir, output));
+            }
+        }
+        Object::CustomTargetIndex(r, idx) => {
+            if let Some(output) = r.outputs.get(*idx) {
+                deps.push(Object::File(FileData {
+                    path: output.clone(),
+                    subdir: r.subdir.clone(),
+                    is_built: true,
+                }));
+                command.push(target_output_path(&vm.build_root, &r.subdir, output));
+            }
+        }
+        other => command.push(other.to_string_value()),
+    }
+}
+
+fn collect_input_parts(vm: &VM, obj: &Object, input: &mut Vec<String>) {
+    match obj {
+        Object::Array(items) => {
+            for item in items {
+                collect_input_parts(vm, item, input);
+            }
+        }
+        Object::File(f) => input.push(resolved_file_path(vm, f)),
+        Object::CustomTarget(r) => {
+            for output in &r.outputs {
+                input.push(target_output_path(&vm.build_root, &r.subdir, output));
+            }
+        }
+        Object::CustomTargetIndex(r, idx) => {
+            if let Some(output) = r.outputs.get(*idx) {
+                input.push(target_output_path(&vm.build_root, &r.subdir, output));
+            }
+        }
+        other => input.push(other.to_string_value()),
+    }
+}
+
+fn script_interpreter(path: &str) -> Option<Vec<String>> {
+    let meta = std::fs::metadata(path).ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if meta.permissions().mode() & 0o111 != 0 {
+            return None;
+        }
+    }
+    let content = std::fs::read_to_string(path).ok()?;
+    let shebang = content.lines().next()?.strip_prefix("#!")?.trim();
+    let mut parts: Vec<String> = shebang.split_whitespace().map(String::from).collect();
+    if parts.is_empty() {
+        return None;
+    }
+    if parts[0].ends_with("/env") && parts.len() > 1 {
+        let program = parts[1].clone();
+        if let Ok(path_env) = std::env::var("PATH") {
+            for dir in path_env.split(':') {
+                let candidate = format!("{}/{}", dir, program);
+                if std::path::Path::new(&candidate).is_file() {
+                    return Some(vec![candidate]);
+                }
+            }
+        }
+        return Some(vec![program]);
+    }
+    Some(parts)
+}
+
+fn wrap_script_command(command: &mut Vec<String>) {
+    if let Some(first) = command.first() {
+        if let Some(interpreter) = script_interpreter(first) {
+            let script = first.clone();
+            let mut wrapped = interpreter;
+            wrapped.push(script);
+            command.splice(0..1, wrapped);
+        }
+    }
+}
+
+fn same_dependency(a: &Object, b: &Object) -> bool {
+    match (a, b) {
+        (Object::File(x), Object::File(y)) => x.path == y.path && x.subdir == y.subdir,
+        _ => a == b,
+    }
+}
+
 fn builtin_custom_target(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     // Disabler propagation: if any argument is a Disabler, return Disabler
     for arg in args {
@@ -2097,52 +2256,15 @@ fn builtin_custom_target(vm: &mut VM, args: &[CallArg]) -> Result<Object, String
         .unwrap_or_default();
 
     let mut command = Vec::new();
-    match VM::get_arg_value(args, "command") {
-        Some(Object::Array(arr)) => {
-            for item in arr {
-                match item {
-                    Object::String(s) => command.push(s.clone()),
-                    Object::ExternalProgram(p) => command.push(p.path.clone()),
-                    Object::File(f) => {
-                        if f.is_built {
-                            if f.subdir.is_empty() {
-                                command.push(format!("{}/{}", vm.build_root, f.path));
-                            } else {
-                                command.push(format!("{}/{}/{}", vm.build_root, f.subdir, f.path));
-                            }
-                        } else if f.subdir.is_empty() {
-                            command.push(format!("{}/{}", vm.source_root, f.path));
-                        } else {
-                            command.push(format!("{}/{}/{}", vm.source_root, f.subdir, f.path));
-                        }
-                    }
-                    other => command.push(other.to_string_value()),
-                }
-            }
-        }
-        Some(Object::String(s)) => {
-            command.push(s.clone());
-        }
-        Some(other) => {
-            command.push(other.to_string_value());
-        }
-        None => {}
+    let mut command_deps = Vec::new();
+    if let Some(cmd_obj) = VM::get_arg_value(args, "command") {
+        collect_command_parts(vm, cmd_obj, &mut command, &mut command_deps);
     }
+    wrap_script_command(&mut command);
 
     let mut input = Vec::new();
-    match VM::get_arg_value(args, "input") {
-        Some(Object::Array(arr)) => {
-            for item in arr {
-                input.push(item.to_string_value());
-            }
-        }
-        Some(Object::String(s)) => {
-            input.push(s.clone());
-        }
-        Some(other) => {
-            input.push(other.to_string_value());
-        }
-        None => {}
+    if let Some(input_obj) = VM::get_arg_value(args, "input") {
+        collect_input_parts(vm, input_obj, &mut input);
     }
 
     let mut output = Vec::new();
@@ -2176,6 +2298,11 @@ fn builtin_custom_target(vm: &mut VM, args: &[CallArg]) -> Result<Object, String
                 ct_depends.push(dep_val.clone());
             }
             _ => {}
+        }
+    }
+    for dep in command_deps {
+        if !ct_depends.iter().any(|existing| same_dependency(existing, &dep)) {
+            ct_depends.push(dep);
         }
     }
     let ct_env: HashMap<String, String> = match VM::get_arg_value(args, "env") {

@@ -385,7 +385,19 @@ fn fs_copyfile(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, S
     let positional = VM::get_positional_args(args);
     let src = match positional.first() {
         Some(Object::String(s)) => s.clone(),
-        Some(Object::File(f)) => f.path.clone(),
+        Some(Object::File(f)) => {
+            if f.is_built {
+                if f.subdir.is_empty() {
+                    format!("{}/{}", vm.build_root, f.path)
+                } else {
+                    format!("{}/{}/{}", vm.build_root, f.subdir, f.path)
+                }
+            } else if f.subdir.is_empty() {
+                format!("{}/{}", vm.source_root, f.path)
+            } else {
+                format!("{}/{}/{}", vm.source_root, f.subdir, f.path)
+            }
+        }
         _ => return Err("fs.copyfile: first argument must be a string or file".to_string()),
     };
     let dest_name = match positional.get(1) {
@@ -413,8 +425,12 @@ fn fs_copyfile(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, S
     vm.build_data.custom_targets.push(CustomTarget {
         name: dest_name.clone(),
         id,
-        command: vec!["cp".to_string(), src, dest_name.clone()],
-        input: Vec::new(),
+        command: vec![
+            "cp".to_string(),
+            "@INPUT@".to_string(),
+            "@OUTPUT@".to_string(),
+        ],
+        input: vec![src],
         output: vec![dest_name],
         depends: Vec::new(),
         depend_files: Vec::new(),
