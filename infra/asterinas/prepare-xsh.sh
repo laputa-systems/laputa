@@ -36,7 +36,7 @@ GIT_AUTHOR_NAME='Laputa Asterinas build' GIT_AUTHOR_EMAIL='build@laputa.invalid'
     GIT_COMMITTER_NAME='Laputa Asterinas build' GIT_COMMITTER_EMAIL='build@laputa.invalid' \
     GIT_AUTHOR_DATE='1970-01-01T00:00:00+0000' GIT_COMMITTER_DATE='1970-01-01T00:00:00+0000' \
     git -C "$stage" -c user.name='Laputa Asterinas build' \
-        -c user.email='build@laputa.invalid' commit --quiet -m 'Pinned XSH build input'
+        -c user.email='build@laputa.invalid' -c gc.auto=0 -c maintenance.auto=false commit --quiet -m 'Pinned XSH build input'
 snapshot_tree="$(git -C "$stage" rev-parse HEAD^{tree})"
 xsh_build_inputs_hash="$(printf '%s\n' "$snapshot_tree" | sha256sum | awk '{print $1}')"
 snapshot="$snapshot_dir/$XSH_COMMIT-$xsh_build_inputs_hash"
