@@ -572,7 +572,7 @@ proc split_edge(split: NinjaSplit, block: List[Str]) -> Result[NinjaSplit] {
   return split when block.is_empty()
 
   for line in block {
-    if line.starts_with(" COMMAND = ") and vendored_generator in line {
+    if line.trim().starts_with("COMMAND = ") and vendored_generator in line {
       return {kept: split.kept, vendored: split.vendored.extend(edge_outputs(block[0])?)}
     }
   }
