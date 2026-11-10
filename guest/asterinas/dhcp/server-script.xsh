@@ -28,7 +28,7 @@ pure rules_for(mode: Str) -> Result[List[types.Rule], Error] {
         script.from("request", 2, []),
       ],
     )
-    "restart" | "carrier" | "tcp" => Ok(
+    "restart" | "carrier" | "tcp" | "reject-routes" | "syslog" => Ok(
       [
         script.always("discover", [granted("offer", 3600)]),
         script.always("request", [granted("ack", 3600)]),

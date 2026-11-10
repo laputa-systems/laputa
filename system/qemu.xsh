@@ -76,7 +76,7 @@ export pure qemu_asterinas_reference_argv(value: QemuConfig, input: QemuAsterina
     value.qemu.display(), "-machine", target.machine, "-cpu", target.cpu,
     "-smp", "2", "-m", f"{input.memory_mib}", "-nographic", "-no-reboot",
     "-nodefaults", "-serial", "stdio", "-kernel", input.kernel.display(),
-    "-initrd", input.initramfs.display(), "-append", "console=ttyS0 rdinit=/init",
+    "-initrd", input.initramfs.display(), "-append", "console=ttyS0 loglevel=3 rdinit=/init",
     "-drive", f"if=none,id=root,format=raw,file={input.disk}",
     "-device", f"{target.block_device},drive=root",
   ].extend(data_disk).extend(network).extend(control)

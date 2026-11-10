@@ -1,7 +1,7 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `57aec8665`, the IPv4 configuration ioctl slice,
-with XSH `d520fbcc5`, recorded with the other inputs in
+The checked-in kernel pin is `4f0f43390`, the link state, reject route and
+`/dev/kmsg` slice, with XSH `d520fbcc5`, recorded with the other inputs in
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
@@ -26,14 +26,24 @@ obligations.
 - IPv4 state: netlink addresses, routes, rules, and route-netlink
   notifications, and the packaged `dhcpc` across acquire, renewal,
   reconfigure, NAK, restart, and carrier loss against a scripted server.
-  Unresolved neighbors queue packets as Linux does.
+  Unresolved neighbors queue packets as Linux does. Links report their
+  carrier, its transition counts and their frame counters, which `ifconfig`
+  shows. Blackhole, unreachable, prohibit and throw routes install, survive
+  link loss, and refuse lookups with Linux's errno.
+- Logging: the packaged `syslogd` receives local datagrams with their sender
+  credentials and reads `/dev/kmsg`, whose records, positioning and overrun
+  follow Linux.
 - Memory: allocation survives cross-CPU frame-pool fragmentation.
 - Native suite: not a full pass. The original 1,281 A0 passes are preserved
   (`infra/asterinas/a0-baseline.json`) and most of the 15,255 discovered
   cases remain unexecuted; a failure that Linux also shows is environment
   debt, not an Asterinas defect.
 
-Known limits that no capability claims: `MAP_POPULATE` is ignored, which Linux
+Known limits that no capability claims: `/dev/kmsg` holds only records that
+user space writes, because Asterinas prints its own log to the console only;
+local, broadcast, anycast and multicast routes through a device fail with
+`EOPNOTSUPP`; traffic to the host's own non-loopback address does not pass
+through `lo` or its counters; `MAP_POPULATE` is ignored, which Linux
 permits; pipe ring buffers and large kernel heap allocations still need
 contiguous frames; anonymous page faults cost about three times the Linux
 reference.
@@ -161,9 +171,22 @@ The cohort uses whichever bundle `make asterinas-build` last selected.
 
 Run the DHCP cohort with `bash infra/asterinas/qualify.sh network --backend both [--case NAME]`.
 It runs the `proc_boot_id` and `udp_device` witnesses, then each mode of `guest/asterinas/dhcp`
-(`lease-acquire`, `lifecycle`, `renewal`, `reconfigure`, `nak`, `restart`, `carrier`, `tcp`) against the same
+(`lease-acquire`, `lifecycle`, `renewal`, `reconfigure`, `nak`, `restart`, `carrier`, `tcp`,
+`reject-routes`, `syslog`) against the same
 TAP-backed `eth0`. The container end of the TAP runs the XSH pin's scripted DHCP server
 (and, for `tcp`, a C payload server) from the case's `peer.sh`; the guest runs the packaged `dhcpc`.
+`carrier` also compares, at every step of its link cycles, `IFLA_CARRIER`, the carrier
+change, up and down counts, the size and error and carrier counters of `IFLA_STATS64`
+and `IFLA_STATS` on `lo` and `eth0`, whether `eth0` counted frames in both directions, and
+the `TX errors` line of the packaged `ifconfig eth0`. Frame counts themselves differ between
+the kernels and are not compared. `reject-routes` installs one foreign route of each type,
+keeps them across a link cycle while `dhcpc` rebinds, connects UDP sockets through them
+(`EINVAL`, `EHOSTUNREACH`, `EACCES`, and a throw that falls through to the `default`
+table), and compares the errno of each invalid request and of the removals. `syslog`
+compares `/dev/kmsg` records, priorities, escaping, the 1024-byte write limit, short-buffer,
+end-of-ring, seek and overrun errors, then runs the packaged `syslogd --kmsg /dev/kmsg`
+with the case's `syslog-client` C program and one kernel-ring record, and compares the
+records it writes apart from times, sequence numbers and process ids.
 The `NET_` transcripts of the two kernels must match. A mode takes 40 to 80 s per backend.
 
 The remaining cohorts run the same way. `device` runs the baseline boot proof, whose

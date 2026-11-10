@@ -2,6 +2,8 @@
 use lib.dhcp_apply as apply
 use lib.dhcp_net as network
 use lib.dhcp_wire as wire
+use lib.gnu as gnu
+use lib.net_state as state
 use lib.nettools_fixture as fixture
 
 const WORK = p"/run/dhcp-case"
@@ -12,6 +14,22 @@ const STATIC_ROUTE_PROTOCOL = 4
 const ETH_P_ALL = 3
 const ETH_P_IP = 2048
 const DHCP_SERVER_PORT = 67
+const IFLA_STATS = 7
+const IFLA_STATS64 = 23
+const IFLA_CARRIER = 33
+const IFLA_CARRIER_CHANGES = 35
+const IFLA_CARRIER_UP_COUNT = 47
+const IFLA_CARRIER_DOWN_COUNT = 48
+const RTN_UNICAST = 1
+const RTN_LOCAL = 2
+const RTN_BLACKHOLE = 6
+const RTN_UNREACHABLE = 7
+const RTN_PROHIBIT = 8
+const RTN_THROW = 9
+const TABLE_DEFAULT = 253
+const SCOPE_HOST = 254
+const SCOPE_NOWHERE = 255
+const KMSG_RECORD_LIMIT = 8192
 
 type ClientStatus = {state: Str}
 
@@ -196,6 +214,226 @@ proc add_foreign_routes() [process, net, error] {
   }
 }
 
+pure attribute_number(attributes: List[LinuxNetlinkAttribute], kind: Int) -> Str {
+  for attribute in attributes {
+    guard attribute.kind.bit_and(16383) == kind else { continue }
+    return f"{bytes.unpack_le(attribute.data, if attribute.data.len() < 4 { attribute.data.len() } else { 4 }) ?? -1}"
+  }
+  "-"
+}
+
+pure counter(data: Bytes, width: Int, index: Int) -> Int {
+  bytes.unpack_le(data, width, index * width) ?? -1
+}
+
+pure frames_counted(attributes: List[LinuxNetlinkAttribute]) -> Bool {
+  for attribute in attributes {
+    guard attribute.kind.bit_and(16383) == IFLA_STATS64 else { continue }
+    let fields = [counter(attribute.data, 8, index) for index in range(4)]
+    return fields[0] > 0 and fields[1] > 0 and fields[2] > fields[0] and fields[3] > fields[1]
+  }
+  false
+}
+
+pure counter_line(attributes: List[LinuxNetlinkAttribute], kind: Int, width: Int) -> Str {
+  for attribute in attributes {
+    guard attribute.kind.bit_and(16383) == kind else { continue }
+    let data = attribute.data
+    let fields = [counter(data, width, index) for index in range(21)]
+    return f"size={data.len()} tx_errors={fields[5]} collisions={fields[9]} tx_aborted={fields[16]} tx_carrier={fields[17]} tx_fifo={fields[18]} tx_heartbeat={fields[19]} tx_window={fields[20]}"
+  }
+  "absent"
+}
+
+proc link_lines(label: Str) [fs, process, env, net, error] {
+  let dump = linux.network_dump()?
+  for link in dump.links {
+    guard let name = link.name else { continue }
+    guard name in ["lo", "eth0"] else { continue }
+    eprint --flush f"NET_DHCP_{label}_CARRIER {name} carrier={attribute_number(link.attributes, IFLA_CARRIER)} changes={attribute_number(link.attributes, IFLA_CARRIER_CHANGES)} up={attribute_number(link.attributes, IFLA_CARRIER_UP_COUNT)} down={attribute_number(link.attributes, IFLA_CARRIER_DOWN_COUNT)}"
+    eprint --flush f"NET_DHCP_{label}_STATS64 {name} {counter_line(link.attributes, IFLA_STATS64, 8)}"
+    eprint --flush f"NET_DHCP_{label}_STATS {name} {counter_line(link.attributes, IFLA_STATS, 4)}"
+    if name == "eth0" { eprint --flush f"NET_DHCP_{label}_FRAMES {name} counted={frames_counted(link.attributes)}" }
+  }
+  let listing = fp"{WORK}/ifconfig.out"
+  let status = process.run(process.command_argv(p"/usr/bin/xsh", [p"/usr/bin/xsh", p"/usr/lib/xsh/core/ifconfig", "eth0"], WORK, {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", listing, listing))?
+  guard status.ok else { fail f"ifconfig eth0 failed: {listing.read_text()?}" }
+  for line in listing.read_text()?.lines() {
+    if line.trim().starts_with("TX errors") { eprint --flush f"NET_DHCP_{label}_IFCONFIG {line.trim()}" }
+  }
+}
+
+pure foreign_route(destination: Str, table: Int, scope: Int, route_type: Int, hop: state.Hop) -> state.Route {
+  {family: .Inet, table: table, destination: destination, prefix: 24, source: null, source_prefix: 0, preferred_source: null, tos: 0, priority: 0, protocol: STATIC_ROUTE_PROTOCOL, scope: scope, route_type: route_type, flags: 0, hops: [hop], other_attributes: []}
+}
+
+proc route_change(label: Str, change: state.Change) [process, net, error] {
+  match state.apply(change) {
+    Ok(_) => eprint --flush f"NET_DHCP_reject_{label} ok"
+    Err(failure) => eprint --flush f"NET_DHCP_reject_{label} {failure.message}"
+  }
+}
+
+proc connect_through(label: Str, address: Str) [process, net, error] {
+  let c = linux.net_constants()
+  let fd = linux.socket(c.AF_INET, c.SOCK_DGRAM)?
+  defer unix.close_fd(fd)
+  match linux.connect(fd, {family: "inet", address: address, port: 9}) {
+    Ok(_) => eprint --flush f"NET_DHCP_reject_CONNECT {label} {address} source={linux.getsockname(fd)?.address}"
+    Err(failure) => eprint --flush f"NET_DHCP_reject_CONNECT {label} {address} errno={gnu.errno(failure)}"
+  }
+}
+
+proc reject_route_lines(label: Str) [process, env, net, error] {
+  let dump = linux.network_dump()?
+  for route in dump.routes {
+    guard route.family == "inet" and route.table != 255 and (route.destination ?? "").starts_with("203.0.") else { continue }
+    eprint --flush f"NET_DHCP_{label}_REJECT_ROUTE {route.destination ?? "default"}/{route.destination_prefix_length} oif={route.output_ifindex ?? 0} table={route.table} proto={route.protocol} scope={route.scope} type={route.route_type}"
+  }
+}
+
+proc await_default_route(label: Str, timeout_ms: Int) [process, env, time, net, error] {
+  let deadline = elapsed_ms()? + timeout_ms
+  while elapsed_ms()? < deadline {
+    let dump = linux.network_dump()?
+    if dump.routes |> any .family == "inet" and .table == network.TABLE_MAIN and .destination == null { return }
+    time.sleep(POLL_MS * 1ms)
+  }
+  eprint --flush f"NET_DHCP_{label}_TIMEOUT waiting for the default route"
+}
+
+proc reject_routes() [fs, process, env, time, net, error] {
+  let none: state.Hop = {ifindex: null, gateway: null}
+  let eth0 = fixture.index_of("eth0")
+  let rejecting = [RTN_BLACKHOLE, RTN_UNREACHABLE, RTN_PROHIBIT, RTN_THROW]
+  for route_type in rejecting + [RTN_LOCAL, 3, 4, 5] {
+    route_change(f"ADD type={route_type}", state.AddRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))?
+  }
+  reject_route_lines("added")?
+  fixture.link_down("eth0")?
+  await_state("down", "no_link", 15000)?
+  reject_route_lines("down")?
+  fixture.link_up("eth0")?
+  await_state("up", "bound", 40000)?
+  await_default_route("rebound", 10000)?
+  let _ = snapshot("rebound")?
+  reject_route_lines("rebound")?
+  for route_type in rejecting { connect_through("rejected", f"203.0.{route_type + 100}.1")? }
+  route_change("THROW_FALLBACK", state.AddRoute(foreign_route("203.0.109.0", TABLE_DEFAULT, 0, RTN_UNICAST, {ifindex: eth0, gateway: "192.0.2.1"})))?
+  connect_through("thrown", "203.0.109.1")?
+  route_change("WITH_GATEWAY", state.AddRoute(foreign_route("203.0.120.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, {ifindex: null, gateway: "192.0.2.1"})))?
+  route_change("WITH_DEVICE", state.AddRoute(foreign_route("203.0.121.0", network.TABLE_MAIN, 0, RTN_UNREACHABLE, {ifindex: eth0, gateway: null})))?
+  route_change("DUPLICATE", state.AddRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))?
+  route_change("NOWHERE_SCOPE", state.AddRoute(foreign_route("203.0.122.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_PROHIBIT, none)))?
+  route_change("HOST_SCOPE", state.AddRoute(foreign_route("203.0.123.0", network.TABLE_MAIN, SCOPE_HOST, RTN_BLACKHOLE, none)))?
+  route_change("UNICAST_NOWHERE_SCOPE", state.AddRoute(foreign_route("203.0.124.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_UNICAST, {ifindex: eth0, gateway: null})))?
+  for route_type in [0, 10, 12] {
+    route_change(f"INVALID type={route_type}", state.AddRoute(foreign_route("203.0.125.0", network.TABLE_MAIN, 0, route_type, none)))?
+  }
+  for route_type in rejecting {
+    route_change(f"DELETE type={route_type}", state.RemoveRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))?
+  }
+  route_change("DELETE_AGAIN", state.RemoveRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))?
+  connect_through("released", "203.0.106.1")?
+  reject_route_lines("deleted")?
+}
+
+pure syslog_record(line: Str) -> Str {
+  var fields: List[Str] = []
+  for field in rx" header_time=\x22[^\x22]*\x22".replace(line, with: "").split(" ") {
+    let name = field.split("=")[0]
+    guard !(name in ["seq", "boot", "boottime_ns", "kseq", "ktime_us", "tag_pid"]) else { continue }
+    if name == "pid" and field != "pid=-" { fields += ["pid=N"] } else { fields += [field] }
+  }
+  fields.join(" ")
+}
+
+proc kmsg_errno(label: Str, attempt: Result[Bytes, Error]) {
+  match attempt {
+    Ok(record) => eprint --flush f"NET_DHCP_kmsg_{label} {kmsg_record(record)}"
+    Err(failure) => eprint --flush f"NET_DHCP_kmsg_{label} errno={gnu.errno(failure)}"
+  }
+}
+
+pure kmsg_record(record: Bytes) -> Str {
+  let text = record.utf8() ?? "undecodable"
+  let fields = text.split(";")
+  let header = fields[0].split(",")
+  return f"malformed {text.trim()}" when header.len() < 4
+  f"priority={header[0]} flag={header[3]} text={fields[1..].join(";").trim()}"
+}
+
+proc kmsg_write(label: Str, text: Str) [fs, error] {
+  match p"/dev/kmsg".write(text) {
+    Ok(_) => eprint --flush f"NET_DHCP_kmsg_{label} written"
+    Err(failure) => eprint --flush f"NET_DHCP_kmsg_{label} errno={gnu.errno(failure)}"
+  }
+}
+
+proc kmsg_device() [fs, process, net, error] {
+  let fd = unix.open_fd(p"/dev/kmsg", nonblock: true)?
+  defer unix.close_fd(fd)
+  let _ = unix.seek_fd(fd, 0, whence: "end")?
+  kmsg_errno("empty", unix.read_fd(fd, KMSG_RECORD_LIMIT))
+  kmsg_write("plain", "laputa-kmsg plain record\n")
+  kmsg_write("daemon", "<29>laputa-kmsg daemon notice")
+  kmsg_write("kernel_facility", "<6>laputa-kmsg facility zero")
+  kmsg_write("escaped", "<14>laputa-kmsg tab\there\\back")
+  kmsg_write("unterminated_prefix", "<6laputa-kmsg open prefix")
+  for length in [1000, 1024, 1025] { kmsg_write(f"length {length}", ["a" for _ in range(length)].join("")) }
+  kmsg_errno("short_buffer", unix.read_fd(fd, 16))
+  for label in ["plain", "daemon", "kernel_facility", "escaped", "unterminated_prefix"] {
+    kmsg_errno(f"read {label}", unix.read_fd(fd, KMSG_RECORD_LIMIT))
+  }
+  for label in ["current", "offset"] {
+    let attempt = if label == "current" { unix.seek_fd(fd, 0, whence: "current") } else { unix.seek_fd(fd, 5, whence: "start") }
+    match attempt {
+      Ok(position) => eprint --flush f"NET_DHCP_kmsg_seek {label} position={position}"
+      Err(failure) => eprint --flush f"NET_DHCP_kmsg_seek {label} errno={gnu.errno(failure)}"
+    }
+  }
+  let behind = unix.open_fd(p"/dev/kmsg", nonblock: true)?
+  defer unix.close_fd(behind)
+  let _ = unix.seek_fd(behind, 0, whence: "end")?
+  let filler = ["f" for _ in range(960)].join("")
+  for index in range(600) { p"/dev/kmsg".write(f"laputa-kmsg fill {index} {filler}")? }
+  kmsg_errno("overrun", unix.read_fd(behind, KMSG_RECORD_LIMIT))
+  match unix.read_fd(behind, KMSG_RECORD_LIMIT) {
+    Ok(_) => eprint --flush "NET_DHCP_kmsg_after_overrun record"
+    Err(failure) => eprint --flush f"NET_DHCP_kmsg_after_overrun errno={gnu.errno(failure)}"
+  }
+}
+
+proc syslog_consumer() [fs, process, env, time, net, error] {
+  let log = fp"{WORK}/syslog.out"
+  let errors = fp"{WORK}/syslog.err"
+  let command = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/lib/xsh/core/syslogd", "--state", WORK.display(), "--socket", "/dev/log", "--kmsg", "/dev/kmsg"], WORK, {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", log, errors, timeout: 600s)
+  let receiver = unix.spawn_process_group_log(command, log)?
+  let deadline = elapsed_ms()? + 15000
+  while elapsed_ms()? < deadline and !p"/dev/log".exists()? { time.sleep(50ms) }
+  eprint --flush f"NET_DHCP_syslog_SOCKET published={p"/dev/log".exists()?}"
+  for mode in ["basic", "multiline", "forge"] {
+    let status = process.run(process.command_argv(p"/usr/lib/asterinas/case/syslog-client", [p"/usr/lib/asterinas/case/syslog-client", mode]))?
+    eprint --flush f"NET_DHCP_syslog_CLIENT {mode} ok={status.ok}"
+  }
+  let logged = elapsed_ms()? + 10000
+  while elapsed_ms()? < logged and !(log.exists()? and "forged" in log.read_text()?) { time.sleep(POLL_MS * 1ms) }
+  p"/dev/kmsg".write("<14>laputa-syslog: a kernel ring record\n")?
+  time.sleep(1s)
+  let _ = unix.shutdown_process_groups([receiver.pid], 3s, 100ms)?
+  for line in log.read_text()?.lines() {
+    guard !("source=kmsg" in line) or "laputa-syslog" in line else { continue }
+    guard !line.starts_with("event=stop") else {
+      eprint --flush f"NET_DHCP_syslog_STOP {[field for field in line.split(" ") if field.starts_with("dropped_") or field.starts_with("senders=")].join(" ")}"
+      continue
+    }
+    eprint --flush f"NET_DHCP_syslog_LINE {syslog_record(line)}"
+  }
+  if errors.exists()? {
+    for line in errors.read_text()?.lines() { eprint --flush f"NET_DHCP_syslog_ERR {line}" }
+  }
+}
+
 proc state_lines() [fs, process, env, time, net, error] -> Result[List[Str]] {
   let dump = linux.network_dump()?
   var lines: List[Str] = []
@@ -327,15 +565,27 @@ proc main() [fs, process, env, time, net, io, error] {
     "carrier" => {
       await_state("bound", "bound", 30000)?
       let _ = snapshot("bound")?
+      link_lines("bound")?
       for cycle in [1, 2, 3] {
         fixture.link_down("eth0")?
         await_state(f"down{cycle}", "no_link", 15000)?
         let _ = snapshot(f"down{cycle}")?
+        link_lines(f"down{cycle}")?
         fixture.link_up("eth0")?
         await_state(f"up{cycle}", "bound", 40000)?
         messages(f"up{cycle}", capture)?
         let _ = snapshot(f"up{cycle}")?
+        link_lines(f"up{cycle}")?
       }
+    }
+    "reject-routes" => {
+      await_state("bound", "bound", 30000)?
+      reject_routes()?
+    }
+    "syslog" => {
+      await_state("bound", "bound", 30000)?
+      kmsg_device()?
+      syslog_consumer()?
     }
     "tcp" => {
       await_state("bound", "bound", 30000)?
