@@ -43,20 +43,9 @@ int main(void) {
 }
 """
 
-proc pc_field(pc: Str, field: Str) [error] -> Result[Str, Error] {
-  for line in pc.split("\n") {
-    return line.byte_slice(field.byte_len() + 2) when line.starts_with(f"{field}: ")
-  }
-
-  proof.ensure(false, "llvm-static-pc", f"llvm.pc has no {field} field")
-  ""
-}
-
 proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "llvm-static")
-  let pc = fp"{root}/usr/lib/pkgconfig/llvm.pc".read_text()?
-  let version = pc_field(pc, "Version")?
-  proof.ensure(version == proof.package_version(root, "llvm-static")?.split("-")[0], "llvm-static-version", f"llvm.pc reports {version}")
+  let version = proof.package_version(root, "llvm-static")?.split("-")[0]
   proof.ensure(fp"{root}/usr/lib/llvm-static/lib/libLLVMMCJIT.a".exists()?, "llvm-static-mcjit", "libLLVMMCJIT.a is missing")
 
   if pm_util.build_arch()? != pm_util.target_arch()? {
@@ -68,9 +57,11 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
   let reported = env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
     run.text $llvm_config "--version"
   }?
-  proof.ensure(reported.trim() == version, "llvm-static-config", f"llvm-config reports {reported.trim()}, llvm.pc {version}")
+  proof.ensure(reported.trim() == version, "llvm-static-config", f"llvm-config reports {reported.trim()}, package {version}")
 
-  let libs = pc_field(pc, "Libs")?.replace(r"${libdir}", with: fp"{root}/usr/lib/llvm-static/lib".display()).split(" ")
+  let libs = env ({LD_LIBRARY_PATH: fp"{root}/usr/lib".display()}) {
+    run.text $llvm_config "--ldflags" "--link-static" "--libs" "--system-libs" "mcjit" "native"
+  }?.words()
   let cxx = process.which("c++")?
   tempdir tmp at fp"{root}/var/tmp/proof-llvm-static" {
     let source = fp"{tmp}/jit.c"

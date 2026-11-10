@@ -1,8 +1,8 @@
 ##! Static LLVM libraries for embedding an LLVM JIT, built for the target
 ##! architecture only, under the self-contained prefix /usr/lib/llvm-static.
 ##! Mesa links them into libgallium and lavapipe, so no LLVM shared library
-##! enters a runtime closure. `llvm-config` stays for build-time consumers
-##! with a config-tool lookup, such as Mesa's generated-source regeneration.
+##! enters a runtime closure. Build-time consumers find LLVM through
+##! `llvm-config`, as Mesa's config-tool lookup does.
 use pm.make
 use pm.target as pm_target
 use pm.util as pm_util
@@ -52,10 +52,6 @@ export const filetree = [
     path: p"usr/lib/llvm-static/bin/llvm-config",
     kind: "binary",
   },
-  {
-    path: p"usr/lib/pkgconfig/llvm.pc",
-    kind: "file",
-  },
 ]
 
 const llvm_prefix = "/usr/lib/llvm-static"
@@ -85,23 +81,6 @@ proc patch_python_requirement() {
 
   file.write(text.replace(old, with: r"""find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION}
     COMPONENTS Interpreter)"""))
-}
-
-# muon has no llvm-config dependency method, so consumers find LLVM through
-# this file. Static archives let the linker keep only the objects a consumer
-# uses; `has_rtti` answers Mesa's RTTI ABI check.
-pure llvm_pc(version: Str, libs: Str, system_libs: Str) -> Str {
-  f"""prefix={llvm_prefix}
-libdir=${{prefix}}/lib
-includedir=${{prefix}}/include
-has_rtti=NO
-
-Name: LLVM
-Description: Static LLVM libraries for embedding a JIT
-Version: {version}
-Libs: -L${{libdir}} {libs} {system_libs}
-Cflags: -I${{includedir}}
-"""
 }
 
 # LLVM infers its host triple by running config.guess through `sh`, which
@@ -183,12 +162,6 @@ export proc build(dest: Path) [fs, process, env, error] {
   }
 
   let llvm_config = fp"build/bin/llvm-config"
-  let version = (run.text $llvm_config "--version").trim()
-  let libs = (run.text $llvm_config "--link-static" "--libs" "all").trim()
-  let system_libs = (run.text $llvm_config "--link-static" "--system-libs").trim()
-  fp"{dest}/usr/lib/pkgconfig".mkdir()
-  fp"{dest}/usr/lib/pkgconfig/llvm.pc".write(llvm_pc(version, libs, system_libs))
-
   for extra in [fp"{dest}{llvm_prefix}/bin", fp"{dest}{llvm_prefix}/share", fp"{dest}{llvm_prefix}/lib/cmake"] {
     extra.remove()
   }

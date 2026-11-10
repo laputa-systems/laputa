@@ -464,15 +464,6 @@ glslang_depfile = []
 glslang_quiet = []
 """,
       },
-      # muon has no llvm-config method; llvm-static ships llvm.pc instead.
-      {
-        old: "  method : host_machine.system() == 'windows' ? 'auto' : 'config-tool',\n",
-        new: "  method : 'pkg-config',\n",
-      },
-      {
-        old: "dep_llvm.get_variable(cmake : 'LLVM_ENABLE_RTTI', configtool: 'has-rtti')",
-        new: "dep_llvm.get_variable(pkgconfig : 'has_rtti')",
-      },
     ],
   )
 
@@ -593,6 +584,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   patch_build()
 
   env ({
+    PATH: f"{pc.pkg_config_sysroot}/usr/lib/llvm-static/bin:{e"PATH" ?? ""}",
     LD_LIBRARY_PATH: pc.ld_library_path,
     PKG_CONFIG: pc.pkg_config,
     PKG_CONFIG_LIBDIR: pc.pkg_config_libdir,
