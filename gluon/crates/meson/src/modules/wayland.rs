@@ -111,61 +111,38 @@ fn scanner_target(vm: &mut VM, name: String, source: &str, output: String, comma
     })
 }
 
-fn wayland_find_protocol(_vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, String> {
-    let positional = VM::get_positional_args(args);
-
-    let protocol_name = match positional.first() {
+fn wayland_find_protocol(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, String> {
+    let name = match VM::get_positional_args(args).first() {
         Some(Object::String(s)) => s.clone(),
         _ => return Err("wayland.find_protocol: first argument must be protocol name".to_string()),
     };
-
-    let state = VM::get_arg_str(args, "state", 99).unwrap_or("stable");
-
-    // Look for protocol XML in standard wayland-protocols paths
-    let search_paths = [
-        "/usr/share/wayland-protocols",
-        "/usr/local/share/wayland-protocols",
-    ];
-
-    let subdirs = match state {
-        "stable" => vec!["stable"],
-        "staging" => vec!["staging"],
-        "unstable" => vec!["unstable"],
-        _ => vec!["stable", "staging", "unstable"],
+    let state = VM::get_arg_str(args, "state", usize::MAX).unwrap_or("stable").to_string();
+    let version = VM::get_arg_value(args, "version");
+    let required_version = || match &version {
+        Some(Object::Int(v)) => Ok(*v),
+        _ => Err(format!("wayland.find_protocol: {} protocol '{}' requires a version", state, name)),
     };
-
-    for base in &search_paths {
-        for subdir in &subdirs {
-            let dir = std::path::Path::new(base).join(subdir).join(&protocol_name);
-            if dir.is_dir() {
-                let xml_name = format!("{}.xml", protocol_name);
-                let xml_path = dir.join(&xml_name);
-                if xml_path.exists() {
-                    return Ok(Object::File(FileData {
-                        path: xml_path.to_string_lossy().to_string(),
-                        subdir: String::new(),
-                        is_built: false,
-                    }));
-                }
-                // Try with version suffix patterns
-                if let Ok(entries) = std::fs::read_dir(&dir) {
-                    for entry in entries.flatten() {
-                        let name = entry.file_name().to_string_lossy().to_string();
-                        if name.ends_with(".xml") {
-                            return Ok(Object::File(FileData {
-                                path: entry.path().to_string_lossy().to_string(),
-                                subdir: String::new(),
-                                is_built: false,
-                            }));
-                        }
-                    }
-                }
-            }
-        }
+    let xml_name = match state.as_str() {
+        "stable" => format!("{}.xml", name),
+        "staging" => format!("{}-v{}.xml", name, required_version()?),
+        "unstable" => format!("{}-unstable-v{}.xml", name, required_version()?),
+        other => return Err(format!("wayland.find_protocol: unknown state '{}'", other)),
+    };
+    let protocols = crate::dependencies::find_dependency(vm, "wayland-protocols", &[])
+        .ok_or("wayland.find_protocol: dependency wayland-protocols not found")?;
+    let pkgdatadir = crate::builtins::methods::dep_get_pkgconfig_variable(
+        vm,
+        &protocols,
+        &[CallArg { name: None, value: Object::String("pkgdatadir".to_string()) }],
+    )?
+    .to_string_value();
+    let path = std::path::Path::new(&pkgdatadir).join(&state).join(&name).join(&xml_name);
+    if !path.is_file() {
+        return Err(format!("wayland.find_protocol: {} does not exist", path.display()));
     }
-
-    Err(format!(
-        "wayland.find_protocol: protocol '{}' not found (state: {})",
-        protocol_name, state
-    ))
+    Ok(Object::File(FileData {
+        path: path.to_string_lossy().to_string(),
+        subdir: String::new(),
+        is_built: false,
+    }))
 }

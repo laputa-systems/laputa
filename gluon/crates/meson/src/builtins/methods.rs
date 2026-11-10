@@ -1238,7 +1238,7 @@ fn dep_get_variable(_vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result<Obje
     }
 }
 
-fn dep_get_pkgconfig_variable(
+pub(crate) fn dep_get_pkgconfig_variable(
     _vm: &mut VM,
     obj: &Object,
     args: &[CallArg],
