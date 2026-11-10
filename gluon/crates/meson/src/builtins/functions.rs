@@ -774,11 +774,11 @@ fn build_target_common(
 
     let mut sources = Vec::new();
     for arg in positional.iter().skip(1) {
-        collect_sources(arg, &mut sources);
+        collect_sources(arg, &vm.source_root, &mut sources);
     }
     // Also collect from 'sources' kwarg (a single value or an array)
     if let Some(value) = VM::get_arg_value(args, "sources") {
-        collect_sources(&value, &mut sources);
+        collect_sources(&value, &vm.source_root, &mut sources);
     }
 
     let mut dependencies = Vec::new();
@@ -1079,12 +1079,12 @@ fn normalize_install_mode(value: Option<&Object>) -> Option<Vec<String>> {
     }
 }
 
-fn collect_sources(obj: &Object, sources: &mut Vec<String>) {
+fn collect_sources(obj: &Object, source_root: &str, sources: &mut Vec<String>) {
     match obj {
         Object::String(s) => sources.push(s.clone()),
         Object::Array(arr) => {
             for item in arr {
-                collect_sources(item, sources);
+                collect_sources(item, source_root, sources);
             }
         }
         Object::File(f) => {
@@ -1107,8 +1107,12 @@ fn collect_sources(obj: &Object, sources: &mut Vec<String>) {
                 } else {
                     sources.push(format!("<orderonly:{}>", p));
                 }
-            } else {
+            } else if Path::new(&f.path).is_absolute() {
                 sources.push(f.path.clone());
+            } else if f.subdir.is_empty() {
+                sources.push(format!("{}/{}", source_root, f.path));
+            } else {
+                sources.push(format!("{}/{}/{}", source_root, f.subdir, f.path));
             }
         }
         Object::GeneratedList(data) => {
@@ -1911,10 +1915,10 @@ fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, S
     let mut sources = Vec::new();
     if let Some(Object::Array(arr)) = VM::get_arg_value(args, "sources") {
         for s in arr {
-            collect_sources(s, &mut sources);
+            collect_sources(s, &vm.source_root, &mut sources);
         }
     } else if let Some(value) = VM::get_arg_value(args, "sources") {
-        collect_sources(&value, &mut sources);
+        collect_sources(&value, &vm.source_root, &mut sources);
     }
 
     let mut variables = HashMap::new();
@@ -3004,7 +3008,7 @@ fn builtin_install_headers(vm: &mut VM, args: &[CallArg]) -> Result<Object, Stri
     let positional = VM::get_positional_args(args);
     let mut sources = Vec::new();
     for arg in &positional {
-        collect_sources(arg, &mut sources);
+        collect_sources(arg, &vm.source_root, &mut sources);
     }
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
         .unwrap_or("include")
@@ -3039,11 +3043,11 @@ fn builtin_install_data(vm: &mut VM, args: &[CallArg]) -> Result<Object, String>
     let positional = VM::get_positional_args(args);
     let mut sources = Vec::new();
     for arg in &positional {
-        collect_sources(arg, &mut sources);
+        collect_sources(arg, &vm.source_root, &mut sources);
     }
     if let Some(Object::Array(arr)) = VM::get_arg_value(args, "sources") {
         for s in arr {
-            collect_sources(s, &mut sources);
+            collect_sources(s, &vm.source_root, &mut sources);
         }
     }
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
@@ -3107,7 +3111,7 @@ fn builtin_install_man(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> 
     let positional = VM::get_positional_args(args);
     let mut sources = Vec::new();
     for arg in &positional {
-        collect_sources(arg, &mut sources);
+        collect_sources(arg, &vm.source_root, &mut sources);
     }
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
         .unwrap_or("share/man")
@@ -4433,7 +4437,7 @@ fn builtin_range(_vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     Ok(Object::Range(start, stop, step))
 }
 
-fn builtin_structured_sources(_vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
+fn builtin_structured_sources(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     let positional = VM::get_positional_args(args);
     let mut groups = Vec::new();
 
@@ -4441,12 +4445,12 @@ fn builtin_structured_sources(_vm: &mut VM, args: &[CallArg]) -> Result<Object, 
         if let Object::Dict(entries) = arg {
             for (k, v) in entries {
                 let mut sources = Vec::new();
-                collect_sources(v, &mut sources);
+                collect_sources(v, &vm.source_root, &mut sources);
                 groups.push((k.clone(), sources));
             }
         } else {
             let mut sources = Vec::new();
-            collect_sources(arg, &mut sources);
+            collect_sources(arg, &vm.source_root, &mut sources);
             groups.push((String::new(), sources));
         }
     }

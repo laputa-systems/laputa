@@ -87,7 +87,7 @@ run_compare_meson() {
   # copy all src files
   for f in "$src"/*; do
     [ -e "$f" ] || continue
-    cp "$f" "$src_copy/"
+    cp -R "$f" "$src_copy/"
   done
   ref_build="$work/build"
   cand_build="$cand_work/builddir"

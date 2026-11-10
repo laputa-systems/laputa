@@ -187,12 +187,14 @@ impl NinjaBackend {
                 let genout = source.strip_prefix("<genout:").and_then(|s| s.strip_suffix('>'));
                 let source_path = if let Some(gout) = genout {
                     gout.to_string()
+                } else if Path::new(source).is_absolute() {
+                    source.to_string()
                 } else if target.subdir.is_empty() {
                     format!("{}/{}", self.source_root, source)
                 } else {
                     format!("{}/{}/{}", self.source_root, target.subdir, source)
                 };
-                let obj_src = genout.as_deref().unwrap_or(source);
+                let obj_src = self.object_source_name(genout.as_deref().unwrap_or(source));
                 let obj_name = obj_src.replace('/', "_").replace('.', "_");
                 let obj_path = format!("{}{}.p/{}.o", target_dir, target.output_name, obj_name);
                 let file_lang = self.detect_file_language(obj_src, &lang);
@@ -611,6 +613,8 @@ impl NinjaBackend {
             let genout = source.strip_prefix("<genout:").and_then(|s| s.strip_suffix('>'));
             let source_path = if let Some(gout) = genout {
                 gout.to_string()
+            } else if Path::new(source).is_absolute() {
+                source.to_string()
             } else if target.subdir.is_empty() {
                 format!("{}/{}", self.source_root, source)
             } else {
@@ -618,10 +622,7 @@ impl NinjaBackend {
             };
 
             let obj_src = genout.as_deref().unwrap_or(source);
-            let obj_src = match obj_src.strip_prefix(&format!("{}/", self.build_root)) {
-                Some(relative) => relative,
-                None => obj_src,
-            };
+            let obj_src = self.object_source_name(obj_src);
             let obj_name = obj_src.replace('/', "_").replace('.', "_");
             let obj_path = format!("{}{}.p/{}.o", target_dir, target.output_name, obj_name);
             let file_lang = self.detect_file_language(obj_src, &lang);
@@ -999,6 +1000,13 @@ impl NinjaBackend {
         }
 
         Ok(())
+    }
+
+    fn object_source_name<'a>(&self, source: &'a str) -> &'a str {
+        source
+            .strip_prefix(&format!("{}/", self.build_root))
+            .or_else(|| source.strip_prefix(&format!("{}/", self.source_root)))
+            .unwrap_or(source)
     }
 
     fn edge_path(&self, path: &str) -> String {
