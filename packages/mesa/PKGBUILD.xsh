@@ -602,8 +602,7 @@ proc stage_vendored_outputs() {
   }
 
   split = split_edge(split, block)?
-  let kept = [line for line in split.kept if ! (line.starts_with("default ") and line.byte_slice(8) in split.vendored)]
-  ninja.write(kept.join("\n"))
+  ninja.write(split.kept.join("\n"))
   let unvendored: List[Str] = collect {
     for output in split.vendored {
       let vendored = fp"generated/{output}"

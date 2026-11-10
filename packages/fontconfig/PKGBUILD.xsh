@@ -81,17 +81,7 @@ proc stage_generated() {
     }
   }
   split = split_edge(split, block)?
-  let kept = collect {
-    for line in split.kept {
-      if line.starts_with("default ") {
-        let targets = [target for target in line.byte_slice(8).split(" ") if target != "" and target not in split.removed]
-        yield "default " + targets.join(" ") when ! targets.is_empty()
-      } else {
-        yield line
-      }
-    }
-  }
-  ninja.write(kept.join("\n"))
+  ninja.write(split.kept.join("\n"))
   let generated = p"generated".resolve()?
   for entry in fs.walk(generated, gitignore: false)? |> where .kind == "file" {
     let output = entry.path.strip_prefix(generated)?.display()
