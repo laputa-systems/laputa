@@ -313,6 +313,18 @@ cleanup/recovery path without duplicate children; malformed config and failed
 readiness produce explicit status. Reboot stops owned services before filesystem
 shutdown. Existing xinit proofs and the graphical reference remain valid.
 
+**Status: lifecycle contract proven; inittab convergence open.**
+`tests/integration/xinit_lifecycle.py` boots an x86_64/KVM guest with this
+checkout's xinit as PID 1, the production `rc.boot` and `rc.shutdown`, and one
+`xinit scan` entry. It proves one graph start, a delayed restart without a
+dependency cascade, a SIGTERM scanner restart with one worker per unit, explicit
+status for a malformed module and a readiness timeout, and a pre-shutdown hook
+that sees no owned workers while the root is still writable. The proof found
+`rc.shutdown` running a command named `hook` instead of each hook. Open: the
+baselayout and installer inittabs still start `mdev.supervise` and the CI
+dropbear unit outside a boot-graph scanner; SIGKILL of the scanner is
+unqualified; the graphical reference was not rerun.
+
 ## R2: Persistent VM networking and time
 
 ### Network lifecycle
