@@ -3389,18 +3389,20 @@ fn compiler_get_supported_function_attributes(
     }
 }
 
+fn argument_syntax(compiler_id: &str) -> &'static str {
+    match compiler_id {
+        "msvc" | "clang-cl" | "intel-cl" => "msvc",
+        _ => "gcc",
+    }
+}
+
 fn compiler_get_argument_syntax(
     _vm: &mut VM,
     obj: &Object,
     _args: &[CallArg],
 ) -> Result<Object, String> {
     if let Object::Compiler(c) = obj {
-        let syntax = if c.id.contains("msvc") || c.id.contains("cl") {
-            "msvc"
-        } else {
-            "gcc"
-        };
-        Ok(Object::String(syntax.to_string()))
+        Ok(Object::String(argument_syntax(&c.id).to_string()))
     } else {
         Err("Not a compiler".to_string())
     }
@@ -3711,5 +3713,19 @@ fn compiler_run(vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result<Object, S
         Ok(Object::RunResult(result))
     } else {
         Err("Not a compiler".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::argument_syntax;
+
+    #[test]
+    fn only_cl_style_compilers_take_msvc_arguments() {
+        let syntaxes: Vec<_> = ["gcc", "clang", "msvc", "clang-cl", "intel-cl", "intel"]
+            .iter()
+            .map(|id| argument_syntax(id))
+            .collect();
+        assert_eq!(syntaxes, ["gcc", "gcc", "msvc", "msvc", "msvc", "gcc"]);
     }
 }
