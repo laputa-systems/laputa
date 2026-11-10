@@ -368,6 +368,10 @@ pub fn register(vm: &mut VM) {
         meson_noop,
     );
     vm.method_registry.insert(
+        ("meson".to_string(), "add_devenv".to_string()),
+        meson_noop,
+    );
+    vm.method_registry.insert(
         (
             "meson".to_string(),
             "install_dependency_manifest".to_string(),

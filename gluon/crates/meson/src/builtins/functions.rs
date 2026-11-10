@@ -827,26 +827,7 @@ fn build_target_common(
     let build_rpath = VM::get_arg_str(args, "build_rpath", usize::MAX)
         .unwrap_or("")
         .to_string();
-    let include_dirs_val = VM::get_arg_value(args, "include_directories");
-    let mut include_dirs = Vec::new();
-    match include_dirs_val {
-        Some(Object::Array(arr)) => {
-            for item in arr {
-                match item {
-                    Object::IncludeDirs(d) => include_dirs.extend(d.dirs.clone()),
-                    Object::String(s) => include_dirs.push(join_subdir(&vm.current_subdir, &s)),
-                    _ => {}
-                }
-            }
-        }
-        Some(Object::IncludeDirs(d)) => {
-            include_dirs.extend(d.dirs.clone());
-        }
-        Some(Object::String(s)) => {
-            include_dirs.push(join_subdir(&vm.current_subdir, &s));
-        }
-        _ => {}
-    }
+    let include_dirs = target_include_dirs(vm, VM::get_arg_value(args, "include_directories"))?;
     let include_dirs: Vec<String> = include_dirs
         .into_iter()
         .map(|dir| normalize_subdir_path(&dir))
@@ -955,6 +936,8 @@ fn build_target_common(
         }
     }
 
+    let mut seen_sources = std::collections::HashSet::new();
+    let sources: Vec<String> = sources.into_iter().filter(|s| seen_sources.insert(s.clone())).collect();
     let target = BuildTarget {
         name: name.clone(),
         id: id.clone(),
@@ -1077,6 +1060,22 @@ fn normalize_install_mode(value: Option<&Object>) -> Option<Vec<String>> {
         }
         _ => None,
     }
+}
+
+fn target_include_dirs(vm: &VM, value: Option<&Object>) -> Result<Vec<String>, String> {
+    let mut items = Vec::new();
+    if let Some(value) = value {
+        flatten_objects(value, &mut items);
+    }
+    let mut dirs = Vec::new();
+    for item in items {
+        match item {
+            Object::IncludeDirs(d) => dirs.extend(d.dirs.clone()),
+            Object::String(s) => dirs.push(join_subdir(&vm.current_subdir, &s)),
+            other => return Err(format!("include_directories takes strings or include_directories objects, not {}", other.type_name())),
+        }
+    }
+    Ok(dirs)
 }
 
 fn collect_sources(obj: &Object, source_root: &str, sources: &mut Vec<String>) {
@@ -1876,26 +1875,7 @@ fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, S
     if let Some(value) = VM::get_arg_value(args, "link_whole") {
         flatten_objects(&value, &mut link_whole);
     }
-    let include_dirs_val = VM::get_arg_value(args, "include_directories");
-    let mut include_dirs = Vec::new();
-    match include_dirs_val {
-        Some(Object::Array(arr)) => {
-            for item in arr {
-                match item {
-                    Object::IncludeDirs(d) => include_dirs.extend(d.dirs.clone()),
-                    Object::String(s) => include_dirs.push(s.clone()),
-                    _ => {}
-                }
-            }
-        }
-        Some(Object::IncludeDirs(d)) => {
-            include_dirs.extend(d.dirs.clone());
-        }
-        Some(Object::String(s)) => {
-            include_dirs.push(s.clone());
-        }
-        _ => {}
-    }
+    let include_dirs = target_include_dirs(vm, VM::get_arg_value(args, "include_directories"))?;
 
     let version = VM::get_arg_str(args, "version", usize::MAX)
         .map(|s| s.to_string())
@@ -2257,8 +2237,10 @@ fn builtin_find_program(vm: &mut VM, args: &[CallArg]) -> Result<Object, String>
     }))
 }
 
-fn resolved_file_path(vm: &VM, f: &FileData) -> String {
-    if f.is_built {
+pub(crate) fn resolved_file_path(vm: &VM, f: &FileData) -> String {
+    if Path::new(&f.path).is_absolute() {
+        f.path.clone()
+    } else if f.is_built {
         if f.subdir.is_empty() {
             format!("{}/{}", vm.build_root, f.path)
         } else {

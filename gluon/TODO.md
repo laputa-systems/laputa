@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: GLU
-Next: 16
+Next: 17
 
 ### GLU-9 · P3 · engine is not on the user build path
 - **Area:** engine
@@ -42,3 +42,11 @@ Next: 16
 - **Recommendation:** Write the log the directory is for, or stop creating it.
 - **Fix with:** none
 - **Effort:** S
+
+### GLU-16 · P2 · install and postconf scripts are silently skipped
+- **Area:** meson
+- **Where:** `crates/meson/src/builtins/methods.rs` (`meson.add_install_script`, `add_postconf_script`, `add_dist_script` map to `meson_noop`)
+- **Problem:** A project whose install relies on `meson.add_install_script` gets a tree missing whatever the script would have written, and setup still succeeds. Meson runs install scripts with `MESON_INSTALL_PREFIX`, `MESON_INSTALL_DESTDIR_PREFIX` and the other documented variables after files are installed, and postconf scripts after setup.
+- **Recommendation:** Record install scripts and run them from `meson install` with Meson's environment, run postconf scripts at the end of setup, and fail on a script Gluon cannot run rather than skip it. Add a fixture compared with reference Meson.
+- **Fix with:** reference-parity
+- **Effort:** M

@@ -1245,17 +1245,10 @@ impl VM {
         for arg in args {
             if arg.name.as_deref() == Some(name) {
                 match &arg.value {
-                    Object::Array(arr) => {
-                        return arr
-                            .iter()
-                            .filter_map(|v| {
-                                if let Object::String(s) = v {
-                                    Some(s.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
+                    Object::Array(_) => {
+                        let mut strings = Vec::new();
+                        flatten_strings(&arg.value, &mut strings);
+                        return strings;
                     }
                     Object::String(s) => return vec![s.clone()],
                     _ => {}
@@ -1263,6 +1256,18 @@ impl VM {
             }
         }
         Vec::new()
+    }
+}
+
+fn flatten_strings(value: &Object, strings: &mut Vec<String>) {
+    match value {
+        Object::String(s) => strings.push(s.clone()),
+        Object::Array(items) => {
+            for item in items {
+                flatten_strings(item, strings);
+            }
+        }
+        _ => {}
     }
 }
 

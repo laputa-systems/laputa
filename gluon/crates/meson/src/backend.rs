@@ -254,7 +254,7 @@ impl NinjaBackend {
             let output_path = format!("{}{}", target_dir, target.output_name);
             match target.target_type {
                 TargetType::Executable => {
-                    let link_rule = format!("{}_LINKER", lang);
+                    let link_rule = format!("{}_LINKER", self.link_language(build_data, target, &lang));
                     let mut link_args = Vec::new();
                     for dep in &target.dependencies {
                         if let Object::Dependency(d) = dep {
@@ -289,7 +289,7 @@ impl NinjaBackend {
                     let link_rule = if target.target_type == TargetType::StaticLibrary {
                         "STATIC_LINKER".to_string()
                     } else {
-                        format!("{}_LINKER", lang)
+                        format!("{}_LINKER", self.link_language(build_data, target, &lang))
                     };
                     let edge = graph::Edge {
                         rule: link_rule,
@@ -694,7 +694,7 @@ impl NinjaBackend {
 
         match target.target_type {
             TargetType::Executable => {
-                let link_rule = format!("{}_LINKER", lang);
+                let link_rule = format!("{}_LINKER", self.link_language(build_data, target, &lang));
                 let link_targets = self.collect_link_targets(build_data, target);
                 let link_args = self.link_arguments(target, build_data, &lang, &link_targets);
                 let mut implicit: Vec<String> = link_targets
@@ -733,7 +733,7 @@ impl NinjaBackend {
                 writeln!(out).unwrap();
             }
             TargetType::SharedLibrary | TargetType::SharedModule => {
-                let link_rule = format!("{}_LINKER", lang);
+                let link_rule = format!("{}_LINKER", self.link_language(build_data, target, &lang));
                 let link_targets = self.collect_link_targets(build_data, target);
                 let link_args = self.link_arguments(target, build_data, &lang, &link_targets);
                 let mut implicit: Vec<String> = link_targets
@@ -1538,6 +1538,17 @@ impl NinjaBackend {
         } else {
             fallback.to_string()
         }
+    }
+
+    fn link_language(&self, build_data: &BuildData, target: &BuildTarget, own: &str) -> String {
+        if own != "c" {
+            return own.to_string();
+        }
+        let links_cpp = self
+            .collect_link_targets(build_data, target)
+            .iter()
+            .any(|linked| self.detect_target_language(linked) == "cpp");
+        if links_cpp { "cpp".to_string() } else { own.to_string() }
     }
 
     fn detect_target_language(&self, target: &BuildTarget) -> String {

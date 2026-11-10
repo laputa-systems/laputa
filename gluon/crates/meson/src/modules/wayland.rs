@@ -14,68 +14,82 @@ pub fn register(vm: &mut VM) {
 }
 
 fn wayland_scan_xml(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, String> {
-    let positional = VM::get_positional_args(args);
-
-    // Collect XML protocol files from positional args
-    let sources: Vec<String> = positional
-        .iter()
-        .filter_map(|o| match o {
-            Object::String(s) => Some(s.clone()),
-            Object::File(f) => Some(f.path.clone()),
-            _ => None,
-        })
-        .collect();
-
+    let mut sources = Vec::new();
+    for arg in VM::get_positional_args(args) {
+        collect_xml(vm, arg, &mut sources)?;
+    }
     if sources.is_empty() {
         return Err("wayland.scan_xml: at least one XML protocol file required".to_string());
     }
 
-    let client = VM::get_arg_bool(args, "client", true);
-    let server = VM::get_arg_bool(args, "server", false);
-    let public = VM::get_arg_bool(args, "public", true);
+    let scope = if VM::get_arg_bool(args, "public", false) { "public" } else { "private" };
+    let include_core_only = VM::get_arg_bool(args, "include_core_only", true);
+    let mut sides = Vec::new();
+    if VM::get_arg_bool(args, "client", true) {
+        sides.push("client");
+    }
+    if VM::get_arg_bool(args, "server", false) {
+        sides.push("server");
+    }
+    let scanner = match crate::builtins::functions::resolve_command_program(vm, "wayland-scanner")? {
+        Object::ExternalProgram(p) => p.path,
+        other => other.to_string_value(),
+    };
 
-    let mut outputs = Vec::new();
-    for src in &sources {
-        let stem = std::path::Path::new(src)
+    let mut targets = Vec::new();
+    for source in &sources {
+        let name = std::path::Path::new(source)
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_default();
-
-        // wayland-scanner generates a .h and .c per protocol
-        if client {
-            outputs.push(format!("{}-client-protocol.h", stem));
+        targets.push(scanner_target(
+            vm,
+            format!("{name}-protocol"),
+            source,
+            format!("{name}-protocol.c"),
+            vec![scanner.clone(), format!("{scope}-code"), "@INPUT@".to_string(), "@OUTPUT@".to_string()],
+        ));
+        for side in &sides {
+            let mut command = vec![scanner.clone(), format!("{side}-header"), "@INPUT@".to_string(), "@OUTPUT@".to_string()];
+            if include_core_only {
+                command.push("--include-core-only".to_string());
+            }
+            targets.push(scanner_target(
+                vm,
+                format!("{name}-{side}-protocol"),
+                source,
+                format!("{name}-{side}-protocol.h"),
+                command,
+            ));
         }
-        if server {
-            outputs.push(format!("{}-server-protocol.h", stem));
+    }
+    Ok(Object::Array(targets))
+}
+
+fn collect_xml(vm: &VM, obj: &Object, sources: &mut Vec<String>) -> Result<(), String> {
+    match obj {
+        Object::String(s) if s.starts_with('/') => sources.push(s.clone()),
+        Object::String(s) if vm.current_subdir.is_empty() => sources.push(format!("{}/{}", vm.source_root, s)),
+        Object::String(s) => sources.push(format!("{}/{}/{}", vm.source_root, vm.current_subdir, s)),
+        Object::File(f) => sources.push(crate::builtins::functions::resolved_file_path(vm, f)),
+        Object::Array(items) => {
+            for item in items {
+                collect_xml(vm, item, sources)?;
+            }
         }
-        outputs.push(format!("{}-protocol.c", stem));
+        other => return Err(format!("wayland.scan_xml: unsupported source {}", other.type_name())),
     }
+    Ok(())
+}
 
-    let name = "wayland_protocols".to_string();
-    let id = format!("wayland_scan_{}", sources.len());
-
-    let mut command = vec!["wayland-scanner".to_string()];
-    if public {
-        command.push("public-code".to_string());
-    } else {
-        command.push("private-code".to_string());
-    }
-    command.push("@INPUT@".to_string());
-    command.push("@OUTPUT@".to_string());
-
-    let ct = CustomTargetRef {
+fn scanner_target(vm: &mut VM, name: String, source: &str, output: String, command: Vec<String>) -> Object {
+    let id = format!("{}@{}", name, vm.current_subdir);
+    vm.build_data.custom_targets.push(CustomTarget {
         name: name.clone(),
         id: id.clone(),
-        outputs: outputs.clone(),
-        subdir: vm.current_subdir.clone(),
-    };
-
-    vm.build_data.custom_targets.push(CustomTarget {
-        name,
-        id,
         command,
-        input: sources,
-        output: outputs,
+        input: vec![source.to_string()],
+        output: vec![output.clone()],
         depends: Vec::new(),
         depend_files: Vec::new(),
         depfile: None,
@@ -84,13 +98,17 @@ fn wayland_scan_xml(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Obje
         install: false,
         install_dir: Vec::new(),
         install_tag: Vec::new(),
-        build_by_default: true,
+        build_by_default: false,
         build_always_stale: false,
         env: std::collections::HashMap::new(),
         subdir: vm.current_subdir.clone(),
     });
-
-    Ok(Object::CustomTarget(ct))
+    Object::CustomTarget(CustomTargetRef {
+        name,
+        id,
+        outputs: vec![output],
+        subdir: vm.current_subdir.clone(),
+    })
 }
 
 fn wayland_find_protocol(_vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, String> {
