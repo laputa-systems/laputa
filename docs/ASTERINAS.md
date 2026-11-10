@@ -1,6 +1,6 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `4479a5d1d`, the `RTM_NEWLINK` slice, with XSH `d520fbcc5`, recorded with the other inputs in
+The checked-in kernel pin is `2ae01fac2`, the kernel log slice, with XSH `d520fbcc5`, recorded with the other inputs in
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
@@ -33,16 +33,15 @@ obligations.
   and resulting state.
 - Logging: the packaged `syslogd` receives local datagrams with their sender
   credentials and reads `/dev/kmsg`, whose records, positioning and overrun
-  follow Linux.
+  follow Linux. The ring carries the kernel's own records down to info level,
+  so `dmesg` shows them; `loglevel=` sets only what the console prints.
 - Memory: allocation survives cross-CPU frame-pool fragmentation.
 - Native suite: not a full pass. The original 1,281 A0 passes are preserved
   (`infra/asterinas/a0-baseline.json`) and most of the 15,255 discovered
   cases remain unexecuted; a failure that Linux also shows is environment
   debt, not an Asterinas defect.
 
-Known limits that no capability claims: `/dev/kmsg` holds only records that
-user space writes, because Asterinas prints its own log to the console only;
-local, broadcast, anycast and multicast routes through a device fail with
+Known limits that no capability claims: local, broadcast, anycast and multicast routes through a device fail with
 `EOPNOTSUPP`, as does an `RTM_NEWLINK` that renames a link or changes its
 hardware address, MTU, queue length or link mode, or any link flag other than
 `IFF_UP`; traffic to the host's own non-loopback address does not pass
@@ -195,7 +194,7 @@ records it writes apart from times, sequence numbers and process ids.
 The `NET_` transcripts of the two kernels must match. A mode takes 40 to 80 s per backend.
 
 The remaining cohorts run the same way. `device` runs the baseline boot proof, whose
-guest coldplugs three times and after a daemon restart, the `device/block_uevent` and `fs/sync/writeback` witnesses and
+guest coldplugs three times and after a daemon restart, the `device/block_uevent`, `device/kmsg` and `fs/sync/writeback` witnesses and
 the modes of `guest/asterinas/device`: `sysfs`, `add` and `nodes` compare the device paths,
 uevent data, synthetic add events and coldplugged node ownership of two disks, their partitions
 and the memory devices with the Linux reference (the case ships `data-disk.sh`, which makes the
