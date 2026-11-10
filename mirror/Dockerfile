@@ -3,7 +3,7 @@ FROM alpine:3.24.1 AS builder
 
 RUN apk add --no-cache musl-dev libgcc ca-certificates
 
-ADD https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-22.1.8/clang+llvm-22.1.8-x86_64-linux-musl.tar.xz /tmp/llvm.tar.xz
+ADD --checksum=sha256:c43f18f143cc17f49814b6c5dda8a1122d17b6bcdff9848b6f77e97b33026dfe https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-23.1.5-dc0d9b9/clang+llvm-23.1.5-x86_64-linux-musl.tar.xz /tmp/llvm.tar.xz
 RUN mkdir -p /opt/llvm-musl \
     && tar xf /tmp/llvm.tar.xz -C /opt/llvm-musl --strip-components=1 \
     && rm /tmp/llvm.tar.xz
