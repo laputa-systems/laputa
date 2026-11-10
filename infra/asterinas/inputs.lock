@@ -1,6 +1,6 @@
 # Immutable inputs used by the Asterinas + Laputa Firecracker proof.
 ASTERINAS_REPOSITORY=https://github.com/joshuarli/asterinas.git
-ASTERINAS_COMMIT=dc4b3fffdf20af42135c298ce1e557dc6f34129d
+ASTERINAS_COMMIT=57aec86653efc97048075b248ab0ecfa6c0eeeae
 ASTERINAS_DEV_IMAGE_VERSION=0.18.1-20260926
 ASTERINAS_DEV_IMAGE_DIGEST=sha256:e4a5a5742247a287af70d1d5b59f5fa93fe8ab46dcc9081a5e3d0a8066faab56
 FIRECRACKER_VERSION=v1.17.0

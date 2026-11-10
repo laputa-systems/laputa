@@ -281,6 +281,31 @@ proc drain_packets(label: Str, socket: Int) [fs, process, env, time, net, error]
   }
 }
 
+pure sockaddr_in(family: Int, octets: List[Int]) -> Result[Bytes, Error] {
+  bytes.concat([bytes.pack_le(family, 2)?, bytes.zero(2)?, bytes.from_ints(octets)?, bytes.zero(8)?])
+}
+
+pure ifreq(name: Str, tail: Bytes) -> Result[Bytes, Error] {
+  let raw = bytes.from_text(name)
+  Ok(bytes.concat([raw, bytes.zero(16 - raw.len())?, tail, bytes.zero(24 - tail.len())?]))
+}
+
+proc ioctl_result(label: Str, result: Result[Bytes, Error]) [process] {
+  match result {
+    Ok(_) => eprint --flush f"NET_{label}_ACK errno=0"
+    Err(error) => eprint --flush f"NET_{label}_ERR errno={error.errno ?? 0}"
+  }
+}
+
+proc address_ioctl(label: Str, fd: Int, request: Int, name: Str, family: Int, octets: List[Int]) [process, net, error] {
+  ioctl_result(label, linux.ioctl(fd, request, ifreq(name, sockaddr_in(family, octets)?)?, 0))
+}
+
+proc route_ioctl(label: Str, operation: Str, destination: Str, genmask: Str, gateway: Str, device: Str) [process, error] {
+  let text = run.text /usr/lib/asterinas/case/ioctl-route-probe ${label} ${operation} ${destination} ${genmask} ${gateway} ${device}
+  eprint --flush text.trim()
+}
+
 proc main() [fs, process, env, time, net, error] {
   let mode = p"/usr/lib/asterinas/case/mode".read_text()?.trim()
   eprint --flush f"NET_BEGIN {mode}"
@@ -436,6 +461,43 @@ proc main() [fs, process, env, time, net, error] {
       drain_packets("ip_after_up", ip)?
       drain_packets("anywhere_after_up", anywhere)?
       for socket in [ip, arp, everything, anywhere] { let _ = unix.close_fd(socket) }
+    }
+    "ioctl-config" => {
+      let c = linux.net_constants()
+      step("up", "eth0", true, 6)?
+      let fd = linux.socket(c.AF_INET, c.SOCK_DGRAM)?
+      defer unix.close_fd(fd)
+      report("start", "eth0", false)?
+      address_ioctl("addr_set", fd, c.SIOCSIFADDR, "eth0", c.AF_INET, [192, 0, 2, 10])
+      report("addr_set", "eth0", false)?
+      address_ioctl("addr_same", fd, c.SIOCSIFADDR, "eth0", c.AF_INET, [192, 0, 2, 10])
+      report("addr_same", "eth0", false)?
+      address_ioctl("mask_same", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET, [255, 255, 255, 0])
+      report("mask_same", "eth0", false)?
+      address_ioctl("mask_wide", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET, [255, 255, 0, 0])
+      report("mask_wide", "eth0", false)?
+      address_ioctl("mask_restore", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET, [255, 255, 255, 0])
+      report("mask_restore", "eth0", false)?
+      address_ioctl("mask_bad", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET, [255, 0, 255, 0])
+      address_ioctl("addr_missing", fd, c.SIOCSIFADDR, "missing0", c.AF_INET, [192, 0, 2, 11])
+      address_ioctl("mask_missing", fd, c.SIOCSIFNETMASK, "missing0", c.AF_INET, [255, 255, 255, 0])
+      address_ioctl("addr_family", fd, c.SIOCSIFADDR, "eth0", c.AF_INET6, [192, 0, 2, 12])
+      address_ioctl("mask_family", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET6, [255, 255, 255, 0])
+      report("after_address_errors", "eth0", false)?
+      route_ioctl("route_add_default", "add", "0.0.0.0", "0.0.0.0", "192.0.2.1", "eth0")
+      report("route_add_default", "eth0", false)?
+      route_ioctl("route_add_default_again", "add", "0.0.0.0", "0.0.0.0", "192.0.2.1", "eth0")
+      route_ioctl("route_add_network", "add", "10.20.0.0", "255.255.0.0", "-", "eth0")
+      report("route_add_network", "eth0", false)?
+      route_ioctl("route_add_network_again", "add", "10.20.0.0", "255.255.0.0", "-", "eth0")
+      route_ioctl("route_add_bad_mask", "add-bad-mask", "10.0.0.0", "255.255.0.0", "192.0.2.1", "eth0")
+      route_ioctl("route_add_family", "add-family", "10.40.0.0", "255.255.0.0", "192.0.2.1", "eth0")
+      route_ioctl("route_add_missing_device", "add", "10.30.0.0", "255.255.0.0", "192.0.2.1", "missing0")
+      route_ioctl("route_del_network", "del", "10.20.0.0", "255.255.0.0", "-", "eth0")
+      route_ioctl("route_del_network_again", "del", "10.20.0.0", "255.255.0.0", "-", "eth0")
+      route_ioctl("route_del_default", "del", "0.0.0.0", "0.0.0.0", "192.0.2.1", "eth0")
+      route_ioctl("route_del_default_again", "del", "0.0.0.0", "0.0.0.0", "192.0.2.1", "eth0")
+      report("final", "eth0", false)?
     }
     other => fail f"unknown network-state mode {other}"
   }

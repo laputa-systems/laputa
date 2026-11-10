@@ -147,8 +147,18 @@ from the main checkout, because worktrees do not carry ignored files.
 Run the IPv4 state operations cohort with
 `bash infra/asterinas/qualify.sh network-state --backend both [--case NAME]`.
 It builds and runs each netlink witness of the cohort on both backends, then runs
-the `guest/asterinas/network-state` case in each mode (including `events`, which compares the route-netlink notifications) against a TAP-backed `eth0`
-and requires the two `NET_` transcripts to be identical. Two normalizations apply:
+the `guest/asterinas/network-state` case in each mode (`loopback`, `link`, `address`,
+`route`, `events`, `packet` and `ioctl-config`) against a TAP-backed `eth0`
+and requires the two `NET_` transcripts to be identical. `events` also compares the
+route-netlink notifications. `ioctl-config` configures the address and netmask with
+`SIOCSIFADDR` and `SIOCSIFNETMASK` through XSH's guarded `linux.ioctl`, and adds and
+removes the gateway and network routes with `SIOCADDRT` and `SIOCDELRT` through the
+case's `ioctl-route-probe` C helper (the guard's catalogue admits only ifreq-shaped
+requests, so it cannot carry a `struct rtentry`). Besides the resulting address and
+route dumps, it compares the errno of each failure: `ENODEV` for an unknown interface,
+`EINVAL` for a non-`AF_INET` ifreq and a non-contiguous netmask, `EEXIST` for a
+duplicate route, `ESRCH` for deleting a route that does not exist, and
+`EAFNOSUPPORT` for a route destination that is not IPv4. Two normalizations apply:
 the Linux reference has a `sit0` link, which the case omits, and IPv6 is outside the
 cohort (the reference kernel has no IPv6 policy routing and adds link-local addresses),
 so IPv6 address, route and rule lines are not compared.
