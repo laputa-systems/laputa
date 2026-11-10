@@ -4463,11 +4463,10 @@ fn add_arguments_to_project_or_global(
     for value in VM::get_positional_args(args) {
         flatten_string_objects(&value, &mut values);
     }
-    let language = VM::get_arg_str(args, "language", usize::MAX).map(String::from);
-    let languages = match language {
-        Some(l) if !l.is_empty() => vec![l],
-        _ => vec!["*".to_string()],
-    };
+    let languages = VM::get_arg_string_array(args, "language");
+    if languages.is_empty() {
+        return Err("Missing required keyword argument \"language\"".to_string());
+    }
     let map = match (link, global) {
         (false, false) => &mut vm.build_data.project_args,
         (true, false) => &mut vm.build_data.project_link_args,

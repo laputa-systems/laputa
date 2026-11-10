@@ -1443,14 +1443,7 @@ impl NinjaBackend {
         map: &std::collections::HashMap<String, Vec<String>>,
         language: &str,
     ) -> Vec<String> {
-        let mut args = Vec::new();
-        if let Some(list) = map.get(language) {
-            args.extend(list.iter().cloned());
-        }
-        if let Some(list) = map.get("*") {
-            args.extend(list.iter().cloned());
-        }
-        args
+        map.get(language).cloned().unwrap_or_default()
     }
 
     fn compiler_base_args(&self, language: &str, build_data: &BuildData) -> Vec<String> {

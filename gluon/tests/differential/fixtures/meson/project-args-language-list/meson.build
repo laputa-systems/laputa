@@ -1,0 +1,5 @@
+project('project-args-language-list', 'c', 'cpp')
+add_project_arguments('-DONLY_C', language: ['c'])
+add_project_arguments('-DONLY_CPP', language: ['cpp'])
+add_project_arguments('-DBOTH', language: ['c', 'cpp'])
+executable('prog', 'main.c', 'helper.cpp')
