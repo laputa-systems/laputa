@@ -1,7 +1,6 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `4f0f43390`, the link state, reject route and
-`/dev/kmsg` slice, with XSH `d520fbcc5`, recorded with the other inputs in
+The checked-in kernel pin is `4479a5d1d`, the `RTM_NEWLINK` slice, with XSH `d520fbcc5`, recorded with the other inputs in
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
@@ -29,7 +28,9 @@ obligations.
   Unresolved neighbors queue packets as Linux does. Links report their
   carrier, its transition counts and their frame counters, which `ifconfig`
   shows. Blackhole, unreachable, prohibit and throw routes install, survive
-  link loss, and refuse lookups with Linux's errno.
+  link loss, and refuse lookups with Linux's errno. `ip link set` brings a
+  link up or down with `RTM_NEWLINK`, which matches Linux's lookup, errno
+  and resulting state.
 - Logging: the packaged `syslogd` receives local datagrams with their sender
   credentials and reads `/dev/kmsg`, whose records, positioning and overrun
   follow Linux.
@@ -42,7 +43,9 @@ obligations.
 Known limits that no capability claims: `/dev/kmsg` holds only records that
 user space writes, because Asterinas prints its own log to the console only;
 local, broadcast, anycast and multicast routes through a device fail with
-`EOPNOTSUPP`; traffic to the host's own non-loopback address does not pass
+`EOPNOTSUPP`, as does an `RTM_NEWLINK` that renames a link or changes its
+hardware address, MTU, queue length or link mode, or any link flag other than
+`IFF_UP`; traffic to the host's own non-loopback address does not pass
 through `lo` or its counters; `MAP_POPULATE` is ignored, which Linux
 permits; pipe ring buffers and large kernel heap allocations still need
 contiguous frames; anonymous page faults cost about three times the Linux
@@ -152,9 +155,11 @@ from the main checkout, because worktrees do not carry ignored files.
 Run the IPv4 state operations cohort with
 `bash infra/asterinas/qualify.sh network-state --backend both [--case NAME]`.
 It builds and runs each netlink witness of the cohort on both backends, then runs
-the `guest/asterinas/network-state` case in each mode (`loopback`, `link`, `address`,
-`route`, `events`, `packet` and `ioctl-config`) against a TAP-backed `eth0`
-and requires the two `NET_` transcripts to be identical. `events` also compares the
+the `guest/asterinas/network-state` case in each mode (`loopback`, `link`,
+`netlink-link`, `address`, `route`, `events`, `packet` and `ioctl-config`) against a
+TAP-backed `eth0` and requires the two `NET_` transcripts to be identical. `link`
+changes link state with `SIOCSIFFLAGS` and `netlink-link` with the packaged
+`ip link set`, which sends `RTM_NEWLINK`. `events` also compares the
 route-netlink notifications. `ioctl-config` configures the address and netmask with
 `SIOCSIFADDR` and `SIOCSIFNETMASK` through XSH's guarded `linux.ioctl`, and adds and
 removes the gateway and network routes with `SIOCADDRT` and `SIOCDELRT` through the

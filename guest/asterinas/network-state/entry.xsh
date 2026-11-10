@@ -145,6 +145,18 @@ proc step(label: Str, name: Str, up: Bool, expected: Int) [fs, process, env, tim
   report(label, "", true)
 }
 
+proc ip_step(label: Str, name: Str, state_word: Str, expected: Int) [fs, process, env, time, net, error] {
+  let output = p"/run/ip-link.out"
+  let status = process.run(process.command_argv(p"/usr/bin/xsh", [p"/usr/bin/xsh", p"/usr/lib/xsh/core/ip", "link", "set", "dev", name, state_word], p"/", {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", output, output))?
+  if status.ok {
+    eprint --flush f"NET_{label}_OK"
+    wait_for_operstate(name, expected)
+  } else {
+    eprint --flush f"NET_{label}_ERR {output.read_text()?.trim()}"
+  }
+  report(label, "", true)
+}
+
 pure attributes_of(payload: Bytes, start: Int) -> List[Attribute] {
   var offset = start
   let found: List[Attribute] = collect {
@@ -319,6 +331,15 @@ proc main() [fs, process, env, time, net, error] {
       step("lo_down", "lo", false, 2)?
       step("lo_up", "lo", true, 0)?
       step("missing", "missing0", true, 0)?
+    }
+    "netlink-link" => {
+      report("initial", "", true)?
+      ip_step("eth0_up", "eth0", "up", 6)?
+      ip_step("eth0_down", "eth0", "down", 2)?
+      ip_step("eth0_down_again", "eth0", "down", 2)?
+      ip_step("eth0_up_again", "eth0", "up", 6)?
+      ip_step("lo_down", "lo", "down", 2)?
+      ip_step("lo_up", "lo", "up", 0)?
     }
     "address" => {
       step("up", "eth0", true, 6)?
