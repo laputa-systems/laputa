@@ -29,7 +29,7 @@ export const nostrip = true
 ## Upstream source archives and checksums.
 export const upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-VERSION-2f0b039/clang+llvm-VERSION-ARCH-linux-musl.tar.xz => llvm-prebuilt",
+    source: p"https://github.com/laputa-systems/llvm-prebuilt-musl/releases/download/llvm-musl-VERSION-dc0d9b9/clang+llvm-VERSION-ARCH-linux-musl.tar.xz => llvm-prebuilt",
     kind: "auto",
     architectures: [
       "all",
@@ -37,11 +37,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "aarch64",
-        sha256: "48d1801c1ccc0197182231b7b465879cf7366336f282287bdd30aa7573725dda",
+        sha256: "fe0a382993c36a04a505157b59503a7294db97e2ac9923e5630f8b393b78f118",
       },
       {
         arch: "x86_64",
-        sha256: "baba8cf90dd957cf64fdca219f659ec6817b699037a15dfa97bb847a01a64219",
+        sha256: "c43f18f143cc17f49814b6c5dda8a1122d17b6bcdff9848b6f77e97b33026dfe",
       },
     ],
   },

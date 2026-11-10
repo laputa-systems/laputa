@@ -7,7 +7,7 @@ FROM alpine:3.24.1
 
 ARG TARGETARCH
 ARG LLVM_VERSION=23.1.5
-ARG LLVM_RELEASE_SHA=2f0b039
+ARG LLVM_RELEASE_SHA=dc0d9b9
 ARG RUSTUP_VERSION=1.29.2
 ARG RUSTUP_X86_64_SHA256=2ba97d668c06dc4b1884f2a3fa6f4cf14b9bd0c1db379af7e4f87a705ff19edd
 ARG RUSTUP_AARCH64_SHA256=7fdbb23acf6495efee2e371580c52b365917551b4835090a225c44ac30915235
@@ -34,8 +34,8 @@ RUN ar rcs /usr/lib/libutil.a
 # same versioned object, fresh cache key. Checksums still pin every byte.
 # LLVM tools must be musl-linked to run in this Alpine image.
 RUN case "$TARGETARCH" in \
-        amd64) arch=x86_64; sum=baba8cf90dd957cf64fdca219f659ec6817b699037a15dfa97bb847a01a64219 ;; \
-        arm64) arch=aarch64; sum=48d1801c1ccc0197182231b7b465879cf7366336f282287bdd30aa7573725dda ;; \
+        amd64) arch=x86_64; sum=c43f18f143cc17f49814b6c5dda8a1122d17b6bcdff9848b6f77e97b33026dfe ;; \
+        arm64) arch=aarch64; sum=fe0a382993c36a04a505157b59503a7294db97e2ac9923e5630f8b393b78f118 ;; \
         *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
     esac \
     && archive=/ntpd-rs/.work/tmp/llvm.tar.xz \
