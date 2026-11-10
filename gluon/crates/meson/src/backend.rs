@@ -195,8 +195,7 @@ impl NinjaBackend {
                     format!("{}/{}/{}", self.source_root, target.subdir, source)
                 };
                 let obj_src = self.object_source_name(genout.as_deref().unwrap_or(source));
-                let obj_name = obj_src.replace('/', "_");
-                let obj_path = format!("{}{}.p/{}.o", target_dir, target.output_name, obj_name);
+                let Some(obj_path) = self.target_object_path(target, source) else { continue };
                 let file_lang = self.detect_file_language(obj_src, &lang);
                 let file_rule = format!("{}_COMPILER", file_lang);
                 let mut bindings = std::collections::HashMap::new();
@@ -288,6 +287,7 @@ impl NinjaBackend {
                 }
                 TargetType::StaticLibrary | TargetType::SharedLibrary | TargetType::SharedModule => {
                     let link_rule = if target.target_type == TargetType::StaticLibrary {
+                        object_files.extend(self.absorbed_whole_archive_objects(build_data, target));
                         "STATIC_LINKER".to_string()
                     } else {
                         format!("{}_LINKER", self.link_language(build_data, target, &lang))
@@ -635,10 +635,8 @@ impl NinjaBackend {
                 format!("{}/{}/{}", self.source_root, target.subdir, source)
             };
 
-            let obj_src = genout.as_deref().unwrap_or(source);
-            let obj_src = self.object_source_name(obj_src);
-            let obj_name = obj_src.replace('/', "_");
-            let obj_path = format!("{}{}.p/{}.o", target_dir, target.output_name, obj_name);
+            let obj_src = self.object_source_name(genout.as_deref().unwrap_or(source));
+            let Some(obj_path) = self.target_object_path(target, source) else { continue };
             let file_lang = self.detect_file_language(obj_src, &lang);
             let file_compile_rule = format!("{}_COMPILER", file_lang);
 
@@ -737,6 +735,7 @@ impl NinjaBackend {
                 writeln!(out).unwrap();
             }
             TargetType::StaticLibrary => {
+                object_files.extend(self.absorbed_whole_archive_objects(build_data, target));
                 write!(
                     out,
                     "build {}: STATIC_LINKER {}",
@@ -1249,6 +1248,44 @@ impl NinjaBackend {
             dir,
             target.outputs.first().unwrap_or(&target.name)
         )
+    }
+
+    fn target_object_path(&self, target: &BuildTarget, source: &str) -> Option<String> {
+        if source.starts_with("<generated:") || source.starts_with("<orderonly:") {
+            return None;
+        }
+        let lower = source.to_lowercase();
+        if [".h", ".hpp", ".hh", ".hxx"].iter().any(|ext| lower.ends_with(ext)) {
+            return None;
+        }
+        let genout = source.strip_prefix("<genout:").and_then(|s| s.strip_suffix('>'));
+        let obj_src = self.object_source_name(genout.unwrap_or(source));
+        let target_dir = if target.subdir.is_empty() { String::new() } else { format!("{}/", target.subdir) };
+        Some(format!("{}{}.p/{}.o", target_dir, target.output_name, obj_src.replace('/', "_")))
+    }
+
+    fn absorbed_whole_archive_objects(&self, build_data: &BuildData, target: &BuildTarget) -> Vec<String> {
+        let mut objects = Vec::new();
+        for obj in &target.link_whole {
+            let reference = match obj {
+                Object::BuildTarget(r) => r,
+                Object::BothLibraries(_, static_lib) => match &**static_lib {
+                    Object::BuildTarget(r) => r,
+                    _ => continue,
+                },
+                _ => continue,
+            };
+            let Some(library) = build_data
+                .targets
+                .iter()
+                .find(|candidate| candidate.id == reference.id && candidate.target_type == TargetType::StaticLibrary)
+            else {
+                continue;
+            };
+            objects.extend(library.sources.iter().filter_map(|source| self.target_object_path(library, source)));
+            objects.extend(self.absorbed_whole_archive_objects(build_data, library));
+        }
+        objects
     }
 
     fn collect_link_targets<'a>(

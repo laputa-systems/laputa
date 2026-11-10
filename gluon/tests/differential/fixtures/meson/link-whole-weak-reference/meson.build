@@ -1,0 +1,6 @@
+project('link-whole-weak-reference', 'c')
+runtime = static_library('runtime', 'runtime.c')
+runtime_body = declare_dependency(link_whole: runtime)
+runtime_dep = declare_dependency(dependencies: runtime_body)
+frontend = static_library('frontend', 'frontend.c', dependencies: runtime_dep)
+shared_library('driver', 'driver.c', link_whole: frontend)
