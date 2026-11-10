@@ -390,6 +390,19 @@ impl NinjaBackend {
                 }
             }
         }
+        let all = graph::Edge {
+            rule: "phony".to_string(),
+            outputs: vec!["all".to_string()],
+            implicit_outputs: vec![],
+            inputs: std::mem::take(&mut state.defaults),
+            implicit_inputs: vec![],
+            order_only_inputs: vec![],
+            bindings: std::collections::HashMap::new(),
+            dyndep: None,
+        };
+        state.producers.insert("all".to_string(), state.edges.len());
+        state.edges.push(all);
+        state.defaults.push("all".to_string());
         state
     }
 
@@ -1196,9 +1209,9 @@ impl NinjaBackend {
             }
         }
 
-        if !defaults.is_empty() {
-            writeln!(out, "default {}", defaults.join(" ")).unwrap();
-        }
+        writeln!(out, "build all: phony {}", defaults.join(" ")).unwrap();
+        writeln!(out).unwrap();
+        writeln!(out, "default all").unwrap();
 
         Ok(())
     }
