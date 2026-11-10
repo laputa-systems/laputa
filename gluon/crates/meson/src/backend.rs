@@ -195,7 +195,7 @@ impl NinjaBackend {
                     format!("{}/{}/{}", self.source_root, target.subdir, source)
                 };
                 let obj_src = self.object_source_name(genout.as_deref().unwrap_or(source));
-                let obj_name = obj_src.replace('/', "_").replace('.', "_");
+                let obj_name = obj_src.replace('/', "_");
                 let obj_path = format!("{}{}.p/{}.o", target_dir, target.output_name, obj_name);
                 let file_lang = self.detect_file_language(obj_src, &lang);
                 let file_rule = format!("{}_COMPILER", file_lang);
@@ -215,8 +215,9 @@ impl NinjaBackend {
                 for inc in &target.include_dirs {
                     args.extend(self.include_arguments(inc));
                 }
-                args.extend(self.compiler_base_args(&file_lang, build_data));
+                args.extend(self.compiler_base_args(&file_lang, build_data, &target.override_options));
                 args.extend(Self::target_picture_args(target, build_data));
+                args.extend(Self::target_visibility_args(target, &file_lang));
                 for dep in &target.dependencies {
                     if let Object::Dependency(d) = dep {
                         args.extend(d.compile_args.iter().cloned());
@@ -636,7 +637,7 @@ impl NinjaBackend {
 
             let obj_src = genout.as_deref().unwrap_or(source);
             let obj_src = self.object_source_name(obj_src);
-            let obj_name = obj_src.replace('/', "_").replace('.', "_");
+            let obj_name = obj_src.replace('/', "_");
             let obj_path = format!("{}{}.p/{}.o", target_dir, target.output_name, obj_name);
             let file_lang = self.detect_file_language(obj_src, &lang);
             let file_compile_rule = format!("{}_COMPILER", file_lang);
@@ -666,8 +667,9 @@ impl NinjaBackend {
             }
 
             // Language-specific args (per-file)
-            args.extend(self.compiler_base_args(&file_lang, build_data));
+            args.extend(self.compiler_base_args(&file_lang, build_data, &target.override_options));
             args.extend(Self::target_picture_args(target, build_data));
+            args.extend(Self::target_visibility_args(target, &file_lang));
 
             // Dependency compile args
             for dep in &target.dependencies {
@@ -1004,7 +1006,7 @@ impl NinjaBackend {
                 }
             }
         }
-        args.extend(self.compiler_base_args(&pp.language, build_data));
+        args.extend(self.compiler_base_args(&pp.language, build_data, &[]));
         args.extend(pp.compile_args.iter().cloned());
 
         let order_only = self.order_only_paths(&pp.depends);
@@ -1447,7 +1449,14 @@ impl NinjaBackend {
         map.get(language).cloned().unwrap_or_default()
     }
 
-    fn compiler_base_args(&self, language: &str, build_data: &BuildData) -> Vec<String> {
+    fn compiler_base_args(&self, language: &str, build_data: &BuildData, overrides: &[String]) -> Vec<String> {
+        let option = |name: &str, project: &str| -> String {
+            overrides
+                .iter()
+                .find_map(|o| o.strip_prefix(name).and_then(|rest| rest.strip_prefix('=')))
+                .unwrap_or(project)
+                .to_string()
+        };
         let mut args = Vec::new();
         if language == "c" || language == "cpp" {
             match build_data.b_colorout.as_str() {
@@ -1457,7 +1466,8 @@ impl NinjaBackend {
                 _ => {}
             }
             args.push("-D_FILE_OFFSET_BITS=64".to_string());
-            let warnings: &[&str] = match build_data.warning_level.as_str() {
+            let warning_level = option("warning_level", &build_data.warning_level);
+            let warnings: &[&str] = match warning_level.as_str() {
                 "0" => &[],
                 "1" => &["-Wall", "-Winvalid-pch"],
                 "2" => &["-Wall", "-Winvalid-pch", "-Wextra"],
@@ -1465,31 +1475,31 @@ impl NinjaBackend {
                 _ => &["-Wall", "-Winvalid-pch", "-Wextra", "-Wpedantic"],
             };
             args.extend(warnings.iter().map(|w| w.to_string()));
-            if build_data.werror {
+            if option("werror", &build_data.werror.to_string()) == "true" {
                 args.push("-Werror".to_string());
             }
-            if language == "c" && !build_data.c_std.is_empty() && build_data.c_std != "none" {
-                args.push(format!("-std={}", build_data.c_std));
-            }
-            if language == "cpp" && !build_data.cpp_std.is_empty() && build_data.cpp_std != "none" {
-                args.push(format!("-std={}", build_data.cpp_std));
+            let std = match language {
+                "c" => option("c_std", &build_data.c_std),
+                _ => option("cpp_std", &build_data.cpp_std),
+            };
+            if !std.is_empty() && std != "none" {
+                args.push(format!("-std={}", std));
             }
             if language == "cpp" {
-                if build_data.cpp_eh == "none" {
+                if option("cpp_eh", &build_data.cpp_eh) == "none" {
                     args.push("-fno-exceptions".to_string());
                 }
-                if !build_data.cpp_rtti {
+                if option("cpp_rtti", &build_data.cpp_rtti.to_string()) == "false" {
                     args.push("-fno-rtti".to_string());
                 }
             }
-            match build_data.optimization.as_str() {
-                "0" | "1" | "2" | "3" | "s" => {
-                    args.push(format!("-O{}", build_data.optimization));
-                }
+            let optimization = option("optimization", &build_data.optimization);
+            match optimization.as_str() {
+                "0" | "1" | "2" | "3" | "s" => args.push(format!("-O{}", optimization)),
                 "g" => args.push("-Og".to_string()),
                 _ => {}
             }
-            if build_data.debug {
+            if option("debug", &build_data.debug.to_string()) == "true" {
                 args.push("-g".to_string());
             }
         }
@@ -1497,6 +1507,19 @@ impl NinjaBackend {
         args.extend(Self::args_for_language(&build_data.global_args, language));
         args.extend(Self::args_for_language(&build_data.option_args, language));
         args
+    }
+
+    fn target_visibility_args(target: &BuildTarget, language: &str) -> Vec<String> {
+        let flags: &[&str] = match (target.gnu_symbol_visibility.as_str(), language) {
+            ("default", _) => &["-fvisibility=default"],
+            ("internal", _) => &["-fvisibility=internal"],
+            ("hidden", _) => &["-fvisibility=hidden"],
+            ("protected", _) => &["-fvisibility=protected"],
+            ("inlineshidden", "cpp") => &["-fvisibility=hidden", "-fvisibility-inlines-hidden"],
+            ("inlineshidden", _) => &["-fvisibility=hidden"],
+            _ => &[],
+        };
+        flags.iter().map(|f| f.to_string()).collect()
     }
 
     fn target_picture_args(target: &BuildTarget, build_data: &BuildData) -> Vec<String> {
