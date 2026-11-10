@@ -265,11 +265,6 @@ const mesa_options = [
   "-Dhtml-docs=disabled",
 ]
 
-# muon accepts cpp_rtti=false but does not pass -fno-rtti, so the C++ code
-# that derives from LLVM classes would reference typeinfo the RTTI-free
-# llvm-static archives do not define.
-const muon_rtti_options = ["-Dcpp_args=-fno-rtti"]
-
 const vendored_generator = "build-support/laputa-vendored-output.xsh"
 
 error MesaBuildError = Failed(kind: Str, message: Str)
@@ -698,7 +693,7 @@ export proc build(dest: Path) [fs, process, env, error] {
   let ninja = process.which("ninja")?
   let jobs_flag = f"-j{cpu.count()}"
   let pc = pm_env.pkg_config_context()?
-  let setup_args = pm_meson.setup_args(mesa_options + muon_rtti_options)
+  let setup_args = pm_meson.setup_args(mesa_options)
   patch_build()
 
   env ({
