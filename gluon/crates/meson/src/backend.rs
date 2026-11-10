@@ -796,6 +796,17 @@ impl NinjaBackend {
         // Substitute placeholders in command
         let mut command_parts = Vec::new();
         for part in &ct.command {
+            match part.as_str() {
+                "@INPUT@" => {
+                    command_parts.extend(inputs.iter().cloned());
+                    continue;
+                }
+                "@OUTPUT@" => {
+                    command_parts.extend(outputs.iter().cloned());
+                    continue;
+                }
+                _ => {}
+            }
             let substituted = part
                 .replace("@INPUT@", &inputs.join(" "))
                 .replace("@OUTPUT@", &outputs.join(" "))
@@ -837,7 +848,6 @@ impl NinjaBackend {
                         .unwrap_or_default(),
                 );
 
-            // Handle @INPUT0@, @OUTPUT0@, etc.
             let mut s = substituted;
             for (i, input) in inputs.iter().enumerate() {
                 s = s.replace(&format!("@INPUT{}@", i), input);
