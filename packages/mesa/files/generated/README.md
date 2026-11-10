@@ -79,6 +79,6 @@ The current archive (138 outputs) was generated with meson 1.12.1,
 Mako 1.4.3, PyYAML 6.0.3, packaging 26.3, Python 3.12, GNU bison 3.8.2,
 flex 2.6.4, and glslang 15.2.0. The 81 outputs of the previous configuration
 are byte-identical to those its Python 3.14 run produced, apart from
-`driconf_static.h`, which gains the `lvp` device. muon 0.7.0 configured from
+`driconf_static.h`, which gains the `lvp` device. Gluon configured from
 the recipe-patched tree finds exactly these 138 generator edges. Then update
 the archive's sha256 in `PKGBUILD.xsh`.

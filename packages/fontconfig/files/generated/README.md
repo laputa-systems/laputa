@@ -4,7 +4,7 @@ The archive contains the generated headers used by the Fontconfig 2.18.3
 recipe. The package build stages them because its build root has no Python or
 gperf. Regenerate them when the upstream version or generator inputs change.
 
-Use Muon 0.7.0, Python 3.15.1, GNU gperf 3.3, Samurai, a C compiler, and
+Use meson, ninja, Python 3.15.1, GNU gperf 3.3, a C compiler, and
 pkg-config with FreeType and Expat available. Extract the verified upstream
 archive under `.work/tmp` and run these commands from the extracted source:
 

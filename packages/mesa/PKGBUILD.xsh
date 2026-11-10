@@ -2,6 +2,27 @@
 use pm.env as pm_env
 use pm.meson as pm_meson
 
+# Desktop GL ships headers and a pkg-config file but no libGL: there is no
+# GLX (no X11 in Laputa), and desktop contexts are created through EGL,
+# which is also how the Ghostty renderer consumes them. Meson writes gl.pc
+# only when GLX is enabled.
+proc write_gl_pkg_config(dest: Path) {
+  fp"{dest}/usr/lib/pkgconfig/gl.pc".write(
+    f"""prefix=/usr
+includedir=\${{prefix}}/include
+libdir=\${{prefix}}/lib
+
+Name: gl
+Description: Mesa OpenGL library
+Version: {ver}
+Requires.private: libdrm >= 2.4.75
+Libs: -L\${{libdir}} -lGL
+Libs.private: -lpthread -pthread -lm
+Cflags: -I\${{includedir}}
+""",
+  )
+}
+
 ## Package recipe export.
 export const name = "mesa"
 
@@ -314,13 +335,6 @@ proc patch_build() {
   patch_file(
     p"meson.build",
     [
-      # muon 0.5 rejects the rust_std project options; this build has no Rust.
-      {
-        old: """    'rust_std=2021',
-    'build.rust_std=2021',
-""",
-        new: "",
-      },
       {
         old: """# Find a python executable that meets our version requirement.
 # - On Windows, a venv has no versioned aliased to 'python'.
@@ -459,13 +473,6 @@ glslang_quiet = []
         old: "dep_llvm.get_variable(cmake : 'LLVM_ENABLE_RTTI', configtool: 'has-rtti')",
         new: "dep_llvm.get_variable(pkgconfig : 'has_rtti')",
       },
-      # muon has no wayland module; src/loader runs wayland-scanner itself.
-      {
-        old: """  # This can be renamed just `wayland` when we require at least 1.8
-  mod_wl = import('unstable-wayland')
-""",
-        new: "",
-      },
     ],
   )
 
@@ -498,55 +505,6 @@ devenv.append('VK_DRIVER_FILES', _dev_icd.full_path())
     ],
   )
 
-  patch_file(
-    p"src/loader/meson.build",
-    [
-      {
-        old: """  wp_protos = {
-    'fifo-v1': mod_wl.find_protocol('fifo', state : 'staging', version : 1),
-    'commit-timing-v1': mod_wl.find_protocol('commit-timing', state : 'staging', version : 1),
-    'linux-dmabuf-unstable-v1': mod_wl.find_protocol('linux-dmabuf', state : 'unstable', version : 1),
-    'presentation-time': mod_wl.find_protocol('presentation-time'),
-    'tearing-control-v1': mod_wl.find_protocol('tearing-control', state : 'staging', version : 1),
-    'linux-drm-syncobj-v1': mod_wl.find_protocol('linux-drm-syncobj', state : 'staging', version : 1),
-    'color-management-v1': mod_wl.find_protocol('color-management', state : 'staging', version : 1)
-  }
-  wp_files = {}
-  foreach name, xml : wp_protos
-    wp_files += {name : mod_wl.scan_xml(xml, include_core_only : false)}
-  endforeach
-""",
-        new: """  wl_scanner = find_program(dependency('wayland-scanner', native : true).get_variable(pkgconfig : 'wayland_scanner'))
-  wl_protocol_dir = dep_wl_protocols.get_variable(pkgconfig : 'pkgdatadir')
-  wp_protos = {
-    'fifo-v1': wl_protocol_dir / 'staging/fifo/fifo-v1.xml',
-    'commit-timing-v1': wl_protocol_dir / 'staging/commit-timing/commit-timing-v1.xml',
-    'linux-dmabuf-unstable-v1': wl_protocol_dir / 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml',
-    'presentation-time': wl_protocol_dir / 'stable/presentation-time/presentation-time.xml',
-    'tearing-control-v1': wl_protocol_dir / 'staging/tearing-control/tearing-control-v1.xml',
-    'linux-drm-syncobj-v1': wl_protocol_dir / 'staging/linux-drm-syncobj/linux-drm-syncobj-v1.xml',
-    'color-management-v1': wl_protocol_dir / 'staging/color-management/color-management-v1.xml',
-  }
-  wp_files = {}
-  foreach name, xml : wp_protos
-    wp_code = custom_target(
-      name + '-protocol.c',
-      input : xml,
-      output : name + '-protocol.c',
-      command : [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
-    )
-    wp_client_header = custom_target(
-      name + '-client-protocol.h',
-      input : xml,
-      output : name + '-client-protocol.h',
-      command : [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
-    )
-    wp_files += {name : [wp_code, wp_client_header]}
-  endforeach
-""",
-      },
-    ],
-  )
 }
 
 type NinjaSplit = {kept: List[Str], vendored: List[Str]}
@@ -625,68 +583,6 @@ proc stage_vendored_outputs() {
   print f"mesa: staged {split.vendored.len() - unvendored.len()} vendored outputs; unvendored: {unvendored.join(" ")}"
 }
 
-# muon 0.5 and 0.7 copy internal compile arguments, build-root include paths,
-# and private libraries into the public fields of the egl, gbm, and glesv2
-# pkg-config files. These are the files meson generates for this
-# configuration.
-proc write_pkg_config(dest: Path) {
-  let dir = fp"{dest}/usr/lib/pkgconfig"
-  let header = """prefix=/usr
-includedir=\${prefix}/include
-libdir=\${prefix}/lib
-"""
-
-  fp"{dir}/egl.pc".write(
-    f"""{header}
-Name: egl
-Description: Mesa EGL Library
-Version: {ver}
-Requires.private: libdrm >= 2.4.75
-Libs: -L\${{libdir}} -lEGL
-Libs.private: -lpthread -pthread -lm
-Cflags: -I\${{includedir}}
-""",
-  )
-
-  fp"{dir}/gbm.pc".write(
-    f"""{header}
-gbmbackendspath=/usr/lib/gbm
-
-Name: gbm
-Description: Mesa gbm library
-Version: {ver}
-Libs: -L\${{libdir}} -lgbm
-Cflags: -I\${{includedir}}
-""",
-  )
-
-  fp"{dir}/glesv2.pc".write(
-    f"""{header}
-Name: glesv2
-Description: Mesa OpenGL ES 2.0 library
-Version: {ver}
-Libs: -L\${{libdir}} -lGLESv2
-Libs.private: -lpthread -pthread -lm
-Cflags: -I\${{includedir}}
-""",
-  )
-
-  # Desktop GL ships headers and a pkg-config file but no libGL: there is no
-  # GLX (no X11 in Laputa), and desktop contexts are created through EGL,
-  # which is also how the Ghostty renderer consumes them.
-  fp"{dir}/gl.pc".write(
-    f"""{header}
-Name: gl
-Description: Mesa OpenGL library
-Version: {ver}
-Requires.private: libdrm >= 2.4.75
-Libs: -L\${{libdir}} -lGL
-Libs.private: -lpthread -pthread -lm
-Cflags: -I\${{includedir}}
-""",
-  )
-}
-
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let meson = process.which("meson")?
@@ -714,5 +610,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }
   }
 
-  write_pkg_config(dest)
+  write_gl_pkg_config(dest)
 }
