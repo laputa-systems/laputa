@@ -1,7 +1,7 @@
 use crate::objects::*;
 use crate::vm::*;
 /// Dependency detection: pkg-config, cmake, config-tool, system library.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::process::Command;
 
 /// Resolve the pkg-config command, honoring meson.override_find_program('pkg-config', ...).
@@ -87,6 +87,7 @@ fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
             variables: HashMap::new(),
             is_internal: false,
             kind: "system".to_string(),
+            config_tool: None,
         })
     };
     let prefix_arg = |header: &str| CallArg {
@@ -267,6 +268,7 @@ pub fn find_dependency(vm: &mut VM, name: &str, args: &[CallArg]) -> Option<Obje
             variables: HashMap::new(),
             is_internal: false,
             kind: String::new(),
+            config_tool: None,
         }));
     }
 
@@ -280,6 +282,10 @@ pub fn find_dependency(vm: &mut VM, name: &str, args: &[CallArg]) -> Option<Obje
         if let Some(dep) = try_fallback(vm, name, fallback) {
             return Some(dep);
         }
+    }
+
+    if name == "llvm" && matches!(method, "auto" | "config-tool") {
+        return find_llvm_config_tool(vm, args, version_req);
     }
 
     match method {
@@ -385,6 +391,7 @@ fn find_pkgconfig(
         variables,
         is_internal: false,
         kind: String::new(),
+        config_tool: None,
     }))
 }
 
@@ -463,6 +470,7 @@ fn find_cmake(name: &str, version_req: Option<&str>, components: &[String]) -> O
         variables: HashMap::new(),
         is_internal: false,
         kind: String::new(),
+        config_tool: None,
     }))
 }
 
@@ -520,6 +528,131 @@ fn find_config_tool(name: &str, version_req: Option<&str>) -> Option<Object> {
         variables: HashMap::new(),
         is_internal: false,
         kind: String::new(),
+        config_tool: Some(config_tool),
+    }))
+}
+
+const LLVM_CONFIG_SUFFIXES: &[&str] = &[
+    "", "-23.1", "23.1", "-23", "23", "-22.1", "22.1", "-22", "22", "-21.1", "21.1", "-21", "21",
+    "-20.1", "20.1", "-20", "20", "-19.1", "19.1", "-19", "19", "-18.1", "18.1", "-18", "18",
+    "-17", "17", "-16", "16", "-15", "15", "-14", "14", "-13", "13", "-12", "12", "-11", "11",
+    "-10", "10", "-9", "90", "-8", "80", "-7", "70", "-6.0", "60", "-5.0", "50", "-4.0", "40",
+    "-3.9", "39", "-3.8", "38", "-3.7", "37", "-3.6", "36", "-3.5", "35", "-devel", "-64",
+];
+
+fn find_on_path(program: &str) -> Option<String> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|dir| dir.join(program))
+        .find(|candidate| candidate.is_file())
+        .map(|candidate| candidate.to_string_lossy().into_owned())
+}
+
+fn llvm_config_words(tool: &str, args: &[&str]) -> Option<Vec<String>> {
+    let output = Command::new(tool).args(args).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(
+        String::from_utf8_lossy(&output.stdout)
+            .split_whitespace()
+            .map(String::from)
+            .collect(),
+    )
+}
+
+fn find_llvm_config_tool(vm: &VM, args: &[CallArg], version_req: Option<&str>) -> Option<Object> {
+    let tool = LLVM_CONFIG_SUFFIXES
+        .iter()
+        .find_map(|suffix| find_on_path(&format!("llvm-config{suffix}")))?;
+    let version = llvm_config_words(&tool, &["--version"])?.join(" ");
+    if let Some(req) = version_req {
+        if !crate::options::version_compare(&version, req) {
+            return None;
+        }
+    }
+
+    let provided: HashSet<String> = llvm_config_words(&tool, &["--components"])?.into_iter().collect();
+    let sorted_unique = |modules: Vec<String>| -> Vec<String> {
+        let mut modules = modules;
+        modules.sort();
+        modules.dedup();
+        modules
+    };
+    let mut modules = Vec::new();
+    for module in sorted_unique(VM::get_arg_string_array(args, "modules")) {
+        if !provided.contains(&module) {
+            return None;
+        }
+        modules.push(module);
+    }
+    for module in sorted_unique(VM::get_arg_string_array(args, "optional_modules")) {
+        if provided.contains(&module) && !modules.contains(&module) {
+            modules.push(module);
+        }
+    }
+
+    let compile_args: Vec<String> = llvm_config_words(&tool, &["--cppflags"])?
+        .into_iter()
+        .filter(|arg| arg != "-DNDEBUG")
+        .collect();
+
+    let static_link = VM::get_arg_bool(args, "static", false);
+    let shared_mode = llvm_config_words(&tool, &["--shared-mode"])?.into_iter().next()?;
+    let link_args = if !static_link && shared_mode == "static"
+        && llvm_config_words(&tool, &["--libfiles", "--link-shared"]).is_none()
+    {
+        let libdir = llvm_config_words(&tool, &["--libdir"])?.into_iter().next()?;
+        let mut shared_libs: Vec<String> = std::fs::read_dir(&libdir)
+            .ok()?
+            .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+            .filter(|file| file.starts_with("libLLVM") && file.ends_with(".so"))
+            .collect();
+        shared_libs.sort();
+        let library = shared_libs.first()?;
+        let mut link_args = llvm_config_words(&tool, &["--ldflags"])?;
+        link_args.push(format!("-l{}", &library["lib".len()..library.len() - ".so".len()]));
+        link_args
+    } else {
+        if static_link && shared_mode == "shared" {
+            llvm_config_words(&tool, &["--libfiles", "--link-static"])?;
+        }
+        let mut query = vec!["--libs", "--ldflags"];
+        if static_link {
+            query.extend(["--link-static", "--system-libs"]);
+        } else {
+            query.push("--link-shared");
+        }
+        query.extend(modules.iter().map(String::as_str));
+        llvm_config_words(&tool, &query)?
+            .into_iter()
+            .map(|arg| match arg.strip_prefix("-l") {
+                Some(path) if arg.ends_with(".so") => path.to_string(),
+                _ => arg,
+            })
+            .collect()
+    };
+
+    let mut dependencies = Vec::new();
+    if let Some(threads) = special_dependency(vm, "threads", "auto") {
+        dependencies.push(threads);
+    }
+
+    Some(Object::Dependency(DependencyData {
+        name: "llvm".to_string(),
+        found: true,
+        version,
+        compile_args,
+        link_args,
+        link_with: Vec::new(),
+        link_whole: Vec::new(),
+        sources: Vec::new(),
+        include_dirs: Vec::new(),
+        dependencies,
+        variables: HashMap::new(),
+        is_internal: false,
+        kind: "config-tool".to_string(),
+        config_tool: Some(tool),
     }))
 }
 
@@ -546,6 +679,7 @@ fn find_system_library(name: &str) -> Option<Object> {
             variables: HashMap::new(),
             is_internal: false,
             kind: String::new(),
+            config_tool: None,
         })),
         _ => None,
     }

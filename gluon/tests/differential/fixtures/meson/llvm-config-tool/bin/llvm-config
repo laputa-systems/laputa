@@ -1,0 +1,31 @@
+#!/bin/sh
+here=$(cd "$(dirname "$0")/.." && pwd)
+link=shared
+system=
+libs=
+out=
+for arg in "$@"; do
+  case $arg in
+    --version) out="$out 23.1.5" ;;
+    --components) out="$out core executionengine mcjit native" ;;
+    --shared-mode) out="$out static" ;;
+    --has-rtti) out="$out NO" ;;
+    --cppflags) out="$out -I$here/include -DNDEBUG -DLLVM_FROM_CPPFLAGS" ;;
+    --cflags) out="$out -DLLVM_FROM_CFLAGS" ;;
+    --ldflags) out="$out -L$here/lib" ;;
+    --link-static) link=static ;;
+    --link-shared) link=shared ;;
+    --system-libs) system=1 ;;
+    --libs) libs=1 ;;
+    --libfiles) out="$out $here/lib/libLLVM.a" ;;
+    --*) exit 1 ;;
+    *) out="$out -Wl,--defsym,llvm_module_$arg=0" ;;
+  esac
+done
+if [ -n "$libs" ]; then
+  out="$out -Wl,--defsym,llvm_link_$link=0"
+fi
+if [ -n "$system" ]; then
+  out="$out -Wl,--defsym,llvm_system_libs=0"
+fi
+echo $out

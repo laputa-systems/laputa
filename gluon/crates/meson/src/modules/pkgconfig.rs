@@ -912,6 +912,7 @@ mod variable_tests {
             variables: HashMap::new(),
             is_internal: false,
             kind: kind.to_string(),
+            config_tool: None,
         })
     }
 

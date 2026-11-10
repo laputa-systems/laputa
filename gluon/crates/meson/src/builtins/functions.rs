@@ -1220,6 +1220,29 @@ fn builtin_shared_module(vm: &mut VM, args: &[CallArg]) -> Result<Object, String
     build_target_common(vm, args, TargetType::SharedModule, true)
 }
 
+fn dependency_identity(args: &[CallArg]) -> String {
+    const LOOKUP_ONLY: &[&str] = &[
+        "method",
+        "version",
+        "native",
+        "required",
+        "fallback",
+        "allow_fallback",
+        "default_options",
+        "not_found_message",
+        "include_type",
+    ];
+    let mut identity: Vec<String> = args
+        .iter()
+        .filter_map(|arg| {
+            let name = arg.name.as_deref()?;
+            (!LOOKUP_ONLY.contains(&name)).then(|| format!("{name}={:?}", arg.value))
+        })
+        .collect();
+    identity.sort();
+    identity.iter().map(|entry| format!("|{entry}")).collect()
+}
+
 fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     let positional = VM::get_positional_args(args);
 
@@ -1262,10 +1285,11 @@ fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
 
     // Build cache key from name + method to avoid cross-method cache hits
     let method = VM::get_arg_str(args, "method", usize::MAX).unwrap_or("auto");
+    let identity = dependency_identity(args);
     let cache_key = if method != "auto" {
-        format!("{}:{}", name, method)
+        format!("{}:{}{}", name, method, identity)
     } else {
-        name.clone()
+        format!("{}{}", name, identity)
     };
 
     // Parse fallback kwarg
@@ -1372,9 +1396,9 @@ fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     // Skip not-found cached deps when we have a fallback or allow_fallback available
     for n in &names {
         let ck = if method != "auto" {
-            format!("{}:{}", n, method)
+            format!("{}:{}{}", n, method, identity)
         } else {
-            n.clone()
+            format!("{}{}", n, identity)
         };
         if let Some(dep) = vm.build_data.dependencies.get(&ck) {
             match dep {
@@ -1948,6 +1972,7 @@ fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, S
         variables,
         is_internal: true,
         kind: String::new(),
+        config_tool: None,
     }))
 }
 

@@ -245,6 +245,7 @@ pub struct DependencyData {
     /// Origin kind: "" (pkgconfig), "library" (compiler.find_library),
     /// "internal", "system", etc. Used by type_name().
     pub kind: String,
+    pub config_tool: Option<String>,
 }
 
 impl DependencyData {
@@ -263,6 +264,7 @@ impl DependencyData {
             variables: HashMap::new(),
             is_internal: false,
             kind: String::new(),
+            config_tool: None,
         }
     }
 }

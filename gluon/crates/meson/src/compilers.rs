@@ -587,6 +587,7 @@ pub fn find_library(compiler: &CompilerData, name: &str, dirs: &[String]) -> Opt
             variables: std::collections::HashMap::new(),
             is_internal: false,
             kind: "library".to_string(),
+            config_tool: None,
         }))
     } else {
         None

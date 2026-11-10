@@ -92,9 +92,11 @@ run_compare_meson() {
   ref_build="$work/build"
   cand_build="$cand_work/builddir"
   mkdir -p "$ref_build" "$cand_build"
-  meson setup "$ref_build" "$src_copy" >"$work/setup.log" 2>&1
+  setup_path=$PATH
+  [ -d "$src_copy/bin" ] && setup_path="$src_copy/bin:$PATH"
+  PATH=$setup_path meson setup "$ref_build" "$src_copy" >"$work/setup.log" 2>&1
   ref_setup=$?
-  (cd "$cand_work" && "$GLUON_MESON" setup "$src_copy" >"$work/cand_setup.log" 2>&1)
+  (cd "$cand_work" && PATH=$setup_path "$GLUON_MESON" setup "$src_copy" >"$work/cand_setup.log" 2>&1)
   cand_setup=$?
   if [ "$ref_setup" != "$cand_setup" ]; then
     printf 'FAIL %s setup exit ref=%s cand=%s\n' "$id" "$ref_setup" "$cand_setup" >>"$TMPBASE/results.log"

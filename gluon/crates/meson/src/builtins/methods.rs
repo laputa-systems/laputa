@@ -1201,15 +1201,16 @@ fn dep_get_variable(_vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result<Obje
                 if let Some(val) = d.variables.get(var) {
                     return Ok(Object::String(val.clone()));
                 }
-                let config_tool = format!("{}-config", d.name);
-                if let Ok(output) = std::process::Command::new(&config_tool)
-                    .arg(format!("--{}", var))
-                    .output()
-                {
-                    if output.status.success() {
-                        let val = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                        if !val.is_empty() {
-                            return Ok(Object::String(val));
+                if let Some(config_tool) = &d.config_tool {
+                    if let Ok(output) = std::process::Command::new(config_tool)
+                        .arg(format!("--{}", var))
+                        .output()
+                    {
+                        if output.status.success() {
+                            let val = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                            if !val.is_empty() {
+                                return Ok(Object::String(val));
+                            }
                         }
                     }
                 }
@@ -1290,14 +1291,15 @@ fn dep_get_configtool_variable(
                 return Ok(Object::String(val.clone()));
             }
             // Try running the config tool
-            let config_tool = format!("{}-config", d.name);
-            if let Ok(output) = std::process::Command::new(&config_tool)
-                .arg(format!("--{}", var))
-                .output()
-            {
-                if output.status.success() {
-                    let val = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    return Ok(Object::String(val));
+            if let Some(config_tool) = &d.config_tool {
+                if let Ok(output) = std::process::Command::new(config_tool)
+                    .arg(format!("--{}", var))
+                    .output()
+                {
+                    if output.status.success() {
+                        let val = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        return Ok(Object::String(val));
+                    }
                 }
             }
         }
@@ -2215,6 +2217,7 @@ fn subproject_dependency(vm: &mut VM, obj: &Object, args: &[CallArg]) -> Result<
                 variables: std::collections::HashMap::new(),
                 is_internal: false,
                 kind: "external_project".to_string(),
+                config_tool: None,
             }));
         }
 
