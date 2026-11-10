@@ -661,6 +661,18 @@ fn builtin_project(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     vm.build_data.werror = option_bool(vm, "werror", false);
     vm.build_data.b_colorout = option_string(vm, "b_colorout", "always");
     vm.build_data.b_staticpic = option_bool(vm, "b_staticpic", true);
+    vm.build_data.cpp_rtti = option_bool(vm, "cpp_rtti", true);
+    vm.build_data.cpp_eh = option_string(vm, "cpp_eh", "default");
+    for language in ["c", "cpp", "objc", "objcpp", "rust"] {
+        for (suffix, link) in [("args", false), ("link_args", true)] {
+            let mut values = Vec::new();
+            if let Some(value) = vm.options.get(&format!("{}_{}", language, suffix)) {
+                flatten_string_objects(value, &mut values);
+            }
+            let map = if link { &mut vm.build_data.option_link_args } else { &mut vm.build_data.option_args };
+            map.insert(language.to_string(), values);
+        }
+    }
     vm.build_data.b_pie = option_bool(vm, "b_pie", false);
 
     let buildtype = option_string(vm, "buildtype", "debug");

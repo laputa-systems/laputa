@@ -1397,6 +1397,7 @@ impl NinjaBackend {
             &build_data.global_link_args,
             language,
         ));
+        link_args.extend(Self::args_for_language(&build_data.option_link_args, language));
 
         link_args.extend(self.rpath_arguments(target, link_targets));
 
@@ -1473,6 +1474,14 @@ impl NinjaBackend {
             if language == "cpp" && !build_data.cpp_std.is_empty() && build_data.cpp_std != "none" {
                 args.push(format!("-std={}", build_data.cpp_std));
             }
+            if language == "cpp" {
+                if build_data.cpp_eh == "none" {
+                    args.push("-fno-exceptions".to_string());
+                }
+                if !build_data.cpp_rtti {
+                    args.push("-fno-rtti".to_string());
+                }
+            }
             match build_data.optimization.as_str() {
                 "0" | "1" | "2" | "3" | "s" => {
                     args.push(format!("-O{}", build_data.optimization));
@@ -1486,6 +1495,7 @@ impl NinjaBackend {
         }
         args.extend(Self::args_for_language(&build_data.project_args, language));
         args.extend(Self::args_for_language(&build_data.global_args, language));
+        args.extend(Self::args_for_language(&build_data.option_args, language));
         args
     }
 
