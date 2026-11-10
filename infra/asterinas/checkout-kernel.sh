@@ -19,9 +19,10 @@ if [[ ! -e "$source_dir/.git" ]]; then
     [[ ! -e "$module_dir" ]] || fail "$module_dir exists without a checkout; remove it to clone again"
     mkdir -p "$(dirname "$module_dir")"
     git clone --no-checkout --separate-git-dir "$module_dir" "$url" "$source_dir"
+    cloned=1
 fi
 
-if [[ "$(git -C "$source_dir" rev-parse HEAD 2>/dev/null)" != "$pin" ]]; then
+if [[ -n "${cloned:-}" || "$(git -C "$source_dir" rev-parse HEAD 2>/dev/null)" != "$pin" ]]; then
     git -C "$source_dir" cat-file -e "$pin^{commit}" 2>/dev/null || git -C "$source_dir" fetch origin "$pin"
     git -C "$source_dir" checkout --detach "$pin"
 fi

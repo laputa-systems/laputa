@@ -506,6 +506,8 @@ checkout_kernel
 [[ "$(git -C "$kernel_fixture/asterinas" rev-parse HEAD)" == "$first_kernel" ]]
 [[ -f "$kernel_fixture/asterinas/.git" ]]
 [[ "$(git -C "$kernel_fixture/asterinas" remote get-url origin)" == "$kernel_origin" ]]
+[[ "$(cat "$kernel_fixture/asterinas/kernel.txt")" == first ]]
+[[ -z "$(git -C "$kernel_fixture/asterinas" status --porcelain)" ]]
 checkout_kernel
 printf 'second\n' > "$kernel_origin/kernel.txt"
 git -C "$kernel_origin" commit -qam second
