@@ -1,20 +1,15 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `dc4b3fffd`, with XSH `d7178a221`, recorded with
-the other inputs in `infra/asterinas/inputs.lock`. It is the ICMP error slice
-rebased onto the monotonic slew (`434e2d626`), and it is not yet published, so
-`qualify.sh published-inputs` fails until the fork's `main` holds it. It is
-qualified by
+The checked-in kernel pin is `57aec8665`, the IPv4 configuration ioctl slice,
+with XSH `d520fbcc5`, recorded with the other inputs in
+`infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
-identical transcripts. Two failures reproduce on the previous kernel pins
-`d4c2e3877` and `434e2d626` and are not attributed to this one: the Linux
-reference fails the clock `pause` case because its QEMU peer holds the guest
-for 12 to 13.5 s against a 5 s margin, and the DHCP `carrier` case
-intermittently differs when `dhcpc` on either backend logs a status-3
-traceback after the case's SIGTERM (recovery rounds 1 and 4 of 10 on
-`dc4b3fffd`). The A0 quiet-host accounting has not been run on this pin
-(deferred: host busy). The [roadmap](ROADMAP.md) owns the successor kernel
+identical transcripts. That run passed on this pin, including ten recovery
+rounds, and quiet-host A0 accounting kept every original pass. The Linux
+reference can still fail the clock `pause` case on a loaded host, because its
+QEMU peer then holds the guest for 12 to 13.5 s against a 5 s margin.
+The [roadmap](ROADMAP.md) owns the successor kernel
 slices and the [TODO queue](../TODO.md) owns the remaining compatibility
 obligations.
 

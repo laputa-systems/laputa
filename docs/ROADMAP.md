@@ -212,7 +212,11 @@ remaining compatibility obligations are LAP-54 and LAP-55. In order:
    +0.08 s for boot (6.70 s against 6.62 s, inside the baseline's 0.18 s
    spread) and −0.21 s for numeric (13.92 s against 14.13 s); the kernel grew
    from 154.3 MB to 160.2 MB and the root image is unchanged.
-   `qualify.sh published-inputs` passes.
+   `qualify.sh published-inputs` passes. The `carrier` traceback was XSH's:
+   a shutdown abort that reached `dhcpc` inside a net wait surfaced as a
+   status-3 script failure. XSH `16a886d00` lets it cross the wait as an
+   abort, and with XSH `d520fbcc5` on kernel `57aec8665`, `qualify.sh all
+   --backend both` passed every cohort and all ten recovery rounds.
 4. Linux page-fault cost and `MAP_POPULATE` are active performance work after
    compatibility. Any improvement needs at least five interleaved baseline
    and candidate runs, completed-work checks, and successful readiness checks.
