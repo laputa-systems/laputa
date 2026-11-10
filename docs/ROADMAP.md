@@ -192,25 +192,27 @@ remaining compatibility obligations are LAP-54 and LAP-55. In order:
 3. One ICMP error slice: ICMP receive, `IP_RECVERR`, and asynchronous socket
    errors, which together serve the Asterinas-only `tracepath` and
    `traceroute` cases, EHOSTUNREACH for the unresolved-neighbor queue, and the
-   matching A3/A5 debt. **Integrated, not yet published or accepted.** The
-   slice is rebased onto the LAP-54 monotonic slew as fork branch
-   `work/successor-icmp-lap54` at `dc4b3fffd` (44 commits on `434e2d626`; the
-   rebase had no conflicts and the diff from the former candidate `2252e24b6`
-   is exactly the slew change). It includes the limited-broadcast DHCP fix
-   (stop addressing those packets to a gateway after route selection) and the
-   paired wildcard-bind UDP test. `676c828a0`, which only keeps unlisted and
-   unrun echo and IPv6 UDP sources, is not part of it. Laputa's lock and
-   gitlink now name `dc4b3fffd`, and the XSH pin is unchanged. `qualify.sh all
-   --backend both` on that kernel passed baseline, device, clock ABI,
-   network-state (16 cases) and network (10 cases), and failed only on the two
-   recorded issues: the Linux-only clock `pause` case, and `carrier` in
-   recovery rounds 1 and 4 of 10, whose only transcript difference was the
-   `dhcpc` status-3 traceback on Asterinas. The resource accounting measured
-   sizes and peak memory; its CPU time is deferred: host busy, and the A0
-   quiet-host accounting is deferred: host busy. Remaining: run the A0
-   accounting and the resource CPU time on a quiet host, and publish the fork
-   branch to its `main`: `qualify.sh published-inputs` fails until then
-   because `dc4b3fffd` exists only locally.
+   matching A3/A5 debt. **Integrated and published.** The
+   slice is rebased onto the LAP-54 monotonic slew at `dc4b3fffd` (44 commits
+   on `434e2d626`; the rebase had no conflicts and the diff from the former
+   candidate `2252e24b6` is exactly the slew change), now the fork's `main`. It
+   includes the limited-broadcast DHCP fix (stop addressing those packets to a
+   gateway after route selection) and the paired wildcard-bind UDP test.
+   `676c828a0`, which only keeps unlisted and unrun echo and IPv6 UDP sources,
+   is not part of it. Laputa's lock and gitlink name `dc4b3fffd`, and the XSH
+   pin is unchanged. `qualify.sh all --backend both` on that kernel passed
+   baseline, device, clock ABI, network-state (16 cases) and network (10
+   cases), and failed only on the two recorded issues: the Linux-only clock
+   `pause` case, and `carrier` in recovery rounds 1 and 4 of 10, whose only
+   transcript difference was the `dhcpc` status-3 traceback on Asterinas.
+   Quiet-host A0 accounting over the 125 A0 modules kept every original pass:
+   1,326 passed, 25 failed (all already in A0's failed set), 49 skipped, no
+   module interrupted or unstarted. Three interleaved resource pairs against
+   the `434e2d626` kernel on a ready host put the candidate's median CPU at
+   +0.08 s for boot (6.70 s against 6.62 s, inside the baseline's 0.18 s
+   spread) and −0.21 s for numeric (13.92 s against 14.13 s); the kernel grew
+   from 154.3 MB to 160.2 MB and the root image is unchanged.
+   `qualify.sh published-inputs` passes.
 4. Linux page-fault cost and `MAP_POPULATE` are active performance work after
    compatibility. Any improvement needs at least five interleaved baseline
    and candidate runs, completed-work checks, and successful readiness checks.
