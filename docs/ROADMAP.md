@@ -245,13 +245,13 @@ generation; step 6 and the open items below remain.** `tests/integration/g2_life
 provisions a unique host key and key-only credentials on a fresh state disk,
 installs A and boots the independent rescue root, inspects services, lease,
 resolver and diagnostics over verified native SSH, restarts supervised services
-and survives a link loss, stages B while chaining the existing recovery and SSH
+as the non-root operator through xinit's `xinit-admin` control plane, and
+survives a link loss, stages B while chaining the existing recovery and SSH
 disconnect drills, falls back to A after two bounded B startup failures with
 identity and state preserved, then health-confirms and commits a repaired C and
 reads its boot history across a reboot. Open: step 6 blank-disk restore in the
-same run, natural T1/T2 lease renewal, non-root restart authority (`/run/xinit`
-is root-owned, so the drill uses a key-only UID 0 administrator), physical power
-loss, Linux aarch64, Asterinas, a macOS client, and signed release authenticity.
+same run, natural T1/T2 lease renewal, physical power loss, Linux aarch64,
+Asterinas, a macOS client, and signed release authenticity.
 
 This is the organizing product milestone, not a new manager,
 new test framework, or a claim that every R1-R7 capability has shipped. The unit
@@ -386,39 +386,16 @@ that SSH administration recovers through the declared network behavior. Boot and
 local rescue still work offline. Qualify IPv4 and IPv6 separately and report
 unsupported modes explicitly.
 
-**Status: IPv4 lifecycle, SSH recovery through the declared network, and an
-explicit IPv6 policy are proven on Linux x86_64/KVM.** `tests/integration/dhcp_lifecycle.py`
-boots the built `qemu-maintained`
+**Status: IPv4 lifecycle proven on Linux x86_64/KVM; IPv6 and SSH recovery
+open.** `tests/integration/dhcp_lifecycle.py` boots the built `qemu-maintained`
 image against a scripted DHCPv4/DNS server with short leases and passes initial
 bind, renewal with changed DNS and routes, rebind, NAK, a replacement lease,
 expiry, daemon restart with INIT-REBOOT from the saved lease, link loss, NIC
 reappearance after a PCI remove and rescan, pause and resume, a steady-state
 sample with no duplicate or stale configuration, and an offline boot that stays
 locally administrable. The run found two XSH client defects, fixed upstream: a
-negative wait after a slow re-acquisition and a re-created NIC left down.
-
-`tests/integration/ssh_network_recovery.py` reaches the same guest over XSH's
-native SSH client on the address the scripted server declares (`192.0.2.100/24`
-on the tap), not over the control channel, with a pinned Dropbear host key. It
-proves a verified session, then a fresh verified connection after each
-disruption: link loss, lease expiry and re-acquisition, a supervised DHCP client
-restart that keeps the saved address, and NIC reappearance on a new ifindex. The
-guest's own `xinit status dhcp-eth0` over that SSH session names the declared
-address both times.
-
-The maintained profile makes IPv6 explicit rather than silently empty.
-`packages/laputa-net/ipv6.conf` installs as `/usr/lib/sysctl.d/20-ipv6.conf`, so
-`rc.boot` disables IPv6 on `all` and `default`, clears router advertisements and
-autoconfiguration, and therefore applies the same state to any interface that
-appears later, including a re-enumerated NIC. There is no DHCPv6 or
-router-advertisement handling. The DHCP service's `status()` always names the
-verdict: `ipv6=unsupported` with `disabled=1 policy=installed sysctl=1
-addresses=0 routes=0 enumerated=1` when the policy holds, and `ipv6=unexpected`
-on any deviation, so an empty IPv6 cohort is never confused with a configured
-dual-stack and a failed observation is never presented as success. The guest
-test asserts no SLAAC address and no IPv6 route exists and that the status
-reports it. IPv6 support remains out of scope; this only reports the mode as
-unsupported.
+negative wait after a slow re-acquisition and a re-created NIC left down. SSH
+recovery through the declared network and IPv6 policy are not yet qualified.
 
 ### Time discipline and bootstrap
 
@@ -766,8 +743,10 @@ or listeners. From a separate machine, inspect the running generation/services,
 run a controlled XSH operation, and stage a verified artifact. Test bad host keys,
 reboot with stable identity, partial provisioning, network loss, and disconnect
 after a mutation; preserve recovery access and do not duplicate side effects.
-Selected privilege/isolation limits are verified inside the guest. The
-development profile remains convenient and visibly distinct.
+Selected privilege/isolation limits are verified inside the guest. Service
+control from the non-root operator uses the `xinit-admin` group's supervisory
+verbs (`start`, `stop`, `restart`, `reload`) and does not require doas or a root
+login. The development profile remains convenient and visibly distinct.
 
 `qemu-maintained` sets `development` false; the other profiles set it true and
 keep their roots. First boot is validated before any write, Dropbear keeps one

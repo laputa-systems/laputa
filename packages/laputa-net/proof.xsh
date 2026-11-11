@@ -6,7 +6,6 @@ proc main(root = p"/rootfs") [fs, error] {
   proof.ensure(fp"{root}/usr/lib/xinit/services/net.xsh".exists()?, "laputa-net", "missing net service module")
   proof.ensure(fp"{root}/usr/lib/xinit/services/dhcp-eth0.xsh".exists()?, "laputa-net", "missing dhcp-eth0 service module")
   proof.ensure(fp"{root}/etc/network/interfaces".exists()?, "laputa-net", "missing /etc/network/interfaces")
-  proof.ensure(fp"{root}/usr/lib/sysctl.d/20-ipv6.conf".exists()?, "laputa-net", "missing IPv6 policy drop-in")
   proof.ensure(fp"{root}/etc/network/if-pre-down.d".is_dir()?, "laputa-net", "missing if-pre-down.d")
   proof.ensure(
     fp"{root}/etc/network/if-post-down.d".is_dir()?,

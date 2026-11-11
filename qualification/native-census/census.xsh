@@ -4,7 +4,7 @@ use pm.local
 use pm.proof
 
 type Component = {name: Str, language: Str, version: Str, origin: Str, markers: List[Str]}
-type Unknown = {subject: Str, evidence: Str, settle: Str, settled: Bool?}
+type Unknown = {subject: Str, evidence: Str, settle: Str}
 type Binary = {package: Str, path: Str, needed: List[Str], runpath: Str, components: List[Component], absent: List[Str], unknown: List[Unknown]}
 type Provider = {package: Str, language: Str, retention: Str, role: Str}
 type Archive = {file: Str, component: Str}
@@ -75,10 +75,6 @@ proc found_markers(strings: List[Str], wanted: List[Str]) -> Map[Bool] {
   found
 }
 
-pure is_open(item: Unknown) -> Bool {
-  (item.settled ?? false) == false
-}
-
 proc census_binary(root: Path, spec: Binary, providers: Map[Str]) [fs, error] {
   let file = fp"{root}/{spec.path}"
   let kind = f"native-census/{spec.package}"
@@ -113,8 +109,6 @@ proc census_binary(root: Path, spec: Binary, providers: Map[Str]) [fs, error] {
     proof.ensure(item.evidence != "" and item.settle != "", kind, f"unknown {item.subject} lacks evidence or a settling step")
     print f"  unknown {item.subject}: {item.evidence}. Settle: {item.settle}"
   }
-  let open = spec.unknown |> where is_open(.)
-  print f"  closed {spec.unknown.len() - open.len()} of {spec.unknown.len()} attributions; {open.len()} open"
 }
 
 cli main census(root: Path, spec: Path = p"qualification/native-census/components.json", plan: Path = p"") {
@@ -183,17 +177,7 @@ cli main census(root: Path, spec: Path = p"qualification/native-census/component
   for binary in table.binaries {
     census_binary(root, binary, providers)
   }
-  let open_entries = collect {
-    for binary in table.binaries {
-      for item in binary.unknown {
-        yield item when is_open(item)
-      }
-    }
-  }
-  for item in open_entries {
-    print f"open attribution: {item.subject}"
-  }
-  print f"native census verified: {table.binaries.len()} binaries; {open_entries.len()} attributions open"
+  print f"native census verified: {table.binaries.len()} binaries"
 }
 
 cli main symbols(stripped: Path, unstripped: Path, spec: Path = p"qualification/native-census/components.json", archive_dirs: List[Path] = []) {

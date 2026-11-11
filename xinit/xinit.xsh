@@ -1,6 +1,10 @@
 #!/bin/xsh --
 error XinitError = Failed(kind: Str, message: Str)
 
+const control_group_name = "xinit-admin"
+const control_request_limit = 64
+const signal_permission_denied = 1
+
 type InittabEntry = {key: Str, id: Str, action: Str, command: Str, argv: List[Str]}
 
 type RuntimeEntry = {key: Str, pid: Int, launches: Int, next_ms: Int, action: Str}
@@ -163,6 +167,89 @@ proc inbox_dir() -> Result[Path] {
 
 proc scanner_marker_path() -> Result[Path] {
   fp"{run_dir()?.display()}/scanner.json"
+}
+
+pure control_permitted(uid: Int, primary_gid: Int, member_gids: List[Int], group_gid: Int) -> Bool {
+  uid == 0 or primary_gid == group_gid or group_gid in member_gids
+}
+
+proc control_group_gid() -> Result[Int] {
+  if test_mode() {
+    let dir = run_dir()?
+    return dir.metadata()?.gid
+  }
+
+  group.lookup(control_group_name)?.gid
+}
+
+proc control_owner_uid() -> Result[Int] {
+  return applet.current_euid() when test_mode()
+
+  0
+}
+
+proc control_sender_permitted(uid: Int) -> Result[Bool] {
+  return true when uid == 0
+
+  return applet.current_euid() == uid when test_mode()
+
+  let account = user.by_uid(uid)?
+  control_permitted(uid, account.gid, user.groups(account.name)?, control_group_gid()?)
+}
+
+proc authorize_control(uid: Int) {
+  guard control_sender_permitted(uid) else {
+    return Err(
+      XinitError.Failed(
+        kind: "xinit-control-refused",
+        message: f"uid {uid} is not root or a member of {control_group_name}",
+      ),
+    )
+  }
+}
+
+proc prepare_control_inbox() {
+  let owner = control_owner_uid()?
+  let dir = run_dir()?
+  dir.mkdir()
+  let run_info = dir.metadata()?
+  let group_gid = control_group_gid()?
+  guard run_info.kind == "dir" else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: f"run directory is not a directory: {dir}"))
+  }
+  guard run_info.uid == owner else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: f"run directory is not owned by uid {owner}: {dir}"))
+  }
+  guard run_info.mode.bit_and(0o022) == 0 else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: f"run directory is group or world writable: {dir}"))
+  }
+  let inbox = inbox_dir()?
+  if ! inbox.exists() {
+    let leaf: RelPath = fp"{inbox.name()}".require()?
+    with parent_root = fs.open_root(dir)? {
+      parent_root.mkdir(leaf, mode: 0o700)
+    }
+  }
+  var info = inbox.metadata()?
+  guard info.kind == "dir" else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: f"control inbox is not a directory: {inbox}"))
+  }
+  guard info.uid == owner else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: f"control inbox is not owned by uid {owner}: {inbox}"))
+  }
+  if info.gid != group_gid or info.mode.bit_and(0o7777) != 0o770 {
+    fs.set_owner(inbox, gid: group_gid)
+    inbox.chmod(0o770)
+    info = inbox.metadata()?
+  }
+  guard info.gid == group_gid and info.mode.bit_and(0o7777) == 0o770 else {
+    return Err(
+      XinitError.Failed(
+        kind: "xinit-control",
+        message: f"control inbox must be mode 0770 owned by root:{control_group_name}: {inbox}",
+      ),
+    )
+  }
 }
 
 pure command_from_argv(argv: List[Str]) -> Command {
@@ -888,14 +975,26 @@ pure default_status(name: Str) -> SavedStatus {
   }
 }
 
-proc pid_alive(pid: Int) -> Bool {
+pure pid_identity_matches(recorded_start_ms: Int, observed_start_ms: Int) -> Bool {
+  recorded_start_ms <= 0 or observed_start_ms == recorded_start_ms
+}
+
+pure pid_live(observed_start_ms: Int, recorded_start_ms: Int, signal_says_alive: Bool) -> Bool {
+  if observed_start_ms > 0 {
+    return pid_identity_matches(recorded_start_ms, observed_start_ms)
+  }
+
+  signal_says_alive
+}
+
+proc signal_alive(pid: Int) -> Bool {
   guard pid > 0 else {
     return false
   }
 
   match process.kill(pid, "0") {
     Ok(_) => true
-    Err(_) => false
+    Err(failure) => (failure.errno ?? 0) == signal_permission_denied
   }
 }
 
@@ -912,13 +1011,11 @@ proc pid_start_time(pid: Int) -> Result[Int] {
 }
 
 proc pid_live_and_ours(pid: Int, start_time_ms: Int) -> Result[Bool] {
-  guard pid_alive(pid) else {
+  guard pid > 0 else {
     return false
   }
 
-  return true when start_time_ms <= 0
-
-  pid_start_time(pid)? == start_time_ms
+  pid_live(pid_start_time(pid)?, start_time_ms, signal_alive(pid))
 }
 
 proc read_status(name: Str) -> Result[SavedStatus] {
@@ -1254,13 +1351,25 @@ proc scanner_active() -> Result[Bool] {
 
   let raw = json.read(marker)?
   let pid = json.get(raw, ["pid"], 0).require(Int)?
-  pid_alive(pid)
+  let start_time_ms = json.get(raw, ["start_time_ms"], 0).require(Int)?
+
+  return false when pid <= 0
+
+  let observed = pid_start_time(pid)?
+
+  observed > 0 and (start_time_ms <= 0 or observed == start_time_ms)
 }
 
-proc request_desired(name: Str, desired: Str) [fs, process, env, error] {
+proc request_desired(name: Str, desired: Str) {
   let dir = inbox_dir()?
-  dir.mkdir()
-  fp"{dir}/{name}".write_atomic(desired)
+  let group_gid = control_group_gid()?
+  let target = fp"{dir}/{name}"
+  let scratch = fp"{dir}/.{name}.{process.current_pid()?}.tmp"
+
+  scratch.write(desired, mode: 0o770)
+  defer scratch.remove()
+  fs.set_owner(scratch, gid: group_gid)
+  scratch.rename(to: target, overwrite: true)
   print f"{name} {desired} queued"
 }
 
@@ -1748,7 +1857,8 @@ proc shutdown_all(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
 proc write_scanner_marker() {
   let dir = run_dir()?
   dir.mkdir()
-  scanner_marker_path()?.write_atomic(json.encode({pid: process.current_pid()?})?)
+  let pid = process.current_pid()?
+  scanner_marker_path()?.write_atomic(json.encode({pid: pid, start_time_ms: pid_start_time(pid)?})?)
 }
 
 proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit] {
@@ -1826,6 +1936,16 @@ proc apply_request(units: List[ServiceUnit], name: Str, desired: Str) -> Result[
   [apply_one(unit, name, desired)? for unit in units]
 }
 
+proc read_control_verb(path_value: Path) -> Result[Str] {
+  let desired = path_value.read_text()?.trim()
+
+  guard desired == "up" or desired == "down" or desired == "restart" or desired == "reload" else {
+    return Err(XinitError.Failed(kind: "xinit-control-refused", message: "unknown control verb"))
+  }
+
+  desired
+}
+
 proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
   let dir = inbox_dir()?
 
@@ -1833,16 +1953,58 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
 
   var out = units
 
-  for entry in fs.children(dir)?
-    |> where .kind == "file"
-    |> sort-by .name {
-    let desired = entry.path.read_text()?.trim()
+  for entry in fs.children(dir)? |> sort-by .name {
+    continue when entry.name.starts_with(".")
 
-    if desired == "up" or desired == "down" or desired == "restart" or desired == "reload" {
-      out = apply_request(out, entry.name, desired)?
+    let path_value = entry.path
+    let observed = match fs.stat(path_value, follow_symlinks: false) {
+      Ok(info) => info
+      Err(failure) => {
+        eprint --flush f"xinit-control-refused: service={entry.name} reason={failure.message}"
+        continue
+      }
     }
 
-    entry.path.remove(missing_ok: false)
+    let uid = observed.uid
+
+    if observed.kind != "file" or observed.nlink != 1 {
+      eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason=not-a-single-regular-file"
+
+      if observed.kind != "dir" {
+        path_value.remove()
+      }
+
+      continue
+    }
+
+    if observed.size > control_request_limit {
+      eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason=oversized"
+      path_value.remove()
+      continue
+    }
+
+    let refusal = match authorize_control(uid) {
+      Ok(_) => ""
+      Err(failure) => failure.message
+    }
+
+    if refusal != "" {
+      eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason={refusal}"
+      path_value.remove()
+      continue
+    }
+
+    match read_control_verb(path_value) {
+      Ok(desired) => {
+        print --flush f"xinit-control accepted service={entry.name} uid={uid} verb={desired}"
+        out = apply_request(out, entry.name, desired)?
+      }
+      Err(failure) => {
+        eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason={failure.message}"
+      }
+    }
+
+    path_value.remove()
   }
 
   out
@@ -1899,6 +2061,7 @@ proc scan_units(names: List[Str]) {
   var units = [unit_init(load_service(name)?) for name in names]
   var remaining = if test_mode() { env_int("XINIT_TEST_MAX_EVENTS", -1)? } else { -1 }
   var shutting_down = false
+  prepare_control_inbox()
   write_scanner_marker()
 
   while true {

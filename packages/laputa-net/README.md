@@ -76,21 +76,19 @@ The result never authorizes retrying a mutation against a stale snapshot.
 ## Typed projection and changes
 
 `network_kernel.xsh` plans over XSH's `lib.net_state`; it holds no raw dump
-checks or request bytes. The boot service and installed package payload remain
+checks or request bytes. It provides no live apply API, mutation runner, or
+convergence result. The boot service and installed package payload remain
 unchanged.
 
 `network_change` validates the complete plan, then maps one operation onto a
 `net_state.Change`. `net_state.request` encodes it. An address request carries
 the interface index, local address, and prefix; a default-route request is a
 main-table (254), boot-protocol (3), universe-scope, unicast route carrying the
-gateway, interface index, and metric with the table attribute. Removals send the
-same protocol and type, so they delete exactly the route this controller adds
-and never a route of another protocol. Additions use exclusive creation.
-Encoding bytes does not qualify their execution against an observed host. See
-[reconciliation](#reconciliation) for the preconditions `network_changes`
-enforces before any effect.
-
-`network_outcome` maps a kernel `Refused` verdict to `NetworkDenied` and any
+gateway, interface index, and metric (omitted when 0) with the table attribute.
+Removals send the same protocol and type, so they delete exactly the route this
+controller adds and never a route of another protocol. Additions use exclusive
+creation. Encoding bytes does not qualify their execution against an observed
+host. `network_outcome` maps a kernel `Refused` verdict to `NetworkDenied` and any
 other failure to `NetworkFailed`; `network_lost_events` maps a drained `Lost`
 notice to `NetworkLostEvents`.
 
@@ -115,7 +113,8 @@ observation are still taken one after another with no shared kernel generation.
 `network_project_stable_states` projects two consecutive observations only when
 they are identical and otherwise reports that the observation changed. This
 narrows cross-dump skew but cannot rule out a change that reverts between the
-two observations.
+two observations. General live application stays withheld pending convergence
+qualification.
 
 The projection checks all IPv4 preferred-source dependencies on selected
 addresses, including routes through another interface. Its address-derived
@@ -124,82 +123,16 @@ one hop with no gateway out of the managed link, priority 0, and no unmodeled
 attributes. Connected, local, and broadcast destinations must also match the
 address's exact derived shape. This exception does not grant mutation authority.
 
-## Reconciliation
-
-`network_reconcile` runs observe -> pure plan -> apply with preconditions ->
-re-observe over one `net_state` notification stream. It subscribes before the
-first observation, so a change after that observation is visible either in a
-lost notification or in the next complete observation.
-
-`network_apply_plan` refuses the whole change set before any effect unless the
-plan is exactly what `network_plan` computes, every same-prefix address
-addition is unambiguous, and every change is exactly encodable. It then applies
-the changes in plan order through `net_state.apply`. Before each change it
-re-observes and requires the plan's predicted cohort for that step; after each
-change it drains notifications and re-observes again. A mismatch before a change
-reports `observation changed before operation N`; an acknowledged change whose
-re-observation diverges reports that divergence. In both cases the pass stops
-with `NetworkReobserve` and no further change is attempted. A refused operation
-is recorded as `NetworkDenied`, the resulting state is observed, and
-`network_replay` turns it into a re-observation; a transport failure or an
-untrustworthy observation is likewise a re-observation. Nothing is retried
-against a stale snapshot, and nothing is rolled back.
-
-`network_reconcile` returns a `NetworkReconcile` holding the plan, the number of
-changes attempted, the last trusted observation, the ordered replay events, and
-the verdict. A plan with no operations attempts no mutation and still
-re-observes. Foreign addresses and routes are never in an operation; the final
-observation is checked by `network_replay`, so a vanished foreign resource is
-reported rather than silently accepted.
-
-Two deletion hazards found by independent review are closed before any request
-is built. A zero-metric default route cannot be removed exactly: Linux treats
-`RTA_PRIORITY` 0, present or absent, as "unset", so a deletion naming metric 0
-deletes a route of any metric with the same remaining key. Measured on Linux
-7.2.9 in an unprivileged network namespace: with only a metric-300 default
-present, a `RTM_DELROUTE` naming metric 0 returned errno 0 and removed it, with
-an explicit `RTA_PRIORITY` attribute carrying 0 and with that attribute omitted.
-The controller therefore never creates and never removes a zero-metric default
-(`a zero-metric default route is never created ...` /
-`... cannot be removed exactly ...`), and an operator's metric-0 route survives.
-Linearizing the metric is not a substitute: creation is exclusive, so a failed
-removal after a successful addition would leave both. A route carrying an
-attribute `net_state.Route` does not model cannot be deleted exactly, because
-the encoder would omit that attribute while the kernel still matched the rest of
-the key. `network_project_state` refuses such a selected default as
-`selected default route carries unsupported attributes`, `net_state.request`
-independently refuses to add one, and `network_changes` refuses the whole plan.
-`net_state.request` permits a removal of a route with unmodeled attributes,
-because a removal sends only the modeled key; the projection is therefore the
-gate that keeps such a route out of every change. Both are measured: a default
-created with an `RTA_METRICS` (kind 8) MTU is observed with
-`other_attributes == [8]` and refused, while an ordinary default projects and is
-unaffected.
-`net_state.Route` now carries the typed `tos`, so a TOS-specific selected
-default is refused rather than projected as an ordinary one.
-
 ## Verification boundary
 
 ```sh
-XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" xsht check packages/laputa-net/network_plan.xsh \
+XSH_MODULE_PATH="$PWD" xsht check packages/laputa-net/network_plan.xsh \
   tests/system/network_policy.xsh
-XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" xsht test tests/system/network_policy.xsh
-XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" xsht test tests/system/network_policy_kernel.xsh
-XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" xsht test tests/system/network_policy_input.xsh
-XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" XSH_ROOT="$XSH_ROOT" XSH_HOST="$XSH" \
-  xsht test tests/system/network_policy_applier.xsh
+XSH_MODULE_PATH="$PWD" xsht test tests/system/network_policy.xsh
+XSH_MODULE_PATH="$PWD" xsht test tests/system/network_policy_kernel.xsh
+XSH_MODULE_PATH="$PWD" xsht test tests/system/network_policy_input.xsh
 bash tests/system/network_policy_docker.sh /absolute/path/to/xsh-tools
 ```
-
-`network_policy_applier.xsh` runs `tests/system/fixtures/network-policy-applier.xsh`
-through `linux.run_in_namespaces` with a private user and network namespace. That
-is the cheapest disposable environment that performs real kernel mutations: the
-process owns the namespace, so both veth endpoints and every address and route it
-creates disappear with it, and no host or guest network state is touched. It
-requires unprivileged user namespaces; the test skips when the kernel or the
-container refuses them, and the fixture itself refuses to run outside its
-`disposable-namespace` scope. The profile-integration half remains the KVM
-`qemu-self-hosting` guest below.
 
 The Docker command expects `bin/xsh` and `core/` under the supplied tool root
 and the existing `xsh-test` image. The container runs as the caller's UID and
@@ -235,10 +168,7 @@ It also replays the recorded fixture and checks the exact same error.
 The native regression independently checks the recorded fixture twice.
 Missing capture files and malformed JSON fail without acquiring host observations.
 
-`network-policy-guest.xsh` is the bounded failure-replay driver. It is
-unchanged by the reconciliation work: it exercises the request/acknowledgement
-transport in a disposable `qemu-self-hosting` guest and does not call the live
-applier.
+`network-policy-guest.xsh` is the bounded failure-replay driver.
 Before creating its own veth pair, it requires the exact `LAPUTA_SELF_HOSTING=1`
 kernel token and a validated `qemu-self-hosting` generation receipt through the
 existing PM reader. It requires observed absence of every selected default route
@@ -298,20 +228,8 @@ XSH_MODULE_PATH=/mnt/self-hosting/inputs/laputa:/usr/lib/xsh/core \
 ```
 
 This slice adds no dependencies and changes no installed payload. It does not
-persist ownership or supervise networking. IPv4 reconciliation through one
-managed virtual-Ethernet link is enabled and qualified in a disposable user and
-network namespace: `tests/system/network_policy_applier.xsh` converges an owned
-address and default route, leaves a foreign address, a peer address, and
-operator and Tailscale-like routes untouched, plans nothing on reapplication,
-refuses a zero-metric or unmodeled-attribute route change before any effect, and
-reports a conflict rather than a rollback for an injected concurrent change and
-for a real ENOBUFS overrun. The KVM `qemu-self-hosting` guest run still covers
-only the bounded failure replay; the live applier has not been re-run there.
-IPv6 is unsupported and reported separately: `NetworkAddress`, `NetworkIntent`,
-`NetworkSnapshot`, and `NetworkOwnership` are IPv4-only, `valid_address` rejects
-a non-IPv4 literal, and `network_project_state` returns only `Family.Inet`
-addresses and routes, so IPv6 addresses are outside this cohort rather than
-silently dropped. Cross-dump atomicity still needs a shared route-netlink
-generation from `linux.network_dump`. XSH-38 and XSH-45 shared-boundary
-qualification, a genuinely concurrent writer in another process, IPv6, Linux
-aarch64, and Asterinas remain unverified.
+persist ownership or supervise networking. LAP-32 remains blocked: address
+withdrawal and general live application require qualification beyond the bounded
+failure-replay driver; TOS is now observed and projected. XSH-38 and XSH-45 shared-boundary
+qualification, concurrent-writer behaviour, IPv6, Linux aarch64, and Asterinas
+remain unverified. The VM failure replay does not establish network convergence.

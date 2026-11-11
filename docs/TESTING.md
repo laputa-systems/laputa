@@ -111,30 +111,6 @@ lease expiry and link loss never cut the control channel. Pass `--xsh` and `--co
 the seed that built the image. It walks renewal, rebind, NAK, expiry, restart, link loss,
 NIC reappearance, and pause/resume, then boots offline.
 
-### Run the SSH network-recovery proof
-
-`python3 tests/integration/ssh_network_recovery.py` needs the same built image and
-KVM, a seed `xsh` with the native SSH client, and `dropbearkey` (pass
-`--dropbearkey`, or let it extract one from `--artifact-store`). It owns one
-unprivileged user and network namespace, one tap, and a scripted DHCPv4 server
-that declares `192.0.2.100/24` on the tap address `192.0.2.1`; the virtio-serial
-control agent is installed only on the disposable state disk. Unlike the DHCP
-lifecycle proof, administration travels over the network under test: XSH's
-native SSH client connects to the declared address inside the namespace with
-the Dropbear host key provisioned on the state disk. After link loss, lease
-expiry and re-acquisition, a supervised `dhcp-eth0` restart, and NIC
-reappearance on a new ifindex, the test requires a fresh verified connection to
-recover on the declared address and reads `xinit status dhcp-eth0` over it.
-
-The same run asserts the maintained profile's explicit IPv6 policy. The
-packaged `/usr/lib/sysctl.d/20-ipv6.conf` disables IPv6 on `all` and `default`,
-clears `accept_ra` and `autoconf`, and therefore keeps a re-enumerated interface
-disabled; the control agent observes no IPv6 address and no IPv6 route
-(`addresses=0 routes=0`), and the service status reports IPv6 as unsupported
-rather than a silent empty cohort: `ipv6=unsupported disabled=1 policy=installed
-sysctl=1 addresses=0 routes=0 enumerated=1`. Any other state is a failure. This
-reports IPv6 as unsupported; it does not add IPv6 support.
-
 ### Run the maintained clock drill
 
 `python3 tests/integration/maintained_ntp.py` needs the built `qemu-maintained` image,

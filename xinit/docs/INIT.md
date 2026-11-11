@@ -169,6 +169,32 @@ While a live `${XINIT_RUN_DIR}/scanner.json` marks a scanner,
 `${XINIT_RUN_DIR}/inbox/SERVICE` instead of acting, and the scanner applies it
 on its next pass. Without a scanner, `start` and `stop` act directly.
 
+The scanner creates and owns the control plane. `${XINIT_RUN_DIR}` is owned by
+root and is not group or world writable. `${XINIT_RUN_DIR}/inbox` is created at
+mode `0700` beneath the run directory descriptor, given the `xinit-admin` group,
+and only then widened to mode `0770`. `xinit-admin` is a reserved group defined
+by baselayout. A request is a regular single-link file of at most 64 bytes,
+owned by the requester and carrying exactly one of `up`, `down`, `restart`, or
+`reload`. The client creates it with mode `0770` and group `xinit-admin` through
+a hidden temporary name, then renames it into place.
+
+The scanner accepts a request only when the file owner uid is 0 or a current
+member of `xinit-admin` (primary or supplementary group), resolved from the
+account database at scan time. The content never supplies an identity. A
+request from anyone else is refused with the typed `xinit-control-refused`
+error, logged, and removed; the scanner keeps running. Every accepted request is
+logged as `xinit-control accepted service=SERVICE uid=UID verb=VERB`; every
+refusal is logged as `xinit-control-refused ... uid=UID reason=...`. A planted
+symlink or FIFO is refused from its `lstat` as a non-regular entry and is not
+followed or opened. A swap between that observation and the read is not yet
+closed: XSH exposes no way to open without following symlinks and without
+blocking, then observe the opened object, so the observation and the read are
+not yet the same object. The
+scanner marker records its pid and kernel start time, so a non-root operator
+detects a live scanner from `/proc` rather than by signalling a root process.
+Status, list, logs, and inspect reads do not require control authority and are
+unchanged.
+
 A scanner gates each unit's first start. A `need` dependency must be
 `running`; `uses` and `after` dependencies may also be `stopped`. Dependencies
 outside the scanned set impose no gate. Respawns are not re-gated, and a

@@ -908,7 +908,8 @@ export let service = {
       XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1",
     },
   )?
-  assert scan == ""
+  assert "xinit-control accepted service=app uid=" in scan
+  assert "verb=down" in scan
   test.unix_fake(ctx, {})
   let logger_status = xinit_text(ctx, ["status", "logger"], {XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1"})?
 
@@ -922,6 +923,165 @@ export let service = {
 
   assert ! fp"{run_dir}/inbox/app".exists()?
   assert unix_log.read_text()?.split("spawn_process_group").len() == 2
+}
+
+test test_control_authorization_allows_root_and_group_members_only [fs, process, error] { |ctx|
+  let source = xinit_script().read_text()? + """
+print control_permitted(0, 1000, [], 124)
+print control_permitted(1001, 1001, [10, 124], 124)
+print control_permitted(1001, 1001, [10, 1000], 124)
+print control_permitted(65534, 65534, [], 124)
+exit 0
+"""
+  let result = test.run_xsh(ctx, source, name: "xinit-control-policy.xsh")?
+
+  assert result.success, result.stderr
+  assert result.stdout == "true\ntrue\nfalse\nfalse\n", result.stdout
+}
+
+test test_control_client_queues_a_mode_0770_request [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-queue")?
+  let run_dir = fp"{root}/run"
+  let service_dir = fp"{root}/services"
+  let inbox = fp"{run_dir}/inbox"
+  service_dir.mkdir()
+  inbox.mkdir()
+  inbox.chmod(0o770)
+  fp"{run_dir}/scanner.json".write(json.encode({pid: process.current_pid()?})?)
+  let result = xinit_text(
+    ctx,
+    ["stop", "app"],
+    {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1"},
+  )?
+
+  assert result == "app down queued\n", result
+  let queued = fp"{inbox}/app"
+  let info = queued.metadata()?
+
+  assert queued.read_text()? == "down"
+  assert info.mode.bit_and(0o7777) == 0o770
+  assert info.uid == applet.current_euid()
+}
+
+test test_scan_refuses_a_planted_fifo_control_request [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-fifo")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  let unix_log = fp"{root}/unix.jsonl"
+  let inbox = fp"{run_dir}/inbox"
+  service_dir.mkdir()
+
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "")
+  inbox.mkdir()
+  inbox.chmod(0o770)
+  fs.mkfifo(fp"{inbox}/app", 0o770)
+  test.timeout(ctx, 20s)
+
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})
+  let result = run_xinit(ctx, ["scan", "app"], scan_env(service_dir, run_dir, log_root, 1))?
+  test.unix_fake(ctx, {})
+
+  assert result.success, result.stderr
+  assert "xinit-control-refused" in result.stderr
+  assert "reason=not-a-single-regular-file" in result.stderr
+  assert ! fp"{inbox}/app".exists()?
+}
+
+test test_scan_refuses_a_planted_symlink_control_request [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-symlink")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  let unix_log = fp"{root}/unix.jsonl"
+  let inbox = fp"{run_dir}/inbox"
+  let outside = fp"{root}/outside"
+  service_dir.mkdir()
+
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "")
+  inbox.mkdir()
+  inbox.chmod(0o770)
+  outside.write("down")
+  fp"{inbox}/app".symlink(to: outside)
+  test.timeout(ctx, 20s)
+
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})
+  let result = run_xinit(ctx, ["scan", "app"], scan_env(service_dir, run_dir, log_root, 1))?
+  test.unix_fake(ctx, {})
+
+  assert result.success, result.stderr
+  assert "xinit-control-refused" in result.stderr
+  assert "reason=not-a-single-regular-file" in result.stderr
+  assert ! fp"{inbox}/app".exists()?
+  assert outside.read_text()? == "down"
+}
+
+test test_prepare_control_inbox_creates_private_then_widens [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-create")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  let unix_log = fp"{root}/unix.jsonl"
+  let inbox = fp"{run_dir}/inbox"
+  service_dir.mkdir()
+
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "")
+  assert ! inbox.exists()?
+
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})
+  let result = run_xinit(ctx, ["scan", "app"], scan_env(service_dir, run_dir, log_root, 1))?
+  test.unix_fake(ctx, {})
+
+  assert result.success, result.stderr
+  let info = inbox.metadata()?
+
+  assert info.kind == "dir"
+  assert info.mode.bit_and(0o7777) == 0o770
+  assert info.gid == run_dir.metadata()?.gid
+  assert info.uid == applet.current_euid()
+}
+
+test test_pid_live_prefers_identity_and_treats_signal_permission_as_alive [fs, process, error] { |ctx|
+  let source = xinit_script().read_text()? + """
+print pid_live(0, 0, true)
+print pid_live(0, 0, false)
+print pid_live(124, 124, false)
+print pid_live(124, 1, false)
+print pid_live(124, 1, true)
+print pid_live(0, 124, true)
+print signal_alive(1)
+print signal_alive(2147480000)
+exit 0
+"""
+  let result = test.run_xsh(ctx, source, name: "xinit-liveness-policy.xsh")?
+
+  assert result.success, result.stderr
+  assert result.stdout == "true\nfalse\ntrue\nfalse\nfalse\ntrue\ntrue\nfalse\n", result.stdout
+}
+
+test test_scan_refuses_an_oversized_control_request [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-refused")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  let unix_log = fp"{root}/unix.jsonl"
+  let inbox = fp"{run_dir}/inbox"
+  service_dir.mkdir()
+
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "")
+  inbox.mkdir()
+  inbox.chmod(0o770)
+  fp"{inbox}/app".write("down" + ([" "] |> repeat(80).join("")), mode: 0o770)
+
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})
+  let result = run_xinit(ctx, ["scan", "app"], scan_env(service_dir, run_dir, log_root, 1))?
+  test.unix_fake(ctx, {})
+
+  assert result.success, result.stderr
+  assert "xinit-control-refused" in result.stderr
+  assert "uid=" in result.stderr
+  assert "reason=oversized" in result.stderr
+  assert ! fp"{inbox}/app".exists()?
 }
 
 test test_scan_notify_readiness_reaches_running [fs, process, error] { |ctx|

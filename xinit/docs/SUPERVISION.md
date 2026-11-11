@@ -75,10 +75,65 @@ While a scanner owns a run directory, `start`, `stop`, `restart`, and
 `reload` post requests to its inbox instead of acting on the process
 ([INIT.md](INIT.md#scanner-and-control)). Without a scanner, the one-shot
 `start` path records the child's kernel start time when available. Every status
-read probes liveness with signal 0 and compares any recorded start time against
-the kernel: a pid that is gone, or alive with a different start time
-(recycled), reconciles to `dead`. The scanner does not need that check,
-because it clears a unit's pid the instant its child exits.
+read compares any recorded start time against the kernel: a pid that is gone,
+or alive with a different start time (recycled), reconciles to `dead`. The
+kernel start time is preferred over a signal probe, so an unprivileged operator
+reads the same state as root and pid reuse is not mistaken for the service. A
+signal probe is the fallback only when no start time is recorded, and it counts
+`EPERM` as alive: a non-root reader cannot signal a root-owned service, and
+that refusal is not evidence the service is gone. The scanner does not need
+that check, because it clears a unit's pid the instant its child exits.
+
+### Request credentials
+
+The control path is a directory inbox, not a socket, so the request credential
+is the inode owner the kernel records when the request is created. XSH exposes
+`unix.connect_stream` for Unix socket clients but no server-side
+bind/listen/accept primitive that reports `SO_PEERCRED`, so a socket control
+plane cannot verify a peer without a new XSH primitive.
+
+`${XINIT_RUN_DIR}` is root-owned and not group or world writable. The scanner
+creates `${XINIT_RUN_DIR}/inbox` at mode `0700` beneath the run directory
+descriptor, sets its group to `xinit-admin`, and only then widens it to `0770`;
+an existing inbox is retightened the same way before it is widened. A newly
+created inbox is therefore never writable by the group that owned its
+umask-derived mode. The kernel
+therefore permits creation only by root or a member of `xinit-admin`; a
+non-member cannot place a request at all. The scanner re-observes each entry with
+`lstat`, requires a regular single-link file of at most 64 bytes, and accepts it
+only when the owner uid is 0 or resolves through the account database to a
+current `xinit-admin` member. The file content is only a verb; no field in it
+names a requester. The client writes through a hidden temporary name with mode
+`0770`, group `xinit-admin`, then renames it, so a scanner pass never reads a
+partial request.
+
+`chown` requires `CAP_CHOWN`, so a member cannot create a file owned by another
+uid, and an unprivileged process cannot make a request appear to come from
+root. Symlinks, directories, hard-linked files, oversized files, and unknown
+verbs that are present when the entry is observed are refused rather than
+followed. A refusal uses the typed
+`xinit-control-refused` error, is logged with the observed uid, and removes only
+the offending entry; the root scanner stays alive. Accepted and refused requests
+are logged to stdout and stderr respectively. Status, list, logs, and inspect
+reads stay unauthenticated and unchanged.
+
+The observation and the read are not yet the same object. `drain_inbox` reads
+each entry with a no-follow `lstat` and then reads it by path, so a group member
+that swaps the entry between the two can still substitute a symlink that pid 1
+would follow or a FIFO that would make it block. Closing that needs an XSH
+primitive that opens a path without following symlinks and without blocking and
+then reports the opened object's kind, owner, link count, and size; XSH exposes
+`unix.open_fd` with `nofollow` and nonblocking but no metadata call for the
+returned descriptor, and `FsRoot.read_result` bounds the read but opens by
+pathname and blocks on a FIFO. Until that primitive exists, this remains an
+open defect and must not be papered over with a sleep, a timeout, or a second
+path check.
+
+Group members share write permission on the inbox. One member can therefore
+unlink or replace another member's still-queued request, which is a denial or a
+replay within the same four-verb service-control authority; it cannot change
+which uid the scanner observes. Root's own requests, and requests from any
+current member, carry that member's kernel identity rather than a claimed one.
 
 ## The inittab engine
 

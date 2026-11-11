@@ -13,10 +13,8 @@
 ##! This service is the single owner of /etc/resolv.conf through dhcpc's
 ##! resolver coordinator: the operator static file at /etc/dhcpc/resolv.static
 ##! is read-only input, per-interface contributions are kept under /run/dhcpc,
-##! and no other maintained service writes the destination. IPv6 is not
-##! supported on this profile: the packaged drop-in disables IPv6
-##! autoconfiguration at boot, and `status()` names that unsupported mode with
-##! the observed IPv6 cohort so an empty IPv6 state is never silent.
+##! and no other maintained service writes the destination. IPv6 has no DHCPv6
+##! or router-advertisement handling here and stays unsupported on this profile.
 
 const interface = "eth0"
 
@@ -57,70 +55,22 @@ export let service = {
 
 ## Reports the lease state the client published, or that none exists yet. A
 ## missing or unreadable state file reads as `lease=unknown`, never as a failure.
-## The IPv6 suffix is always present. `ipv6=unsupported` with `addresses=0
-## routes=0 enumerated=1` is the supported report for this profile; any
-## deviation reads `ipv6=unexpected`, and a report that cannot run at all reads
-## `ipv6=unobserved`, so an empty cohort is never presented as a silent success.
-## No IPv6 address, route, or autoconfiguration is requested anywhere.
 export proc status() [fs, process, env, error] -> Result[Str, Error] {
   let published = fp"/run/dhcpc/{interface}.status"
 
-  let summary = if ! published.exists() {
-    "lease=unknown"
-  } else {
-    try {
-      let report = json.decode(published.read_text()?)?.require(Record)?
-      let state = report.get("state")?.require(Str)?
-      let address = report.get("address")?
-      let prefix = report.get("prefix")?
-      if address != null and prefix != null {
-        f"lease={state} address={address.require(Str)?}/{prefix.require(Int)?}"
-      } else {
-        f"lease={state}"
-      }
-    } ?? "lease=unknown"
-  }
+  return Ok("lease=unknown") unless published.exists()
 
-  let ipv6 = try {
-    ipv6_policy_report()?
-  } ?? "ipv6=unobserved"
-
-  Ok(f"{summary} {ipv6}")
-}
-
-const ipv6_policy = p"/usr/lib/sysctl.d/20-ipv6.conf"
-const ipv6_sysctl = p"/proc/sys/net/ipv6/conf/all/disable_ipv6"
-
-# `unsupported` requires the installed drop-in, the applied kernel switch, a
-# complete network observation, and no IPv6 address or route on any interface.
-# Anything else is reported as `unexpected` rather than mistaken for a
-# configured dual-stack.
-proc ipv6_policy_report() [fs, process, env, error] -> Result[Str, Error] {
-  let declared = ipv6_policy.exists()?
-  var addresses = 0
-  var routes = 0
-  var enumerated = false
-  match linux.network_dump() {
-    Ok(dump) => {
-      enumerated = true
-      for address in dump.addresses {
-        if address.family == "inet6" {
-          addresses += 1
-        }
-      }
-      for route in dump.routes {
-        if route.family == "inet6" {
-          routes += 1
-        }
-      }
+  let summary = try {
+    let report = json.decode(published.read_text()?)?.require(Record)?
+    let state = report.get("state")?.require(Str)?
+    let address = report.get("address")?
+    let prefix = report.get("prefix")?
+    if address != null and prefix != null {
+      f"lease={state} address={address.require(Str)?}/{prefix.require(Int)?}"
+    } else {
+      f"lease={state}"
     }
-    Err(_) => {}
   }
-  let applied = ipv6_sysctl.exists()? and ipv6_sysctl.read_text()?.trim() == "1"
-  let disabled = declared and applied and enumerated and addresses == 0 and routes == 0
-  let verdict = if disabled { "ipv6=unsupported" } else { "ipv6=unexpected" }
-  let policy = if declared { "installed" } else { "missing" }
-  let switch = if applied { "1" } else { "0" }
-  let observed = if enumerated { 1 } else { 0 }
-  Ok(f"{verdict} disabled={if disabled { 1 } else { 0 }} policy={policy} sysctl={switch} addresses={addresses} routes={routes} enumerated={observed} source=ra+autoconf")
+
+  Ok(summary ?? "lease=unknown")
 }

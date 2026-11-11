@@ -412,24 +412,28 @@ Dropbear package artifact under `LAPUTA_ARTIFACT_STORE` (default
 prints that rescue is unverified and continues. `--keep` retains consoles, the
 state image, generation bundles, and the host activation record.
 
-The test provisions a fresh state disk with a unique Dropbear host key, a
-locked-password `probe` account, and a key-only UID 0 `g2admin` account with
-separate keys, and checks that the immutable generation disk contains neither
-account's authorized public key nor either private key body.
-It installs generation A from the bundle under policy revision 1, runs the
+The test provisions a fresh state disk with a unique Dropbear host key and a
+locked-password `probe` account whose first-boot record adds it to the reserved
+`xinit-admin` group, and checks that the immutable generation disk contains
+neither the operator's authorized public key nor the operator's private key
+body. It installs generation A from the bundle under policy revision 1, runs the
 existing `rescue_guest.py` for an independently composed rescue root
 (clean/repaired/unrecoverable disks), and boots A through the launcher. Over the
 verified native SSH path it checks the pinned
-host key, running receipt and health report, critical service states, the bound
+host key, running receipt and health report, critical service states, the
+root:`xinit-admin` 0770 control inbox, the bound
 lease and dhcpc-owned resolver, the observed clock-service state, and redacted
-diagnostics. Restarting `logger` and `dhcp-eth0` as `g2admin` rechecks new pids,
-readiness, and a rebound lease; a QMP `set_link` down/up breaks and restores
-SSH and requires a bound lease afterwards.
+diagnostics. Restarting `logger` and `dhcp-eth0` as the non-root `probe`
+operator goes through the scanner's verified control inbox and rechecks new
+pids, accepted-request log lines carrying the operator uid, readiness, and a
+rebound lease; a QMP `set_link` down/up breaks and restores SSH and requires a
+bound lease afterwards.
 
 The test then runs the existing `activation_recovery.py` and
 `activation_ssh.py` drills against the same run, stages generation B (the real
-kernel with a zeroed disk) under policy revision 2, powers A off through PID 1,
-and boots B twice. B never reaches userspace; the host bounds each attempt and
+kernel with a zeroed disk) under policy revision 2, flushes the guest
+filesystems as `probe`, quits QEMU, and boots B twice. B never reaches
+userspace; the host bounds each attempt and
 selects retained A after the cap with `LAPUTA_FAILED_GENERATION=b` and the host
 record's `failure` naming B's receipt and two consumed attempts. The next stage
 clears that `failure` record; the persistent host key and a staged home sentinel
@@ -440,14 +444,15 @@ and live `dropbear`, `logger`, and `dhcp-eth0`, and only then confirmed through
 `activation_confirm_guest_health`. A further C reboot shows the committed
 record and the retained four-entry history.
 
-On 2026-11-11 this passed on Linux x86_64/KVM against the prebuilt
-`qemu-maintained` generation `07f2eaf08a68…`. It establishes G2 steps 1-5 for
-that bundle only. It does not establish natural T1/T2 lease renewal, physical
-power loss, Linux aarch64, Asterinas, a macOS client, signed release
-authenticity, or step 6 blank-disk restore. The maintained non-root `probe`
-account cannot restart supervised daemons because `/run/xinit` is root-owned,
-so the restart path uses the provisioned UID 0 administrator; non-root
-privilege delegation remains unqualified. Staging digests pin bytes and the PM
+On 2026-11-11 this passed on Linux x86_64/KVM against the `qemu-maintained`
+generation `1db713b29fd2…` rebuilt from this tree with the verified
+`xinit-admin` control inbox. It establishes G2 steps 1-5 for that bundle only.
+It does not establish natural T1/T2 lease renewal, physical power loss, Linux
+aarch64, Asterinas, a macOS client, signed release authenticity, clean PID 1
+poweroff, or step 6 blank-disk restore. The maintained non-root `probe`
+account restarts supervised daemons through the xinit `xinit-admin` control
+plane; no UID 0 administrator is provisioned, and shutdown is an operator
+filesystem flush followed by a QMP quit. Staging digests pin bytes and the PM
 `generation_sha256` is publisher identity, not a signature.
 
 ### Persistent diagnostics

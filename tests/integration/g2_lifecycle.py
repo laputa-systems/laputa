@@ -44,7 +44,6 @@ DEFAULT_BUNDLE = ROOT / "target/laputa/qemu-maintained/current"
 DEFAULT_ARTIFACT_STORE = ROOT / ".out/artifacts/x86_64/v2/sha256"
 CRITICAL_SERVICES = ["dhcp-eth0", "dropbear", "logger"]
 OPERATOR = "probe"
-ADMIN = "g2admin"
 PROFILE = "qemu-maintained"
 
 DEFAULT_XSH = pathlib.Path(os.environ.get("LAPUTA_XSH", DEFAULT_XSH))
@@ -194,14 +193,6 @@ proc main(...argv: List[Str]) [fs, process, net, env, time, error, io] {
   }
 }
 main(@args)?
-'''
-
-POWEROFF = r'''#!/bin/xsh
-
-proc main() [process, error] {
-  process.kill(1, signal: "USR2")?
-}
-main()?
 '''
 
 
@@ -392,26 +383,9 @@ def rescue_packages(artifact_store):
     return wanted & found
 
 
-def install_admin(staging, public):
-    passwd = staging / "etc/passwd"
-    passwd.write_text(passwd.read_text().rstrip("\n") + f"\n{ADMIN}:x:0:0:G2 Administrator:/home/{ADMIN}:/usr/bin/xsh-login\n")
-    shadow = staging / "etc/shadow"
-    shadow.write_text(shadow.read_text().rstrip("\n") + f"\n{ADMIN}:*:0:0:99999:7:::\n")
-    home = staging / f"home/{ADMIN}"
-    ssh_dir = home / ".ssh"
-    ssh_dir.mkdir(parents=True)
-    home.chmod(0o755)
-    ssh_dir.chmod(0o700)
-    authorized = ssh_dir / "authorized_keys"
-    authorized.write_text(public + "\n")
-    authorized.chmod(0o600)
-
-
 def provision(args, work):
     client_key = work / "client"
     run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "g2-lifecycle", "-f", str(client_key)], xsh_env(work), timeout=30)
-    admin_key = work / "admin"
-    run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "g2-admin", "-f", str(admin_key)], xsh_env(work), timeout=30)
     staging = work / "state-staging"
     for name in ("etc", "home", "var"):
         (staging / name).mkdir(parents=True)
@@ -437,13 +411,11 @@ def provision(args, work):
     assert host_key.stat().st_mode & 0o077 == 0, "the host key is not private"
     fingerprint = next(line.split()[-1] for line in (generated.stdout + generated.stderr).splitlines() if line.startswith("Fingerprint:"))
     public = client_key.with_suffix(".pub").read_text().strip()
-    admin_public = admin_key.with_suffix(".pub").read_text().strip()
 
     hostname = f"laputa-g2-{os.urandom(3).hex()}"
     run_xsh(args, work, work / "provision.xsh", "--", staging, OPERATOR, hostname, public, timeout=60)
 
     install_strace_tools(staging)
-    install_admin(staging, admin_public)
 
     shadow = (staging / "etc/shadow").read_text().splitlines()
     operator_shadow = [line for line in shadow if line.startswith(f"{OPERATOR}:")]
@@ -452,6 +424,11 @@ def provision(args, work):
     operator_passwd = [line for line in passwd if line.startswith(f"{OPERATOR}:")]
     assert len(operator_passwd) == 1, "operator account is not unique"
     assert operator_passwd[0].split(":")[5] == f"/home/{OPERATOR}", "operator home differs"
+    operator_uid = int(operator_passwd[0].split(":")[2])
+    groups = (staging / "etc/group").read_text().splitlines()
+    xinit_admin = [line for line in groups if line.startswith("xinit-admin:")]
+    assert len(xinit_admin) == 1, "the image has no single xinit-admin group"
+    assert OPERATOR in xinit_admin[0].split(":")[3].split(","), "the operator is not an xinit-admin member"
     authorized = staging / f"home/{OPERATOR}/.ssh/authorized_keys"
     assert authorized.read_text().strip().endswith(public.split()[-1]) or public in authorized.read_text(), "authorized key differs"
 
@@ -467,14 +444,12 @@ def provision(args, work):
     shutil.rmtree(staging)
 
     bundle = args.bundle
-    for label, material in (("operator", public.split()[1]), ("administrator", admin_public.split()[1])):
-        if contains_bytes(bundle / "disk.img", material.encode()):
-            fail(f"the immutable generation disk contains the {label} public key")
-    for label, path in (("operator", client_key), ("administrator", admin_key)):
-        body = "".join(line for line in path.read_text().splitlines() if not line.startswith("-----"))
-        if contains_bytes(bundle / "disk.img", body[80:144].encode()):
-            fail(f"the immutable generation disk contains the {label} private key")
-    return client_key, admin_key, fingerprint, state_image, hostname
+    if contains_bytes(bundle / "disk.img", public.split()[1].encode()):
+        fail("the immutable generation disk contains the operator public key")
+    body = "".join(line for line in client_key.read_text().splitlines() if not line.startswith("-----"))
+    if contains_bytes(bundle / "disk.img", body[80:144].encode()):
+        fail("the immutable generation disk contains the operator private key")
+    return client_key, operator_uid, fingerprint, state_image, hostname
 
 
 def patch_argv(raw, port, console, qmp, work):
@@ -617,24 +592,33 @@ def boot_markers(args, work, port, key, pin):
     return [json.loads(line) for line in log["lines"] if line.strip()]
 
 
-def poweroff_guest(args, work, port, admin_key, pin, child, log_file, label):
-    script = work / f"poweroff-{label}.xsh"
-    script.write_text(POWEROFF)
-    staged = remote(args, work, port, admin_key, pin, "stage", script, f"g2-poweroff-{label}", user=ADMIN)
-    assert staged["outcome"] in ("staged", "present"), staged
-    result = remote(args, work, port, admin_key, pin, "run", json.dumps(["/usr/bin/xsh", staged["path"]]), user=ADMIN)
-    assert result["exit_code"] == 0, result
+def qmp_quit(socket_path):
+    try:
+        qmp(socket_path, "quit", {})
+    except (RuntimeError, OSError):
+        pass
+
+
+def poweroff_guest(args, work, port, key, pin, child, log_file, label):
+    flushed = remote(args, work, port, key, pin, "run", json.dumps(["/usr/bin/xsh", "/usr/lib/xsh/core/sync"]))
+    assert flushed["exit_code"] == 0, flushed
+    qmp_quit(work / "outputs/qmp.sock")
     deadline = time.monotonic() + 120
     while time.monotonic() < deadline and child.poll() is None:
         time.sleep(0.5)
     if child.poll() is None:
         stop(child, log_file)
-        fail(f"guest {label} did not power off through PID 1")
-    assert child.returncode == 0, f"guest {label} poweroff exit {child.returncode}"
-    log(f"poweroff {label}: clean QEMU exit 0")
+        fail(f"guest {label} did not stop after QMP quit")
+    assert child.returncode == 0, f"guest {label} QEMU exit {child.returncode}"
+    log(f"poweroff {label}: operator flushed guest filesystems, QEMU quit 0")
 
 
-def step_remote(args, work, port, key, admin_key, pin, hostname, digest):
+def wait_control_log(console, service, uid, timeout=20):
+    marker = f"xinit-control accepted service={service} uid={uid} verb=restart"
+    wait_until(lambda: marker in console_text(console), timeout, 0.25, marker)
+
+
+def step_remote(args, work, port, key, pin, hostname, digest, console, operator_uid):
     log("step 2: verified SSH inspection and lifecycle exercise")
     info = remote(args, work, port, key, pin, "info")
     assert info["host_key"] == pin, info
@@ -653,6 +637,11 @@ def step_remote(args, work, port, key, admin_key, pin, hostname, digest):
     services = {item["name"]: item["state"] for item in inspection["services"]}
     for name in CRITICAL_SERVICES:
         assert services.get(name) == "running", (name, services)
+
+    inbox_mode = remote(args, work, port, key, pin, "run", json.dumps(["/usr/bin/stat", "-c", "%U:%G:%a", "/run/xinit/inbox"]))
+    assert inbox_mode["exit_code"] == 0, inbox_mode
+    assert inbox_mode["stdout"].strip() == "root:xinit-admin:770", inbox_mode
+    log("control inbox: root:xinit-admin mode 0770")
 
     lease = lease_status(args, work, port, key, pin)
     assert lease["state"] == "bound", lease
@@ -681,21 +670,23 @@ def step_remote(args, work, port, key, admin_key, pin, hostname, digest):
 
     logger = service_state(args, work, port, key, pin, "logger")
     assert logger["state"] == "running" and logger["ready"], logger
-    restarted = remote(args, work, port, admin_key, pin, "run", json.dumps(["/usr/bin/xinit", "restart", "logger"]), user=ADMIN)
+    restarted = remote(args, work, port, key, pin, "run", json.dumps(["/usr/bin/xinit", "restart", "logger"]))
     assert restarted["exit_code"] == 0, restarted
     logger = service_after_restart(args, work, port, key, pin, "logger", logger["pid"])
     assert logger["ready"], logger
-    log(f"supervised restart: logger pid={logger['pid']} restarts={logger['restarts']}")
+    wait_control_log(console, "logger", operator_uid)
+    log(f"supervised restart as uid {operator_uid}: logger pid={logger['pid']} restarts={logger['restarts']}")
 
     dhcp = service_state(args, work, port, key, pin, "dhcp-eth0")
-    restarted = remote(args, work, port, admin_key, pin, "run", json.dumps(["/usr/bin/xinit", "restart", "dhcp-eth0"]), user=ADMIN)
+    restarted = remote(args, work, port, key, pin, "run", json.dumps(["/usr/bin/xinit", "restart", "dhcp-eth0"]))
     assert restarted["exit_code"] == 0, restarted
     dhcp = service_after_restart(args, work, port, key, pin, "dhcp-eth0", dhcp["pid"])
     wait_until(lambda: lease_status(args, work, port, key, pin)["state"] == "bound", 60, 0.5, "lease after dhcp restart")
     after_restart = lease_status(args, work, port, key, pin)
     assert after_restart["address"] == "10.0.2.15"
     assert after_restart["wall_ms"] > lease["wall_ms"]
-    log(f"supervised restart: dhcp-eth0 pid={dhcp['pid']} lease={after_restart['state']} {after_restart['address']}")
+    wait_control_log(console, "dhcp-eth0", operator_uid)
+    log(f"supervised restart as uid {operator_uid}: dhcp-eth0 pid={dhcp['pid']} lease={after_restart['state']} {after_restart['address']}")
 
     qmp(work / "outputs/qmp.sock", "set_link", {"name": "nic0", "up": False})
     down = remote(args, work, port, key, pin, "inspect", timeout=5, check=False)
@@ -731,7 +722,7 @@ def step_remote(args, work, port, key, admin_key, pin, hostname, digest):
 
 
 def scenario(args, work):
-    client_key, admin_key, fingerprint, state_image, hostname = provision(args, work)
+    client_key, operator_uid, fingerprint, state_image, hostname = provision(args, work)
     log(f"step 1: provisioned {OPERATOR} with locked password and host key {fingerprint}")
 
     generation = json.loads((args.bundle / "generation.json").read_text())
@@ -789,7 +780,7 @@ def scenario(args, work):
         assert copied["exit_code"] == 0, copied
         log("step 2: a verified staged file is placed in persistent home state")
 
-        step_remote(args, work, port, client_key, admin_key, fingerprint, hostname, digest)
+        step_remote(args, work, port, client_key, fingerprint, hostname, digest, console_a, operator_uid)
 
         recovery = subprocess.run(
             [sys.executable, str(ROOT / "tests/integration/activation_recovery.py")],
@@ -828,7 +819,7 @@ def scenario(args, work):
         inspection = remote(args, work, port, client_key, fingerprint, "inspect")
         assert inspection["generation"]["generation_sha256"] == digest
         log("step 3: generation b is operator-authorized, byte-pinned, staged, and pending; A still serves")
-        poweroff_guest(args, work, port, admin_key, fingerprint, child, log_file, "a-to-b")
+        poweroff_guest(args, work, port, client_key, fingerprint, child, log_file, "a-to-b")
         status = host(args, work, "status", state_dir)
         assert status["pending"] == "b" and status["current"] == "a" and status["attempts"] == 0, status
 
@@ -886,7 +877,7 @@ def scenario(args, work):
         assert staged_c["policy_revision"] == 3 and staged_c["policy_ids"] == ["a", "b", "c"], staged_c
         assert staged_c["failure"] is None, staged_c
         log("step 5: repaired generation c is staged with a retained fallback and no commit")
-        poweroff_guest(args, work, port, admin_key, fingerprint, child, log_file, "a-to-c")
+        poweroff_guest(args, work, port, client_key, fingerprint, child, log_file, "a-to-c")
 
         raw = host(args, work, "argv", state_dir, outputs)["argv"]
         assert "LAPUTA_GENERATION_ID=c LAPUTA_BOOT_SERIAL=3" in " ".join(raw), raw
@@ -915,7 +906,7 @@ def scenario(args, work):
         markers = boot_markers(args, work, port, client_key, fingerprint)
         assert [(item["generation_id"], item["boot_serial"], item["failed_generation"]) for item in markers] == [("a", 0, ""), ("a", 2, "b"), ("c", 3, "")], markers
         log("step 5: health-confirmed c committed with a retained, still-admitted a")
-        poweroff_guest(args, work, port, admin_key, fingerprint, child, log_file, "c-reboot")
+        poweroff_guest(args, work, port, client_key, fingerprint, child, log_file, "c-reboot")
 
         raw = host(args, work, "argv", state_dir, outputs)["argv"]
         assert "LAPUTA_GENERATION_ID=c LAPUTA_BOOT_SERIAL=3" in " ".join(raw), raw
@@ -948,10 +939,10 @@ def scenario(args, work):
             time.sleep(0.5)
         assert all(child.poll() is not None for child, _ in launched), "a QEMU child was left running"
 
-    print("UNVERIFIED natural T1/T2 lease renewal (the run exercises persisted-lease reacquisition, a supervised restart, and rebind after link loss)")
+    print("UNVERIFIED natural T1/T2 lease renewal (the run exercises persisted-lease reacquisition, supervised non-root restarts, and rebind after link loss)")
     print("UNVERIFIED physical power loss or host filesystem reordering (process death and ENOSPC only)")
     print("UNVERIFIED aarch64 guest, Asterinas/Firecracker backend, and macOS administration client")
-    print("UNVERIFIED non-root operator privilege delegation (the test provisioned a key-only UID 0 administrator because /run/xinit is root-owned)")
+    print("UNVERIFIED clean PID 1 poweroff (the run removes the root account, flushes filesystems as the operator, and quits QEMU)")
     print("UNVERIFIED G2 step 6 blank-disk restore (R7 tests/integration/restore_drill.py was not run)")
     print("UNVERIFIED signed release authenticity (generation_sha256 is PM publisher identity; byte pins are operator authorization)")
     print("UNVERIFIED rebuild by this test (the prebuilt --bundle was consumed)")

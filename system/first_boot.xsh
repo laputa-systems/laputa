@@ -460,6 +460,40 @@ proc ensure_line(rootfs: FsRoot, rel: RelPath, line: Str) {
   write_text(rootfs, rel, append_record(body, line), 0o644)
 }
 
+proc ensure_group_member(rootfs: FsRoot, group_name: Str, member: Str) {
+  let group_rel: RelPath = p"etc/group"
+  let body = read_optional(rootfs, group_rel)?
+  var found = false
+  var lines = []
+
+  for line in body.lines() {
+    let fields = line.split(":")
+
+    if fields.len() == 4 and fields[0] == group_name {
+      found = true
+      var members = if fields[3] == "" { [] } else { fields[3].split(",") }
+
+      if ! (member in members) {
+        members += [member]
+      }
+
+      lines += [f"{fields[0]}:{fields[1]}:{fields[2]}:{members.join(",")}"]
+    } else {
+      lines += [line]
+    }
+  }
+
+  guard found else {
+    fail f"group {group_name} is missing"
+  }
+
+  let rendered = lines.join("\n") + "\n"
+
+  if rendered != body {
+    write_text(rootfs, group_rel, rendered, 0o644)
+  }
+}
+
 proc ensure_account(rootfs: FsRoot, name: Str) {
   let passwd_rel: RelPath = p"etc/passwd"
   let group_rel: RelPath = p"etc/group"
@@ -476,6 +510,7 @@ proc ensure_account(rootfs: FsRoot, name: Str) {
 
   if rootfs.exists(group_rel) {
     ensure_line(rootfs, group_rel, f"{name}:x:{id}:")
+    ensure_group_member(rootfs, "xinit-admin", name)
   }
 
   if rootfs.exists(shadow_rel) {

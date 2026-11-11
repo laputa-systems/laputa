@@ -342,7 +342,7 @@ test test_new_operator_skips_used_account_ids [fs, error] { |ctx|
   let root = prepare(ctx, name: "ids")?
   fp"{root}/etc".mkdir()
   fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\nlaputa:x:1000:1000:Laputa User:/home/laputa:/bin/xshi\n")
-  fp"{root}/etc/group".write("root:x:0:\nlaputa:x:1000:\n")
+  fp"{root}/etc/group".write("root:x:0:\nlaputa:x:1000:\nxinit-admin:x:124:\n")
   fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\nlaputa:*:0:0:99999:7:::\n")
   fp"{root}/etc/shells".write("/bin/xshi\n")
   first_boot.apply(root, base("new"))
@@ -350,6 +350,7 @@ test test_new_operator_skips_used_account_ids [fs, error] { |ctx|
   assert "pazu:x:1001:1001::/home/pazu:/usr/bin/xsh-login" in passwd.lines()
   assert "laputa:x:1000:1000:Laputa User:/home/laputa:/bin/xshi" in passwd.lines()
   assert "pazu:x:1001:" in fp"{root}/etc/group".read_lines()?
+  assert "xinit-admin:x:124:pazu" in fp"{root}/etc/group".read_lines()?
   assert "pazu:*:0:0:99999:7:::" in fp"{root}/etc/shadow".read_lines()?
   assert "/usr/bin/xsh-login" in fp"{root}/etc/shells".read_lines()?
   let after = snapshot(root)?

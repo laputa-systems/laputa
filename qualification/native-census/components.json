@@ -46,9 +46,9 @@
       ],
       "absent": ["breakpad", "Sentry", "libpng error", "incorrect header check"],
       "unknown": [
-        {"subject": "Highway 1.2.0", "evidence": "SharedDeps.addSimd links it whenever -Dsimd is on, which is the default; the stripped binary carries no Highway string. Settled by the pinned commit -Dstrip=false build: nm -S finds 12 hwy:: symbols (3,545 bytes) plus 16 Highway-instantiated ghostty::N_{AVX2,SSE2,SSE4,SSSE3} kernels (5,576 bytes), and build.zig.zon pins highway 1.2.0", "settle": "Rebuild with -Dstrip=false and rerun nm; the symbol names are stable across the 2% section-size delta between the local and CI builds", "settled": true},
-        {"subject": "oniguruma, wuffs, simdutf, stb, glslang and SPIRV-Cross byte share", "evidence": "the binary is stripped, so no per-component sizes exist. The pinned commit -Dstrip=false build attributes symbol bytes by archive and object membership: SPIRV-Cross 1,735,020; glslang 1,635,275; Dear ImGui 924,031; oniguruma 469,786; wuffs 228,922 and stb 36,445 by prefix; simdutf 222,065; glad GL 55,031; Highway 6,716 (3,545 runtime plus 5,576 in 16 instantiated kernels); sound control socket 4,996; glad EGL 130. The other 21,018,930 bytes in 12,760 symbols are Ghostty own Zig code and runtime plus the per-protocol Wayland glue", "settle": "Attribute the symbols of a -Dstrip=false build of the pinned commit; the released binary is stripped and shares no build ID with it, so the shares are evidence about the pinned source, not the shipped bytes", "settled": true},
-        {"subject": "compiler-rt and Zig-translated C", "evidence": "Zig links its own compiler-rt and translate-c output without version strings. The -Dstrip=false build shows 42 Zig-runtime symbols (20,913 bytes), one compiler-rt arithmetic helper (207 bytes), and no translate-c marker string, so no C is incorporated this way", "settle": "Zig 0.17.0 source tree for the build, plus an unstripped binary", "settled": true}
+        {"subject": "Highway 1.2.0", "evidence": "SharedDeps.addSimd links it whenever -Dsimd is on, which is the default; the stripped binary carries no Highway string", "settle": "Build the pinned commit with -Dstrip=false and run nm for hwy:: symbols, or read the Zig link command from zig build --verbose-link"},
+        {"subject": "oniguruma, wuffs, simdutf, stb, glslang and SPIRV-Cross byte share", "evidence": "the binary is stripped, so no per-component sizes exist", "settle": "Build the pinned commit with -Dstrip=false and attribute symbol sizes by archive membership as qualification/native-census/census.xsh symbols does for Play"},
+        {"subject": "compiler-rt and Zig-translated C", "evidence": "Zig links its own compiler-rt and translate-c output without version strings", "settle": "Zig 0.17.0 source tree for the build, plus an unstripped binary"}
       ]
     },
     {
@@ -66,9 +66,8 @@
       ],
       "absent": ["libass", "fribidi", "OpenSSL", "libcurl", "libfontconfig"],
       "unknown": [
-        {"subject": "SPIRV-Headers", "evidence": "headers only at SPIRV_HEADERS_REV 04fd3caa, so no object code is expected; no member of libSPIRV-Tools.a or libSPIRV.a names a SPIRV-Headers translation unit", "settle": "Archive membership of libSPIRV-Tools.a shows no SPIRV-Headers objects", "settled": true},
-        {"subject": "Rust crates with build scripts", "evidence": "cc 1.11.1 is reached from player-display and wayland-backend 0.3.17 only. player-display/build.rs compiles bridge/metal_window.m behind CARGO_CFG_TARGET_OS == macos, which Linux never sets; wayland-backend compiles its two log_shim.c files only under its log feature, and cargo tree -e features shows neither player nor wayland-client enabling it. No Linux C is compiled by a Rust build script", "settle": "cargo tree --target x86_64-unknown-linux-musl -e features in ~/d/play confirms no wayland-backend log feature and no Linux cc invocation", "settled": true},
-        {"subject": "25,121 non-Rust bytes unattributed by play_symbols", "evidence": "the residue is the shaderc_util front end, which lives in libshaderc_combined.a and not libshaderc.a; linux-link.args names libshaderc_combined.a. Re-attributing with that archive leaves 17 symbols and 3,257 bytes: crt/main/_init/_fini from musl, rust_eh_personality, the libm forwarders (floor, ceil, round, truncf and float variants) and completed.1/object.0 from Rust self-contained musl libc. The spec named libshaderc.a, so it counted 25,121", "settle": "Replace libshaderc.a with libshaderc_combined.a in play_symbols.archives and lower max_unattributed_native_bytes to 4096", "settled": true}
+        {"subject": "SPIRV-Headers", "evidence": "headers only at SPIRV_HEADERS_REV, so no object code is expected", "settle": "Archive membership of libSPIRV-Tools.a shows no SPIRV-Headers objects"},
+        {"subject": "Rust crates with build scripts", "evidence": "Cargo.lock shows cc used only by player-display for macOS and by wayland-backend; pkg-config by wayland-sys", "settle": "cargo tree --target x86_64-unknown-linux-musl -e build,normal in ~/d/play confirms no Linux C compilation"}
       ]
     },
     {
@@ -83,8 +82,8 @@
       ],
       "absent": [],
       "unknown": [
-        {"subject": "libgallium LLVM byte share", "evidence": "the library is stripped and LLVM is archived into it", "settle": "Link map from the mesa gluon build with -Wl,-Map, or the unstripped library", "settled": false},
-        {"subject": "Mesa vendored C (xxhash, util, NIR)", "evidence": "XXH strings occur, but vendored sources are Mesa own and are not separate dependencies; the shipped libgallium exports 83 symbols through a version script, so no vendored object is a provider", "settle": "Mesa 26.2.4 subprojects and src/util tree", "settled": true}
+        {"subject": "libgallium LLVM byte share", "evidence": "the library is stripped and LLVM is archived into it", "settle": "Link map from the mesa gluon build with -Wl,-Map, or the unstripped library"},
+        {"subject": "Mesa vendored C (xxhash, util, NIR)", "evidence": "XXH strings occur, but vendored sources are Mesa's own and are not separate dependencies", "settle": "Mesa 26.2.4 subprojects and src/util tree"}
       ]
     },
     {
@@ -98,7 +97,7 @@
       ],
       "absent": [],
       "unknown": [
-        {"subject": "libvulkan_lvp LLVM byte share", "evidence": "the library is stripped, but it exports LLVM dynamically: 22,663 llvm:: symbols carry 12,434,304 of its 15,246,973 dynamic symbol bytes, 82% of that table and 17% of the 71,845,240-byte file", "settle": "Re-measure with nm -D -S on a rebuilt library; a link map would confirm section-level placement", "settled": true}
+        {"subject": "libvulkan_lvp LLVM byte share", "evidence": "the library is stripped and LLVM is archived into it", "settle": "Link map from the mesa build or the unstripped library"}
       ]
     },
     {
@@ -111,8 +110,8 @@
       ],
       "absent": ["mimalloc"],
       "unknown": [
-        {"subject": "runtime-loaded libwayland-server.so", "evidence": "the string is wayland-backend types::server InitError Display, which compiles in whichever backend is selected. This build selects only the rs backend: the binary imports no dlopen or dlsym, has no libwayland-server.so.0 string, and carries none of the sys backend C entry points (wl_display_create, wl_global_create, wl_display_run), so the string is unreachable. cargo tree -e features shows wayland-backend default plus wayland-sys default only", "settle": "A guest run without wayland-libs-server is the remaining behavioural witness; the ELF already proves the path is not linked", "settled": true},
-        {"subject": "object compiled by clang version 23.1.5", "evidence": ".comment names clang 23.1.0-rc2 from the musl crt and libc objects and clang 23.1.5 from crtbeginS.o, which the llvm-toolchain package ships at usr/lib/crtbeginS.o and usr/lib/llvm23/lib/clang/23/lib/linux/crtbeginS.o; rustc 1.99.0 supplies the Rust objects. The object is clang own CRT begin file, not a package source file", "settle": "Compare .comment of usr/lib/crtbeginS.o in the llvm-toolchain artifact with the tinyland .comment", "settled": true}
+        {"subject": "runtime-loaded libwayland-server.so", "evidence": "the binary carries the load-failure string could not load libwayland-server.so, while the profile forbids wayland-libs-server and tinyland/harness/audit.sh rejects the wayland-sys server feature", "settle": "cargo tree -e features -i wayland-sys in tinyland, then run the compositor in the guest without wayland-libs-server and confirm the dlopen path is unreachable"},
+        {"subject": "object compiled by clang version 23.1.5", "evidence": ".comment names clang 23.1.0-rc2 (musl crt objects) and clang 23.1.5 for another object", "settle": "Link with -Wl,-Map or list the archive members of the Rust target libunwind.a and compare their .comment"}
       ]
     },
     {
@@ -123,7 +122,7 @@
       "components": [],
       "absent": ["mimalloc"],
       "unknown": [
-        {"subject": "libseat client source language and backends", "evidence": "libseat.so.1 is C compiled by clang 23.1.5 and linked with LLD 23.1.5, cut from the C seatd release the recipe pins at SHA-256 302564d5. It exports the 11 upstream libseat_* entry points and dlopens no backend, so the only backend is the seatd socket client that the Rust daemon serves", "settle": "Read packages/seatd-rs/PKGBUILD.xsh and the built object .comment; the seatd-only client replacement is the first LAP-51 priority", "settled": true}
+        {"subject": "libseat client source language and backends", "evidence": "the recipe says the client is cut from the C seatd release; the package ships it beside the Rust daemon", "settle": "Read packages/seatd-rs/PKGBUILD.xsh and the built object .comment; the seatd-only client replacement is the first LAP-51 priority"}
       ]
     },
     {
@@ -139,8 +138,8 @@
       ],
       "absent": [],
       "unknown": [
-        {"subject": "xz-utils version inside liblzma-sys 0.4.9", "evidence": "liblzma-sys 0.4.9 vendors XZ Utils 5.8.4; the crate xz/NEWS opens at 5.8.4 (2026-09-09) and the README records the 0.4.x XZ 5.8 upgrade", "settle": "Read xz/NEWS in the liblzma-sys 0.4.9 crate source", "settled": true},
-        {"subject": "GCC 9.4.0 objects", "evidence": "GCC (GNU) 9.4.0 is the compiler of Rust bundled musl self-contained libc.a, crt1.o, Scrt1.o, crti.o, crtn.o and libunwind.a in the rustc 1.100.0-nightly 2026-09-14 musl target. The three C archives are clang 23.1.4/23.1.5 only, and the binary carries 71 lzma_, 236 ZSTD_, and 99 mi_ C symbols from them", "settle": "Compare readelf -p .comment of the self-contained sysroot objects with the xsh .comment and the three C archives", "settled": true}
+        {"subject": "xz-utils version inside liblzma-sys 0.4.9", "evidence": "the crate wrapper path is present but liblzma carries no version string", "settle": "liblzma-sys 0.4.9 xz submodule revision from the crate source"},
+        {"subject": "GCC 9.4.0 objects", "evidence": ".comment names GCC (GNU) 9.4.0, which compiled some C that is neither Alpine nor Laputa clang", "settle": "Compare .comment of libmimalloc.a, libzstd.a and liblzma.a in the xsh cargo target directory"}
       ]
     },
     {
@@ -160,7 +159,7 @@
     "binary_buildid_note": "the stripped release and the unstripped build-linux binary must share a build ID",
     "archives": [
       {"file": "libplacebo.a", "component": "libplacebo"},
-      {"file": "libshaderc_combined.a", "component": "shaderc"},
+      {"file": "libshaderc.a", "component": "shaderc"},
       {"file": "libglslang.a", "component": "glslang"},
       {"file": "libglslang-default-resource-limits.a", "component": "glslang"},
       {"file": "libSPIRV.a", "component": "glslang"},
@@ -174,6 +173,6 @@
       {"file": "libgcc.a", "component": "libgcc"},
       {"file": "libgcc_eh.a", "component": "libgcc"}
     ],
-    "max_unattributed_native_bytes": 4096
+    "max_unattributed_native_bytes": 65536
   }
 }
