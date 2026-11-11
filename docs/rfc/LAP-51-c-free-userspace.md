@@ -189,6 +189,24 @@ production settings. Interleave at least five samples for timing claims and
 apply readiness checks before and immediately after accepted windows. No
 language choice alone establishes a size or performance improvement.
 
+Every candidate below carries the same four gate classes, defined in
+[Native census](../NATIVE-CENSUS.md#replacement-gates) and inherited here by
+reference: differential correctness against the C library as oracle through the
+real consumer, identical failure classes on hostile and boundary inputs, closure
+that removes the SONAME and adds nothing, and interleaved performance with
+readiness checks. The census records the per-candidate oracle, corpus, failure
+set, closure target, and workload. Defining a gate is not running it: no gate
+has been executed and no production default changes.
+
+| Candidate | Correctness oracle | Failure set | Closure proof | Performance workload |
+|---|---|---|---|---|
+| seatd client (`libseat.so.1`) | C client against the Rust daemon | disconnect, denied open, `EINTR`, FD exhaustion, fail closed | tinyland `DT_NEEDED` becomes `libc.so` alone | seat-open latency, tinyland guest startup |
+| libxkbcommon | Ghostty's `xkb_*` import list; every keycode, modifier, group | malformed keymap, missing XKB directory | `libxkbcommon.so.0` leaves; `xkeyboard-config` kept or replaced | keymap compile, per-key cost |
+| zlib (`libz.so.1`) | C oracle inflate at every level, round-trip, gzip, streaming | truncated, corrupt, bomb; allocator hooks | identical exported symbol set | `compress2` on RGBA, PCF inflate |
+| FreeType, HarfBuzz, libpng | final pixels: fallback, combining, ZWJ, color, variable axes, Arabic | FreeType fuzz corpus, malformed fonts | all three SONAMEs leave together | 100,000-iteration Arabic shape and rasterize; memory pairs |
+| Wayland client library | ABI for Mesa, Ghostty, Play | malformed protocol, disconnect | SONAME leaves only after all three qualify | startup and idle RSS |
+| Prebuilt-release statics | output equivalence: regex matches, shader validation, rendered frames | malformed shaders and images | per-component share shrinks in the unstripped baseline | render workload per component |
+
 ## Alternatives considered
 
 Rewrite every native dependency. This forces unrelated media, runtime, kernel,

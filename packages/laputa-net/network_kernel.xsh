@@ -120,10 +120,29 @@ pure ipv4_bytes(address: Str) -> Result[Bytes, Error] {
   bytes.from_ints([octet as Int for octet in address.split(".")])
 }
 
-## Map only an operation belonging to a valid, unchanged policy plan onto a typed change.
-export pure network_change(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Change, Error] {
+pure change_for(operation: policy.NetworkOperation, ifindex: Int) -> Result[net_state.Change, Error] {
+  match operation {
+    policy.NetworkBringLinkUp => Ok(net_state.LinkUp(ifindex))
+    policy.NetworkAddAddress(address) => Ok(net_state.AddAddress(typed_address(address, ifindex)))
+    policy.NetworkRemoveAddress(address) => Ok(net_state.RemoveAddress(typed_address(address, ifindex)))
+    policy.NetworkAddDefaultRoute(route) => {
+      if route.metric == 0 {
+        return Err(NetworkKernelError.Conflict("a zero-metric default route is never created because the kernel treats priority 0 as unset on removal, so it could not be removed exactly"))
+      }
+      Ok(net_state.AddRoute(typed_default_route(route, ifindex)))
+    }
+    policy.NetworkRemoveDefaultRoute(route) => {
+      if route.metric == 0 {
+        return Err(NetworkKernelError.Conflict("a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"))
+      }
+      Ok(net_state.RemoveRoute(typed_default_route(route, ifindex)))
+    }
+  }
+}
+
+pure validated_plan(plan: policy.NetworkPlan) -> Result[Unit, Error] {
   let expected = policy.network_plan(plan.intent, plan.owned, plan.before)?
-  if expected != plan or index < 0 or index >= plan.operations.len() {
+  if expected != plan {
     return Err(NetworkKernelError.Conflict("operation is not part of a valid policy plan"))
   }
   var predicted = plan.before
@@ -144,14 +163,41 @@ export pure network_change(plan: policy.NetworkPlan, index: Int) -> Result[net_s
     }
     predicted = after_operation(predicted, operation)
   }
-  let ifindex = plan.intent.ifindex
-  match plan.operations[index] {
-    policy.NetworkBringLinkUp => Ok(net_state.LinkUp(ifindex))
-    policy.NetworkAddAddress(address) => Ok(net_state.AddAddress(typed_address(address, ifindex)))
-    policy.NetworkRemoveAddress(address) => Ok(net_state.RemoveAddress(typed_address(address, ifindex)))
-    policy.NetworkAddDefaultRoute(route) => Ok(net_state.AddRoute(typed_default_route(route, ifindex)))
-    policy.NetworkRemoveDefaultRoute(route) => Ok(net_state.RemoveRoute(typed_default_route(route, ifindex)))
+  Ok()
+}
+
+## Every change of a valid, unchanged policy plan, in plan order, before any
+## effect. One unencodable removal refuses the whole plan, so no operation of a
+## plan that cannot finish exactly is ever applied.
+export pure network_changes(plan: policy.NetworkPlan) -> Result[List[net_state.Change], Error] {
+  validated_plan(plan)
+  Ok([change_for(operation, plan.intent.ifindex)? for operation in plan.operations])
+}
+
+## Map one operation belonging to a valid, unchanged policy plan onto a typed
+## change. The plan's own validity, including same-prefix ambiguity, is checked
+## for every operation; encodability is refused only for this operation, so the
+## whole set `network_changes` additionally refuses when a later one cannot be
+## expressed.
+export pure network_change(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Change, Error] {
+  validated_plan(plan)?
+  if index < 0 or index >= plan.operations.len() {
+    return Err(NetworkKernelError.Conflict("operation is not part of a valid policy plan"))
   }
+  change_for(plan.operations[index], plan.intent.ifindex)
+}
+
+## The observation a plan's first `count` operations must produce from its precondition.
+export pure network_after(plan: policy.NetworkPlan, count: Int) -> Result[policy.NetworkSnapshot, Error] {
+  let expected = policy.network_plan(plan.intent, plan.owned, plan.before)?
+  if expected != plan or count < 0 or count > plan.operations.len() {
+    return Err(NetworkKernelError.Conflict("operation is not part of a valid policy plan"))
+  }
+  var predicted = plan.before
+  for operation in plan.operations[0..count] {
+    predicted = after_operation(predicted, operation)
+  }
+  Ok(predicted)
 }
 
 pure typed_address(address: policy.NetworkAddress, ifindex: Int) -> net_state.Address {
@@ -165,6 +211,93 @@ pure typed_default_route(route: policy.NetworkDefaultRoute, ifindex: Int) -> net
     protocol: 3, scope: 0, route_type: 1, flags: 0,
     hops: [{ifindex, gateway: route.gateway}], other_attributes: [],
   }
+}
+
+## One live reconcile pass: the plan it applied, how many changes it attempted,
+## the observation it last trusted, its ordered replay events, and the verdict.
+## A conflict is a reported re-observation; nothing is rolled back or replayed.
+export type NetworkReconcile = {
+  plan: policy.NetworkPlan,
+  attempts: Int,
+  observed: policy.NetworkSnapshot?,
+  events: List[policy.NetworkReplayEvent],
+  result: policy.NetworkReplayResult,
+}
+
+## True when two observations name the same cohort, whatever their ordinals.
+export pure same_cohort(left: policy.NetworkSnapshot, right: policy.NetworkSnapshot) -> Bool {
+  left.ifindex == right.ifindex and left.name == right.name and left.kind == right.kind and left.up == right.up and left.addresses == right.addresses and left.routes == right.routes
+}
+
+## Observe and project the managed link, reporting an untrustworthy observation
+## as its own failure rather than an empty state.
+export proc network_observe(intent: policy.NetworkIntent, sequence: Int) [process, env, error] -> Result[policy.NetworkSnapshot, Error] {
+  network_project_state(net_state.observe()?, intent, sequence)
+}
+
+## Apply a planned change set through `net_state.apply`, re-observing before and
+## after every step. A stale precondition, refused operation, transport failure,
+## untrustworthy observation or lost notification stops the pass with an explicit
+## re-observation; no change is retried or reverted, and a refused change never
+## implies a rollback.
+export proc network_apply_plan(plan: policy.NetworkPlan, notifications: Int, sequence: Int) [process, env, net, error] -> Result[NetworkReconcile, Error] {
+  let changes = network_changes(plan)?
+  var events: List[policy.NetworkReplayEvent] = [policy.NetworkPrecondition(plan.before)]
+  var attempts = 0
+  var ordinal = sequence
+  if let lost = network_lost_events(net_state.drain(notifications)?) {
+    return Ok({plan, attempts, observed: null, events: events + [lost], result: policy.NetworkReobserve("lost events require full observation")})
+  }
+  var final = plan.before
+  for index in range(changes.len()) {
+    ordinal += 1
+    var precondition = plan.before
+    match network_observe(plan.intent, ordinal) {
+      Ok(observed) => { precondition = observed }
+      Err(problem) => return Ok({plan, attempts, observed: null, events, result: policy.NetworkReobserve(f"observing before operation {index} failed: {problem.message}")})
+    }
+    if !same_cohort(precondition, network_after(plan, index)?) {
+      return Ok({plan, attempts, observed: precondition, events, result: policy.NetworkReobserve(f"observation changed before operation {index}")})
+    }
+    attempts += 1
+    let outcome = network_outcome(index, net_state.apply(changes[index]))
+    events += [outcome]
+    ordinal += 1
+    if let lost = network_lost_events(net_state.drain(notifications)?) {
+      return Ok({plan, attempts, observed: null, events: events + [lost], result: policy.NetworkReobserve("lost events require full observation")})
+    }
+    var observed = plan.before
+    match network_observe(plan.intent, ordinal) {
+      Ok(reobserved) => { observed = reobserved }
+      Err(problem) => return Ok({plan, attempts, observed: null, events, result: policy.NetworkReobserve(f"observing after operation {index} failed: {problem.message}")})
+    }
+    final = observed
+    if outcome != policy.NetworkApplied(index) {
+      return Ok({plan, attempts, observed, events: events + [policy.NetworkObserved(observed)], result: policy.network_replay(plan, events)})
+    }
+    if !same_cohort(observed, network_after(plan, index + 1)?) {
+      return Ok({plan, attempts, observed, events: events + [policy.NetworkObserved(observed)], result: policy.NetworkReobserve(f"operation {index} was acknowledged but the observation diverged")})
+    }
+  }
+  if changes.is_empty() {
+    ordinal += 1
+    match network_observe(plan.intent, ordinal) {
+      Ok(reobserved) => { final = reobserved }
+      Err(problem) => return Ok({plan, attempts, observed: null, events, result: policy.NetworkReobserve(f"re-observing an unchanged plan failed: {problem.message}")})
+    }
+  }
+  events += [policy.NetworkObserved(final)]
+  Ok({plan, attempts, observed: final, events, result: policy.network_replay(plan, events)})
+}
+
+## Observe, plan and reconcile one managed link over one notification stream.
+## A plan with no changes attempts no mutation and still re-observes.
+export proc network_reconcile(intent: policy.NetworkIntent, owned: policy.NetworkOwnership, sequence: Int) [process, env, net, error] -> Result[NetworkReconcile, Error] {
+  let notifications = net_state.subscribe()?
+  defer unix.close_fd(notifications)
+  let observed = network_observe(intent, sequence)?
+  let plan = policy.network_plan(intent, owned, observed)?
+  network_apply_plan(plan, notifications, sequence)
 }
 
 ## The replay event for the kernel's verdict on one operation: a refusal is a denial; anything else that did not apply is a failure.
