@@ -74,7 +74,7 @@
     {
       "package": "mesa",
       "path": "usr/lib/libgallium-26.2.4.so",
-      "needed": ["libm.so", "libdrm.so.2"],
+      "needed": ["libdrm.so.2", "librt.so"],
       "runpath": "",
       "components": [
         {"name": "LLVM", "language": "C++", "version": "23.1.5", "origin": "llvm-static package linked into the Mesa gallium driver", "markers": ["LLVM version 23.1.5"]},
@@ -83,14 +83,14 @@
       ],
       "absent": [],
       "unknown": [
-        {"subject": "libgallium LLVM byte share", "evidence": "the library is stripped and LLVM is archived into it", "settle": "Link map from the mesa gluon build with -Wl,-Map, or the unstripped library", "settled": false},
+        {"subject": "libgallium LLVM byte share", "evidence": "the shipped library is stripped, so the mesa gluon build's -Wl,-Map link map measured it: libgallium-link.map (49,181,662 bytes, sha256 81e64a716aea29803459c87dc6460e8c1efbcde61e3981282a2bb0b3ade90b8a) attributes 44,830,058 bytes in 82,172 live input sections to llvm-static archives, 56% of the 80,492,448-byte linked image and 64% of the 69,526,696-byte shipped file; llvm-toolchain libc++/unwind adds 416,944 bytes in 2,311 live input sections, and all live input sections total 80,655,466 bytes", "settle": "Rebuild Mesa through packages/mesa/PKGBUILD.xsh, which rewrites the libgallium link edge with -Wl,-Map=libgallium-link.map and prints the llvm-static, llvm23 and total live input-section bytes to the mesa build log", "settled": true},
         {"subject": "Mesa vendored C (xxhash, util, NIR)", "evidence": "XXH strings occur, but vendored sources are Mesa own and are not separate dependencies; the shipped libgallium exports 83 symbols through a version script, so no vendored object is a provider", "settle": "Mesa 26.2.4 subprojects and src/util tree", "settled": true}
       ]
     },
     {
       "package": "mesa",
       "path": "usr/lib/libvulkan_lvp.so",
-      "needed": ["libm.so", "libdrm.so.2", "libwayland-client.so.0", "libudev.so.1"],
+      "needed": ["librt.so", "libdrm.so.2", "libwayland-client.so.0", "libudev.so.1"],
       "runpath": "",
       "components": [
         {"name": "LLVM", "language": "C++", "version": "23.1.5", "origin": "llvm-static package linked into lavapipe", "markers": ["LLVM version 23.1.5", "llvmpipe (LLVM 23.1.5"]},
@@ -98,7 +98,7 @@
       ],
       "absent": [],
       "unknown": [
-        {"subject": "libvulkan_lvp LLVM byte share", "evidence": "the library is stripped, but it exports LLVM dynamically: 22,663 llvm:: symbols carry 12,434,304 of its 15,246,973 dynamic symbol bytes, 82% of that table and 17% of the 71,845,240-byte file", "settle": "Re-measure with nm -D -S on a rebuilt library; a link map would confirm section-level placement", "settled": true}
+        {"subject": "libvulkan_lvp LLVM byte share", "evidence": "the library is stripped, but it exports LLVM dynamically: 26,119 llvm:: symbols carry 14,039,676 of its 15,246,662 dynamic symbol bytes, 92% of that table and 19% of the 72,800,264-byte file", "settle": "Re-measure with llvm-nm -D -S --defined-only --demangle on a rebuilt library; a link map would confirm section-level placement", "settled": true}
       ]
     },
     {

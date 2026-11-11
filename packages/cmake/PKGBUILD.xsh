@@ -61,7 +61,7 @@ export const filetree = [
   },
   {
     path: p"usr/share/cmake",
-    kind: "symlink",
+    kind: "tree",
   },
   {
     path: p"usr/share/doc/cmake-build/licenses/rust-std/alloc-0.0.0",
@@ -111,4 +111,16 @@ export proc build(dest: Path) [fs, error] {
   }
 
   let _ = fs.copy_tree(source, target, parents: true, overwrite: true)?
+  # The cmake-build tarball ships `share/cmake` as a compatibility symlink to
+  # `share/cmake-<ver>`, which cannot merge with the CMake package configs other
+  # packages install beneath `share/cmake`.
+  let share_cmake = fp"{dest}/usr/share/cmake"
+
+  if share_cmake.is_symlink() {
+    share_cmake.remove()
+  }
+
+  if ! share_cmake.exists() {
+    share_cmake.mkdir()
+  }
 }

@@ -287,6 +287,7 @@ const mesa_options = [
 ]
 
 const vendored_generator = "build-support/laputa-vendored-output.xsh"
+const libgallium_link_map = "libgallium-link.map"
 
 error MesaBuildError = Failed(kind: Str, message: Str)
 
@@ -574,6 +575,83 @@ proc stage_vendored_outputs() {
   print f"mesa: staged {split.vendored.len() - unvendored.len()} vendored outputs; unvendored: {unvendored.join(" ")}"
 }
 
+proc add_libgallium_link_map() -> Result[Str, Error] {
+  let ninja = p"build/build.ninja"
+  var output: List[Str] = []
+  var in_edge = false
+  var library = ""
+
+  for line in ninja.read_text()?.split("\n") {
+    if line.starts_with("build ") {
+      let head = line.split(": ")[0]
+      in_edge = head.ends_with(f"/libgallium-{ver}.so")
+
+      if in_edge {
+        library = head.byte_slice(6)
+      }
+    }
+
+    if in_edge and line.starts_with("  LINK_ARGS = ") {
+      let args = line.byte_slice(14)
+      output += [f"  LINK_ARGS = -Wl,-Map={libgallium_link_map} {args}"]
+      in_edge = false
+      continue
+    }
+
+    output += [line]
+  }
+
+  if library == "" {
+    return Err(
+      MesaBuildError.Failed(kind: "mesa-link-map", message: f"build.ninja has no libgallium-{ver}.so link edge"),
+    )
+  }
+
+  ninja.write(output.join("\n"))
+  library
+}
+
+proc report_libgallium_link_map(link_map_path: Path, library: Path) -> Result[Str, Error] {
+  guard link_map_path.exists() else {
+    return Err(MesaBuildError.Failed(kind: "mesa-link-map", message: f"the libgallium link wrote no map at {link_map_path}"))
+  }
+
+  var llvm_bytes = 0
+  var llvm_sections = 0
+  var cxx_bytes = 0
+  var cxx_sections = 0
+  var included_bytes = 0
+
+  for line in link_map_path.read_lines()? {
+    let fields = line.fields()
+    continue unless fields.len() >= 5
+
+    let input = fields[4]
+    continue unless ":(" in input
+
+    let size = f"0x{fields[2]}".parse_int() ?? 0
+    included_bytes += size
+
+    if "/usr/lib/llvm-static/" in input {
+      llvm_bytes += size
+      llvm_sections += 1
+    } else if "/usr/lib/llvm23/lib/" in input {
+      cxx_bytes += size
+      cxx_sections += 1
+    }
+  }
+
+  if llvm_bytes == 0 {
+    return Err(
+      MesaBuildError.Failed(kind: "mesa-link-map", message: f"{link_map_path} attributes no live input section to llvm-static"),
+    )
+  }
+
+  let file_size = fs.stat(library)?.size
+  let map_size = fs.stat(link_map_path)?.size
+  f"mesa link map: {link_map_path.display()} {map_size} bytes sha256 {hash.sha256(link_map_path)?.hex()}; libgallium {library.display()} {file_size} bytes; LLVM {llvm_bytes} bytes in {llvm_sections} live input sections; llvm-toolchain libc++/unwind {cxx_bytes} bytes in {cxx_sections} live input sections; all live input sections {included_bytes} bytes"
+}
+
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let meson = process.which("meson")?
@@ -593,7 +671,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   }) {
     run $meson @setup_args
     stage_vendored_outputs()
+    let libgallium = add_libgallium_link_map()?
     run $ninja "-C" "build" $jobs_flag
+    print report_libgallium_link_map(fp"build/{libgallium_link_map}", fp"build/{libgallium}")?
 
     env ({
       DESTDIR: dest,

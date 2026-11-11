@@ -55,9 +55,9 @@ must be explained before the audit passes. Every unknown needs its evidence and
 a step that would settle it, and each carries `settled`. The run prints the
 closed and open counts per binary and ends with
 `native census verified: N binaries; M attributions open`, so a remaining
-attribution is visible in the output rather than assumed away. On this root the
-only open entry is `libgallium LLVM byte share`. Negative runs of a removed
-marker, a removed provider entry, and a removed `DT_NEEDED` entry each fail.
+attribution is visible in the output rather than assumed away. On this root no
+attribution remains open. Negative runs of a removed marker, a removed provider
+entry, and a removed `DT_NEEDED` entry each fail.
 
 `symbols` attributes the symbols of an unstripped build to the archives that
 were linked into it. It requires the unstripped and released binaries to share
@@ -274,17 +274,22 @@ only imported zlib function.
 
 ## Other binaries in the root
 
-**Mesa.** `libgallium-26.2.4.so` (68,098,416 bytes) and `libvulkan_lvp.so`
-(71,845,240) each embed LLVM 23.1.5 from `llvm-static` with its libc++abi, and
-libgallium also carries LLVM's libunwind. Both are stripped. `libvulkan_lvp.so`
-exports its LLVM symbols dynamically: 22,663 `llvm::` symbols carry 12,434,304
-of the library's 15,246,973 dynamic symbol bytes — 82% of that symbol table and
-17% of the 71,845,240-byte file, before section padding. `libgallium-26.2.4.so` exports only 83
+**Mesa.** `libgallium-26.2.4.so` (69,526,696 bytes) and `libvulkan_lvp.so`
+(72,800,264) each embed LLVM 23.1.5 from `llvm-static` with its libc++abi, and
+libgallium also carries LLVM's libunwind. Both are stripped and need
+`librt.so` (musl's libc alias) and `libdrm.so.2`. `libvulkan_lvp.so`
+exports its LLVM symbols dynamically: 26,119 `llvm::` symbols carry 14,039,676
+of the library's 15,246,662 dynamic symbol bytes — 92% of that symbol table and
+19% of the 72,800,264-byte file, before section padding. `libgallium-26.2.4.so` exports only 83
 symbols through a version script and links `llvm-static` with
 `-Wl,--gc-sections`; the string `LLVM version 23.1.5` is present but no
-`llvm::` symbol survives, so its LLVM share needs a link map
-(`-Wl,-Map`) from the Mesa package build, which this census does not run. That
-one byte share remains open.
+`llvm::` symbol survives in the stripped library. The Mesa recipe builds the
+link with `-Wl,-Map=libgallium-link.map` and reports the live input-section
+totals to its build log: the 49,181,662-byte map attributes 44,830,058 bytes in
+82,172 sections to `llvm-static` archives and 416,944 bytes in 2,311 sections
+to llvm-toolchain's libc++ and libunwind. That is 56% of the 80,492,448-byte
+linked image and 64% of the 69,526,696-byte stripped file, and it closes the
+byte-share attribution.
 
 **tinyland.** It needs `libseat.so.1` (seatd-rs) and `libc.so` (musl) and has
 no `RUNPATH`. Its only static native code observed is the LLVM libunwind

@@ -65,6 +65,12 @@ test test_flex_local_source_matches_declared_checksum [fs, env, error] {
   assert_local_source_checksums("flex")
 }
 
+test test_vulkan_headers_build_root_carries_the_cxx_toolchain [fs, env, error] {
+  let pkg = recipe.load_package(p"packages/vulkan-headers")?
+
+  assert "llvm-toolchain" in pkg.mkdeps_host, "vulkan-headers runs CMake's C++ compiler test, so its build root needs the compiler driver and libc++"
+}
+
 test test_recipe_selects_target_filetree_variant [fs, env, error] {
   let x86 = recipe.load_package_for_target(p"packages/musl", types.target_x86_64())?
   let arm = recipe.load_package_for_target(p"packages/musl", types.target_aarch64())?

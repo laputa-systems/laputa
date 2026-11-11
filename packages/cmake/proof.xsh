@@ -10,8 +10,12 @@ proc main(rootfs = p"/rootfs") [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/cpack", "cpack")
   proof.target_elf(rootfs, p"usr/bin/ctest", "ctest")
 
-  if ! fp"{rootfs}/usr/share/cmake/Modules/CMake.cmake".exists() {
+  if ! fp"{rootfs}/usr/share/cmake-4.4/Modules/CMake.cmake".exists() {
     Err(ScriptError.Failed(kind: "cmake-proof", message: "missing CMake module tree"))?
+  }
+
+  if fp"{rootfs}/usr/share/cmake".is_symlink() or ! fp"{rootfs}/usr/share/cmake".is_dir() {
+    Err(ScriptError.Failed(kind: "cmake-proof", message: "usr/share/cmake is not a directory"))?
   }
 
   if pm_util.build_arch()? != pm_util.target_arch()? {

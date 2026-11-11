@@ -16,7 +16,7 @@ export const rel = "1"
 export const deps: List[Str] = []
 
 ## Package recipe export.
-export const mkdeps_host = ["cmake", "gluon"]
+export const mkdeps_host = ["llvm-toolchain", "cmake", "gluon"]
 
 ## Package recipe export.
 export const upstream_sources = [
