@@ -102,6 +102,15 @@ bash tests/docker/ntpd_privileges.sh laputa-package-tools:TAG "$PWD/.out/seed/x8
 It checks the launched identity and capability sets and refuses a conflicting
 UID before changing the runtime directory. It does not qualify clock steering.
 
+### Run the DHCP lifecycle proof
+
+`python3 tests/integration/dhcp_lifecycle.py` needs the built `qemu-maintained` image and
+KVM. It owns one unprivileged user and network namespace, a tap, a scripted DHCPv4/DNS
+server, and a virtio-serial control agent installed only on the disposable state disk, so
+lease expiry and link loss never cut the control channel. Pass `--xsh` and `--core` for
+the seed that built the image. It walks renewal, rebind, NAK, expiry, restart, link loss,
+NIC reappearance, and pause/resume, then boots offline.
+
 ### Run the maintained clock drill
 
 `python3 tests/integration/maintained_ntp.py` needs the built `qemu-maintained` image,

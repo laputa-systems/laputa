@@ -373,6 +373,17 @@ that SSH administration recovers through the declared network behavior. Boot and
 local rescue still work offline. Qualify IPv4 and IPv6 separately and report
 unsupported modes explicitly.
 
+**Status: IPv4 lifecycle proven on Linux x86_64/KVM; IPv6 and SSH recovery
+open.** `tests/integration/dhcp_lifecycle.py` boots the built `qemu-maintained`
+image against a scripted DHCPv4/DNS server with short leases and passes initial
+bind, renewal with changed DNS and routes, rebind, NAK, a replacement lease,
+expiry, daemon restart with INIT-REBOOT from the saved lease, link loss, NIC
+reappearance after a PCI remove and rescan, pause and resume, a steady-state
+sample with no duplicate or stale configuration, and an offline boot that stays
+locally administrable. The run found two XSH client defects, fixed upstream: a
+negative wait after a slow re-acquisition and a re-created NIC left down. SSH
+recovery through the declared network and IPv6 policy are not yet qualified.
+
 ### Time discipline and bootstrap
 
 The in-tree `ntpd-rs` has a Graviola/rustcrypto musl package and xinit service.
