@@ -423,7 +423,7 @@ def provision(args, work):
     shutil.copy(ROOT / "packages/nftables/nftables.conf", staging / "etc/nftables.conf")
     (staging / "etc/network").mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / "packages/laputa-net/interfaces", staging / "etc/network/interfaces")
-    for directory, mode in (("var/lib/dhcpc", 0o700), ("var/lib/laputa", 0o755), ("var/lib/ntpd-rs", 0o755), ("var/log", 0o755)):
+    for directory, mode in (("var/lib/dhcpc", 0o700), ("var/lib/laputa", 0o755), ("var/log", 0o755)):
         path = staging / directory
         path.mkdir(parents=True, exist_ok=True)
         path.chmod(mode)
@@ -664,6 +664,8 @@ def step_remote(args, work, port, key, admin_key, pin, hostname, digest):
 
     clock = service_state(args, work, port, key, pin, "ntpd-rs")
     assert clock is not None, "the maintained profile installs ntpd-rs"
+    assert clock["state"] == "running" and clock["ready"], clock
+    assert clock["restarts"] == 0, clock
     log(f"clock status: ntpd-rs state={clock['state']} ready={clock['ready']} restarts={clock['restarts']}")
 
     diagnosis = remote(args, work, port, key, pin, "diagnose")

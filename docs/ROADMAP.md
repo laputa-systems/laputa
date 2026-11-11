@@ -251,8 +251,7 @@ identity and state preserved, then health-confirms and commits a repaired C and
 reads its boot history across a reboot. Open: step 6 blank-disk restore in the
 same run, natural T1/T2 lease renewal, non-root restart authority (`/run/xinit`
 is root-owned, so the drill uses a key-only UID 0 administrator), a host record
-that names the failed generation after fallback, `ntpd-rs` readiness in this
-profile, physical power loss, Linux aarch64, Asterinas, a macOS client, and
+that names the failed generation after fallback, physical power loss, Linux aarch64, Asterinas, a macOS client, and
 signed release authenticity.
 
 This is the organizing product milestone, not a new manager,

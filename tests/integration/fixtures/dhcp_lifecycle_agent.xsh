@@ -140,6 +140,20 @@ proc nic_cycle() -> Result[Record, Error] {
   Ok({device: device.display(), ifindex_before: before, ifindex_after: after})
 }
 
+proc ntp_status() -> Result[Record, Error] {
+  let out = p"/run/ntp-offline-ctl.out"
+  let err = p"/run/ntp-offline-ctl.err"
+  let config = p"/usr/share/ntpd-rs/ntp.toml"
+  let status = process.run(process.command_argv(p"/usr/bin/ntp-ctl", ["ntp-ctl", "status", "-c", f"{config}"], p"/", {}, b"", out, err, timeout: 15s))?
+  Ok({
+    service: optional_json(p"/run/xinit/ntpd-rs.json")?,
+    log: text_of(p"/var/log/ntpd-rs/current", 65536)?,
+    ctl_exit: status.exit_code()?,
+    ctl: text_of(out, 16384)?,
+    ctl_error: text_of(err, 4096)?,
+  })
+}
+
 proc resolve(name: Str) -> Result[Record, Error] {
   let out = p"/run/dhcp-lifecycle-getent.out"
   let err = p"/run/dhcp-lifecycle-getent.err"
@@ -161,6 +175,8 @@ proc handle(fd: Int, line: Str) -> Result[Unit, Error] {
   } else if op == "resolve" {
     let name = json.get(request, ["name"], "").require(Str)?
     reply(fd, {ok: true, result: resolve(name)?})?
+  } else if op == "ntp" {
+    reply(fd, {ok: true, result: ntp_status()?})?
   } else if op == "log" {
     reply(fd, {ok: true, result: text_of(p"/var/log/dhcp-eth0/current", 32768)?})?
   } else {

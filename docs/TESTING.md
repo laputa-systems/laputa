@@ -125,6 +125,18 @@ monotonic clock to move less than 20 ms in 120 seconds with no logged jump. On 2
 the sync boot reached stratum 2 and the offline boot saw a one-millisecond change. The
 drill uses real operators, so a failure can be an operator outage; rerun before concluding.
 
+### Run the offline clock-readiness guest
+
+`python3 tests/integration/maintained_ntp_offline.py` needs the built `qemu-maintained`
+image and KVM but no outbound network. It owns a user and network namespace, a tap with no
+DHCP server, and the DHCP lifecycle control agent, so the guest has `eth0` without an
+address, default route or resolver and cannot reach any NTS-KE server. The disposable state
+disk leaves `/var/lib/ntpd-rs` absent, as the maintained provisioning does, so the launcher
+creates it with UID/GID 123 and mode 0700; a provisioner that pre-creates it with other
+ownership is refused by design. The daemon must report `running`, `ready` with no restarts,
+print stratum 16 through `ntp-ctl`, and keep the same process and readiness for 120 seconds.
+Unlike the maintained clock drill, this never contacts a real operator.
+
 ### Run the disposable NTP guest
 
 With the x86_64 seed, package-tools image and artifact closure already built,
