@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the roadmap G2 steps 1-5 on one installed x86_64/KVM VM.
+"""Run the roadmap G2 steps 1-6 on one installed x86_64/KVM VM.
 
 Step 1 provisions a fresh state disk, installs generation A from a built
 bundle through the host activation record, and keeps the immutable image free
@@ -16,6 +16,13 @@ selects the retained A after the bounded attempts and the state disk survives.
 Step 5 stages a repaired C, verifies its running receipt and declared service
 health over SSH, confirms it, and inspects the activation history across the
 following reboot.
+Step 6 drives the R7 restore drill's backup and restore phases against the same
+installed state disk, replaces it with the blank disk the repository restored,
+boots the committed generation, and proves the host key, operator-readable
+identity files, staged home sentinel, committed generation and boot history
+match the pre-restore values over the same pinned SSH path. No UID 0
+administrator exists; /etc/shadow is compared as bytes in the state image on
+the host before and after the restore, not read as root.
 
 The test consumes a bundle produced by the existing builder; it does not
 rebuild it. Staging digests pin bytes and are not an authenticity claim. The
@@ -24,9 +31,11 @@ PM generation_sha256 is the publisher identity the guest reports back.
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import pathlib
+import secrets
 import shutil
 import signal
 import socket
@@ -101,6 +110,12 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     let config = qemu.qemu_config(target)?
     let outputs = build.outputs(outputs_root)
     print json.encode({argv: qemu.boot_command_argv(config, maintained.profile, outputs, types.Test, state)?})?
+  } else if operation == "argv-plain" {
+    let outputs_root = Path(argv[2])
+    let target = qemu.host_qemu_target()?
+    let config = qemu.qemu_config(target)?
+    let outputs = build.outputs(outputs_root)
+    print json.encode({argv: qemu.boot_command_argv(config, maintained.profile, outputs, types.Test, null)?})?
   } else if operation == "confirm" {
     let report = json.read(Path(argv[2]))?.require(activation.GuestHealthReport)?
     var critical: List[Str] = []
@@ -235,7 +250,9 @@ def require_prerequisites(args, work):
         ("state formatter", ROOT / "packages/laputa-fs/files/mkfs.ext4.xsh"),
         ("activation recovery", ROOT / "tests/integration/activation_recovery.py"),
         ("activation ssh", ROOT / "tests/integration/activation_ssh.py"),
+        ("restore drill", ROOT / "tests/integration/restore_drill.py"),
         ("ssh-keygen", pathlib.Path(shutil.which("ssh-keygen") or "/nonexistent")),
+        ("mkfs.ext4", pathlib.Path(shutil.which("mkfs.ext4") or "/nonexistent")),
         ("qemu-system-x86_64", pathlib.Path(shutil.which("qemu-system-x86_64") or "/nonexistent")),
         ("strace", pathlib.Path(shutil.which("strace") or "/nonexistent")),
         ("unshare", pathlib.Path(shutil.which("unshare") or "/nonexistent")),
@@ -248,6 +265,15 @@ def require_prerequisites(args, work):
         missing.append(f"host architecture {os.uname().machine} is not x86_64")
     if not args.dropbearkey.exists():
         missing.append(f"dropbearkey: {args.dropbearkey} (pass --dropbearkey or set LAPUTA_ARTIFACT_STORE)")
+    available = set()
+    if args.artifact_store.exists():
+        for entry in args.artifact_store.iterdir():
+            metadata = entry / "artifact.json"
+            if metadata.exists():
+                available.add(json.loads(metadata.read_text()).get("package_name", ""))
+    for package in ("rustic", "gnu-stubs"):
+        if package not in available:
+            missing.append(f"{package} artifact: {args.artifact_store}")
     if missing:
         print("SKIP: missing prerequisites:\n  " + "\n  ".join(missing), file=sys.stderr)
         sys.exit(77)
@@ -417,8 +443,8 @@ def provision(args, work):
 
     install_strace_tools(staging)
 
-    shadow = (staging / "etc/shadow").read_text().splitlines()
-    operator_shadow = [line for line in shadow if line.startswith(f"{OPERATOR}:")]
+    shadow_body = (staging / "etc/shadow").read_bytes()
+    operator_shadow = [line for line in shadow_body.decode().splitlines() if line.startswith(f"{OPERATOR}:")]
     assert len(operator_shadow) == 1 and operator_shadow[0].split(":")[1] == "*", "operator password is not locked"
     passwd = (staging / "etc/passwd").read_text().splitlines()
     operator_passwd = [line for line in passwd if line.startswith(f"{OPERATOR}:")]
@@ -449,7 +475,7 @@ def provision(args, work):
     body = "".join(line for line in client_key.read_text().splitlines() if not line.startswith("-----"))
     if contains_bytes(bundle / "disk.img", body[80:144].encode()):
         fail("the immutable generation disk contains the operator private key")
-    return client_key, operator_uid, fingerprint, state_image, hostname
+    return client_key, operator_uid, fingerprint, state_image, hostname, shadow_body
 
 
 def patch_argv(raw, port, console, qmp, work):
@@ -613,6 +639,130 @@ def poweroff_guest(args, work, port, key, pin, child, log_file, label):
     log(f"poweroff {label}: operator flushed guest filesystems, QEMU quit 0")
 
 
+def load_restore_drill():
+    path = ROOT / "tests/integration/restore_drill.py"
+    spec = importlib.util.spec_from_file_location("g2_restore_drill", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def restic_search(args):
+    roots = [ROOT, *ROOT.parents]
+    if len(args.artifact_store.parents) > 4:
+        roots.append(args.artifact_store.parents[4])
+    return [path for path in (root / ".cache/restore-tools" for root in roots) if path.is_dir()]
+
+
+def restore_identity(args, work, port, key, pin):
+    files = {}
+    for path in ("/etc/passwd", "/etc/group", "/etc/hostname",
+                 "/etc/laputa/first-boot/applied", f"/home/{OPERATOR}/.ssh/authorized_keys"):
+        result = remote(args, work, port, key, pin, "read", path)
+        assert result["exit_code"] == 0, (path, result)
+        files[path] = result["stdout"]
+    return files
+
+
+def assert_shadow_preserved(image, shadow_body, label):
+    assert contains_bytes(image, shadow_body), (
+        f"the {label} state image does not carry the provisioned /etc/shadow bytes; "
+        "the no-root model compares shadow in the image, never as a root reader"
+    )
+
+
+def step_restore(args, work, state_dir, outputs, state_image, client_key, shadow_body,
+                 fingerprint, hostname, digest, sentinel, child, log_file, port, launched):
+    restore = load_restore_drill()
+    log("step 6: R7 blank-disk restore of the committed generation")
+    reference = {
+        "info": remote(args, work, port, client_key, fingerprint, "info"),
+        "inspection": remote(args, work, port, client_key, fingerprint, "inspect"),
+        "markers": boot_markers(args, work, port, client_key, fingerprint),
+        "sentinel": remote(args, work, port, client_key, fingerprint, "read", f"/home/{OPERATOR}/g2-state-sentinel")["stdout"],
+        "identity": restore_identity(args, work, port, client_key, fingerprint),
+    }
+    assert reference["info"]["host_key"] == fingerprint, reference["info"]
+    assert reference["inspection"]["hostname"] == hostname, reference["inspection"]["hostname"]
+    assert reference["inspection"]["generation"]["generation_sha256"] == digest, reference["inspection"]["generation"]
+    assert reference["sentinel"] == sentinel, reference["sentinel"]
+    status_before = host(args, work, "status", state_dir)
+    assert status_before["current"] == "c" and status_before["fallback"] == "a", status_before
+    assert status_before["pending"] is None and status_before["last"] == "confirmed", status_before
+    log(f"step 6: captured {len(reference['markers'])} boot markers, operator-readable identity files, host key, sentinel and generation c")
+    poweroff_guest(args, work, port, client_key, fingerprint, child, log_file, "c-to-restore")
+
+    media = work / "restore"
+    media.mkdir()
+    password1 = ("test-only-restore1-" + secrets.token_hex(8) + "\n").encode()
+    password2 = ("test-only-restore2-" + secrets.token_hex(8) + "\n").encode()
+    restore.build_restore_tools(media, password1, password2, store=args.artifact_store,
+                                cache_dir=work / "restic-cache", search=restic_search(args))
+    skeleton_image = media / "skeleton.ext4"
+    restore.build_skeleton_state(skeleton_image, media, drill_hook=False)
+    backup_image = media / "backup.ext4"
+    blank_image = media / "blank.ext4"
+    assert_shadow_preserved(state_image, shadow_body, "committed")
+    assert not contains_bytes(skeleton_image, shadow_body), "the blank skeleton already carried the provisioned shadow"
+    state_before = sha256_file(state_image)
+    blank_before = sha256_file(blank_image)
+    assert not contains_bytes(blank_image, sentinel.encode()), "the restore target already carried the sentinel"
+    template = host(args, work, "argv-plain", state_dir, outputs)["argv"]
+    assert "LAPUTA_GENERATION_ID=" not in " ".join(template), template
+
+    restore.backup_state(template, state_image, state_image, backup_image,
+                         work / "restore-backup.log", work / "restore-backup.qemu.log", cwd=ROOT)
+    log("step 6: the committed state's identity, home and boot history were snapshotted with the first repository key removed")
+
+    restore.restore_state(template, skeleton_image, state_image, backup_image, blank_image,
+                          work / "restore-restore.log", work / "restore-restore.qemu.log", cwd=ROOT)
+    blank_after = sha256_file(blank_image)
+    assert blank_after != blank_before, "the restore left the blank disk untouched"
+    assert contains_bytes(blank_image, sentinel.encode()), "the restored disk does not carry the staged home sentinel"
+    assert_shadow_preserved(blank_image, shadow_body, "restored")
+    restore.install_state(blank_image, state_image)
+    assert sha256_file(state_image) == blank_after, "the state disk was not replaced by the restored blank"
+    assert sha256_file(state_image) != state_before, "the state disk still carries the pre-restore image"
+    log("step 6: the state disk was replaced by a blank disk restored through the R7 repository")
+
+    raw = host(args, work, "argv", state_dir, outputs)["argv"]
+    assert "LAPUTA_GENERATION_ID=c LAPUTA_BOOT_SERIAL=3" in " ".join(raw), raw
+    console = work / "console-restored.log"
+    port = free_port()
+    child, log_file = launch(patch_argv(raw, port, console, outputs / "qmp.sock", work),
+                             console, work / "qemu-restored.log")
+    launched.append((child, log_file))
+    try:
+        wait_ssh(child, console, port)
+        health = wait_health(args, work, port, client_key, fingerprint)
+        assert health["generation_id"] == "c" and health["boot_serial"] == 3, health
+        assert health["root_digest"] == digest, health
+        info = remote(args, work, port, client_key, fingerprint, "info")
+        assert info["host_key"] == fingerprint, info
+        inspection = remote(args, work, port, client_key, fingerprint, "inspect")
+        assert inspection["hostname"] == hostname, inspection["hostname"]
+        assert inspection["generation"] == reference["inspection"]["generation"], inspection["generation"]
+        services = {item["name"]: item["state"] for item in inspection["services"]}
+        for name in CRITICAL_SERVICES:
+            assert services.get(name) == "running", (name, services)
+        sentinel_now = remote(args, work, port, client_key, fingerprint, "read", f"/home/{OPERATOR}/g2-state-sentinel")
+        assert sentinel_now["stdout"] == reference["sentinel"], sentinel_now
+        assert restore_identity(args, work, port, client_key, fingerprint) == reference["identity"], "the restored identity files changed"
+        markers = boot_markers(args, work, port, client_key, fingerprint)
+        pre = reference["markers"]
+        assert markers[:len(pre)] == pre, "the restored boot history lost its pre-restore entries"
+        assert len(markers) == len(pre) + 1, (pre, markers)
+        assert (markers[-1]["generation_id"], markers[-1]["boot_serial"], markers[-1]["failed_generation"]) == ("c", 3, ""), markers[-1]
+        status = host(args, work, "status", state_dir)
+        assert status == status_before, status
+        log("step 6: the restored VM boots committed c with the same identity, host key, sentinel, generation and boot history")
+    finally:
+        if child.poll() is None:
+            stop(child, log_file)
+        elif log_file is not None and not log_file.closed:
+            log_file.close()
+
+
 def wait_control_log(console, service, uid, timeout=20):
     marker = f"xinit-control accepted service={service} uid={uid} verb=restart"
     wait_until(lambda: marker in console_text(console), timeout, 0.25, marker)
@@ -722,7 +872,7 @@ def step_remote(args, work, port, key, pin, hostname, digest, console, operator_
 
 
 def scenario(args, work):
-    client_key, operator_uid, fingerprint, state_image, hostname = provision(args, work)
+    client_key, operator_uid, fingerprint, state_image, hostname, shadow_body = provision(args, work)
     log(f"step 1: provisioned {OPERATOR} with locked password and host key {fingerprint}")
 
     generation = json.loads((args.bundle / "generation.json").read_text())
@@ -925,6 +1075,9 @@ def scenario(args, work):
         info = remote(args, work, port, client_key, fingerprint, "info")
         assert info["host_key"] == fingerprint, info
         log("step 5: c rebooted as current with the same identity and state; failure/activation history persisted")
+
+        step_restore(args, work, state_dir, outputs, state_image, client_key, shadow_body,
+                     fingerprint, hostname, digest, sentinel, child, log_file, port, launched)
     finally:
         for child, log_file in launched:
             if child.poll() is None:
@@ -942,11 +1095,10 @@ def scenario(args, work):
     print("UNVERIFIED natural T1/T2 lease renewal (the run exercises persisted-lease reacquisition, supervised non-root restarts, and rebind after link loss)")
     print("UNVERIFIED physical power loss or host filesystem reordering (process death and ENOSPC only)")
     print("UNVERIFIED aarch64 guest, Asterinas/Firecracker backend, and macOS administration client")
-    print("UNVERIFIED clean PID 1 poweroff (the run removes the root account, flushes filesystems as the operator, and quits QEMU)")
-    print("UNVERIFIED G2 step 6 blank-disk restore (R7 tests/integration/restore_drill.py was not run)")
+    print("UNVERIFIED clean PID 1 poweroff (no UID 0 administrator is provisioned, the operator flushes filesystems and quits QEMU)")
     print("UNVERIFIED signed release authenticity (generation_sha256 is PM publisher identity; byte pins are operator authorization)")
     print("UNVERIFIED rebuild by this test (the prebuilt --bundle was consumed)")
-    print("PASS: G2 steps 1-5 on one installed x86_64/KVM VM")
+    print("PASS: G2 steps 1-6 on one installed x86_64/KVM VM")
 
 
 def parse_args():

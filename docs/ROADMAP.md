@@ -79,7 +79,8 @@ planning update incorporates the in-tree direction and the subsequently recorded
 DHCP/syslog, signed-snapshot, and self-hosting work. None of these documentation
 reviews reran build or guest proofs. Historical defects are not automatically
 current defects; the owning topic documents and exact-artifact evidence decide
-what remains. G2 below remains planned, not passed.
+what remains. G2's integrated scenario passes for the recorded Linux x86_64/KVM
+scope; the gaps listed with its status stay planned, not passed.
 
 **Supported direction:** Linux guests under QEMU on aarch64 and x86_64, plus the
 pinned x86_64 Asterinas/Firecracker backend. Linux aarch64 guest qualification
@@ -240,18 +241,23 @@ in a quiet-host accounting run.
 
 ## G2: The remotely maintainable VM
 
-**Status: steps 1-5 pass on Linux x86_64/KVM for one prebuilt `qemu-maintained`
-generation; step 6 and the open items below remain.** `tests/integration/g2_lifecycle.py`
+**Status: steps 1-6 pass on Linux x86_64/KVM under the no-root model for one
+prebuilt `qemu-maintained` generation.** `tests/integration/g2_lifecycle.py`
 provisions a unique host key and key-only credentials on a fresh state disk,
 installs A and boots the independent rescue root, inspects services, lease,
 resolver and diagnostics over verified native SSH, restarts supervised services
 as the non-root operator through xinit's `xinit-admin` control plane, and
 survives a link loss, stages B while chaining the existing recovery and SSH
 disconnect drills, falls back to A after two bounded B startup failures with
-identity and state preserved, then health-confirms and commits a repaired C and
-reads its boot history across a reboot. Open: step 6 blank-disk restore in the
-same run, natural T1/T2 lease renewal, physical power loss, Linux aarch64,
-Asterinas, a macOS client, and signed release authenticity.
+identity and state preserved, health-confirms and commits a repaired C, reads
+its boot history across a reboot, and restores C's state onto a blank disk
+through the R7 drill before verifying the restored host key,
+operator-readable identity files, staged home sentinel, committed generation
+and boot history over the same verified SSH path. No UID 0 administrator is
+provisioned; the restored `/etc/shadow` is compared as image bytes on the host,
+not read as root. Open: natural T1/T2 lease renewal, physical power loss, Linux
+aarch64, Asterinas, a macOS client, signed release authenticity, and clean
+PID 1 poweroff, which the no-root shutdown path does not exercise.
 
 This is the organizing product milestone, not a new manager,
 new test framework, or a claim that every R1-R7 capability has shipped. The unit

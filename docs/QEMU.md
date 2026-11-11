@@ -395,7 +395,7 @@ records separate VM filesystem publication cases.
 
 ### G2 integrated lifecycle
 
-`tests/integration/g2_lifecycle.py` runs roadmap G2 steps 1-5 on one installed
+`tests/integration/g2_lifecycle.py` runs roadmap G2 steps 1-6 on one installed
 x86_64/KVM VM:
 
 ```sh
@@ -410,8 +410,14 @@ Dropbear package artifact under `LAPUTA_ARTIFACT_STORE` (default
 `mount`, `ssh-keygen`, and the bundle's `vmlinuz`, `disk.img`, and
 `generation.json`. The artifact store must hold `baselayout`, `musl`, `xsh`,
 `xinit`, and `e2fsprogs` for the chained rescue drill; when it does not, the run
-prints that rescue is unverified and continues. `--keep` retains consoles, the
-state image, generation bundles, and the host activation record.
+prints that rescue is unverified and continues. Step 6 additionally needs the
+store's `rustic` and `gnu-stubs` artifacts, `mkfs.ext4`, and network access on
+the first run to fetch restic into a tool cache; missing artifacts or
+`mkfs.ext4` stop the run at its prerequisite check with exit 77 instead of
+reporting a pass, and the restore stage itself raises rather than degrading to
+a skip. `--keep` retains consoles, the state image, generation bundles, the
+restore media and backup repository, and the host activation record. Fetched
+restic is cached under `.cache/restore-tools`.
 
 The test provisions a fresh state disk with a unique Dropbear host key and a
 locked-password `probe` account whose first-boot record adds it to the reserved
@@ -439,22 +445,45 @@ selects retained A after the cap with `LAPUTA_FAILED_GENERATION=b` and the host
 record's `failure` naming B's receipt and two consumed attempts. The next stage
 clears that `failure` record; the persistent host key and a staged home sentinel
 survive, and the boot marker history names the A boots and failed B. The
-repaired C is staged from the
-bundle under policy revision 3, booted, checked for a matching running receipt
-and live `dropbear`, `logger`, and `dhcp-eth0`, and only then confirmed through
-`activation_confirm_guest_health`. A further C reboot shows the committed
-record and the retained four-entry history.
+repaired C is staged from the bundle under policy revision 3, booted, checked
+for a matching running receipt and live `dropbear`, `logger`, and `dhcp-eth0`,
+and only then confirmed through `activation_confirm_guest_health`. A further C
+reboot shows the committed record and the retained four-entry history.
 
-On 2026-11-11 this passed on Linux x86_64/KVM against the `qemu-maintained`
-generation `1db713b29fd2…` rebuilt from this tree with the verified
-`xinit-admin` control inbox. It establishes G2 steps 1-5 for that bundle only.
-It does not establish natural T1/T2 lease renewal, physical power loss, Linux
-aarch64, Asterinas, a macOS client, signed release authenticity, clean PID 1
-poweroff, or step 6 blank-disk restore. The maintained non-root `probe`
-account restarts supervised daemons through the xinit `xinit-admin` control
-plane; no UID 0 administrator is provisioned, and shutdown is an operator
-filesystem flush followed by a QMP quit. Staging digests pin bytes and the PM
-`generation_sha256` is publisher identity, not a signature.
+The last stage closes step 6 by driving the R7 restore drill's functions from
+`restore_drill.py` against that same committed C. It reads the pre-restore
+identity files, host key, staged home sentinel, running receipt, inspection
+record, and boot-marker history over verified SSH as the non-root `probe`
+operator, then flushes the guest filesystems and quits QEMU. `/etc/shadow` is
+never read as a UID 0 administrator; the fixture's `/etc/shadow` body is
+captured when the state disk is provisioned and matched as bytes inside the
+committed state image before the drill and inside the restored blank disk
+afterwards, the same raw-image inspection the harness already uses for the
+sentinel. The skeleton image used for the restore is required not to carry that
+body, so the containment check cannot pass on an untouched base. With the
+immutable image bundle and a template argv that carries no generation token, it
+snapshots C's `/etc`, `/home`, and `/var` into a fresh rustic repository on the
+backup disk after removing the first repository key, restores that repository
+onto a newly built blank state disk, and asserts the blank disk changed and
+carries the sentinel. The blank disk replaces the state disk, and the restored
+VM boots committed C with boot serial 3. The same verified SSH path then
+re-reads the operator-readable identity files, host key, sentinel, receipt,
+inspection, service states, and boot markers, requiring them to match the
+pre-restore capture; only one new marker entry may appear. The drill therefore
+runs its own backup/restore/verify code rather than a G2-side reimplementation.
+
+On 2026-11-12 this passed on Linux x86_64/KVM against the `qemu-maintained`
+generation `769b73813b3b…` built from this tree with the verified
+`xinit-admin` control inbox. It establishes G2 steps 1-6 under the no-root
+model for that bundle only: no UID 0 administrator is provisioned, the
+maintained `probe` account restarts supervised daemons through the xinit
+`xinit-admin` control plane and shutdown is an operator filesystem flush
+followed by a QMP quit. It does not establish natural T1/T2 lease renewal,
+physical power loss, Linux aarch64, Asterinas, a macOS client, signed release
+authenticity, or clean PID 1 poweroff, which remains unverified because no root
+operator can signal PID 1 in this model. Step 6 restores the committed state
+onto a blank disk through the R7 repository. Staging digests pin bytes and the
+PM `generation_sha256` is publisher identity, not a signature.
 
 ### Persistent diagnostics
 

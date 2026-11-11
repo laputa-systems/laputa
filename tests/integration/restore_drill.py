@@ -28,6 +28,15 @@ VERIFY_OK = "RESTORE_VERIFY_OK"
 PROOF_OK = "LAPUTA_MAINTAINED_PROOF_OK"
 FAILED = "LAPUTA_MAINTAINED_PROOF_FAILED"
 MARKER_COUNT = "LAPUTA_BOOT_MARKER_COUNT"
+RESTORE_VERIFY_MARKERS = (
+    "RESTORE_CHECK_OK",
+    "RESTORE_RESTIC_OK",
+    "RESTORE_REBACKUP_OK",
+    "RESTORE_KEYLOSS_OK",
+    "RESTORE_SECOND_KEY_OK",
+    "RESTORE_MASTERKEY_OK",
+    VERIFY_OK,
+)
 
 RESTIC_VERSION = "0.18.1"
 RESTIC_URL = (
@@ -40,6 +49,10 @@ RESTIC_BZ2_SHA256 = (
 RESTIC_BIN_SHA256 = (
     "01143daba61a1dc8afb0cb3d03ba83e6b118f55b6b146b27473a09efc3df13d6"
 )
+
+
+def artifact_store():
+    return pathlib.Path(os.environ.get("LAPUTA_ARTIFACT_STORE", root / ".out/artifacts/x86_64/v2/sha256"))
 
 
 def run_xsh(*args, timeout=60):
@@ -56,7 +69,7 @@ def drill_cmd(op, *args):
     return run_xsh(str(fixture), "--", op, *[str(a) for a in args])
 
 
-def stage_base(staging):
+def stage_base(staging, drill_hook=True):
     for name in ("etc", "home", "var"):
         (staging / name).mkdir(parents=True)
     base_etc = root / "packages/baselayout/files/rootfs/etc"
@@ -70,8 +83,9 @@ def stage_base(staging):
             subprocess.run(["cp", "-a", str(entry), str(staging / "etc")], check=True)
     subprocess.run(["cp", str(root / "profiles/qemu-maintained/etc/inittab"),
                     str(staging / "etc/inittab")], check=True)
-    with open(staging / "etc/inittab", "a") as handle:
-        handle.write("::once:/usr/bin/xsh /etc/laputa/drill/drill.xsh\n")
+    if drill_hook:
+        with open(staging / "etc/inittab", "a") as handle:
+            handle.write("::once:/usr/bin/xsh /etc/laputa/drill/drill.xsh\n")
     subprocess.run(["cp", str(root / "packages/nftables/nftables.conf"),
                     str(staging / "etc/nftables.conf")], check=True)
     (staging / "etc/network").mkdir(parents=True, exist_ok=True)
@@ -98,8 +112,8 @@ def make_state_image(staging, image, size="256M"):
     image.chmod(0o600)
 
 
-def stage_backup_disk(tools_dir, image, pw1, pw2, size="512M"):
-    staging = drill / "backup-staging"
+def stage_backup_disk(tools_dir, image, pw1, pw2, size="512M", staging_dir=None, store=None):
+    staging = pathlib.Path(staging_dir) if staging_dir is not None else drill / "backup-staging"
     subprocess.run(["rm", "-rf", str(staging)], check=True)
     (staging / "tools").mkdir(parents=True)
     (staging / "tools/rustic").write_bytes((tools_dir / "rustic").read_bytes())
@@ -108,12 +122,15 @@ def stage_backup_disk(tools_dir, image, pw1, pw2, size="512M"):
     (staging / "tools/restic").chmod(0o755)
     lib = staging / "tools/lib"
     lib.mkdir(parents=True)
-    store = root / ".out/artifacts/x86_64/v2/sha256"
+    store = pathlib.Path(store) if store is not None else artifact_store()
     gnu_stubs = next(
-        entry for entry in store.iterdir()
-        if (entry / "artifact.json").exists()
-        and json.loads((entry / "artifact.json").read_text()).get("package_name") == "gnu-stubs"
+        (entry for entry in store.iterdir()
+         if (entry / "artifact.json").exists()
+         and json.loads((entry / "artifact.json").read_text()).get("package_name") == "gnu-stubs"),
+        None,
     )
+    if gnu_stubs is None:
+        raise RuntimeError(f"no gnu-stubs artifact in {store}; the restore tools need its libgcc_s")
     with tarfile.open(str(gnu_stubs / "payload.tar.gz")) as archive:
         for member in ("usr/lib/libgcc_s.so", "usr/lib/libgcc_s.so.1"):
             reader = archive.extractfile(archive.getmember(member))
@@ -133,8 +150,10 @@ def stage_backup_disk(tools_dir, image, pw1, pw2, size="512M"):
     subprocess.run(["rm", "-rf", str(staging)], check=True)
 
 
-def provision_restic():
-    cache = root / ".cache/restore-tools"
+def provision_restic(cache_dir=None, search=None):
+    cache = pathlib.Path(cache_dir) if cache_dir is not None else root / ".cache/restore-tools"
+    if search is None:
+        search = (root / ".work/tmp/restore-tools",)
     cache.mkdir(parents=True, exist_ok=True)
     target = cache / f"restic_{RESTIC_VERSION}_linux_amd64"
     if target.exists():
@@ -142,9 +161,12 @@ def provision_restic():
         if digest != RESTIC_BIN_SHA256:
             raise RuntimeError(f"cached restic has unexpected sha256 {digest}")
         return target
-    for name in ("restic_0.18.1_linux_amd64", "restic_0.18.1_linux_amd64.bz2"):
-        candidate = root / ".work/tmp/restore-tools" / name
-        if candidate.exists() and name == "restic_0.18.1_linux_amd64":
+    for directory in search:
+        candidate = pathlib.Path(directory) / f"restic_{RESTIC_VERSION}_linux_amd64"
+        if candidate.exists():
+            digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+            if digest != RESTIC_BIN_SHA256:
+                raise RuntimeError(f"cached restic has unexpected sha256 {digest}")
             shutil.copy(str(candidate), str(target))
             return target
     archive = cache / "restic.bz2"
@@ -160,8 +182,8 @@ def provision_restic():
     return target
 
 
-def provision_rustic(tools_dir):
-    store = root / ".out/artifacts/x86_64/v2/sha256"
+def provision_rustic(tools_dir, quiet=False, store=None):
+    store = pathlib.Path(store) if store is not None else artifact_store()
     key = None
     for entry in store.iterdir():
         meta = entry / "artifact.json"
@@ -172,13 +194,14 @@ def provision_rustic(tools_dir):
             key = record["key"]
             break
     if key is None:
-        raise RuntimeError("no rustic artifact in the store; build it first")
+        raise RuntimeError(f"no rustic artifact in {store}; build it first")
     package_id = json.loads((store / key / "artifact.json").read_text())["package_id"]
     version = package_id.rsplit("-", 1)[0].rsplit("-", 1)[1]
     if version != "0.11.4":
         raise RuntimeError(f"unexpected rustic version: {package_id}")
-    print(f"PASS tooling: packaged rustic {version}, artifact {key}")
-    payload = (root / ".out/artifacts/x86_64/v2/sha256" / key / "payload.tar.gz")
+    if not quiet:
+        print(f"PASS tooling: packaged rustic {version}, artifact {key}")
+    payload = store / key / "payload.tar.gz"
     with tarfile.open(str(payload)) as archive:
         member = archive.getmember("usr/bin/rustic")
         reader = archive.extractfile(member)
@@ -188,7 +211,7 @@ def provision_rustic(tools_dir):
 
 
 def launch(argv, console, errlog, extra_cmdline="", extra_drives=(),
-           strip_proof_flag=False):
+           strip_proof_flag=False, cwd=None):
     fixed = list(argv)
     serial = fixed.index("-serial")
     fixed[serial + 1] = f"file:{console}"
@@ -213,7 +236,7 @@ def launch(argv, console, errlog, extra_cmdline="", extra_drives=(),
         pass
     console.unlink(missing_ok=True)
     err = open(errlog, "wb")
-    child = subprocess.Popen(fixed, stdout=subprocess.DEVNULL, stderr=err, cwd=root)
+    child = subprocess.Popen(fixed, stdout=subprocess.DEVNULL, stderr=err, cwd=cwd or root)
     return child, err
 
 
@@ -249,12 +272,15 @@ def fail_if_bad(console):
             raise RuntimeError(f"guest proof failed with {marker}; inspect {console}")
 
 
-def validate_verify_output(text):
+def validate_verify_output(text, marker_count=2, require_proof=True):
     for marker in ("Kernel panic", "not syncing", FAILED, "RESTORE_FAILED"):
         assert marker not in text, f"guest proof failed with {marker}"
-    for marker in (PROOF_OK, VERIFY_OK, f"{MARKER_COUNT} 2", "RESTORE_CHECK_OK",
-                   "RESTORE_RESTIC_OK", "RESTORE_REBACKUP_OK", "RESTORE_KEYLOSS_OK",
-                   "RESTORE_SECOND_KEY_OK", "RESTORE_MASTERKEY_OK"):
+    required = list(RESTORE_VERIFY_MARKERS)
+    if require_proof:
+        required.append(PROOF_OK)
+    if marker_count is not None:
+        required.append(f"{MARKER_COUNT} {marker_count}")
+    for marker in required:
         assert marker in text, f"missing {marker} after restore"
 
 
@@ -262,14 +288,80 @@ def boot_base_argv():
     return json.loads(drill_cmd("argv-plain"))["argv"]
 
 
+def install_state(source, dest):
+    if pathlib.Path(source).resolve() != pathlib.Path(dest).resolve():
+        shutil.copy(str(source), str(dest))
+
+
+def start_phase(argv, console, qemu_log, token, drives=(), extra="",
+                strip_proof_flag=True, cwd=None):
+    extra_cmdline = f" {extra.strip()} {token}" if extra.strip() else f" {token}"
+    return launch(argv, console, qemu_log, extra_cmdline, drives,
+                  strip_proof_flag=strip_proof_flag, cwd=cwd)
+
+
+def run_phase(argv, console, qemu_log, token, drives=(), extra="",
+              strip_proof_flag=True, timeout=420, expect=(), cwd=None):
+    guest, err = start_phase(argv, console, qemu_log, token, drives, extra=extra,
+                             strip_proof_flag=strip_proof_flag, cwd=cwd)
+    try:
+        for marker in expect:
+            wait_for(console, marker, timeout)
+        fail_if_bad(console)
+        return console.read_text(errors="replace")
+    finally:
+        stop_guest(guest, err, console)
+
+
+def backup_state(argv, state_source, state_dest, backup_image, console, qemu_log,
+                 extra="", cwd=None, timeout=420):
+    install_state(state_source, state_dest)
+    return run_phase(argv, console, qemu_log, "LAPUTA_RESTORE_BACKUP=1",
+                     [("backup", backup_image)], extra=extra, strip_proof_flag=True,
+                     timeout=timeout, expect=(BACKUP_OK,), cwd=cwd)
+
+
+def restore_state(argv, state_source, state_dest, backup_image, blank_image,
+                  console, qemu_log, extra="", cwd=None, timeout=420):
+    install_state(state_source, state_dest)
+    return run_phase(argv, console, qemu_log, "LAPUTA_RESTORE_RESTORE=1",
+                     [("backup", backup_image), ("blank", blank_image)], extra=extra,
+                     strip_proof_flag=True, timeout=timeout, expect=(RESTORE_OK,), cwd=cwd)
+
+
+def prepare_tools(tools_dir, cache_dir=None, quiet=False, store=None, search=None):
+    tools_dir.mkdir(parents=True, exist_ok=True)
+    provision_rustic(tools_dir, quiet=quiet, store=store)
+    shutil.copy(str(provision_restic(cache_dir, search=search)), str(tools_dir / "restic"))
+
+
+def build_restore_tools(drill_home, pw1, pw2, store=None, cache_dir=None, search=None):
+    tools_dir = drill_home / "tools"
+    prepare_tools(tools_dir, cache_dir=cache_dir, store=store, search=search)
+    stage_backup_disk(tools_dir, drill_home / "backup.ext4", pw1, pw2,
+                      staging_dir=drill_home / "backup-staging", store=store)
+    staging = drill_home / "blank-staging"
+    subprocess.run(["rm", "-rf", str(staging)], check=True)
+    staging.mkdir(parents=True)
+    make_state_image(staging, drill_home / "blank.ext4")
+    subprocess.run(["rm", "-rf", str(staging)], check=True)
+    return tools_dir
+
+
+def build_skeleton_state(image, drill_home, drill_hook=True):
+    staging = drill_home / "skeleton-staging"
+    subprocess.run(["rm", "-rf", str(staging)], check=True)
+    stage_base(staging, drill_hook=drill_hook)
+    if drill_hook:
+        stage_drill_files(staging)
+    make_state_image(staging, image)
+    subprocess.run(["rm", "-rf", str(staging)], check=True)
+
+
 def setup():
     for path in (state_image, drill):
         subprocess.run(["rm", "-rf", str(path)], check=True)
     drill.mkdir(parents=True)
-    tools_dir = drill / "tools"
-    tools_dir.mkdir(parents=True)
-    provision_rustic(tools_dir)
-    shutil.copy(str(provision_restic()), str(tools_dir / "restic"))
     pw1 = ("test-only-restore1-" + secrets.token_hex(8) + "\n").encode()
     pw2 = ("test-only-restore2-" + secrets.token_hex(8) + "\n").encode()
     staging = drill / "boot1-staging"
@@ -279,62 +371,32 @@ def setup():
     stage_drill_files(staging)
     make_state_image(staging, drill / "boot1-state.ext4")
     subprocess.run(["rm", "-rf", str(staging)], check=True)
-    staging = drill / "skeleton-staging"
-    subprocess.run(["rm", "-rf", str(staging)], check=True)
-    stage_base(staging)
-    stage_drill_files(staging)
-    make_state_image(staging, drill / "skeleton-state.ext4")
-    subprocess.run(["rm", "-rf", str(staging)], check=True)
-    stage_backup_disk(tools_dir, drill / "backup.ext4", pw1, pw2)
-    staging = drill / "blank-staging"
-    subprocess.run(["rm", "-rf", str(staging)], check=True)
-    staging.mkdir(parents=True)
-    make_state_image(staging, drill / "blank.ext4")
-    subprocess.run(["rm", "-rf", str(staging)], check=True)
+    build_skeleton_state(drill / "skeleton-state.ext4", drill)
+    build_restore_tools(drill, pw1, pw2)
 
 
 def phase_backup():
-    shutil.copy(str(drill / "boot1-state.ext4"), str(state_image))
-    console = drill / "backup.log"
-    guest, err = launch(
-        boot_base_argv(), console, drill / "backup.qemu.log",
-        " LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1 LAPUTA_RESTORE_BACKUP=1",
-        [("backup", drill / "backup.ext4")],
-        strip_proof_flag=True,
-    )
-    try:
-        wait_for(console, BACKUP_OK, 420)
-        fail_if_bad(console)
-        print("PASS backup: state dirs snapshotted with no generation in the set")
-    finally:
-        stop_guest(guest, err, console)
+    backup_state(boot_base_argv(), drill / "boot1-state.ext4", state_image,
+                 drill / "backup.ext4", drill / "backup.log", drill / "backup.qemu.log",
+                 extra="LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1")
+    print("PASS backup: state dirs snapshotted with no generation in the set")
 
 
 def phase_restore():
-    shutil.copy(str(drill / "skeleton-state.ext4"), str(state_image))
-    console = drill / "restore.log"
-    guest, err = launch(
-        boot_base_argv(), console, drill / "restore.qemu.log",
-        " LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1 LAPUTA_RESTORE_RESTORE=1",
-        [("backup", drill / "backup.ext4"), ("blank", drill / "blank.ext4")],
-        strip_proof_flag=True,
-    )
-    try:
-        wait_for(console, RESTORE_OK, 420)
-        fail_if_bad(console)
-        print("PASS restore: blank disk carries byte-identical identity files")
-    finally:
-        stop_guest(guest, err, console)
+    restore_state(boot_base_argv(), drill / "skeleton-state.ext4", state_image,
+                  drill / "backup.ext4", drill / "blank.ext4",
+                  drill / "restore.log", drill / "restore.qemu.log",
+                  extra="LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1")
+    print("PASS restore: blank disk carries byte-identical identity files")
 
 
 def phase_verify():
-    shutil.copy(str(drill / "blank.ext4"), str(state_image))
+    install_state(drill / "blank.ext4", state_image)
     console = drill / "verify.log"
-    guest, err = launch(
-        boot_base_argv(), console, drill / "verify.qemu.log",
-        " LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1 LAPUTA_RESTORE_VERIFY=1",
-        [("backup", drill / "backup.ext4")],
-    )
+    guest, err = start_phase(boot_base_argv(), console, drill / "verify.qemu.log",
+                             "LAPUTA_RESTORE_VERIFY=1", [("backup", drill / "backup.ext4")],
+                             extra="LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1",
+                             strip_proof_flag=False)
     try:
         wait_for(console, PROOF_OK, 420)
         wait_for(console, VERIFY_OK, 120)
