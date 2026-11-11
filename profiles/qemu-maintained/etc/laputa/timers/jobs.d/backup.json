@@ -1,0 +1,10 @@
+{
+  "format": "laputa-timer-job-1",
+  "name": "backup",
+  "schedule": {"kind": "calendar", "hour": 3, "minute": 47},
+  "command": ["/usr/bin/xsh", "/usr/lib/laputa/backup.xsh", "run"],
+  "timeout_ms": 3600000,
+  "overlap": "skip",
+  "missed": "coalesce",
+  "retries": {"max": 2, "delay_ms": 300000}
+}

@@ -4,8 +4,9 @@
 owns every job, and xinit supervises only that process. It is not PID 1 and not
 a second init system: no boot-critical service depends on it, a broken job
 definition never holds back boot, rescue, or login, and stopping the service
-stops its jobs. Nothing here schedules backups or pruning; a job definition can
-request either once a later slice adds the command.
+stops its jobs. The maintained profile ships a daily backup job; scheduling is
+not an entry fee for restore or inspection, and the manual restore drill
+remains the primary restore proof.
 
 The roadmap entry is [R7](ROADMAP.md#r7-backups-timers-and-persistent-diagnostics).
 
@@ -54,6 +55,24 @@ receives `LAPUTA_TIMER_NAME`, `LAPUTA_TIMER_ATTEMPT`, `LAPUTA_TIMER_MISSED`,
 
 Limits: 64 definitions, 64 argv entries, interval 1 s to 365 days. There is no
 global concurrency cap; one process per due occurrence is the only bound.
+
+## Maintained jobs
+
+`qemu-maintained` ships two calendar jobs:
+
+- `daily-sync` runs `/usr/bin/sync` daily at 03:17 UTC.
+- `backup` runs `/usr/bin/xsh /usr/lib/laputa/backup.xsh run` daily at 03:47
+  UTC with a one-hour timeout, `skip` overlap, `coalesce` missed runs, and two
+  retries five minutes apart.
+
+The backup job reads `/etc/laputa/backup.json`: repository and key paths,
+`/etc /home /var` sources, keep-last retention, quiesce and release hooks, and
+the receipt location. The job ends by writing a receipt beside the repository;
+a restore binds to that receipt instead of `latest`. Retention, quiescence,
+failure reporting, and the receipt contract are in [backup](BACKUP.md). The
+maintained state disk carries the administered job and configuration copies,
+so provisioning copies them from the image's `/etc` with the rest of the
+static configuration.
 
 ## Scheduling semantics
 
@@ -196,7 +215,13 @@ this is not a lossless event log.
   coalescing, forward and backward wall steps, overlap, bounded retries,
   cancellation, outcomes, durable state transitions, and definition
   validation.
+- `tests/system/backup.xsh` checks the shipped backup job and configuration,
+  the retention and receipt bindings, and the configuration boundaries.
 - `tests/integration/timers_guest.py` runs the rebuilt `qemu-maintained` image
   under KVM: a three-second interval job, a bounded-retry job, cancel/resume,
   a 20-second QMP pause, a cold boot of the same state disk with a coalesced catch-up, an xinit
   restart that reloads state, and the remote `run` path.
+- `tests/integration/backup_schedule.py` runs a timer interval job through the
+  shipped backup runner, observes quiescence, the repository check, keep-last
+  pruning, a bounded failure in timer state, and a receipt-bound blank-disk
+  restore with the restore-drill helpers.

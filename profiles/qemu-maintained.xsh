@@ -16,6 +16,8 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "ntpd-rs",
     "laputa-syslog",
     "laputa-timers",
+    "laputa-backup",
+    "rustic",
     "xinfra",
   ],
   kernel_package: "linux",

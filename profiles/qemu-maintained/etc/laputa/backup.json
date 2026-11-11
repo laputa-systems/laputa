@@ -1,0 +1,17 @@
+{
+  "format": "laputa-backup-config-1",
+  "repository": "/mnt/backup/repo",
+  "password_file": "/mnt/backup/keys/password",
+  "sources": ["/etc", "/home", "/var"],
+  "exclude_if_present": ".no-backup",
+  "retention": {"keep_last": 3},
+  "quiesce": {
+    "command": ["/usr/bin/xsh", "/usr/lib/laputa/backup-quiesce.xsh", "stop", "logger", "dhcp-eth0"],
+    "timeout_ms": 60000
+  },
+  "release": {
+    "command": ["/usr/bin/xsh", "/usr/lib/laputa/backup-quiesce.xsh", "start", "logger", "dhcp-eth0"],
+    "timeout_ms": 60000
+  },
+  "rustic": "/usr/bin/rustic"
+}

@@ -798,14 +798,31 @@ recover access. A fresh receipt-bound guest passed this drill with a previously
 extracted packaged rustic binary and restic 0.18.1; fresh rustic artifact metadata
 was unavailable, so this does not establish a fresh package provenance check.
 Five harness regressions cover stale and interleaved console output and missing
-or failed proof markers. Scheduling, retention, remote backends and a packaged
-restic remain open. The existing `laputa-systems/fs`
-copy/sync utility is not a substitute for retained backups. Define encryption-key
-recovery, retention, repository checking, application quiescence, and which state
-is restored versus reconstructed from package generations. Distinguish restoring
-a machine's identity from creating a clone. Prove a manual restore before
-scheduling unattended backup or pruning. An actual blank-disk restore, not a
+or failed proof markers. Remote backends, a packaged restic, and a production
+key ceremony and target remain open. The existing `laputa-systems/fs`
+copy/sync utility is not a substitute for retained backups. Encryption-key
+recovery, retention, repository checking, application quiescence, and the state
+that is restored versus reconstructed from package generations are defined in
+[backup](BACKUP.md). Restoring a machine's identity is distinct from creating a
+clone. The manual restore is the primary proof; the scheduled path does not
+replace it. An actual blank-disk restore, not a
 successful backup command, is the G2 acceptance result.
+
+**Backups status: the scheduled path is delivered; the manual drill remains
+primary.** `packages/laputa-backup` installs the runner and the xinit quiesce
+hook. `qemu-maintained` ships a daily 03:47 UTC backup job, keep-last 3
+retention, a pre-backup stop of `logger` and `dhcp-eth0`, a post-backup
+`rustic check`, and a receipt beside the repository. The runner exits nonzero
+on any failed step and the timer records the outcome under its bounded
+retries. `tests/system/backup.xsh` covers the shipped job and configuration,
+retention, receipt binding, and configuration boundaries.
+`tests/integration/backup_schedule.py` on a rebuilt `qemu-maintained` image
+proves the timer-driven backup, the quiesced snapshot boundary, the repository
+check, keep-last pruning, a bounded failure in timer state, and a second boot
+that restores the receipt's snapshot onto a blank disk and verifies identity
+and the quiesced writer boundary. Open: remote backends, a packaged restic,
+production key ceremony and target provisioning, and aarch64 guests.
+
 
 **Timers.** Prefer a small supervised XSH scheduler using xinit to own jobs, not
 a second init system or a mandatory new subsystem inside PID 1. Specify interval
@@ -816,11 +833,14 @@ side effects across crashes; use idempotent jobs or explicit reconciliation.
 Scheduling is a follow-up to working manual maintenance, not an entry fee for
 remote inspection, diagnostics, or restore.
 
-**Timers status: supervised scheduler proven on Linux x86_64/KVM; no backup
-or pruning job is scheduled.** `packages/laputa-timers` installs one foreground
+**Timers status: supervised scheduler proven on Linux x86_64/KVM; the
+maintained profile schedules a daily backup and its pruning.** `packages/laputa-timers` installs one foreground
 XSH scheduler as an xinit boot service, and `qemu-maintained` selects it. The
-profile overlay ships one real calendar job (`daily-sync`, `/usr/bin/sync` daily
-at 03:17 UTC) under `/etc/laputa/timers/jobs.d`. Job definitions are generation
+profile overlay ships two real calendar jobs, `daily-sync` (`/usr/bin/sync`
+daily at 03:17 UTC) and `backup` (`/usr/lib/laputa/backup.xsh run` daily at
+03:47 UTC) under `/etc/laputa/timers/jobs.d`. The backup job's quiescence,
+retention, repository check, and receipt are in [backup](BACKUP.md). Job
+definitions are generation
 input; durable last/next state and cancellation markers are on the state disk;
 the scheduler never writes a definition. Interval deadlines use the process
 monotonic clock and calendar deadlines use UTC wall time. Each job chooses
@@ -839,9 +859,10 @@ xinit, and reads the status through the existing remote program; it exits 0.
 The QMP pause froze every guest clock (`resume=steady`; 7.29 s of both wall and
 boottime elapsed only across the post-pause window), so no guest time passed,
 no occurrence was due, and no burst occurred. The cold boot's 13 missed
-intervals coalesced into one catch-up with the calendar anchor unchanged. Open:
-aarch64 and Asterinas guests, and the actual backup/pruning jobs with their
-quiescence and retention policy remain a later slice. Jobs must be idempotent;
+intervals coalesced into one catch-up with the calendar anchor unchanged.
+`tests/integration/backup_schedule.py` adds the timer-driven backup, retention,
+failure-state, and receipt-bound restore proof. Open:
+aarch64 and Asterinas guests. Jobs must be idempotent;
 exactly-once side effects across a crash are not promised. See
 [timers](TIMERS.md) for the contract.
 

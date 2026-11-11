@@ -1370,7 +1370,27 @@ proc request_desired(name: Str, desired: Str) {
   defer scratch.remove()
   fs.set_owner(scratch, gid: group_gid)
   scratch.rename(to: target, overwrite: true)
+  wake_scanner()?
   print f"{name} {desired} queued"
+}
+
+proc wake_scanner() {
+  return unless ! fake_pids()
+
+  let marker = scanner_marker_path()?
+
+  return unless marker.exists()
+
+  let raw = json.read(marker)?
+  let pid = json.get(raw, ["pid"], 0).require(Int)?
+  let start_time_ms = json.get(raw, ["start_time_ms"], 0).require(Int)?
+
+  return unless pid > 0 and start_time_ms > 0 and pid_start_time(pid)? == start_time_ms
+
+  match process.kill(pid, "HUP") {
+    Ok(_) => {}
+    Err(_) => {}
+  }
 }
 
 proc start_service(name: Str) {

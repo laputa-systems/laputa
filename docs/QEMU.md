@@ -560,9 +560,21 @@ that owns the termination hook), the xinit service
 `lib/monotonic.xsh`. The service is one foreground process on target `boot`
 with notify readiness and always-restart. Readiness means the definitions,
 state, and cancellation markers are loaded and the live snapshot is published,
-not that a job has run. Nothing takes `need` on it. The profile overlay ships a
-real calendar job definition, `daily-sync`, which runs `/usr/bin/sync` daily at
-03:17 UTC.
+not that a job has run. Nothing takes `need` on it. The profile overlay ships
+two real calendar job definitions: `daily-sync`, which runs `/usr/bin/sync`
+daily at 03:17 UTC, and `backup`, which runs
+`/usr/lib/laputa/backup.xsh run` daily at 03:47 UTC.
+
+`backup` reads `/etc/laputa/backup.json` from the same generation-owned `/etc`.
+The shipped configuration keeps the newest three snapshots of `/etc /home /var`
+in `/mnt/backup/repo`, stops `logger` and `dhcp-eth0` through
+`/usr/lib/laputa/backup-quiesce.xsh` before the snapshot, checks the repository
+with `rustic check` after it, prunes with `rustic forget --keep-last 3 --prune`,
+and writes `laputa-backup-receipt.json` beside the repository. The runner
+exits nonzero on any failed step, so the timer records the outcome and applies
+its bounded retries. See [backup](BACKUP.md) for the contract and key policy.
+The manual restore drill in `tests/integration/restore_drill.py` remains the
+primary restore proof.
 
 Job definitions are generation input under `/etc`; the maintained state disk
 carries the administered copy. Durable run state is
@@ -590,6 +602,20 @@ catch-up (`coalesced=13`, three runs in the window) and the calendar anchor was
 unchanged. A guest whose clock instead advances across a pause is classified
 as a gap or wall step and coalesces in the same way; neither case can produce a
 burst.
+
+`tests/integration/backup_schedule.py` boots the same rebuilt generation twice
+with an ext4 backup disk attached. A ten-second timer job runs the shipped
+backup runner against a fixture password and repository. A fixture writer
+appends to `/var/lib/backup-proof/writer.log`; the configured quiesce hook
+stops it and `logger`/`dhcp-eth0`, the snapshot is taken, `rustic check` runs,
+keep-last pruning leaves exactly three snapshots, and the receipt names the new
+snapshot. A second job runs the same runner with a missing key, and the test
+observes its nonzero outcome, bounds it to the two configured attempts, and
+shows that cancelling it stops the failure counter. The second boot mounts the
+backup disk and a blank disk, reads the receipt, restores that exact snapshot,
+and verifies the identity hashes and the quiesced writer line count from the
+restored state. It reuses the restore drill's provisioning, launch, and serial
+helpers. The manual restore drill remains the primary proof.
 
 `guest/qemu-maintained-proof.xsh` runs only with
 `LAPUTA_MAINTAINED_PROOF_FLAG=1`. It saves seven identity/account hashes on the
