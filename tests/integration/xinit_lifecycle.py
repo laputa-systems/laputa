@@ -15,12 +15,7 @@ ready = "R1_PROOF_READY"
 pre_shutdown = "R1_REBOOT_OWNED_STOPPED_BEFORE_FS_SHUTDOWN"
 failure = "R1_FAIL"
 
-inittab = """::sysinit:/usr/lib/init/rc.boot
-ttyS0::respawn:/usr/bin/xinit scan r1
-::once:/etc/r1/proof.xsh
-::restart:/usr/bin/xinit /etc/inittab
-::shutdown:/usr/lib/init/rc.shutdown
-"""
+scanner_entry = "::respawn:/usr/bin/xinit scan boot"
 
 
 def require(condition, message, console=None):
@@ -67,6 +62,9 @@ def stage_root(seed, stage):
     copy(stage, baselayout / "usr/lib/init/rc.boot", "/usr/lib/init/rc.boot", 0o755)
     copy(stage, baselayout / "usr/lib/init/rc.shutdown", "/usr/lib/init/rc.shutdown", 0o755)
 
+    shipped = [line.strip() for line in (baselayout / "etc/inittab").read_text().splitlines() if line.strip() == scanner_entry]
+    require(len(shipped) == 1, "baselayout inittab must name exactly one boot scanner")
+
     for name in ("base", "app", "slow"):
         copy(stage, fixtures / f"lifecycle_{name}.xsh", f"/usr/lib/xinit/services/r1-{name}.xsh")
     copy(stage, fixtures / "lifecycle_broken.xsh", "/etc/r1/broken.xsh")
@@ -74,7 +72,18 @@ def stage_root(seed, stage):
     copy(stage, fixtures / "lifecycle_proof.xsh", "/etc/r1/proof.xsh", 0o755)
     copy(stage, fixtures / "lifecycle_pre_shutdown.xsh", "/etc/rc.d/50-r1.pre.shutdown", 0o755)
 
-    (stage / "etc/inittab").write_text(inittab)
+    (stage / "etc/inittab").write_text(
+        "\n".join(
+            [
+                "::sysinit:/usr/lib/init/rc.boot",
+                shipped[0],
+                "::once:/etc/r1/proof.xsh",
+                "::restart:/usr/bin/xinit /etc/inittab",
+                "::shutdown:/usr/lib/init/rc.shutdown",
+                "",
+            ]
+        )
+    )
     (stage / "etc/fstab").write_text("")
 
 
@@ -158,7 +167,7 @@ def run_guest(seed, kernel, qemu, timeout):
     console = work / "console.log"
     qemu_log = work / "qemu.log"
     stage_root(seed, stage)
-    require((stage / "etc/inittab").read_text().count("scan r1") == 1, "inittab must name exactly one scanner")
+    require((stage / "etc/inittab").read_text().count("xinit scan boot") == 1, "inittab must name exactly one boot scanner")
     pack(stage, initrd)
 
     child, errors = launch(qemu, kernel, initrd, console, qemu_log)

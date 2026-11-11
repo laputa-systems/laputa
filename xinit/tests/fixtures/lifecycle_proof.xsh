@@ -145,7 +145,7 @@ proc worker_count(name: Str) -> Result[Int] {
 proc scanner_count() -> Result[Int] {
   var total = 0
   for entry in process.list()? {
-    if entry.status != "Z" and "scan r1" in entry.argv {
+    if entry.status != "Z" and "xinit" in entry.argv and "scan" in entry.argv and "boot" in entry.argv {
       total += 1
     }
   }

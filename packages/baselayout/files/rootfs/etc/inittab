@@ -1,4 +1,4 @@
 ::sysinit:/usr/lib/init/rc.boot
-::once:/usr/lib/init/mdev.supervise
+::respawn:/usr/bin/xinit scan boot
 ::restart:/usr/bin/xinit /etc/inittab
 ::shutdown:/usr/lib/init/rc.shutdown

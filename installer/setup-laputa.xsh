@@ -1,4 +1,4 @@
-#!/bin/xsh
+##! Laputa target installer: partition a disk, compose the target root, and write its boot configuration.
 use disk_selection
 use rootfs_size
 use trust.store as trust_store
@@ -325,6 +325,26 @@ proc prompt_network_method(ci: Bool) -> Result[Str] {
   "dhcp"
 }
 
+## The normal installed target's inittab: one boot scanner and the operator logins.
+export pure normal_target_inittab(serial_console: Str) -> Str {
+  f"""::sysinit:/usr/lib/init/rc.boot
+::respawn:/usr/bin/xinit scan boot
+{serial_console}::respawn:/usr/bin/login -f pazu
+tty1::respawn:/usr/bin/login -f pazu
+::restart:/usr/bin/xinit /etc/inittab
+::shutdown:/usr/lib/init/rc.shutdown
+"""
+}
+
+## The CI target's inittab: one boot scanner and the idle keepalive.
+export pure ci_target_inittab() -> Str {
+  """::sysinit:/usr/lib/init/rc.boot
+::respawn:/usr/bin/xinit scan boot
+::respawn:/usr/local/bin/laputa-ci-idle
+::shutdown:/usr/lib/init/rc.shutdown
+"""
+}
+
 proc write_target_config(root: Path, esp_part: Path, swap_part: Path, root_part: Path, ci: Bool, network_method: Str) {
   let fstab_root = if ci { "/dev/vda3" } else { root_part.display() }
   let fstab_esp = if ci { "/dev/vda1" } else { esp_part.display() }
@@ -402,38 +422,15 @@ main()?
 
     fp"{root}/usr/local/bin/laputa-ci-idle".chmod(0o755)
   } else {
-    write_file(
-      fp"{root}/etc/inittab",
-      f"""::sysinit:/usr/lib/init/rc.boot
-::once:/usr/lib/init/mdev.supervise
-{serial_console_name()?}::respawn:/usr/bin/login -f pazu
-tty1::respawn:/usr/bin/login -f pazu
-::restart:/usr/bin/xinit /etc/inittab
-::shutdown:/usr/lib/init/rc.shutdown
-""",
-    )
+    write_file(fp"{root}/etc/inittab", normal_target_inittab(serial_console_name()?))
   }
 
   fp"{root}/home/pazu".mkdir()
   fp"{root}/home/pazu".chmod(0o755)
-  let qemu_smoke_ssh = if ci { configure_qemu_smoke_ssh(root)? } else { false }
-
   if ci {
-    let dropbear_line = if qemu_smoke_ssh {
-      """::once:/usr/bin/xinit supervise dropbear
-"""
-    } else {
-      ""
-    }
+    let _ = configure_qemu_smoke_ssh(root)?
 
-    write_file(
-      fp"{root}/etc/inittab",
-      f"""::sysinit:/usr/lib/init/rc.boot
-::once:/usr/lib/init/mdev.supervise
-{dropbear_line}::respawn:/usr/local/bin/laputa-ci-idle
-::shutdown:/usr/lib/init/rc.shutdown
-""",
-    )
+    write_file(fp"{root}/etc/inittab", ci_target_inittab())
 
     fs.install(
       p"/usr/lib/init/rc.d/laputa-ci-smoke.boot",
@@ -554,9 +551,6 @@ proc install_to_disk(disk: Path, ci: Bool) {
   write_stdout_line("Laputa install complete. Remove installer media before booting the target disk.")
 }
 
-## Seeds the fresh target's trust store from its pinned package seeds so the
-## installed system verifies trust from first boot. Fails the install closed
-## when the target's seeds or managed symlinks are not intact.
 proc seed_target_trust_store(root: Path) {
   let generation = trust_store.trust_store_bootstrap_from_seeds(root)?
   write_stdout_line(f"Trust store seeded at generation {generation} from package seeds.")
@@ -620,7 +614,8 @@ proc run_installer(argv: List[Str]) {
   install_to_disk(disk, ci)
 }
 
-proc main(...argv: List[Str]) [fs, process, time, env, error, io] {
+## The installer entry point.
+export proc main(...argv: List[Str]) [fs, process, time, env, error, io] {
   env ({XSH_LINUX_REAL: "1"}) {
     run_installer(argv)
   }

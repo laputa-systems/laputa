@@ -9,7 +9,7 @@ export const package_kind = "payload"
 export const ver = "1"
 
 ## Exported declaration `rel`.
-export const rel = "17"
+export const rel = "18"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -211,10 +211,6 @@ export const filetree = [
   },
   {
     path: p"usr/bin/getent",
-    kind: "file",
-  },
-  {
-    path: p"usr/lib/init/mdev.supervise",
     kind: "file",
   },
   {

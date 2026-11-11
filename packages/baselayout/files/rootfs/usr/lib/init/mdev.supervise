@@ -1,4 +1,0 @@
-#!/bin/xsh
-if p"/usr/bin/mdevd".exists() {
-  run /usr/bin/xinit supervise mdevd
-}

@@ -5,7 +5,7 @@ export let service = {
   kind: "longrun",
   command: process.command_argv(p"/bin/xsh", ["/bin/xsh", "/etc/r1/worker.xsh", "r1-base", "ready"]),
   targets: [
-    "r1",
+    "boot",
   ],
   readiness: "notify",
   ready_timeout_ms: 1500,
