@@ -1,117 +1,86 @@
-use xinfra.host
-use xinfra.outcome
-use xinfra.plan
-use xinfra.redact
-use xinfra.report
+use infra.compare
+use infra.report
 
-proc sample_rows() -> List[report.ResultRow] {
-  [
-    report.row("run-1", "web-1", "motd", "apply", outcome.Changed, true, "", 7),
-    report.row("run-1", "web-1", "nginx", "apply", outcome.Unchanged, true, "", 1),
-  ]
-}
-
-test test_golden_json_schema { |ctx|
-  let built = report.build("run-1", sample_rows(), 0)
-  let rendered = report.render(built, report.Json, redact.empty())?
-  test.eq(
-    rendered,
-    """{"kind":"report","results":[{"cause":"","duration_ms":7,"host":"web-1","kind":"result","outcome":"changed","phase":"apply","resource":"motd","run_id":"run-1","schema_version":1,"verified":true},{"cause":"","duration_ms":1,"host":"web-1","kind":"result","outcome":"unchanged","phase":"apply","resource":"nginx","run_id":"run-1","schema_version":1,"verified":true}],"run_id":"run-1","schema_version":1,"summary":{"blocked":0,"changed":1,"exit":0,"failed":0,"hosts":["web-1"],"kind":"summary","partial":0,"run_id":"run-1","schema_version":1,"skipped":0,"unchanged":1,"unknown":0}}
-""",
-  )?
-}
-
-test test_golden_jsonl_schema { |ctx|
-  let built = report.build("run-1", sample_rows(), 0)
-  let rendered = report.render(built, report.Jsonl, redact.empty())?
-  test.eq(
-    rendered,
-    """{"cause":"","duration_ms":7,"host":"web-1","kind":"result","outcome":"changed","phase":"apply","resource":"motd","run_id":"run-1","schema_version":1,"verified":true}
-{"cause":"","duration_ms":1,"host":"web-1","kind":"result","outcome":"unchanged","phase":"apply","resource":"nginx","run_id":"run-1","schema_version":1,"verified":true}
-{"blocked":0,"changed":1,"exit":0,"failed":0,"hosts":["web-1"],"kind":"summary","partial":0,"run_id":"run-1","schema_version":1,"skipped":0,"unchanged":1,"unknown":0}
-""",
-  )?
-}
-
-test test_summary_counts_and_exit_rules { |ctx|
-  let values = [outcome.Changed, outcome.Unchanged, outcome.Changed, outcome.Skipped]
-  let totals = outcome.counts(values)
-  test.eq(totals.changed, 2)?
-  test.eq(totals.unchanged, 1)?
-  test.eq(totals.skipped, 1)?
-  test.eq(outcome.apply_exit(totals), 0)?
-  test.eq(outcome.check_exit(totals), 1)?
-
-  let failed = outcome.counts([outcome.Failed, outcome.Changed])
-  test.eq(outcome.apply_exit(failed), 1)?
-  test.eq(outcome.check_exit(failed), 2)?
-  test.eq(outcome.doctor_exit(failed), 1)?
-  test.eq(outcome.interrupted_exit(), 130)?
-
-  let unknown = outcome.counts([outcome.Unknown])
-  test.eq(outcome.apply_exit(unknown), 1)?
-  test.eq(outcome.check_exit(unknown), 2)?
-  test.eq(outcome.check_exit(outcome.counts([outcome.Unchanged])), 0)?
-  test.eq(outcome.of_status(host.Partial), outcome.Partial)?
-  test.eq(outcome.of_prediction(plan.Undetermined), outcome.Unknown)?
-}
-
-test test_control_sequences_are_sanitized { |ctx|
-  let cause = "bad\x1b[31mred\x07end"
-  let built = report.build(
-    "run-1",
-    [report.row("run-1", "web-1", "motd", "apply", outcome.Failed, false, cause, 3)],
-    1,
+pure entry(host: Str, id: Str, status: Str, act: Str? = null, detail: Str? = null) -> report.Entry {
+  report.Entry(
+    host:,
+    id:,
+    kind: "file",
+    status:,
+    act:,
+    changes: [compare.Change(field: "mode", from: "0644", to: "0600")],
+    conditional: false,
+    phase: null,
+    detail:,
+    verified: null,
   )
-  let human = report.render(built, report.Human, redact.empty())?
-  test.ok("bad?[31mred?end" in human)?
-  test.ok("\x1b" not in human)?
-  let structured = report.render(built, report.Json, redact.empty())?
-  test.ok("bad?[31mred?end" in structured)?
-  test.ok("\x1b" not in structured)?
 }
 
-test test_overlong_utf8_cause_truncates_on_a_boundary { |ctx|
-  let pieces: List[Str] = collect {
-    for index in range(3000) {
-      let _ = index
-      yield "€"
-    }
+pure scenario(mode: Str, entries: List[report.Entry], ok: Bool = true) -> report.Report {
+  report.Report(mode:, hosts: [report.HostReport(host: "web-1", ok:, phase: null, detail: null, entries:)])
+}
+
+test terminal_control_sequences_from_a_host_are_neutralized {
+  let hostile = "bad\u{1b}[2J\u{1b}]0;title\u{7}\r\u{9b}31m ok\nnext\tline"
+  let clean = report.sanitize(hostile)
+  assert "\u{1b}" not in clean
+  assert "\u{7}" not in clean
+  assert "\r" not in clean
+  assert "\u{9b}" not in clean
+  assert "ok\nnext\tline" in clean
+}
+
+test secrets_are_replaced_wherever_they_appear {
+  let text = report.redact("token=hunter22 and hunter22 again; other=safe", ["hunter22", ""])
+  assert text == "token=*** and *** again; other=safe"
+}
+
+test text_output_shows_only_what_needs_attention_by_default {
+  let shown = report.text(scenario("plan", [entry("web-1", "quiet", "satisfied"), entry("web-1", "motd", "drift", act: "update")]), false)
+  assert "motd" in shown
+  assert "mode: 0644 -> 0600" in shown
+  assert "quiet" not in shown
+  let verbose = report.text(scenario("plan", [entry("web-1", "quiet", "satisfied")]), true)
+  assert "quiet" in verbose
+}
+
+test text_output_is_sanitized_after_assembly {
+  let nasty = entry("web-1", "motd", "failed", detail: "boom\u{1b}[31m")
+  assert "\u{1b}" not in report.text(scenario("apply", [nasty]), false)
+}
+
+test exit_status_distinguishes_drift_from_trouble {
+  assert report.exit_status(scenario("plan", [entry("web-1", "a", "drift", act: "create")])) == 0
+  assert report.exit_status(scenario("check", [entry("web-1", "a", "satisfied")])) == 0
+  assert report.exit_status(scenario("check", [entry("web-1", "a", "drift", act: "create")])) == 1
+  assert report.exit_status(scenario("check", [entry("web-1", "a", "drift"), entry("web-1", "b", "uncertain")])) == 3
+  assert report.exit_status(scenario("apply", [entry("web-1", "a", "changed")])) == 0
+  for status in ["failed", "partial", "unknown", "conflict", "uncertain"] {
+    assert report.exit_status(scenario("apply", [entry("web-1", "a", status)])) == 3, status
   }
-  let cause = pieces.join("")
-  let built = report.build(
-    "run-1",
-    [report.row("run-1", "web-1", "motd", "apply", outcome.Failed, false, cause, 3)],
-    1,
-  )
-  let human = report.render(built, report.Human, redact.empty())?
-  let structured = report.render(built, report.Json, redact.empty())?
-  test.ok("truncated" in human)?
-  test.ok("truncated" in structured)?
+  assert report.exit_status(scenario("apply", [], ok: false)) == 3
 }
 
-test test_exact_secrets_are_redacted_everywhere { |ctx|
-  let redactor = redact.with_secret(redact.empty(), "canary-value")
-  let built = report.build(
-    "run-1",
-    [report.row("run-1", "web-1", "token", "apply", outcome.Failed, false, "wrote canary-value", 2)],
-    1,
-  )
-  let human = report.render(built, report.Human, redactor)?
-  test.ok("[redacted]" in human)?
-  test.ok("canary-value" not in human)?
-  let structured = report.render(built, report.Json, redactor)?
-  test.ok("[redacted]" in structured)?
-  test.ok("canary-value" not in structured)?
-  let lines = report.render(built, report.Jsonl, redactor)?
-  test.ok("[redacted]" in lines)?
-  test.ok("canary-value" not in lines)?
+test json_lines_are_one_valid_object_per_line_with_a_summary {
+  let lines = report.json_lines(scenario("plan", [entry("web-1", "a", "drift", act: "update"), entry("web-1", "b", "satisfied")]))?.lines()
+  assert lines.len() == 3
+  for line in lines {
+    let decoded = json.decode(line)?.require(Record)?
+    assert "type" in decoded.keys()
+  }
+  let first = json.decode(lines[0])?.require(Record)?
+  assert first.get("type")?.require(Str)? == "entry"
+  assert first.get("host")?.require(Str)? == "web-1"
+  assert first.get("act")?.require(Str)? == "update"
+  let last = json.decode(lines[2])?.require(Record)?
+  assert last.get("type")?.require(Str)? == "summary"
+  assert last.get("exit")?.require(Int)? == 0
 }
 
-test test_redaction_prefers_the_longest_secret { |ctx|
-  var redactor = redact.empty()
-  redactor = redact.with_secret(redactor, "canary")
-  redactor = redact.with_secret(redactor, "canary-value")
-  test.eq(redact.redact("canary-value", redactor), "[redacted]")?
-  test.eq(redact.redact("canary and canary-value", redactor), "[redacted] and [redacted]")?
+test json_documents_keep_changes_as_structured_data {
+  let document = json.decode(report.json_document(scenario("check", [entry("web-1", "a", "drift")]))?)?.require(Record)?
+  let hosts = document.get("hosts")?.require(List[Record])?
+  let entries = hosts[0].get("entries")?.require(List[Record])?
+  let changes = entries[0].get("changes")?.require(List[Record])?
+  assert changes[0].get("field")?.require(Str)? == "mode"
 }

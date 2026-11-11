@@ -1,0 +1,6 @@
+#!/sbin/openrc-run
+description="xsh-infra differential service"
+command=/bin/sleep
+command_args="3600"
+command_background=true
+pidfile=/run/${RC_SVCNAME}.pid

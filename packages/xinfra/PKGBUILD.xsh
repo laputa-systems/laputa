@@ -6,7 +6,7 @@ export const name = "xinfra"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.1.0"
+export const ver = "0.2.0"
 
 ## Package recipe export.
 export const rel = "1"
@@ -22,7 +22,7 @@ export const runtime_only_deps = ["xsh"]
 export let mkdeps_host = []
 
 ## Package recipe export.
-## xinfra lives in this monorepo as a top-level tree. The recipe addresses
+## xinfra is vendored into this monorepo as a top-level tree. The recipe addresses
 ## only the shipped subtrees as `repository/` sources, which the PM resolves
 ## against the checkout root and hashes into the plan fingerprint.
 export const upstream_sources = [
@@ -91,32 +91,6 @@ export const upstream_sources = [
       },
     ],
   },
-  {
-    source: p"repository/xinfra/LICENSE",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "SKIP",
-      },
-    ],
-  },
-  {
-    source: p"repository/xinfra/NOTICE",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "SKIP",
-      },
-    ],
-  },
 ]
 
 ## Package recipe export.
@@ -127,8 +101,6 @@ export const filetree = [
   {path: p"usr/share/doc/xinfra/docs", kind: "tree"},
   {path: p"usr/share/doc/xinfra/examples", kind: "tree"},
   {path: p"usr/share/doc/xinfra/README.md", kind: "file"},
-  {path: p"usr/share/licenses/xinfra/LICENSE", kind: "file"},
-  {path: p"usr/share/licenses/xinfra/NOTICE", kind: "file"},
 ]
 
 ## Package recipe export.
@@ -138,8 +110,6 @@ export proc build(dest: Path) [fs, error] {
   let _ = fs.copy_tree(p"docs", fp"{dest}/usr/share/doc/xinfra/docs", parents: true, overwrite: true)?
   let _ = fs.copy_tree(p"examples", fp"{dest}/usr/share/doc/xinfra/examples", parents: true, overwrite: true)?
   fs.install(p"README.md", fp"{dest}/usr/share/doc/xinfra/README.md", 0o644, parents: true, overwrite: true)
-  fs.install(p"LICENSE", fp"{dest}/usr/share/licenses/xinfra/LICENSE", 0o644, parents: true, overwrite: true)
-  fs.install(p"NOTICE", fp"{dest}/usr/share/licenses/xinfra/NOTICE", 0o644, parents: true, overwrite: true)
   fp"{dest}/usr/bin".mkdir()
 
   fp"{dest}/usr/bin/xinfra".write(

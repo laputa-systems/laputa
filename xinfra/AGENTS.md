@@ -1,56 +1,44 @@
-# xinfra
+# Agent Guide
 
-xinfra is a configuration-management tool for Alpine hosts, written in XSH.
-[README](README.md) covers install and use; this file routes developer work.
+Vendored from laputa-systems/xsh-infra at df05b26; make changes upstream, not here.
+
+xsh-infra is a small configuration-management tool written in XSH. It reconciles
+Alpine/Laputa-style hosts over XSH's native SSH client. Policy lives in XSH;
+the controller needs a qualified `xsh` and `xsht` and nothing else. Read
+[Architecture](docs/ARCHITECTURE.md) before changing a module boundary and
+[Usage](docs/USAGE.md) before changing the CLI or the report formats.
 
 ## Commands
 
-| Command | Purpose |
-|---|---|
-| `make check` | Static checks over the source tree. |
-| `make test` | Unit and golden tests. |
-| `make integration` | Remote scenarios on the Lima fixtures. |
-| `make differential` | Compare against pyinfra 3.10.0. |
-| `make package` | Build the source tarball under `.work/dist`. |
-| `make install PREFIX=DIR` | Build, unpack, and install under `DIR`. |
-| `make fixtures` / `make verify` / `make down` | Start, probe, or remove the `xinfra-*` guests. |
+- Check: `xsht check lib bin tests examples`.
+- Test: `xsht test --jobs 16`. Tests that need disposable hosts skip when
+  `XINFRA_TEST_INVENTORY` is unset.
+- Disposable Alpine hosts: `xsh fixtures/alpine.xsh up`, then
+  `XINFRA_TEST_INVENTORY=.work/fixtures/inventory.toml xsht test`, then
+  `xsh fixtures/alpine.xsh down`. See [Testing](docs/TESTING.md).
+- Use an `xsh` and `xsht` built from XSH `master` (verification profile) and
+  put both on `PATH`. Never edit the XSH checkout from here; an API need goes
+  in [docs/XSH-API.md](docs/XSH-API.md).
 
-The Makefile uses the release pair under `XSH_ROOT` (default `../../xsh`); set
-`XSH` or `XSHT` to run other binaries. Fixtures and scratch live under `.work`;
-keep it excluded through `.git/info/exclude`. `dev/pins.env` records the
-qualified XSH pin.
+## Rules
 
-## Layout
-
-- `bin/xinfra.xsh` is the CLI entry point.
-- `lib/xinfra/` holds the model, validation, planner, driver, and resources.
-- `tests/` is the XSH unit suite.
-- `dev/` holds fixtures, integration cases, differential, performance, and packaging.
-- `examples/alpine-web/` is a runnable deployment.
-
-## Invariants
-
-- A deployment declares resources; loading and planning never mutate a host.
-- All remote I/O goes through `lib/xinfra/transport.xsh` with `/bin/sh -c`,
-  `LC_ALL=C`, a fixed `PATH`, and `shlex` quoting.
-- Host trust is a pinned `SHA256:` Ed25519 host key and an unencrypted Ed25519
-  user key. There is no `known_hosts`, agent, password, PTY, or SFTP path.
-- A file stages in the destination parent, validates there, and is promoted
-  only after verification. The live object stays until promotion.
-- Secrets are env or file references resolved at apply. They never enter argv,
-  the remote environment, plans, reports, or packages.
-- `apply` takes one lock per host. A submitted mutation is never retried, and
-  an unknown result is not success.
-- The guest and the package contain no Python, pyinfra, or agent. pyinfra is a
-  test oracle under `.work` only.
-
-## Docs
-
-- [Resources](docs/resources.md) — resource fields and semantics.
-- [Operations](docs/operations.md) — plan/apply, failures, locks, saved plans.
-- [Security](docs/security.md) — host trust, secrets, privilege.
-- [Platform](docs/platform.md) — supported systems and architecture.
-- [Compatibility](docs/compatibility.md) — pyinfra comparison.
-- [Performance](docs/performance.md) — measured costs.
-- [Qualification](docs/qualification.md) — acceptance record and limits.
-- [TODO](TODO.md) — known gaps and priorities.
+- Pure planning, comparison, ordering and parsing stay in `pure` functions.
+  Host effects live only in `transport`, `observe`, `mutate` and `lock`.
+- Remote execution runs over the native `ssh` module only. No external
+  `ssh`, `scp` or `sftp`, no remote XSH, Python or `jq`.
+- `shell.quote` is the only place a request value becomes remote shell source.
+  Remote scripts are constants that receive values as positional arguments.
+- No new language syntax, async runtime or daemon. Deployment programs are
+  trusted operator code.
+- A language or runtime defect gets a minimal reproducer and a note in
+  `docs/XSH-API.md`, not a workaround that hides it.
+- Never deploy to real hosts. Fixtures are disposable and use fresh keys.
+- Write no comments in code. Put the why in a name, a type, a test, or the
+  commit body. Doc comments (`##`) on exports are required by `xsht check`.
+- Do not run formatters or autofixers.
+- Commits are Conventional Commits (`type(scope): subject`, imperative,
+  lowercase, at most 72 characters); the body says why. Commit directly to
+  `master`; never push without being asked.
+- Scratch and worktrees go under `.work/`, which `.git/info/exclude` ignores.
+  Never use `/tmp`.
+- Stop only the containers and processes you started, by ID.

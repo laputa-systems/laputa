@@ -1,0 +1,8 @@
+server.document-root = "{{.root}}"
+server.port = {{.port}}
+server.username = "lighttpd"
+server.groupname = "lighttpd"
+server.pid-file = "/run/lighttpd.pid"
+server.errorlog = "/var/log/lighttpd/error.log"
+index-file.names = ("index.html")
+mimetype.assign = (".html" => "text/html", ".txt" => "text/plain")

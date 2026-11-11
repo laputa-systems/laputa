@@ -1,0 +1,16 @@
+[defaults]
+user = "deploy"
+privilege = "doas"
+key = "keys/deploy_ed25519"
+timeout_ms = 10000
+
+[groups.web.vars]
+title = "front door"
+
+[hosts.web-1]
+address = "192.0.2.11"
+host_key = "SHA256:REPLACE-WITH-THE-HOSTS-PINNED-FINGERPRINT-43-CHARS"
+groups = ["web"]
+
+[hosts.web-1.vars]
+port = 8080
