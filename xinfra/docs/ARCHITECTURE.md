@@ -20,8 +20,13 @@ Test helpers (`tests/infra/testing.xsh`) are not part of the library and are not
 
 ## The transport boundary
 
-Everything that reaches a host is `transport.exec(connection, script, args)`:
-a constant script and positional arguments. `shell.command` renders it as
+Everything that reaches a host is `transport.exec(connection, operation, args)`:
+one catalogue operation and positional arguments. A host declares its login
+shell as `dialect` (`posix`, the default, or `xsh`), and `scripts.source` is the
+only selector: one constant exists per (operation, dialect), and an operation a
+dialect does not provide is a typed refusal, never the other dialect's script.
+
+For `posix`, `shell.command` renders
 
 ```
 /bin/sh -c '<script>' xinfra 'arg1' 'arg2'      (prefixed with doas -n when escalating)
@@ -29,22 +34,61 @@ a constant script and positional arguments. `shell.command` renders it as
 
 `shell.quote` is the only place a value becomes shell source: it single-quotes a
 word and refuses NUL. Scripts are constants in `scripts.xsh` and read their
-values as `"$1"`; no request value is ever spliced into script text. The quoting
-round trip is tested with hostile values (quotes, newlines, `$()`, backticks,
-leading hyphens, empty strings, non-ASCII) through a local `sh -c` and through
-the Alpine login shell, and `doctor` repeats it on every host. Paths are
-absolute UTF-8 text with no NUL, empty, `.` or `..` component; anything else is
-refused at declaration instead of being converted.
+values as `"$1"`; no request value is ever spliced into script text.
+
+For `xsh`, the command string *is* the XSH source. A login shell such as
+Laputa's `/usr/bin/xsh-login` executes its `-c` argument as a program, so the
+source is sent directly and nothing is wrapped in `sh -c`. `shell.xsh_command`
+prepends `let xinfra_args: List[Str] = [...]` to the constant source; each
+operand becomes an XSH double-quoted string literal through `shell.xsh_quote`,
+which escapes quotes, backslashes, `$`, control bytes and non-ASCII bytes and
+refuses NUL. The operand is data: it cannot terminate the literal or change the
+program. The round trip is tested with hostile values through the local `xsh`
+and through `xsh-login` in the guest run. The `xsh` dialect has no `doas`
+wrapper; inventory refuses `privilege = "doas"` with it.
+
+The quoting round trip is tested with hostile values (quotes, newlines, `$()`,
+backticks, leading hyphens, empty strings, non-ASCII) through a local `sh -c` and
+through the Alpine login shell, and `doctor` repeats it on every host with the
+dialect's own renderer. Paths are absolute UTF-8 text with no NUL, empty, `.` or
+`..` component; anything else is refused at declaration instead of being
+converted.
 
 Remote hosts use the native `ssh` module: one authenticated session per host,
 reused for facts, the lock and every mutation. The `local` transport runs the
-same command string through `sh -c` and exists for tests and development only.
-There is no other production backend and no external `ssh`, `scp` or `sftp`.
+same command string through the dialect's interpreter (`sh` or `xsh`) and exists
+for tests and development only. There is no other production backend and no
+external `ssh`, `scp` or `sftp`.
 
 Output is a protocol, not formatted `ls`: free-form text (owners, symlink
 targets, error text) is hex encoded by the remote script and decoded by `probe`,
 so newlines and odd bytes survive. Absent, unreadable, blocked (a parent is not
 a directory) and malformed are different facts.
+
+## Service adapters
+
+`model.ServiceAdapter` is the closed set of service managers. The OpenRC
+adapter probes `/etc/init.d`, runlevel membership and `rc-service status`, and
+controls enablement with `rc-update` and running state with `rc-service`. The
+xinit adapter treats a file under `${XINIT_SERVICE_DIR}` (default
+`/usr/lib/xinit/services`) as existence, parses the documented
+`xinit status SERVICE` line for `running`, `starting`, `dead`, `down`,
+`pending`, `finishing` and `ready`, and controls only the documented verbs:
+`start`, `stop`, `restart` and `reload`. It declares no enablement because
+xinit has none; a declaration that asks for it is refused before connecting.
+Running-state control needs write access to `/run/xinit`: on a POSIX target the
+host must run as root or through `doas -n`, and on an `xsh` target as root
+because that dialect has no doas wrapper.
+
+The adapter runs through the transport's `xsh` dialect on a stock Laputa
+generation, whose login shell `/usr/bin/xsh-login` executes its `-c` argument as
+XSH and whose `/bin/sh` is a disabled `xshi` applet. The file, directory,
+symlink, argv command, xinit service and lock operations all have XSH sources.
+Package, account, OpenRC service and shell-string command resources have none:
+declaring one for an `xsh` host is refused by `workload.prepare` before anything
+connects, and the transport would refuse it again if it were asked. xinit's
+running-state control still needs write access to `/run/xinit`, so an `xsh` host
+must use `privilege = "root"` or `plain`.
 
 ## Execution certainty
 
@@ -86,9 +130,15 @@ leaves the mtime alone.
 - No retry of a mutation after a lost connection.
 - No agent, password, `known_hosts` or certificate trust; no `~/.ssh` reads.
 - No PTY, no interactive prompts, no sudo; `doas -n` only.
-- No Python, remote Python, remote XSH, `jq`, systemd or hidden bootstrap.
-- No service adapter for Laputa's xinit. Laputa's services are owned by xinit
-  (its R1 lifecycle work); an adapter waits for that contract instead of
-  inventing a control API. The adapter enum is closed with OpenRC.
+- No Python, remote Python, `jq`, systemd or hidden bootstrap. Remote XSH is
+  the documented Laputa exception: an `xsh` host receives catalogued XSH source
+  for `xsh-login -c`, one constant per operation, with operands as escaped
+  literals. It is never produced by translating POSIX script text, and every
+  other target remains POSIX. See the transport boundary above.
+- No service operation xinit does not define. Its adapter uses `xinit status`
+  for running and readiness, the scanned service directory for existence, and
+  `xinit start`, `stop`, `restart` and `reload` for control. xinit has no
+  enable/disable, so `enabled` is refused at declaration. The adapter enum is
+  closed with OpenRC and xinit.
 - No recursive deletion, no UID/GID change, no user-data removal.
 - No plugin framework, no hidden global host context, no source-line hashing.

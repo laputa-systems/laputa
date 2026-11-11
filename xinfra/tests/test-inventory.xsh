@@ -104,6 +104,26 @@ test a_local_host_needs_no_connection_details {
   assert loaded.hosts[0].key == null
 }
 
+test the_dialect_defaults_to_posix_and_accepts_xsh_for_one_host_or_defaults {
+  let defaulted = inventory.parse(complete, p"/etc/xinfra")?
+  assert defaulted.hosts[0].dialect == model.Posix
+  assert defaulted.hosts[1].dialect == model.Posix
+  let pinned = "address = \"1.2.3.4\"\nuser = \"deploy\"\nkey = \"k\"\nhost_key = \"" + pin + "\"\n"
+  let host = inventory.parse("[hosts.laputa]\n" + pinned + "dialect = \"xsh\"\n", p"/x")?
+  assert host.hosts[0].dialect == model.Xsh
+  let shared = inventory.parse("[defaults]\ndialect = \"xsh\"\nuser = \"deploy\"\nkey = \"k\"\n[hosts.laputa]\naddress = \"1.2.3.4\"\nhost_key = \"" + pin + "\"\n[hosts.laputa2]\naddress = \"1.2.3.5\"\nhost_key = \"" + pin + "\"\n", p"/x")?
+  assert shared.hosts[0].dialect == model.Xsh
+  assert shared.hosts[1].dialect == model.Xsh
+  let local = inventory.parse("[hosts.here]\ntransport = \"local\"\ndialect = \"xsh\"\n", p"/x")?
+  assert local.hosts[0].dialect == model.Xsh
+}
+
+test an_unknown_dialect_and_xsh_doas_are_refused {
+  let pinned = "address = \"1.2.3.4\"\nuser = \"deploy\"\nkey = \"k\"\nhost_key = \"" + pin + "\"\n"
+  assert refused(inventory.parse("[hosts.a]\n" + pinned + "dialect = \"fish\"\n", p"/x"), "dialect must be posix or xsh")
+  assert refused(inventory.parse("[hosts.a]\n" + pinned + "dialect = \"xsh\"\nprivilege = \"doas\"\n", p"/x"), "no doas escalation")
+}
+
 test limits_select_hosts_or_groups_and_reject_unknown_names {
   let loaded = inventory.parse(complete, p"/etc/xinfra")?
   let all = inventory.select(loaded, [])?

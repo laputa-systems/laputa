@@ -415,3 +415,35 @@ export pure service(
   let spec = model.ServiceSpec(name:, adapter: .OpenRc, runlevel:, enabled:, running:, reload_on:, restart_on:)
   Ok(model.Resource(id:, needs:, spec: model.Service(spec)))
 }
+
+## Declare a Laputa xinit service. `running` starts or stops it; `reload_on`
+## and `restart_on` name resources whose change reloads or restarts the service
+## once per apply, however many of them changed; a restart supersedes a reload.
+## xinit has no enable or disable, so `enabled` is refused.
+export pure xinit_service(
+  id: Str,
+  name: Str,
+  enabled: Bool? = null,
+  running: Bool? = null,
+  reload_on: List[Str] = [],
+  restart_on: List[Str] = [],
+  needs: List[Str] = [],
+) -> Result[model.Resource, Error] {
+  require_args("service", id, needs)?
+  ctx f"service {id}" {
+    check.service_ok(name)?
+    check.needs_ok(reload_on)?
+    check.needs_ok(restart_on)?
+  }
+
+  guard enabled == null else {
+    fail f"service {id}: xinit has no enable or disable"
+  }
+
+  guard running != null or ! reload_on.is_empty() or ! restart_on.is_empty() else {
+    fail f"service {id}: declare running, or a trigger"
+  }
+
+  let spec = model.ServiceSpec(name:, adapter: .Xinit, runlevel: "", enabled: null, running:, reload_on:, restart_on:)
+  Ok(model.Resource(id:, needs:, spec: model.Service(spec)))
+}

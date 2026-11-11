@@ -254,7 +254,11 @@ test a_triggered_command_runs_only_after_a_listed_resource_changed {
 }
 
 pure service_fact(enabled: Bool, running: fact.Running) -> fact.Fact {
-  fact.OnService(fact.ServiceFound(fact.ServiceInfo(enabled:, running:)))
+  fact.OnService(fact.ServiceFound(fact.ServiceInfo(enabled:, running:, ready: null)))
+}
+
+pure xinit_fact(running: fact.Running, ready: Bool) -> fact.Fact {
+  fact.OnService(fact.ServiceFound(fact.ServiceInfo(enabled: null, running:, ready:)))
 }
 
 test services_converge_enablement_and_running_state {
@@ -286,6 +290,38 @@ test restart_supersedes_reload_and_each_is_one_notification {
 test a_stopped_service_is_not_reloaded_by_a_trigger {
   let resource = declare.service(id: "s", name: "sshd", reload_on: ["a"])?
   assert compare.verdict(resource.spec, service_fact(true, .Stopped), null, ["a"]) is compare.Satisfied
+}
+
+test an_xinit_service_plans_from_its_status_not_from_enablement {
+  let resource = declare.xinit_service(id: "s", name: "logger", running: true)?
+  assert compare.verdict(resource.spec, xinit_fact(.Started, true), null, none) is compare.Satisfied
+  assert act(compare.verdict(resource.spec, xinit_fact(.Stopped, false), null, none)) == .Update
+  assert fields(compare.verdict(resource.spec, xinit_fact(.Stopped, false), null, none)) == ["running"]
+  assert fields(compare.verdict(resource.spec, xinit_fact(.Crashed, false), null, none)) == ["running"]
+  assert compare.verdict(resource.spec, fact.OnService(fact.NoService), null, none) is compare.Uncertain(_)
+  match compare.verdict(resource.spec, fact.OnService(fact.ServiceUnseen(fact.Unreadable(cause: .Denied, detail: "no"))), null, none) {
+    compare.Uncertain(unreadable) => assert unreadable.cause == .Denied
+    else => assert false, "an unreadable status was not uncertain"
+  }
+
+  let stopped = declare.xinit_service(id: "s", name: "logger", running: false)?
+  assert fields(compare.verdict(stopped.spec, xinit_fact(.Started, true), null, none)) == ["running"]
+  assert compare.verdict(stopped.spec, xinit_fact(.Stopped, false), null, none) is compare.Satisfied
+}
+
+test an_xinit_trigger_restarts_or_reloads_once_per_apply {
+  let resource = declare.xinit_service(id: "s", name: "logger", reload_on: ["a"], restart_on: ["b"])?
+  assert compare.verdict(resource.spec, xinit_fact(.Started, true), null, none) is compare.Satisfied
+  assert fields(compare.verdict(resource.spec, xinit_fact(.Started, true), null, ["a"])) == ["notify"]
+  let both = compare.verdict(resource.spec, xinit_fact(.Started, true), null, ["a", "b"])
+  match both {
+    compare.Drifted(drift) => {
+      assert drift.changes.len() == 1
+      assert drift.changes[0].to == "restart"
+    }
+    else => assert false, "no drift"
+  }
+  assert compare.verdict(resource.spec, xinit_fact(.Stopped, false), null, ["a"]) is compare.Satisfied
 }
 
 test modes_render_as_four_octal_digits {

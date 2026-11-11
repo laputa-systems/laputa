@@ -24,54 +24,65 @@ pure report(execution: transport.Execution) -> Result[Str, fact.Unreadable] {
   }
 }
 
-proc read(connection: transport.Connection, script: Str, args: List[Str]) [process, error] -> Result[transport.Execution, transport.TransportError] {
-  transport.exec(connection, script, args, privileged: connection.escalate_reads)
+proc read(connection: transport.Connection, operation: scripts.Operation, args: List[Str]) [fs, process, error] -> Result[transport.Execution, transport.TransportError] {
+  transport.exec(connection, operation, args, privileged: connection.escalate_reads)
 }
 
 ## The state of one path as the host reports it.
-export proc path_state(connection: transport.Connection, target: Str) [process, error] -> Result[fact.PathState, transport.TransportError] {
-  let execution = read(connection, scripts.path_state, [target])?
+export proc path_state(connection: transport.Connection, target: Str) [fs, process, error] -> Result[fact.PathState, transport.TransportError] {
+  let execution = read(connection, .PathState, [target])?
   match report(execution) {
     Ok(text) => Ok(probe.path_fact(text))
     Err(reason) => Ok(fact.Unseen(reason))
   }
 }
 
-proc package_state(connection: transport.Connection, spec: model.PackageSpec) [process, error] -> Result[fact.PackageState, transport.TransportError] {
+proc package_state(connection: transport.Connection, spec: model.PackageSpec) [fs, process, error] -> Result[fact.PackageState, transport.TransportError] {
   let wanted = if spec.constraint == null { "" } else { spec.constraint.version }
-  let execution = read(connection, scripts.package_state, [spec.name, wanted])?
+  let execution = read(connection, .PackageState, [spec.name, wanted])?
   match report(execution) {
     Ok(text) => Ok(probe.package_fact(text))
     Err(reason) => Ok(fact.PackageUnseen(reason))
   }
 }
 
-proc accounts(connection: transport.Connection) [process, error] -> Result[probe.AccountsState, transport.TransportError] {
-  let execution = read(connection, scripts.accounts_state, [])?
+proc accounts(connection: transport.Connection) [fs, process, error] -> Result[probe.AccountsState, transport.TransportError] {
+  let execution = read(connection, .AccountsState, [])?
   match report(execution) {
     Ok(text) => Ok(probe.accounts(text))
     Err(reason) => Ok(probe.AccountsUnseen(reason))
   }
 }
 
-proc service_state(connection: transport.Connection, spec: model.ServiceSpec) [process, error] -> Result[fact.ServiceState, transport.TransportError] {
-  let execution = read(connection, scripts.service_state, [spec.name, spec.runlevel])?
-  match report(execution) {
-    Ok(text) => Ok(probe.service_fact(text))
-    Err(reason) => Ok(fact.ServiceUnseen(reason))
+proc service_state(connection: transport.Connection, spec: model.ServiceSpec) [fs, process, error] -> Result[fact.ServiceState, transport.TransportError] {
+  match spec.adapter {
+    model.OpenRc => {
+      let execution = read(connection, .ServiceState, [spec.name, spec.runlevel])?
+      match report(execution) {
+        Ok(text) => Ok(probe.service_fact(text))
+        Err(reason) => Ok(fact.ServiceUnseen(reason))
+      }
+    }
+    model.Xinit => {
+      let execution = read(connection, .XinitServiceState, [spec.name])?
+      match report(execution) {
+        Ok(text) => Ok(probe.xinit_service_fact(text))
+        Err(reason) => Ok(fact.ServiceUnseen(reason))
+      }
+    }
   }
 }
 
-proc guard_state(connection: transport.Connection, invocation: model.Invocation) [process, error] -> Result[fact.GuardState, transport.TransportError] {
+proc guard_state(connection: transport.Connection, invocation: model.Invocation) [fs, process, error] -> Result[fact.GuardState, transport.TransportError] {
   let execution = match invocation {
-    model.Argv(argv) => read(connection, scripts.run_argv, argv)?
-    model.Shell(text) => read(connection, scripts.run_shell, [text])?
+    model.Argv(argv) => read(connection, .RunArgv, argv)?
+    model.Shell(text) => read(connection, .RunShell, [text])?
   }
   Ok(fact.Exited(execution.code))
 }
 
 ## Read the fact a resource's spec is compared with.
-export proc observe(connection: transport.Connection, spec: model.Spec) [process, error] -> Result[fact.Fact, transport.TransportError] {
+export proc observe(connection: transport.Connection, spec: model.Spec) [fs, process, error] -> Result[fact.Fact, transport.TransportError] {
   match spec {
     model.Directory(directory) => Ok(fact.OnPath(path_state(connection, directory.path)?))
     model.File(file) => Ok(fact.OnPath(path_state(connection, file.path)?))
@@ -104,8 +115,8 @@ export proc observe(connection: transport.Connection, spec: model.Spec) [process
 }
 
 ## The tools a host has and the authority it runs as, for `doctor`.
-export proc capabilities(connection: transport.Connection) [process, error] -> Result[probe.Capabilities, transport.TransportError] {
-  let execution = transport.exec(connection, scripts.capabilities)?
+export proc capabilities(connection: transport.Connection) [fs, process, error] -> Result[probe.Capabilities, transport.TransportError] {
+  let execution = transport.exec(connection, .Capabilities)?
   guard execution.code == 0 else {
     return Err(transport.TransportError.Abnormal(f"the capability probe exited {execution.code}"))
   }

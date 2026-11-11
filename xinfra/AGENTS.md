@@ -1,6 +1,6 @@
 # Agent Guide
 
-Vendored from laputa-systems/xsh-infra at df05b26; make changes upstream, not here.
+Vendored from laputa-systems/xsh-infra at e293bfd; make changes upstream, not here.
 
 xsh-infra is a small configuration-management tool written in XSH. It reconciles
 Alpine/Laputa-style hosts over XSH's native SSH client. Policy lives in XSH;
@@ -25,9 +25,12 @@ the controller needs a qualified `xsh` and `xsht` and nothing else. Read
 - Pure planning, comparison, ordering and parsing stay in `pure` functions.
   Host effects live only in `transport`, `observe`, `mutate` and `lock`.
 - Remote execution runs over the native `ssh` module only. No external
-  `ssh`, `scp` or `sftp`, no remote XSH, Python or `jq`.
-- `shell.quote` is the only place a request value becomes remote shell source.
-  Remote scripts are constants that receive values as positional arguments.
+  `ssh`, `scp` or `sftp`, no remote Python or `jq`. Remote XSH is allowed only
+  for a target whose inventory dialect is `xsh` (Laputa, which has no POSIX
+  shell); see docs/ARCHITECTURE.md.
+- `shell.quote` and `shell.xsh_quote` are the only places a request value
+  becomes remote source. Remote scripts are constants that receive values as
+  positional arguments (POSIX) or as the `xinfra_args` literal list (XSH).
 - No new language syntax, async runtime or daemon. Deployment programs are
   trusted operator code.
 - A language or runtime defect gets a minimal reproducer and a note in

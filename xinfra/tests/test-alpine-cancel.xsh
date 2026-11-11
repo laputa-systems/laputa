@@ -84,12 +84,12 @@ proc collect(dir: Path, code: Int) [fs, error] -> Result[Cancelled, Error] {
   Ok(Cancelled(code:, stdout: fp"{dir}/apply.out".read_text()?, stderr: fp"{dir}/apply.err".read_text()?))
 }
 
-proc wait_for_remote(host: model.Host, script: Str, args: List[Str], limit_ms: Int) [env, process, time, error] -> Result[Bool, Error] {
+proc wait_for_remote(host: model.Host, script: Str, args: List[Str], limit_ms: Int) [fs, env, process, time, error] -> Result[Bool, Error] {
   let connection = transport.connect(host)?
   let started = time.now()
   var found = false
   while time.now() - started < limit_ms {
-    let execution = transport.exec(connection, script, args)?
+    let execution = transport.exec_script(connection, script, args)?
     if (execution.stdout.utf8() ?? "") == "yes\n" {
       found = true
       break
@@ -136,18 +136,18 @@ proc apply_again_with_apk_lock_retry(
   Ok(result)
 }
 
-proc assert_lock_free(host: model.Host, lock_path: Str) [env, process, error] -> Result[Unit, Error] {
+proc assert_lock_free(host: model.Host, lock_path: Str) [fs, env, process, error] -> Result[Unit, Error] {
   let connection = transport.connect(host)?
   let held = lock.inspect(connection, lock_path)?
   let _ = transport.disconnect(connection)
   assert held == null, f"the lock {lock_path} was not released: {held ?? ""}"
 }
 
-proc exists(host: model.Host, target: Str) [env, process, error] -> Result[Bool, Error] {
+proc exists(host: model.Host, target: Str) [fs, env, process, error] -> Result[Bool, Error] {
   Ok(testing.remote_text(host, "test -e \"$1\" && echo yes || echo no", [target])? == "yes\n")
 }
 
-proc mode(host: model.Host, target: Str) [env, process, error] -> Result[Str, Error] {
+proc mode(host: model.Host, target: Str) [fs, env, process, error] -> Result[Str, Error] {
   testing.remote_text(host, "stat -c %a -- \"$1\"", [target], privileged: true)
 }
 
@@ -739,7 +739,7 @@ test cancellation_before_and_after_a_user_is_reported_from_the_target_side_and_c
   }
 }
 
-proc service_cleanup(host: model.Host, name: Str) [env, process, error] -> Result[Unit, Error] {
+proc service_cleanup(host: model.Host, name: Str) [fs, env, process, error] -> Result[Unit, Error] {
   let _ = testing.remote_text(host, "rc-service \"$1\" stop >/dev/null 2>&1 || true; rc-update del \"$1\" default >/dev/null 2>&1 || true; rm -f \"/etc/init.d/$1\" \"/var/tmp/$1\".*", [name], privileged: true)?
 }
 

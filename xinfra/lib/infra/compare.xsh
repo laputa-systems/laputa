@@ -308,13 +308,24 @@ pure any_changed(triggers: List[Str], changed: List[Str]) -> Bool {
 pure compare_service(spec: model.ServiceSpec, state: fact.ServiceState, changed: List[Str]) -> Verdict {
   match state {
     fact.ServiceUnseen(unreadable) => Uncertain(unreadable)
-    fact.NoService => Uncertain(reading(.Unavailable, f"no init script for service {spec.name}"))
+    fact.NoService => {
+      let missing = match spec.adapter {
+        model.OpenRc => f"no init script for service {spec.name}"
+        model.Xinit => f"no xinit service file for {spec.name}"
+      }
+      Uncertain(reading(.Unavailable, missing))
+    }
     fact.ServiceFound(info) => {
       var changes: List[Change] = []
-      if spec.enabled != null and info.enabled != spec.enabled {
-        let from = if info.enabled { "enabled" } else { "disabled" }
-        let to = if spec.enabled { "enabled" } else { "disabled" }
-        changes += [change("enabled", from, to)]
+      if spec.enabled != null {
+        guard let enabled = info.enabled else {
+          return Conflicting(f"the {spec.adapter} adapter has no enable or disable")
+        }
+        if enabled != spec.enabled {
+          let from = if enabled { "enabled" } else { "disabled" }
+          let to = if spec.enabled { "enabled" } else { "disabled" }
+          changes += [change("enabled", from, to)]
+        }
       }
 
       let restart = any_changed(spec.restart_on, changed)

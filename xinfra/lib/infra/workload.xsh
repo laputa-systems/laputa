@@ -6,6 +6,7 @@ use infra.compare
 use infra.content
 use infra.graph
 use infra.model
+use infra.scripts
 
 ## The resources declared for one host, in dependency order after `prepare`.
 export type Workload = {host: model.Host, resources: List[model.Resource]}
@@ -38,6 +39,20 @@ proc measure_file(host: Str, resource: model.Resource, spec: model.FileSpec) [fs
 
   let measured = ctx f"{host}: file {resource.id}" { content.measure(source)? }
   Ok(measured)
+}
+
+pure dialect_refusal(host: model.Host, resource: model.Resource, operation: scripts.Operation) -> Str {
+  f"{host.name}: {resource.id}: the {host.dialect} dialect has no script for {operation}; a {model.kind(resource.spec)} resource cannot run on this host"
+}
+
+proc check_dialect(host: model.Host, resources: List[model.Resource]) -> Result[Unit, Error] {
+  for resource in resources {
+    for operation in scripts.operations(resource.spec) {
+      guard scripts.supports(host.dialect, operation) else {
+        fail dialect_refusal(host, resource, operation)
+      }
+    }
+  }
 }
 
 proc secret_values(host: Str, resource: model.Resource) [env, error] -> Result[List[Str], Error] {
@@ -82,6 +97,7 @@ export proc prepare(declared: List[Workload]) [fs, env, error] -> Result[Prepare
   var secrets: List[Str] = []
   for entry in declared {
     let resources = ctx f"host {entry.host.name}" { graph.order(entry.resources)? }
+    ctx f"host {entry.host.name}" { check_dialect(entry.host, resources)? }
     ordered += [Workload(host: entry.host, resources:)]
     for resource in resources {
       match resource.spec {

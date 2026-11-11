@@ -146,14 +146,15 @@ test an_unreadable_or_malformed_account_database_is_an_error_not_an_empty_one {
 test service_reports_map_status_codes {
   match probe.service_fact("state found\nenabled yes\nstatus 0\n") {
     fact.ServiceFound(info) => {
-      assert info.enabled
+      assert info.enabled == true
+      assert info.ready == null
       assert info.running == .Started
     }
     else => assert false, "not found"
   }
   match probe.service_fact("state found\nenabled no\nstatus 3\n") {
     fact.ServiceFound(info) => {
-      assert ! info.enabled
+      assert info.enabled == false
       assert info.running == .Stopped
     }
     else => assert false, "not found"
@@ -166,6 +167,59 @@ test service_reports_map_status_codes {
   match probe.service_fact("state unavailable\n") {
     fact.ServiceUnseen(unreadable) => assert unreadable.cause == .Unavailable
     else => assert false, "not unseen"
+  }
+}
+
+test xinit_status_reports_existence_running_and_readiness {
+  match probe.xinit_service_fact("state found\nrunning running\nready true\n") {
+    fact.ServiceFound(info) => {
+      assert info.enabled == null
+      assert info.running == .Started
+      assert info.ready == true
+    }
+    else => assert false, "not found"
+  }
+  match probe.xinit_service_fact("state found\nrunning starting\nready false\n") {
+    fact.ServiceFound(info) => {
+      assert info.running == .Started
+      assert info.ready == false
+    }
+    else => assert false, "not found"
+  }
+  match probe.xinit_service_fact("state found\nrunning dead\nready false\n") {
+    fact.ServiceFound(info) => assert info.running == .Crashed
+    else => assert false, "not found"
+  }
+  for down in ["down", "stopped", "pending", "finishing"] {
+    match probe.xinit_service_fact(f"state found\nrunning {down}\nready false\n") {
+      fact.ServiceFound(info) => assert info.running == .Stopped
+      else => assert false, f"{down} was not found"
+    }
+  }
+  assert probe.xinit_service_fact("state missing\n") is fact.NoService
+  match probe.xinit_service_fact("state unavailable\n") {
+    fact.ServiceUnseen(unreadable) => assert unreadable.cause == .Unavailable
+    else => assert false, "not unseen"
+  }
+  match probe.xinit_service_fact("state denied\ndetail 6e6f\n") {
+    fact.ServiceUnseen(unreadable) => {
+      assert unreadable.cause == .Denied
+      assert unreadable.detail == "no"
+    }
+    else => assert false, "not unseen"
+  }
+  match probe.xinit_service_fact("state error\ndetail 6f6f7073\n") {
+    fact.ServiceUnseen(unreadable) => {
+      assert unreadable.cause == .Unavailable
+      assert unreadable.detail == "oops"
+    }
+    else => assert false, "not unseen"
+  }
+  for report in ["", "state found\nrunning running\n", "state found\nrunning running\nready maybe\n", "state weird\n"] {
+    match probe.xinit_service_fact(report) {
+      fact.ServiceUnseen(unreadable) => assert unreadable.cause == .Malformed
+      else => assert false, f"{report} was not unseen"
+    }
   }
 }
 

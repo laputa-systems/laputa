@@ -27,7 +27,7 @@ proc apply_args(inventory: Path, deploy: Path, lock_path: Str) -> List[Str] {
   ["bin/xinfra.xsh", "apply", f"{inventory}", f"{deploy}", "--limit", "fx-2", "--lock-path", lock_path, "--format", "jsonl"]
 }
 
-proc wait_for_lock(connection: transport.Connection, lock_path: Str) [env, process, time, error] -> Result[Bool, Error] {
+proc wait_for_lock(connection: transport.Connection, lock_path: Str) [fs, env, process, time, error] -> Result[Bool, Error] {
   for _ in range(100) {
     if lock.inspect(connection, lock_path)? != null {
       return Ok(true)

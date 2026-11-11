@@ -11,6 +11,9 @@ xsht check lib bin tests examples fixtures packaging
 xsht test --jobs 16                                    # fixture tests skip without hosts
 ```
 
+The xsh dialect suite runs the catalogue's XSH sources through the `xsh` on
+PATH, so the verification build must stay on PATH for the whole run.
+
 ## Disposable Alpine container hosts
 
 ```sh
@@ -76,6 +79,7 @@ image download also needs network the first time.
 | `test-probe`, `test-compare` | Parsing every host report; one verdict per resource kind, including conflicts, uncertainty and redaction. |
 | `test-report`, `test-lock` | Sanitizing, redaction, exit statuses, JSON/JSONL shape; lock ownership, contention, token release. |
 | `test-engine-local`, `test-engine-semantics` | Apply, idempotence, drift, plan/check purity, validator failure, blocked dependents, failure policies, barriers, job bound, trigger coalescing, secrets, hostile paths, stale plans, unknown outcomes. |
+| `test-xinit-adapter`, `test-xsh-dialect` | The xinit adapter against a fake POSIX `xinit`: start, restart, stop, an unknown service and a denied status, through observe, compare, apply and verify. The xsh dialect: hostile argument round trip through a real `xsh`, XSH sources checked against the POSIX facts for paths and xinit services, typed refusal of operations the dialect lacks, and a local xsh-host apply that creates, updates, retargets and removes a directory, file and symlink and controls an xinit service. |
 | `test-cli`, `test-install` | Exit statuses 0/1/2, report formats, validation before mutation, install tree contents. |
 | `test-transport-ssh`, `test-alpine-*` | The same behaviors against real OpenSSH and Alpine: hostile names through the login shell, doas and refused doas, a wrong host-key pin, a 40 MiB artifact, a 600 MiB transfer cut off by its timeout, accounts, packages (versions, out-of-band removal, an unavailable package), OpenRC reload coalescing, a stopped service repaired, a failed validation that never restarts a service, every command condition, failing commands and hostile arguments, unreachable and unauthenticated hosts, a host failing midway beside a healthy one, concurrent applies, SIGKILL and SIGTERM of the controller. |
 | `test-alpine-cancel` | Two-process cancellation of a running `apply` on `fx-3` with every boundary held from the target side: a blocking command resource before and after each resource kind, plus an in-flight request for a command, a streamed file transfer and a service reload. Each case signals only the controller, checks the deferred stderr report and that the host lock is free, then removes the hold and re-runs to convergence. |
@@ -83,6 +87,11 @@ image download also needs network the first time.
 The `test-alpine-*` suites run against either fixture. The container fixture
 uses `rc_sys=docker`; the VM fixture is a real guest whose PID 1 is OpenRC
 `init` and whose `sshd` comes from the default runlevel.
+
+The Laputa xsh dialect is not part of the committed fixture suite: it needs a
+qemu-maintained generation and the lifecycle provisioning in
+`laputa/tests/integration/g2_lifecycle.py`. The qualified run and what it
+covered are recorded in the [matrix](MATRIX.md).
 
 ## Cancellation boundaries
 

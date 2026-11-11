@@ -14,6 +14,18 @@ export proc resources(host: model.Host) [fs, error] -> Result[List[model.Resourc
 }
 """
 
+const xinit_enabled_source = r"""
+##! An xinit service that asks for enablement xinit does not have.
+
+use infra.declare
+use infra.model
+
+## The resources one host should have.
+export proc resources(host: model.Host) [fs, error] -> Result[List[model.Resource], Error] {
+  [declare.xinit_service(id: "logger", name: "logger", enabled: true)?]
+}
+"""
+
 const broken_source = r"""
 ##! A deployment with a dependency cycle.
 
@@ -102,6 +114,15 @@ test invalid_input_exits_two_before_any_host_is_touched { |ctx|
   let missing = xinfra("plan", f"{dir}/nope.toml", f"{deploy}")?
   assert missing.status.exit_code()? == 2
   assert ! fp"{dir}/target".exists()?
+}
+
+test declaring_xinit_enablement_is_refused_before_any_host_is_touched { |ctx|
+  let dir = test.temp_dir(ctx)?
+  let inventory = inventory_for(dir)?
+  let deploy = deploy_in(dir, xinit_enabled_source)?
+  let refused = xinfra("plan", f"{inventory}", f"{deploy}")?
+  assert refused.status.exit_code()? == 2
+  assert "no enable or disable" in refused.stderr
 }
 
 test a_deployment_that_is_not_a_module_with_resources_is_refused { |ctx|

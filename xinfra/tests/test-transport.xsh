@@ -11,7 +11,7 @@ proc local() [process, error] -> Result[transport.Connection, transport.Transpor
 
 test hostile_arguments_arrive_byte_for_byte {
   let connection = local()?
-  let result = transport.exec(connection, scripts.echo_arguments, hostile)?
+  let result = transport.exec(connection, .EchoArguments, hostile)?
   assert result.code == 0
   let expected = hostile |> map { |word| word + "\0" } |> collect()
   assert result.stdout.utf8()? == expected.join("")
@@ -19,7 +19,7 @@ test hostile_arguments_arrive_byte_for_byte {
 
 test a_nonzero_exit_is_an_execution_not_an_error {
   let connection = local()?
-  let result = transport.exec(connection, "printf out; printf err >&2; exit 7")?
+  let result = transport.exec_script(connection, "printf out; printf err >&2; exit 7")?
   assert result.code == 7
   assert result.stdout == b"out"
   assert result.stderr == b"err"
@@ -28,19 +28,19 @@ test a_nonzero_exit_is_an_execution_not_an_error {
 test stdin_bytes_and_files_reach_the_script_unchanged {
   let connection = local()?
   let payload = b"\x00\x01binary\xff\n"
-  let echoed = transport.exec(connection, "cat", stdin: payload)?
+  let echoed = transport.exec_script(connection, "cat", stdin: payload)?
   assert echoed.stdout == payload
 
   let scratch = fs.tempdir()?
   let source = fp"{scratch.host_path()?}/blob"
   source.write(payload)
-  let streamed = transport.exec(connection, "cat", stdin_path: source)?
+  let streamed = transport.exec_script(connection, "cat", stdin_path: source)?
   assert streamed.stdout == payload
 }
 
 test a_command_killed_by_a_signal_is_abnormal_not_exit_zero {
   let connection = local()?
-  match transport.exec(connection, "kill -TERM $$") {
+  match transport.exec_script(connection, "kill -TERM $$") {
     Err(transport.TransportError.Abnormal {message}) => assert "signal" in message
     else => assert false, "a signal death was not abnormal"
   }
@@ -48,7 +48,7 @@ test a_command_killed_by_a_signal_is_abnormal_not_exit_zero {
 
 test a_timeout_after_the_command_started_is_interrupted {
   let connection = local()?
-  match transport.exec(connection, "sleep 5", timeout_ms: 200) {
+  match transport.exec_script(connection, "sleep 5", timeout_ms: 200) {
     Err(transport.TransportError.Interrupted {..}) => assert true
     else => assert false, "a timeout was not interrupted"
   }
@@ -56,7 +56,7 @@ test a_timeout_after_the_command_started_is_interrupted {
 
 test a_nul_in_an_argument_is_refused_before_anything_runs {
   let connection = local()?
-  match transport.exec(connection, "true", ["a\0b"]) {
+  match transport.exec_script(connection, "true", ["a\0b"]) {
     Err(transport.TransportError.Refused {..}) => assert true
     else => assert false, "NUL was not refused"
   }

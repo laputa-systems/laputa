@@ -40,14 +40,14 @@ pure transport_failure(phase: outcome.Phase, error: transport.TransportError, ap
 proc output(
   connection: transport.Connection,
   phase: outcome.Phase,
-  script: Str,
+  operation: scripts.Operation,
   args: List[Str],
   applied: Bool,
   stdin: Bytes? = null,
   stdin_path: Path? = null,
   timeout_ms: Int? = null,
-) [process, error] -> Result[transport.Execution, outcome.StepError] {
-  match transport.exec(connection, script, args, privileged: true, stdin:, stdin_path:, timeout_ms:) {
+) [fs, process, error] -> Result[transport.Execution, outcome.StepError] {
+  match transport.exec(connection, operation, args, privileged: true, stdin:, stdin_path:, timeout_ms:) {
     Err(error) => Err(transport_failure(phase, error, applied))
     Ok(execution) => {
       if execution.code == 0 {
@@ -62,14 +62,14 @@ proc output(
 proc step(
   connection: transport.Connection,
   phase: outcome.Phase,
-  script: Str,
+  operation: scripts.Operation,
   args: List[Str],
   applied: Bool,
   stdin: Bytes? = null,
   stdin_path: Path? = null,
   timeout_ms: Int? = null,
-) [process, error] -> Result[Unit, outcome.StepError] {
-  let _ = output(connection, phase, script, args, applied, stdin:, stdin_path:, timeout_ms:)?
+) [fs, process, error] -> Result[Unit, outcome.StepError] {
+  let _ = output(connection, phase, operation, args, applied, stdin:, stdin_path:, timeout_ms:)?
 }
 
 ## The directory that holds a path. The parent of a top-level name is `/`.
@@ -97,9 +97,9 @@ pure changes_field(drift: compare.Drift, field: Str) -> Bool {
   drift.changes |> any { |change| change.field == field }
 }
 
-proc apply_directory(connection: transport.Connection, spec: model.DirectorySpec, drift: compare.Drift) [process, error] -> Result[Unit, outcome.StepError] {
+proc apply_directory(connection: transport.Connection, spec: model.DirectorySpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, scripts.remove_directory, [spec.path], false)?
+    step(connection, .Apply, .RemoveDirectory, [spec.path], false)?
     return
   }
 
@@ -107,18 +107,18 @@ proc apply_directory(connection: transport.Connection, spec: model.DirectorySpec
   if drift.act == .Create {
     let initial = if spec.mode == null { "" } else { compare.octal(0o700) }
     let parents = if spec.parents { "1" } else { "0" }
-    step(connection, .Apply, scripts.make_directory, [spec.path, parents, initial], false)?
+    step(connection, .Apply, .MakeDirectory, [spec.path, parents, initial], false)?
     applied = true
   }
 
   let owner = owner_spec(spec.owner, spec.group)
   if owner != "" and (drift.act == .Create or changes_field(drift, "owner") or changes_field(drift, "group")) {
-    step(connection, .Apply, scripts.change_owner, [owner, spec.path], applied)?
+    step(connection, .Apply, .ChangeOwner, [owner, spec.path], applied)?
     applied = true
   }
 
   if spec.mode != null and (drift.act == .Create or changes_field(drift, "mode")) {
-    step(connection, .Apply, scripts.change_mode, [compare.octal(spec.mode), spec.path], applied)?
+    step(connection, .Apply, .ChangeMode, [compare.octal(spec.mode), spec.path], applied)?
   }
 }
 
@@ -139,8 +139,8 @@ pure staged_path(execution: transport.Execution) -> Result[Str, outcome.StepErro
   }
 }
 
-proc discard(connection: transport.Connection, stage: Str, cause: outcome.StepError) [process, error] -> outcome.StepError {
-  match step(connection, .Cleanup, scripts.discard_stage, [stage], false) {
+proc discard(connection: transport.Connection, stage: Str, cause: outcome.StepError) [fs, process, error] -> outcome.StepError {
+  match step(connection, .Cleanup, .DiscardStage, [stage], false) {
     Ok(_) => cause
     Err(cleanup) => {
       match cause {
@@ -183,8 +183,8 @@ proc stream_content(
     }
   }
 
-  step(connection, .Stage, scripts.write_stage, [stage], false, stdin: data, stdin_path: streamed, timeout_ms: connection.transfer_timeout_ms)?
-  let inspected = output(connection, .Stage, scripts.inspect_stage, [stage], false)?
+  step(connection, .Stage, .WriteStage, [stage], false, stdin: data, stdin_path: streamed, timeout_ms: connection.transfer_timeout_ms)?
+  let inspected = output(connection, .Stage, .InspectStage, [stage], false)?
   let table = inspected.stdout.utf8() ?? ""
   if f"digest {expected.digest}" not in table.lines() {
     return Err(failure(.Stage, "the staged copy does not match the intended content", false))
@@ -205,7 +205,7 @@ proc replace_file(
   let existing = existing_info(state)
   let owner = owner_spec(spec.owner ?? existing?.owner ?? "", spec.group ?? existing?.group ?? "")
   let mode = spec.mode ?? existing?.mode ?? 0o644
-  let created = output(connection, .Stage, scripts.create_stage, [parent_of(spec.path)], false)?
+  let created = output(connection, .Stage, .CreateStage, [parent_of(spec.path)], false)?
   let stage = staged_path(created)?
   match stream_content(connection, stage, source, expected) {
     Err(error) => {
@@ -214,7 +214,7 @@ proc replace_file(
     Ok(_) => {}
   }
 
-  match step(connection, .Stage, scripts.finish_stage, [stage, owner, compare.octal(mode)], false) {
+  match step(connection, .Stage, .FinishStage, [stage, owner, compare.octal(mode)], false) {
     Err(error) => {
       return Err(discard(connection, stage, error))
     }
@@ -222,7 +222,7 @@ proc replace_file(
   }
 
   if ! spec.validate.is_empty() {
-    match step(connection, .Validate, scripts.run_argv, validator_argv(spec.validate, stage), false) {
+    match step(connection, .Validate, .RunArgv, validator_argv(spec.validate, stage), false) {
       Err(error) => {
         return Err(discard(connection, stage, error))
       }
@@ -230,7 +230,7 @@ proc replace_file(
     }
   }
 
-  match step(connection, .Promote, scripts.promote_stage, [stage, spec.path], false) {
+  match step(connection, .Promote, .PromoteStage, [stage, spec.path], false) {
     Err(error) => {
       return Err(discard(connection, stage, error))
     }
@@ -247,7 +247,7 @@ proc apply_file(
   expected: compare.Material?,
 ) [fs, env, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, scripts.remove_file, [spec.path], false)?
+    step(connection, .Apply, .RemoveFile, [spec.path], false)?
     return
   }
 
@@ -267,25 +267,25 @@ proc apply_file(
   let owner = owner_spec(spec.owner, spec.group)
   var applied = false
   if owner != "" and (changes_field(drift, "owner") or changes_field(drift, "group")) {
-    step(connection, .Apply, scripts.change_owner, [owner, spec.path], false)?
+    step(connection, .Apply, .ChangeOwner, [owner, spec.path], false)?
     applied = true
   }
 
   if spec.mode != null and changes_field(drift, "mode") {
-    step(connection, .Apply, scripts.change_mode, [compare.octal(spec.mode), spec.path], applied)?
+    step(connection, .Apply, .ChangeMode, [compare.octal(spec.mode), spec.path], applied)?
   }
 }
 
-proc apply_link(connection: transport.Connection, spec: model.SymlinkSpec, drift: compare.Drift) [process, error] -> Result[Unit, outcome.StepError] {
+proc apply_link(connection: transport.Connection, spec: model.SymlinkSpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   match drift.act {
     compare.Remove => {
-      step(connection, .Apply, scripts.remove_link, [spec.path], false)?
+      step(connection, .Apply, .RemoveLink, [spec.path], false)?
     }
     compare.Update => {
-      step(connection, .Apply, scripts.replace_link, [spec.target, spec.path], false)?
+      step(connection, .Apply, .ReplaceLink, [spec.target, spec.path], false)?
     }
     else => {
-      step(connection, .Apply, scripts.make_link, [spec.target, spec.path], false)?
+      step(connection, .Apply, .MakeLink, [spec.target, spec.path], false)?
     }
   }
 }
@@ -294,30 +294,30 @@ pure package_argument(spec: model.PackageSpec) -> Str {
   if spec.constraint == null { spec.name } else { f"{spec.name}{spec.constraint.op}{spec.constraint.version}" }
 }
 
-proc apply_package(connection: transport.Connection, spec: model.PackageSpec, drift: compare.Drift) [process, error] -> Result[Unit, outcome.StepError] {
+proc apply_package(connection: transport.Connection, spec: model.PackageSpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, scripts.apk_del, [spec.name], false, timeout_ms: 600000)?
+    step(connection, .Apply, .ApkDel, [spec.name], false, timeout_ms: 600000)?
   } else {
-    step(connection, .Apply, scripts.apk_add, [package_argument(spec)], false, timeout_ms: 600000)?
+    step(connection, .Apply, .ApkAdd, [package_argument(spec)], false, timeout_ms: 600000)?
   }
 }
 
-proc refresh_index(connection: transport.Connection) [process, error] -> Result[Unit, outcome.StepError] {
-  step(connection, .Apply, scripts.apk_update, [], false, timeout_ms: 600000)?
+proc refresh_index(connection: transport.Connection) [fs, process, error] -> Result[Unit, outcome.StepError] {
+  step(connection, .Apply, .ApkUpdate, [], false, timeout_ms: 600000)?
 }
 
-proc apply_group(connection: transport.Connection, spec: model.GroupSpec, drift: compare.Drift) [process, error] -> Result[Unit, outcome.StepError] {
+proc apply_group(connection: transport.Connection, spec: model.GroupSpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, scripts.delete_group, [spec.name], false)?
+    step(connection, .Apply, .DeleteGroup, [spec.name], false)?
   } else {
     let gid = if spec.gid == null { "" } else { f"{spec.gid}" }
-    step(connection, .Apply, scripts.add_group, [spec.name, gid], false)?
+    step(connection, .Apply, .AddGroup, [spec.name, gid], false)?
   }
 }
 
-proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: fact.Fact, drift: compare.Drift) [process, error] -> Result[Unit, outcome.StepError] {
+proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: fact.Fact, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, scripts.delete_user, [spec.name], false)?
+    step(connection, .Apply, .DeleteUser, [spec.name], false)?
     return
   }
 
@@ -326,14 +326,14 @@ proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: f
   if drift.act == .Create {
     let uid = if spec.uid == null { "" } else { f"{spec.uid}" }
     let system_flag = if spec.system { "1" } else { "0" }
-    step(connection, .Apply, scripts.add_user, [spec.name, uid, spec.group ?? "", spec.home ?? "", spec.shell ?? "", system_flag], false)?
+    step(connection, .Apply, .AddUser, [spec.name, uid, spec.group ?? "", spec.home ?? "", spec.shell ?? "", system_flag], false)?
     applied = true
   } else {
     let primary = if changes_field(drift, "group") { spec.group ?? "" } else { "" }
     let home = if changes_field(drift, "home") { spec.home ?? "" } else { "" }
     let shell = if changes_field(drift, "shell") { spec.shell ?? "" } else { "" }
     if primary != "" or home != "" or shell != "" {
-      step(connection, .Apply, scripts.modify_user, [spec.name, primary, home, shell], false)?
+      step(connection, .Apply, .ModifyUser, [spec.name, primary, home, shell], false)?
       applied = true
     }
   }
@@ -344,7 +344,7 @@ proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: f
       else => false
     }
     if ! known {
-      step(connection, .Apply, scripts.join_group, [spec.name, member], applied)?
+      step(connection, .Apply, .JoinGroup, [spec.name, member], applied)?
       applied = true
     }
   }
@@ -355,12 +355,23 @@ pure notification(drift: compare.Drift) -> Str? {
   if notices.is_empty() { null } else { notices[0].to }
 }
 
-proc apply_service(connection: transport.Connection, spec: model.ServiceSpec, drift: compare.Drift) [process, error] -> Result[Unit, outcome.StepError] {
+pure control_operation(adapter: model.ServiceAdapter) -> scripts.Operation {
+  match adapter {
+    model.OpenRc => .ControlService
+    model.Xinit => .XinitControlService
+  }
+}
+
+proc apply_service(connection: transport.Connection, spec: model.ServiceSpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   var applied = false
   for change in drift.changes {
     if change.field == "enabled" {
-      let script = if change.to == "enabled" { scripts.enable_service } else { scripts.disable_service }
-      step(connection, .Apply, script, [spec.name, spec.runlevel], applied)?
+      guard spec.adapter == .OpenRc else {
+        return Err(failure(.Apply, "xinit has no enable or disable", applied))
+      }
+
+      let operation: scripts.Operation = if change.to == "enabled" { .EnableService } else { .DisableService }
+      step(connection, .Apply, operation, [spec.name, spec.runlevel], applied)?
       applied = true
     }
   }
@@ -368,18 +379,18 @@ proc apply_service(connection: transport.Connection, spec: model.ServiceSpec, dr
   for change in drift.changes {
     if change.field == "running" {
       let action = if change.to == "started" { "start" } else { "stop" }
-      step(connection, .Apply, scripts.control_service, [spec.name, action], applied, timeout_ms: 120000)?
+      step(connection, .Apply, control_operation(spec.adapter), [spec.name, action], applied, timeout_ms: 120000)?
       applied = true
     }
   }
 
   let notice = notification(drift)
   if notice != null and ! changes_field(drift, "running") {
-    step(connection, .Notify, scripts.control_service, [spec.name, notice], applied, timeout_ms: 120000)?
+    step(connection, .Notify, control_operation(spec.adapter), [spec.name, notice], applied, timeout_ms: 120000)?
   }
 }
 
-proc apply_command(connection: transport.Connection, spec: model.CommandSpec) [env, process, error] -> Result[Unit, outcome.StepError] {
+proc apply_command(connection: transport.Connection, spec: model.CommandSpec) [env, fs, process, error] -> Result[Unit, outcome.StepError] {
   var input: Bytes? = null
   if spec.stdin_env != null {
     match env.get(spec.stdin_env) {
@@ -390,16 +401,16 @@ proc apply_command(connection: transport.Connection, spec: model.CommandSpec) [e
     }
   }
 
-  let script = match spec.invocation {
-    model.Argv(_) => scripts.run_argv
-    model.Shell(_) => scripts.run_shell
+  let operation = match spec.invocation {
+    model.Argv(_) => scripts.RunArgv
+    model.Shell(_) => scripts.RunShell
   }
   let args = match spec.invocation {
     model.Argv(argv) => argv
     model.Shell(text) => [text]
   }
 
-  match transport.exec(connection, script, args, privileged: true, stdin: input, timeout_ms: spec.timeout_ms) {
+  match transport.exec(connection, operation, args, privileged: true, stdin: input, timeout_ms: spec.timeout_ms) {
     Err(error) => Err(transport_failure(.Apply, error, false))
     Ok(execution) => {
       guard execution.code in spec.accept else {

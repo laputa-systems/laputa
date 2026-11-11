@@ -101,6 +101,23 @@ test a_service_must_declare_something {
   assert declare.service(id: "s", name: "sshd", restart_on: ["conf"]) is Ok(_)
 }
 
+test an_xinit_service_declares_no_enablement_or_runlevel {
+  assert refused(declare.xinit_service(id: "s", name: "logger", enabled: true), "no enable or disable")
+  assert refused(declare.xinit_service(id: "s", name: "logger"), "declare running")
+  assert refused(declare.xinit_service(id: "s", name: "bad name", running: true), "invalid service name")
+  let resource = declare.xinit_service(id: "s", name: "logger", running: true, restart_on: ["conf"])?
+  match resource.spec {
+    model.Service(spec) => {
+      assert spec.adapter == .Xinit
+      assert spec.enabled == null
+      assert spec.running == true
+      assert spec.runlevel == ""
+    }
+    else => assert false, "not a service"
+  }
+  assert model.dependencies(resource) == ["conf"]
+}
+
 test dependencies_include_declared_triggers {
   let service = declare.service(id: "s", name: "sshd", reload_on: ["a"], restart_on: ["b"], needs: ["c"])?
   assert model.dependencies(service) == ["c", "a", "b"]

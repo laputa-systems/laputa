@@ -21,6 +21,10 @@ host (`lock` phase) before any mutation. With `privilege = "doas"` reads are
 escalated too, so plans see root-only paths; set `escalate_reads = false` to
 read as the login user and get `uncertain` for what it cannot read.
 
+The `xsh` dialect has no `doas` wrapper; inventory refuses it with
+`privilege = "doas"`. Use `plain` or `root`. An xinit service still needs write
+access to `/run/xinit`, so on a Laputa target use `root`.
+
 ## Secrets
 
 - `secret_env` file content and `stdin_env` command input come from controller
@@ -30,16 +34,18 @@ read as the login user and get `uncertain` for what it cannot read.
 - Every message that came from a host is scanned for known secret values before
   it is stored. A command that prints a secret in some transformed form (for
   example base64) is not caught.
-- Staging files are created mode 0600 by `mktemp` under umask 077, in the
-  destination directory, and take their final mode only just before the rename.
+- Staging files are created mode 0600 in the destination directory (`mktemp`
+  under umask 077 on a POSIX target, an exclusive `mknod` on an xsh target) and
+  take their final mode only just before the rename.
 - Do not put secrets in inventory vars or in deployment text: those appear in
   plans.
 
 ## The host lock
 
-`apply` takes `/run/xinfra.lock` (a directory made with `mkdir`) on each host
-before its first mutation and releases it at the end, on failure, and on
-`SIGINT`/`SIGTERM`. The lock holds an ownership token and a holder description.
+`apply` takes `/run/xinfra.lock` (a mode-0700 directory created atomically) on
+each host before its first mutation and releases it at the end, on failure, and
+on `SIGINT`/`SIGTERM`. The lock holds an ownership token and a holder
+description.
 A second apply sees `another apply holds ...` and fails that host. Plan, check
 and doctor take no lock.
 

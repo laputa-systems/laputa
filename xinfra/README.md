@@ -2,7 +2,10 @@
 
 A small configuration-management tool written in [XSH](https://github.com/laputa-systems/xsh),
 inspired by pyinfra. It reconciles Alpine/Laputa-style hosts over XSH's native
-SSH client: no Python, no remote XSH, no daemon, no external `ssh`.
+SSH client: no Python, no daemon, no external `ssh`. A POSIX target receives
+constant `/bin/sh` scripts. A Laputa target, whose login shell executes its `-c`
+argument as XSH, receives catalogued XSH source instead (the documented
+per-target exception).
 
 ```sh
 xinfra doctor INVENTORY                 # validate hosts, keys, shell, tools, authority
@@ -21,7 +24,9 @@ xsh bin/xinfra.xsh plan .work/fixtures/inventory.toml examples/alpine-web/deploy
 Resources: directories, regular files (local source, text or rendered
 template, optional validator, atomic replacement), symlinks, Alpine packages,
 groups and users, commands with an explicit idempotence condition, and OpenRC
-services with change-triggered reload or restart. Reports are text, JSON or
+or Laputa xinit services with change-triggered reload or restart. The xinit
+adapter uses only xinit's documented status and control verbs; it has no
+enable or disable. Reports are text, JSON or
 JSON Lines.
 
 - [Usage](docs/USAGE.md): inventory, deployment programs, every resource, the
@@ -35,6 +40,8 @@ JSON Lines.
 - [Requirements on XSH](docs/XSH-API.md): the XSH behavior this relies on.
 
 Requirements: a qualified `xsh` with the native `ssh` module and `xsht` for the
-tests. Targets need an SSH server that runs commands, a POSIX `sh`, and BusyBox
-or GNU `stat`, `sha256sum`, `od`, `mktemp` and friends (see the matrix).
-Install the runtime with `xsh packaging/install.xsh PREFIX`.
+tests. POSIX targets need an SSH server that runs commands, a POSIX `sh`, and
+BusyBox or GNU `stat`, `sha256sum`, `od`, `mktemp` and friends. Laputa targets
+need `/usr/bin/xsh-login` as the login shell and the XSH runtime; their
+`/bin/sh` is never used. See the matrix. Install the runtime with
+`xsh packaging/install.xsh PREFIX`.

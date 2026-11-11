@@ -12,10 +12,16 @@ export enum Privilege: Str { Plain = "plain", Root = "root", Doas = "doas" }
 ## `/bin/sh` and exists for tests and development.
 export enum TransportKind: Str { Ssh = "ssh", Local = "local" }
 
+## What the remote login shell is. `Posix` sends `/bin/sh -c` command strings.
+## `Xsh` sends XSH source, for a login shell such as Laputa's `xsh-login`,
+## whose `-c` argument is the program it executes.
+export enum Dialect: Str { Posix = "posix", Xsh = "xsh" }
+
 ## One managed machine.
 export type Host = {
   name: Str,
   transport: TransportKind,
+  dialect: Dialect,
   address: Str,
   port: Int,
   user: Str,
@@ -116,7 +122,7 @@ export type CommandSpec = {
 }
 
 ## The service managers xsh-infra can drive.
-export enum ServiceAdapter: Str { OpenRc = "openrc" }
+export enum ServiceAdapter: Str { OpenRc = "openrc", Xinit = "xinit" }
 
 ## A service, its boot enablement and running state, and the resources whose
 ## change reloads or restarts it.

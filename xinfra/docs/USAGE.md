@@ -13,6 +13,7 @@ fields are errors.
 [defaults]
 user = "deploy"
 privilege = "doas"            # plain | root | doas
+dialect = "posix"             # posix | xsh
 key = "keys/id_ed25519"       # unencrypted Ed25519 OpenSSH key; relative to this file
 timeout_ms = 10000            # connect and ordinary command timeout
 transfer_timeout_ms = 600000  # file transfers
@@ -34,6 +35,16 @@ title = "front door"
 `transport = "local"` runs the same scripts through a local `/bin/sh` for
 development and tests; it needs no address, key or pin. Host variables merge
 defaults, then groups in listed order, then the host.
+
+`dialect` says what the remote login shell is. `posix` (the default) sends
+constant `/bin/sh -c` command strings. `xsh` sends catalogued XSH source for a
+login shell such as Laputa's `/usr/bin/xsh-login`, whose `-c` argument is the
+program it executes; `/bin/sh` is never used. With `xsh`, declaring a package,
+package index, group, user, OpenRC service or a `shell:` command is refused
+before connecting, because those catalogue operations have no XSH source yet.
+The xsh dialect has no `doas` wrapper: use `privilege = "plain"` or `"root"`.
+Setting `dialect = "xsh"` on a local host runs the same source through the
+`xsh` on PATH, for tests and development.
 
 `--limit NAME` (repeatable) selects hosts or groups. A name matching nothing is
 an error.
@@ -86,6 +97,7 @@ are called.
 | `user_account(id, name, presence, uid, primary_group, groups, home, shell, system_account, needs)` | A user. `groups` are memberships that must hold; extras are left alone. A different uid is a conflict. Removal keeps the home directory and data. |
 | `command(id, argv / shell, creates / skip_if / only_if / run_on / always, stdin_env, accept, timeout_seconds, needs)` | A command with exactly one condition (below). |
 | `service(id, name, enabled, running, runlevel, reload_on, restart_on, needs)` | An OpenRC service. Triggers imply dependencies. |
+| `xinit_service(id, name, enabled, running, reload_on, restart_on, needs)` | A Laputa xinit service. Existence is a file in the scanned service directory; `running` and readiness come from `xinit status`. Starts, stops, restarts and reloads through xinit's documented verbs. xinit has no enable or disable, so `enabled` is refused. |
 
 Command conditions: `creates: "/path"` (skip when it exists), `skip_if: [argv]`
 or `skip_if_shell: "text"` (skip when the read-only guard exits 0),
@@ -98,6 +110,16 @@ uncertain fact, not a reason to run the command.
 Several changed triggers coalesce: a service with `reload_on: [a, b]` is
 reloaded once per apply however many of `a` and `b` changed, and a restart
 trigger supersedes a reload. A stopped service is not reloaded.
+
+OpenRC enablement uses `rc-update` and needs the `runlevel`; a running-state
+change uses `rc-service`. The xinit adapter has no runlevel or enablement and
+uses `xinit start`, `stop`, `restart` and `reload` only. Controlling either
+manager changes host state, so the host needs root or `doas -n` authority.
+
+The `xsh` dialect supports directories, files, symlinks, argv commands (with
+their `creates`/`argv` guards), xinit services and the apply lock. The remaining
+resource kinds are refused at declaration for such a host rather than executed
+through a fallback shell.
 
 File content: `text` and `data` are held in memory; `source: p"..."` streams
 from a local file; `secret_env: "NAME"` reads a controller environment variable

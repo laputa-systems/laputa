@@ -310,7 +310,7 @@ proc run_step(step: Step, secrets: List[Str]) [fs, env, process, error] -> Recon
 
 type Locked = {host: Str, held: lock.Held?, failure: Str?}
 
-proc take_lock(state: HostState, lock_path: Str, secrets: List[Str]) [env, process, time, error] -> Locked {
+proc take_lock(state: HostState, lock_path: Str, secrets: List[Str]) [fs, env, process, time, error] -> Locked {
   let host = state.workload.host.name
   guard let connection = state.connection else {
     return Locked(host:, held: null, failure: "the host has no connection")
@@ -376,7 +376,7 @@ pure blocked_state(state: HostState, resource: model.Resource, reason: Str, secr
   {...state, unsettled: state.unsettled + [resource.id], entries: state.entries + [entry]}
 }
 
-proc release_all(states: Map[Str, HostState]) [env, process, error] {
+proc release_all(states: Map[Str, HostState]) [fs, env, process, error] {
   for state in states.values() {
     if state.connection != null {
       if state.held != null {
@@ -391,11 +391,11 @@ proc release_all(states: Map[Str, HostState]) [env, process, error] {
   }
 }
 
-proc release_on(connection: transport.Connection, held: lock.Held) [process, error] -> Bool {
+proc release_on(connection: transport.Connection, held: lock.Held) [fs, process, error] -> Bool {
   lock.release(connection, held) is Ok(_)
 }
 
-proc release_fresh(host: model.Host, held: lock.Held) [env, process, error] -> Bool {
+proc release_fresh(host: model.Host, held: lock.Held) [fs, env, process, error] -> Bool {
   match transport.connect(host) {
     Err(_) => false
     Ok(connection) => {
@@ -406,7 +406,7 @@ proc release_fresh(host: model.Host, held: lock.Held) [env, process, error] -> B
   }
 }
 
-proc settle_lock(state: HostState, secrets: List[Str]) [env, process, error] -> HostState {
+proc settle_lock(state: HostState, secrets: List[Str]) [fs, env, process, error] -> HostState {
   guard let held = state.held else {
     return state
   }

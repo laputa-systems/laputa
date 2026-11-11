@@ -60,8 +60,9 @@ export enum UserState { NoUser, UserFound(UserInfo), UserUnseen(Unreadable) }
 ## Whether an init script reports its service started, stopped, or otherwise.
 export enum Running: Str { Started = "started", Stopped = "stopped", Crashed = "crashed", Indeterminate = "indeterminate" }
 
-## What the service manager reported for one service.
-export type ServiceInfo = {enabled: Bool, running: Running}
+## What the service manager reported for one service. `enabled` is null when
+## the manager has no enablement notion; `ready` is null when it reports none.
+export type ServiceInfo = {enabled: Bool?, running: Running, ready: Bool?}
 
 ## The state of one service.
 export enum ServiceState { NoService, ServiceFound(ServiceInfo), ServiceUnseen(Unreadable) }

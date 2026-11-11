@@ -14,13 +14,17 @@ const required = ["stat", "sha256sum", "od", "tr", "mktemp", "mv", "readlink", "
 
 const resource_tools = [
   ["package", "apk"],
-  ["service", "rc-service"],
-  ["service", "rc-update"],
   ["user", "adduser"],
   ["user", "deluser"],
   ["group", "addgroup"],
   ["group", "delgroup"],
 ]
+
+const openrc_tools = ["rc-service", "rc-update"]
+
+pure all_present(absent: List[Str], tools: List[Str]) -> Bool {
+  tools |> all { |tool| tool not in absent }
+}
 
 const hostile = ["plain", "", "-x", "it's", "a b", "line\nbreak", "$HOME", "$(echo injected)", "`id`", "; id", "\\", "caf\u{e9}"]
 
@@ -55,7 +59,15 @@ pure note(host: Str, id: Str, detail: Str) -> report.Entry {
 }
 
 ## Which declared resource kinds the host's tools cannot support.
-export pure unsupported(absent: List[Str]) -> List[Str] {
+export pure unsupported(dialect: model.Dialect, absent: List[Str]) -> List[Str] {
+  if dialect == .Xsh {
+    var kinds = ["package", "package-index", "group", "user", "service (OpenRC)", "command (shell string)"]
+    if "xinit" in absent {
+      kinds += ["service (xinit)"]
+    }
+    return kinds
+  }
+
   var kinds: List[Str] = []
   for pair in resource_tools {
     if pair[1] in absent and pair[0] not in kinds {
@@ -63,22 +75,33 @@ export pure unsupported(absent: List[Str]) -> List[Str] {
     }
   }
 
+  if ! all_present(absent, openrc_tools) and "xinit" in absent {
+    kinds += ["service"]
+  }
+
   kinds
 }
 
-## The baseline utilities missing from a capability report.
-export pure missing_required(absent: List[Str]) -> List[Str] {
+## The baseline utilities missing from a capability report. An xsh target runs
+## the catalogue's XSH sources, so it has no POSIX utility baseline.
+export pure missing_required(dialect: model.Dialect, absent: List[Str]) -> List[Str] {
+  if dialect == .Xsh {
+    return []
+  }
+
   required |> where { |tool| tool in absent } |> collect()
 }
 
-proc shell_contract(connection: transport.Connection, host: Str) [process, error] -> report.Entry {
-  match transport.exec(connection, scripts.echo_arguments, hostile) {
+proc shell_contract(connection: transport.Connection, host: Str) [fs, process, error] -> report.Entry {
+  match transport.exec(connection, .EchoArguments, hostile) {
     Err(error) => check(host, "shell", false, error.message)
     Ok(execution) => {
       let expected = hostile |> map { |word| word + "\0" } |> collect()
       let seen = execution.stdout.utf8() ?? ""
       if execution.code == 0 and seen == expected.join("") {
-        check(host, "shell", true, "POSIX quoting round trip")
+        check(host, "shell", true, if connection.dialect == .Xsh { "XSH string-literal round trip" } else { "POSIX quoting round trip" })
+      } else if connection.dialect == .Xsh {
+        check(host, "shell", false, "the login shell did not return hostile arguments unchanged as XSH literals")
       } else {
         check(host, "shell", false, "the remote shell did not return hostile arguments unchanged; it must accept POSIX single quotes")
       }
@@ -86,12 +109,12 @@ proc shell_contract(connection: transport.Connection, host: Str) [process, error
   }
 }
 
-proc authority(connection: transport.Connection, host: model.Host, capabilities: probe.Capabilities) [process, error] -> report.Entry {
+proc authority(connection: transport.Connection, host: model.Host, capabilities: probe.Capabilities) [fs, process, error] -> report.Entry {
   match host.privilege {
     model.Plain => check(host.name, "privilege", true, f"plain: mutations run as uid {capabilities.uid}")
     model.Root => check(host.name, "privilege", capabilities.uid == 0, f"root: the login runs as uid {capabilities.uid}")
     model.Doas => {
-      match transport.exec(connection, "id -u", privileged: true) {
+      match transport.exec_script(connection, "id -u", privileged: true) {
         Err(error) => check(host.name, "privilege", false, error.message)
         Ok(execution) => {
           let uid = (execution.stdout.utf8() ?? "").trim()
@@ -102,7 +125,7 @@ proc authority(connection: transport.Connection, host: model.Host, capabilities:
   }
 }
 
-proc inspect_host(host: model.Host, lock_path: Str) [env, process, error] -> report.HostReport {
+proc inspect_host(host: model.Host, lock_path: Str) [fs, env, process, error] -> report.HostReport {
   let connection = match transport.connect(host) {
     Ok(opened) => opened
     Err(error) => {
@@ -117,9 +140,9 @@ proc inspect_host(host: model.Host, lock_path: Str) [env, process, error] -> rep
       entries += [check(host.name, "utilities", false, error.message)]
     }
     Ok(found) => {
-      let lacking = missing_required(found.absent)
+      let lacking = missing_required(host.dialect, found.absent)
       entries += [check(host.name, "utilities", lacking.is_empty(), if lacking.is_empty() { "baseline present" } else { f"missing: {lacking.join(", ")}" })]
-      for kind in unsupported(found.absent) {
+      for kind in unsupported(host.dialect, found.absent) {
         entries += [note(host.name, f"support-{kind}", f"{kind} resources are unsupported on this host")]
       }
 
@@ -143,7 +166,7 @@ proc inspect_host(host: model.Host, lock_path: Str) [env, process, error] -> rep
 }
 
 ## Inspect each host and report every check. Nothing is changed.
-export proc inspect(hosts: List[model.Host], lock_path: Str, jobs: Int) [env, process, error] -> report.Report {
+export proc inspect(hosts: List[model.Host], lock_path: Str, jobs: Int) [fs, env, process, error] -> report.Report {
   let reports = hosts |> par-map(jobs:) { |host| inspect_host(host, lock_path) } |> collect()
   report.Report(mode: "doctor", hosts: reports)
 }

@@ -256,12 +256,44 @@ export pure service_fact(stdout: Str) -> fact.ServiceState {
       }
       let enabled = table.get("enabled") ?? ""
       if enabled == "yes" or enabled == "no" {
-        fact.ServiceFound(fact.ServiceInfo(enabled: enabled == "yes", running:))
+        fact.ServiceFound(fact.ServiceInfo(enabled: enabled == "yes", running:, ready: null))
       } else {
         fact.ServiceUnseen(malformed("service report has no enablement"))
       }
     }
     else => fact.ServiceUnseen(malformed(f"service report has no state: {stdout}"))
+  }
+}
+
+## Parse the `xinit_service_state` script output into the state of one xinit
+## service. Existence comes from the scanned service directory; running and
+## ready come from the `xinit status` line.
+export pure xinit_service_fact(stdout: Str) -> fact.ServiceState {
+  let table = fields(stdout)
+  match table.get("state") ?? "" {
+    "missing" => fact.NoService
+    "unavailable" => fact.ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "xinit is not installed"))
+    "denied" => fact.ServiceUnseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
+    "error" => fact.ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
+    "found" => {
+      let running: fact.Running = match table.get("running") ?? "" {
+        "running" => .Started
+        "starting" => .Started
+        "dead" => .Crashed
+        "down" => .Stopped
+        "stopped" => .Stopped
+        "pending" => .Stopped
+        "finishing" => .Stopped
+        else => .Indeterminate
+      }
+      let readiness = table.get("ready") ?? ""
+      guard readiness == "true" or readiness == "false" else {
+        return fact.ServiceUnseen(malformed("xinit status report has no readiness"))
+      }
+
+      fact.ServiceFound(fact.ServiceInfo(enabled: null, running:, ready: readiness == "true"))
+    }
+    else => fact.ServiceUnseen(malformed(f"xinit service report has no state: {stdout}"))
   }
 }
 

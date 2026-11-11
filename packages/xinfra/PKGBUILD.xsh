@@ -6,7 +6,7 @@ export const name = "xinfra"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "0.2.0"
+export const ver = "0.3.0"
 
 ## Package recipe export.
 export const rel = "1"

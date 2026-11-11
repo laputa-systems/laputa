@@ -6,9 +6,9 @@ use infra.model
 
 const host_name = rx"^[a-z0-9][a-z0-9._-]{0,62}$"
 const host_key_pin = rx"^SHA256:[A-Za-z0-9+/]{43}$"
-const host_fields = ["address", "port", "user", "key", "host_key", "privilege", "transport", "groups", "vars", "timeout_ms", "transfer_timeout_ms", "escalate_reads"]
+const host_fields = ["address", "port", "user", "key", "host_key", "privilege", "transport", "dialect", "groups", "vars", "timeout_ms", "transfer_timeout_ms", "escalate_reads"]
 const group_fields = ["vars"]
-const default_fields = ["port", "user", "key", "host_key", "privilege", "transport", "timeout_ms", "transfer_timeout_ms", "escalate_reads", "vars"]
+const default_fields = ["port", "user", "key", "host_key", "privilege", "transport", "dialect", "timeout_ms", "transfer_timeout_ms", "escalate_reads", "vars"]
 const top_fields = ["defaults", "hosts", "groups"]
 
 ## The hosts of an inventory in name order.
@@ -75,6 +75,16 @@ pure transport_of(what: Str, text: Str?) -> Result[model.TransportKind, Error] {
   }
 }
 
+pure dialect_of(what: Str, text: Str?) -> Result[model.Dialect, Error] {
+  match text ?? "posix" {
+    "posix" => Ok(model.Posix)
+    "xsh" => Ok(model.Xsh)
+    else => {
+      fail f"{what}.dialect must be posix or xsh"
+    }
+  }
+}
+
 pure merged(base: Map[Str, Any], over: Map[Str, Any]) -> Map[Str, Any] {
   var result = base
   for {key, value} in over {
@@ -106,6 +116,7 @@ pure build_host(
 
   only_fields(what, entries, host_fields)?
   let transport = transport_of(what, pick_text(text_of(what, entries, "transport")?, text_of("defaults", defaults, "transport")?))?
+  let dialect = dialect_of(what, pick_text(text_of(what, entries, "dialect")?, text_of("defaults", defaults, "dialect")?))?
   let address = text_of(what, entries, "address")?
   let login = pick_text(text_of(what, entries, "user")?, text_of("defaults", defaults, "user")?)
   let port = pick_int(int_of(what, entries, "port")?, int_of("defaults", defaults, "port")?)
@@ -118,6 +129,10 @@ pure build_host(
   let groups = list_of(what, entries, "groups")?
   guard timeout > 0 and transfer > 0 else {
     fail f"{what}.timeout_ms and transfer_timeout_ms must be positive"
+  }
+
+  guard dialect == model.Posix or privilege != model.Doas else {
+    fail f"{what}: the xsh dialect has no doas escalation; use privilege plain or root"
   }
 
   var vars = vars_of("defaults", defaults)?
@@ -134,6 +149,7 @@ pure build_host(
     return Ok(model.Host(
       name:,
       transport:,
+      dialect:,
       address: "localhost",
       port: 0,
       user: login ?? "local",
@@ -178,6 +194,7 @@ pure build_host(
   Ok(model.Host(
     name:,
     transport:,
+    dialect:,
     address: wanted_address,
     port: wanted_port,
     user: wanted_user,

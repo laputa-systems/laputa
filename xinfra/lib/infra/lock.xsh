@@ -24,11 +24,11 @@ pure hex_or_raw(text: Str) -> Str {
 }
 
 ## Take the lock on a host, or fail with the holder's own description.
-export proc acquire(connection: transport.Connection, lock_path: Str) [env, process, time, error] -> Result[Held, LockError] {
+export proc acquire(connection: transport.Connection, lock_path: Str) [fs, env, process, time, error] -> Result[Held, LockError] {
   let controller = system.hostname() ?? "unknown"
   let pid = process.current_pid() ?? 0
   let holder = holder_text(controller, pid, time.now())
-  match transport.exec(connection, scripts.acquire_lock, [lock_path, holder], privileged: true) {
+  match transport.exec(connection, .AcquireLock, [lock_path, holder], privileged: true) {
     Err(error) => Err(LockError.Failed(error.message), cause: error)
     Ok(execution) => {
       let text = execution.stdout.utf8() ?? ""
@@ -45,8 +45,8 @@ export proc acquire(connection: transport.Connection, lock_path: Str) [env, proc
 
 ## Release a lock this controller holds. A lock held under another token is
 ## left alone and reported.
-export proc release(connection: transport.Connection, held: Held) [process, error] -> Result[Unit, LockError] {
-  match transport.exec(connection, scripts.release_lock, [held.path, held.token], privileged: true) {
+export proc release(connection: transport.Connection, held: Held) [fs, process, error] -> Result[Unit, LockError] {
+  match transport.exec(connection, .ReleaseLock, [held.path, held.token], privileged: true) {
     Err(error) => Err(LockError.Failed(error.message), cause: error)
     Ok(execution) => {
       guard execution.code == 0 else {
@@ -57,8 +57,8 @@ export proc release(connection: transport.Connection, held: Held) [process, erro
 }
 
 ## Describe the holder of a host's lock, or null when it is free.
-export proc inspect(connection: transport.Connection, lock_path: Str) [process, error] -> Result[Str?, LockError] {
-  let execution = match transport.exec(connection, scripts.inspect_lock, [lock_path], privileged: true) {
+export proc inspect(connection: transport.Connection, lock_path: Str) [fs, process, error] -> Result[Str?, LockError] {
+  let execution = match transport.exec(connection, .InspectLock, [lock_path], privileged: true) {
     Err(error) => {
       return Err(LockError.Failed(error.message), cause: error)
     }
@@ -80,6 +80,6 @@ export proc inspect(connection: transport.Connection, lock_path: Str) [process, 
 
 ## Remove a lock after an operator has confirmed its token, for example after a
 ## controller crash. The token must match the one on the host.
-export proc break_lock(connection: transport.Connection, lock_path: Str, token: Str) [process, error] -> Result[Unit, LockError] {
+export proc break_lock(connection: transport.Connection, lock_path: Str, token: Str) [fs, process, error] -> Result[Unit, LockError] {
   release(connection, Held(path: lock_path, token:))
 }

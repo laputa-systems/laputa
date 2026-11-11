@@ -17,7 +17,7 @@ proc fixture(name: Str) [env, fs, error] -> Result[model.Host?, Error] {
   testing.fixture_host(name)
 }
 
-proc exists(host: model.Host, target: Str) [env, process, error] -> Result[Bool, Error] {
+proc exists(host: model.Host, target: Str) [fs, env, process, error] -> Result[Bool, Error] {
   Ok(testing.remote_text(host, "test -e \"$1\" && echo present || echo absent", [target])? == "present\n")
 }
 

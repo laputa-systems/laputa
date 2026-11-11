@@ -12,6 +12,28 @@ export pure local_host(name: Str = "local") -> model.Host {
   model.Host(
     name:,
     transport: .Local,
+    dialect: .Posix,
+    address: "localhost",
+    port: 0,
+    user: "local",
+    key: null,
+    host_key: null,
+    privilege: .Plain,
+    groups: [],
+    vars: {},
+    timeout_ms: 20000,
+    transfer_timeout_ms: 600000,
+    escalate_reads: false,
+  )
+}
+
+## A local host that runs catalogue scripts as XSH source through the `xsh` on
+## PATH, for tests of the xsh dialect.
+export pure local_xsh_host(name: Str = "local-xsh") -> model.Host {
+  model.Host(
+    name:,
+    transport: .Local,
+    dialect: .Xsh,
     address: "localhost",
     port: 0,
     user: "local",
@@ -66,9 +88,9 @@ export pure scratch_name(dir: Path) -> Str {
 
 ## Run a script on a host and return its standard output as text, failing on a
 ## nonzero status. Used by tests to look at a fixture host directly.
-export proc remote_text(host: model.Host, script: Str, args: List[Str] = [], privileged: Bool = false) [env, process, error] -> Result[Str, Error] {
+export proc remote_text(host: model.Host, script: Str, args: List[Str] = [], privileged: Bool = false) [fs, env, process, error] -> Result[Str, Error] {
   let connection = transport.connect(host)?
-  let execution = transport.exec(connection, script, args, privileged:)?
+  let execution = transport.exec_script(connection, script, args, privileged:)?
   guard execution.code == 0 else {
     fail f"exit {execution.code}: {execution.stderr.utf8() ?? ""}"
   }
