@@ -238,6 +238,59 @@ test test_two_failed_boots_restore_the_fallback [fs, time, error] { |ctx|
   assert restaged.boot_attempts == 0
 }
 
+test test_fallback_record_names_the_failed_generation_until_the_next_stage [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-failure-record")?
+  install(state, generation("a"))
+  stage(state, generation("b"))
+  let _ = activation.activation_begin_boot(state)?
+  activation.activation_boot_failed(state)
+  let _ = activation.activation_begin_boot(state)?
+  activation.activation_boot_failed(state)
+  let fallen = activation.activation_status(state)?
+  assert fallen.current.id == "a"
+  assert fallen.pending == null
+  assert fallen.last_operation == "fell-back"
+  assert fallen.failure == activation.ActivationFailure(generation: generation("b"), attempts: 2)
+  assert "\"failure\"" in record_text(state)?
+  assert activation.activation_status(state)?.failure == fallen.failure
+  stage(state, generation("c"))
+  let restaged = activation.activation_status(state)?
+  assert restaged.failure == null
+  assert_pending(restaged, "c")
+}
+
+test test_failure_record_is_validated_and_old_format_is_named [fs, time, error] { |ctx|
+  let state = state_dir(ctx, "activation-failure-format")?
+  install(state, generation("a"))
+  let target = fp"{state}/{activation.ACTIVATION_RECORD_NAME}"
+  let record = activation.activation_status(state)?
+  let legacy = {
+    format: "laputa-activation-4",
+    admission_policy: record.admission_policy,
+    boot_serial: record.boot_serial,
+    current: record.current,
+    fallback: record.fallback,
+    pending: record.pending,
+    boot_attempts: record.boot_attempts,
+    max_boot_attempts: record.max_boot_attempts,
+    last_operation: record.last_operation,
+  }
+  target.write(json.encode(legacy)?)
+  match activation.activation_status(state) {
+    Ok(_) => assert false, "old format accepted"
+    Err(error) => {
+      assert "laputa-activation-4" in error.message
+      assert activation.ACTIVATION_FORMAT in error.message
+    }
+  }
+  target.write(json.encode({...record, failure: {generation: generation("b"), attempts: 0}})?)
+  assert activation.activation_status(state) is Err(_)
+  target.write(json.encode({...record, failure: {generation: generation("b"), attempts: 3}})?)
+  assert activation.activation_status(state) is Err(_)
+  target.write(json.encode({...record, failure: {generation: record.current, attempts: 2}})?)
+  assert activation.activation_status(state) is Err(_)
+}
+
 test test_begin_boot_falls_back_when_another_attempt_would_exceed_max [fs, time, error] { |ctx|
   let state = state_dir(ctx, "activation-attempt-cap")?
   install(state, generation("a"))

@@ -71,6 +71,7 @@ proc summary(record: activation.ActivationRecord) -> Record {
     serial: record.boot_serial,
     max_attempts: record.max_boot_attempts,
     last: record.last_operation,
+    failure: if record.failure == null { null } else { {id: record.failure.generation.id, digest: record.failure.generation.root_digest, attempts: record.failure.attempts} },
     policy_revision: record.admission_policy.revision,
     policy_ids: [image.generation.id for image in record.admission_policy.images],
   }
@@ -856,6 +857,7 @@ def scenario(args, work):
         stop(child)
         status = host(args, work, "status", state_dir)
         assert status["pending"] == "b" and status["attempts"] == 2, status
+        assert status["failure"] is None, status
         log("step 4: the second startup failure exhausted the bound; the pending generation stays recorded")
 
         raw = host(args, work, "argv", state_dir, outputs)["argv"]
@@ -870,6 +872,7 @@ def scenario(args, work):
         assert health["generation_id"] == "a" and health["boot_serial"] == 2, health
         status = host(args, work, "status", state_dir)
         assert status["current"] == "a" and status["pending"] is None and status["attempts"] == 2 and status["last"] == "fell-back", status
+        assert status["failure"] == {"id": "b", "digest": digest, "attempts": 2}, status
         info = remote(args, work, port, client_key, fingerprint, "info")
         assert info["host_key"] == fingerprint, info
         sentinel_now = remote(args, work, port, client_key, fingerprint, "read", "/home/probe/g2-state-sentinel")
@@ -881,6 +884,7 @@ def scenario(args, work):
         staged_c = host(args, work, "stage", state_dir, "c", digest, args.bundle / "vmlinuz", args.bundle / "disk.img", timeout=600)
         assert staged_c["pending"] == "c" and staged_c["current"] == "a" and staged_c["fallback"] == "a", staged_c
         assert staged_c["policy_revision"] == 3 and staged_c["policy_ids"] == ["a", "b", "c"], staged_c
+        assert staged_c["failure"] is None, staged_c
         log("step 5: repaired generation c is staged with a retained fallback and no commit")
         poweroff_guest(args, work, port, admin_key, fingerprint, child, log_file, "a-to-c")
 

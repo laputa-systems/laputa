@@ -9,8 +9,8 @@ export const ACTIVATION_RECORD_NAME = "activation.json"
 export const ACTIVATION_LOCK_NAME = "activation.flock"
 ## Boot attempts allowed before the launcher selects the fallback.
 export const ACTIVATION_MAX_BOOT_ATTEMPTS = 2
-## Activation record version containing host admission policy.
-export const ACTIVATION_FORMAT = "laputa-activation-4"
+## Activation record version containing host admission policy and failure history.
+export const ACTIVATION_FORMAT = "laputa-activation-5"
 ## Shared state format accepted for every admitted generation; migrations are refused.
 export const ACTIVATION_STATE_FORMAT = "laputa-maintained-state-1"
 
@@ -34,6 +34,10 @@ export type GenerationImage = {id: Str, kernel_file: Path, disk_file: Path}
 ## fallback boot can report which generation did not come up.
 export type ActivationLaunch = {image: GenerationImage, boot_serial: Int, failed: GenerationReceipt?}
 
+## Generation the launcher abandoned after exhausting its boot attempts, with
+## the attempts consumed. The next stage or confirmation clears it.
+export type ActivationFailure = {generation: GenerationReceipt, attempts: Int}
+
 ## Durable current, fallback, and pending generation selection.
 export type ActivationRecord = {
   format: Str,
@@ -45,7 +49,10 @@ export type ActivationRecord = {
   boot_attempts: Int,
   max_boot_attempts: Int,
   last_operation: Str,
+  failure: ActivationFailure?,
 }
+
+type ActivationFormatHeader = {format: Str}
 
 ## Result of selecting the pending generation for one boot.
 export type BootSelection = {id: Str, serial: Int}
@@ -104,8 +111,16 @@ pure activation_pending_ok(pending: GenerationReceipt?) -> Bool {
   }
 }
 
+pure activation_failure_ok(failure: ActivationFailure?, current: GenerationReceipt) -> Bool {
+  if failure == null {
+    true
+  } else {
+    activation_receipt_ok(failure.generation) and failure.generation.id != current.id and failure.attempts >= 1 and failure.attempts <= ACTIVATION_MAX_BOOT_ATTEMPTS
+  }
+}
+
 pure activation_record_ok(record: ActivationRecord) -> Bool {
-  record.format == ACTIVATION_FORMAT and activation_policy_ok(record.admission_policy) and record.boot_serial >= record.boot_attempts and activation_receipt_ok(record.current) and activation_receipt_ok(record.fallback) and activation_pending_ok(record.pending) and record.boot_attempts >= 0 and record.max_boot_attempts == ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != ""
+  record.format == ACTIVATION_FORMAT and activation_policy_ok(record.admission_policy) and record.boot_serial >= record.boot_attempts and activation_receipt_ok(record.current) and activation_receipt_ok(record.fallback) and activation_pending_ok(record.pending) and activation_failure_ok(record.failure, record.current) and record.boot_attempts >= 0 and record.max_boot_attempts == ACTIVATION_MAX_BOOT_ATTEMPTS and record.last_operation != ""
 }
 
 pure activation_policy_ok(policy: AdmissionPolicy) -> Bool {
@@ -204,6 +219,14 @@ export proc activation_status(state_dir: Path) [fs, error] -> Result[ActivationR
   if let Err(_) = parsed {
     return Err(activation_reject("activation record is unreadable"))
   }
+  let header = parsed?.require(ActivationFormatHeader)
+  if let Err(_) = header {
+    return Err(activation_reject("activation record is unreadable"))
+  }
+  let format = header?.format
+  guard format == ACTIVATION_FORMAT else {
+    return Err(activation_reject(f"activation record format {format} is not {ACTIVATION_FORMAT}; stop all activation writers and install a fresh record"))
+  }
   let checked = parsed?.require_exact(ActivationRecord)
   if let Err(_) = checked {
     return Err(activation_reject("activation record is unreadable"))
@@ -260,6 +283,7 @@ export proc activation_install(
     boot_attempts: 0,
     max_boot_attempts: ACTIVATION_MAX_BOOT_ATTEMPTS,
     last_operation: "installed",
+    failure: null,
   })
 }
 
@@ -280,7 +304,7 @@ export proc activation_stage(
     return Err(activation_reject("a generation is already pending"))
   }
   let _ = activation_admitted_image(state_dir, record.admission_policy, candidate)?
-  activation_write(state_dir, {...record, fallback: record.current, pending: candidate, boot_attempts: 0, last_operation: "staged"})
+  activation_write(state_dir, {...record, fallback: record.current, pending: candidate, boot_attempts: 0, last_operation: "staged", failure: null})
 }
 
 ## Count one boot of the pending generation, or select the fallback when another attempt would pass the cap.
@@ -335,6 +359,7 @@ proc activation_begin_boot_record(state_dir: Path, record: ActivationRecord) -> 
       current: record.fallback,
       pending: null,
       last_operation: "fell-back",
+      failure: {generation: pending, attempts: record.boot_attempts},
     })
     return FellBack({id: record.fallback.id, serial: record.boot_serial})
   }
@@ -376,6 +401,7 @@ export proc activation_confirm_health(
     boot_attempts: 0,
     max_boot_attempts: record.max_boot_attempts,
     last_operation: "confirmed",
+    failure: null,
   })
 }
 
@@ -409,6 +435,7 @@ export proc activation_confirm_guest_health(
     pending: null,
     boot_attempts: 0,
     last_operation: "confirmed",
+    failure: null,
   })
 }
 
@@ -418,7 +445,7 @@ export proc activation_boot_failed(
 ) [fs, time, error] -> Result[Unit, Error] {
   let lock = activation_acquire_lock(state_dir)?
   let record = activation_status(state_dir)?
-  let _ = activation_require_pending(record)?
+  let pending = activation_require_pending(record)?
   guard record.boot_attempts >= 1 else {
     return Err(activation_reject("generation has not booted"))
   }
@@ -437,6 +464,7 @@ export proc activation_boot_failed(
     current: record.fallback,
     pending: null,
     last_operation: "fell-back",
+    failure: {generation: pending, attempts: record.boot_attempts},
   })
 }
 

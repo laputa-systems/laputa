@@ -250,9 +250,8 @@ disconnect drills, falls back to A after two bounded B startup failures with
 identity and state preserved, then health-confirms and commits a repaired C and
 reads its boot history across a reboot. Open: step 6 blank-disk restore in the
 same run, natural T1/T2 lease renewal, non-root restart authority (`/run/xinit`
-is root-owned, so the drill uses a key-only UID 0 administrator), a host record
-that names the failed generation after fallback, physical power loss, Linux aarch64, Asterinas, a macOS client, and
-signed release authenticity.
+is root-owned, so the drill uses a key-only UID 0 administrator), physical power
+loss, Linux aarch64, Asterinas, a macOS client, and signed release authenticity.
 
 This is the organizing product milestone, not a new manager,
 new test framework, or a claim that every R1-R7 capability has shipped. The unit
@@ -623,8 +622,9 @@ a macOS aarch64 host via Docker.
 bounded startup failures, fallback with preserved state, and a health-confirmed
 commit through the same host APIs on one KVM guest, chaining
 `activation_recovery.py` and `activation_ssh.py`. After fallback the host record
-keeps current, fallback and policy but not the failed generation id; only the
-launcher selection and the guest boot markers carry it.
+keeps current, fallback and policy and names the failed generation with the
+attempts it consumed, until the next stage or confirmation clears it; the
+launcher selection and the guest boot markers carry the same identity.
 
 `system/activation.xsh` records install, stage, pending boot, guest health
 confirmation, and fallback after two attempts. Versioned activation records bind

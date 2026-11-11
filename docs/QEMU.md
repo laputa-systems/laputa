@@ -205,7 +205,8 @@ bound lease, a managed resolver, and a boot-marker log count of two; a
 fallback drill (two power cuts on a pending generation, then boot) proves the
 logs name the failed generation with its service history and no secrets,
 with a marker count of three and the activation record resting on the
-fallback with pending cleared. `maintained_guest.py --firewall` boots fresh
+fallback with pending cleared and the failed generation named.
+`maintained_guest.py --firewall` boots fresh
 state disks whose `/etc/nftables.conf` is absent or not valid nftables syntax:
 the firewall oneshot must fail without becoming `running`, Dropbear must have no
 process and no ready listener, and the guest must not reach the identity proof. The guest then powers itself
@@ -271,14 +272,20 @@ before counting an attempt. Missing metadata or changed image bytes fail closed.
 These local checks do not authenticate a downloaded release or defend against an
 administrator who can rewrite both image and receipt.
 
-Activation records use `laputa-activation-4` and include `boot_serial`. Older
-records are rejected, with no silent migration. Before upgrading an existing
-installation, stop all activation writers, including v3 writers, and retain an
+Activation records use `laputa-activation-5` and include `boot_serial` plus an
+optional `failure` record. A fallback writes `failure` with the abandoned
+generation receipt and the attempts it consumed, so the host record names what
+did not boot after `pending` is cleared. The next stage or confirmation clears
+`failure`; a fallback boot of the retained current generation leaves it in
+place. Older records, including v4, are rejected with an error naming the found
+and required formats, with no silent migration. Before upgrading an existing
+installation, stop all activation writers, including v4 writers, and retain an
 independent rescue route. Re-publish verified images with v2 receipts and install
-a fresh v4 host record with explicit admission pins; do not relabel old JSON or
-delete the guest state disk. Keep the old host record separately until the
-replacement is verified. Before first installation, stop every pre-v3 writer
-and use one writer version per state directory.
+a fresh v5 host record with explicit admission pins; do not relabel old JSON or
+delete the guest state disk. Installing that fresh record discards the previous
+selection and failure history, so read status first and keep the old host record
+separately until the replacement is verified. Before first installation, stop
+every pre-v3 writer and use one writer version per state directory.
 The earlier writer uses `activation.lock`; it cannot coordinate with
 `activation.flock`. Format rejection protects an existing record but does not
 serialize first installation by mixed writer versions. Every pending boot
@@ -333,10 +340,11 @@ Adding a candidate requires publishing it, authorizing its returned pin through
 `activation_update_policy` at a higher revision, and then calling
 `activation_stage`. A stale policy-update request fails instead of overwriting
 a newer revision. After losing a reply, read status and reconcile its revision.
-An older caller must upgrade before writing: a v3 record cannot express the v4
-admission policy. Policy revisions and shared-state compatibility need explicit
-review during replacement; recreating the record must not restore revoked pins
-or authorize an incompatible retained image.
+An older caller must upgrade before writing: a v4 record cannot express the v5
+failure history. Policy revisions and shared-state compatibility need explicit
+review during replacement; recreating the record must not restore revoked pins,
+authorize an incompatible retained image, or claim a failure history it did not
+observe.
 An operator can stage an already retained, still-admitted generation through
 the same API to request rollback. This preserves the current policy revision
 and does not authorize replaying stale remote repository metadata.
@@ -422,9 +430,11 @@ The test then runs the existing `activation_recovery.py` and
 `activation_ssh.py` drills against the same run, stages generation B (the real
 kernel with a zeroed disk) under policy revision 2, powers A off through PID 1,
 and boots B twice. B never reaches userspace; the host bounds each attempt and
-selects retained A after the cap with `LAPUTA_FAILED_GENERATION=b`. The
-persistent host key and a staged home sentinel survive, and the boot marker
-history names the A boots and failed B. The repaired C is staged from the
+selects retained A after the cap with `LAPUTA_FAILED_GENERATION=b` and the host
+record's `failure` naming B's receipt and two consumed attempts. The next stage
+clears that `failure` record; the persistent host key and a staged home sentinel
+survive, and the boot marker history names the A boots and failed B. The
+repaired C is staged from the
 bundle under policy revision 3, booted, checked for a matching running receipt
 and live `dropbear`, `logger`, and `dhcp-eth0`, and only then confirmed through
 `activation_confirm_guest_health`. A further C reboot shows the committed
@@ -469,7 +479,8 @@ A collection reads the existing syslog path (`/var/log/logger/current`),
 capture. Timestamps pair `boot_id` with `boottime_ns`, so a pre-sync wall clock
 does not make boot and service order ambiguous; `wall_ns` is retained only as a
 display and calendar hint. The failed generation comes from the launcher's
-`LAPUTA_FAILED_GENERATION` token and from the persisted boot markers.
+`LAPUTA_FAILED_GENERATION` token, the host activation record's `failure` entry,
+and the persisted boot markers.
 
 The support bundle runs the existing XSH `system-report --json --section`
 collectors for `identity`, `kernel`, `storage`, `network`, and `processes`.
