@@ -435,6 +435,15 @@ export type Package = {
 ## The sorted local package definitions and externally available names used for one graph resolution.
 export type PackageCatalog = {root: Path, packages: List[Package], remote_names: List[Str]}
 
+## The OS-enforced confinement profile applied to one package build child.
+## `read` names every host tree a build may read, list or execute beneath;
+## `write` names the scratch tree it may change. The executor additionally
+## grants the build's work tree to `read` and `write`, its seeded build root to
+## `read`, and the running interpreter's directory to `read`. `tcp` grants TCP
+## bind and connect. An unopenable declared path or a kernel without Landlock
+## ABI 6 fails the spawn instead of running the child unconfined.
+export type BuildConfinement = {read: List[Path], write: List[Path], tcp: Bool}
+
 ## Target, bootstrap, and build-epoch rules that determine a package graph's build semantics.
 export type BuildPolicy = {
   target: Target,

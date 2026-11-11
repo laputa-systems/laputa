@@ -12,6 +12,12 @@ static void require(int condition, const char *name) {
     if (!condition) { fprintf(stderr, "closed build violation: %s (errno %d)\n", name, errno); exit(1); }
 }
 
+/* A read-only mount reports EROFS; the Landlock domain reports EACCES. */
+static int read_only(int errno_value) { return errno_value == EROFS || errno_value == EACCES; }
+
+/* Docker's network namespace reports ENETUNREACH; denied TCP reports EACCES. */
+static int network_denied(int errno_value) { return errno_value == ENETUNREACH || errno_value == EACCES; }
+
 int main(void) {
     require(getuid() != 0, "unprivileged recipe");
     require(getenv("LAPUTA_AMBIENT_POISON") == NULL, "ambient environment absent");
@@ -23,20 +29,29 @@ int main(void) {
     require(open("/scratch/escape", O_RDONLY) < 0 && errno == ENOENT, "symlink host read unavailable");
     require(unlink("/scratch/escape") == 0, "scratch symlink removed");
     require(symlink("/escape", "/scratch/escape") == 0, "scratch write symlink created");
-    require(open("/scratch/escape", O_WRONLY | O_CREAT, 0600) < 0 && errno == EROFS, "symlink root write rejected");
+    errno = 0;
+    require(open("/scratch/escape", O_WRONLY | O_CREAT, 0600) < 0 && read_only(errno), "symlink root write rejected");
     require(unlink("/scratch/escape") == 0, "scratch write symlink removed");
     require(access("/usr/bin/curl", F_OK) < 0 && errno == ENOENT, "undeclared executable unavailable");
     require(access("/usr/lib/libambient.so", F_OK) < 0 && errno == ENOENT, "undeclared library unavailable");
-    require(open("/escape", O_WRONLY | O_CREAT, 0600) < 0 && errno == EROFS, "root write rejected");
+    errno = 0;
+    require(open("/escape", O_WRONLY | O_CREAT, 0600) < 0 && read_only(errno), "root write rejected");
+    /* /cohort is a readable mount that is outside every declared read root: an
+       EACCES here is Landlock denying it, where an unconfined build would read it. */
+    errno = 0;
+    require(open("/cohort/build.xsh", O_RDONLY) < 0 && errno == EACCES, "undeclared cohort read denied by confinement");
     const char *source = getenv("LAPUTA_COHORT_SOURCE");
     require(source != NULL, "explicit source coordinate available");
-    require(open(source, O_WRONLY | O_TRUNC) < 0 && errno == EROFS, "source write rejected");
-    require(open("/usr/lib/libc.a", O_WRONLY | O_TRUNC) < 0 && errno == EROFS, "seed write rejected");
+    errno = 0;
+    require(open(source, O_WRONLY | O_TRUNC) < 0 && read_only(errno), "source write rejected");
+    errno = 0;
+    require(open("/usr/lib/libc.a", O_WRONLY | O_TRUNC) < 0 && read_only(errno), "seed write rejected");
     require(socket(AF_INET, SOCK_RAW, 1) < 0 && errno == EPERM, "raw socket privilege rejected");
     int connection = socket(AF_INET, SOCK_STREAM, 0);
     require(connection >= 0, "ordinary socket available");
     struct sockaddr_in address = {.sin_family = AF_INET, .sin_port = htons(9), .sin_addr = {.s_addr = htonl(0xc0000201)}};
-    require(connect(connection, (struct sockaddr *)&address, sizeof(address)) < 0 && errno == ENETUNREACH, "external network unavailable");
+    errno = 0;
+    require(connect(connection, (struct sockaddr *)&address, sizeof(address)) < 0 && network_denied(errno), "external network unavailable");
     require(close(connection) == 0, "ordinary socket closed");
     require(chroot("/") < 0 && errno == EPERM, "chroot privilege rejected");
     DIR *descriptors = opendir("/proc/self/fd");

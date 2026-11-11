@@ -46,6 +46,21 @@ export pure x86_64_docker() -> types.BuildPolicy {
   {...aarch64_docker(), target: types.target_x86_64(), build_target: types.target_x86_64()}
 }
 
+## Returns the closed-build cohort's OS-enforced confinement profile for package
+## build children. `read` names the toolchain, the seed and its Rust runtime, PM
+## modules, /proc and the device entries a build reads; `write` names only its
+## scratch tree. No declared root is `/`. The executor adds the build's work tree
+## to `read` and `write`, its seeded build root to `read`, and the running
+## interpreter's directory to `read`. TCP stays denied. This is an execution-time
+## profile, not a PM-wide default.
+export pure closed_build_confinement(scratch: Path) -> types.BuildConfinement {
+  {
+    read: [p"/bin", p"/usr", p"/lib", p"/seed", p"/pm", p"/proc", p"/dev/null", p"/dev/urandom"],
+    write: [scratch],
+    tcp: false,
+  }
+}
+
 ## Returns a copy of a policy configured for native or cross build graph resolution.
 export pure with_native_build(value: types.BuildPolicy, native_build: Bool) -> types.BuildPolicy {
   {...value, native_build}

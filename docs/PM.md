@@ -134,6 +134,20 @@ both `pm.xsh` and `packages/`. It executes the saved plan with `pm/execute.xsh`;
 artifact-store receipts are the sole resume state. `-j` changes scheduling only,
 never a plan or artifact key.
 
+`execute.BuildConfinement` is an execution-time profile, not a PM-wide default.
+`execute.build_plan` and `execute.build_plan_node` accept one, and then they
+require `-j` of one: every package build child starts through `linux.run_confined`
+(Landlock ABI 6 plus `no_new_privs`) instead of in the executor process. The
+profile's `read` roots bound what the child may read, list and execute, its
+`write` roots what it may change, and `tcp` whether it may bind or connect. The
+executor adds the build's work tree to both lists, its seeded build root to
+`read`, and the running interpreter's directory to `read`. The interpreter is
+the current executable when it is `xsh`, then `XSH_HOST`, then `/bin/xsh`, and
+`process.which` last, so an ambient `PATH` cannot substitute it. An older or
+disabled Landlock, or an unopenable declared root, fails the spawn before any
+build child starts; no weaker profile is substituted. `policy.closed_build_confinement`
+is the closed-build cohort's profile.
+
 `repo publish` selects the completed plan nodes from verified receipts, uploads
 immutable payload, metadata, and proof objects, then updates the index last.
 Objects are named by key and the index row is the only mutable pointer (see

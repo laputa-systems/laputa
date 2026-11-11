@@ -3,14 +3,27 @@ FROM ${SEED_IMAGE} AS seed
 COPY probe.c /probe.c
 COPY bin/mold /bin/mold
 RUN ["/usr/bin/clang", "-fuse-ld=/bin/mold", "-static", "-nostdlib", "/usr/lib/crt1.o", "/usr/lib/crti.o", "/probe.c", "/usr/lib/libc.a", "/usr/lib/crtn.o", "-o", "/probe"]
+# The compiler seed image keeps a prebuilt musl LLVM either beneath
+# /usr/lib/llvm23 or beneath /opt/llvm with a canonical /usr/bin/clang link.
+# Stage whichever exists at the one location the scratch image names, and copy
+# only the shared libraries the seed actually ships.
+RUN set -eu; \
+    llvm=/usr/lib/llvm23; \
+    if [ ! -d "$llvm" ]; then llvm=/opt/llvm; fi; \
+    test -d "$llvm"; \
+    mkdir -p /stage/lib; \
+    cp -a "$llvm" /stage/llvm23; \
+    for library in /usr/lib/libLLVM.so.23.1 /usr/lib/libstdc++.so.6* /usr/lib/libgcc_s.so.1 /usr/lib/libffi.so.8* /usr/lib/libz.so.1* /usr/lib/libzstd.so.1* /usr/lib/libxml2.so.2* /usr/lib/liblzma.so.5* /usr/lib/libbfd-2.45.1.so /usr/lib/libctf.so.0* /usr/lib/libctf-nobfd.so.0* /usr/lib/libjansson.so.4* /usr/lib/libsframe.so.2*; do \
+      if [ -e "$library" ]; then cp -a "$library" /stage/lib/; fi; \
+    done
 
 FROM scratch
 COPY --from=seed /lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
 COPY --from=seed /lib/libc.musl-x86_64.so.1 /lib/libc.musl-x86_64.so.1
-COPY --from=seed /usr/lib/llvm23 /usr/lib/llvm23
+COPY --from=seed /stage/llvm23 /usr/lib/llvm23
 COPY --from=seed /usr/include /usr/include
 COPY --from=seed /usr/lib/libc.a /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o /usr/lib/
-COPY --from=seed /usr/lib/libLLVM.so.23.1 /usr/lib/libstdc++.so.6* /usr/lib/libgcc_s.so.1 /usr/lib/libffi.so.8* /usr/lib/libz.so.1* /usr/lib/libzstd.so.1* /usr/lib/libxml2.so.2* /usr/lib/liblzma.so.5* /usr/lib/libbfd-2.45.1.so /usr/lib/libctf.so.0* /usr/lib/libctf-nobfd.so.0* /usr/lib/libjansson.so.4* /usr/lib/libsframe.so.2* /usr/lib/
+COPY --from=seed /stage/lib/ /usr/lib/
 COPY --from=seed /usr/bin/ld /usr/bin/ld
 COPY --from=seed /usr/bin/readelf /usr/bin/readelf
 COPY links/ /

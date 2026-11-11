@@ -19,6 +19,26 @@ type ExecuteContext = {
   remote_repo: Str,
   executor: types.ExecutorProvenance?,
   published: Map[types.ArtifactReceipt],
+  confinement: types.BuildConfinement?,
+}
+
+pure confined_build_runner() -> Str {
+  r"""use pm.build
+
+proc main(pkg_dir: Path, src: Path, dest: Path, tarball: Path) [fs, process, env, error] {
+  build.build_prepared_package(pkg_dir, src, dest, tarball)
+}
+
+main(@args)?
+"""
+}
+
+proc execute_xsh_runner() -> Result[Path] {
+  let current = applet.current_exe()?
+  guard current.name() == "xsh" else {
+    return Err(types.PmError.PackageContract(f"a confined build must run under xsh, not {current}"))
+  }
+  current
 }
 
 proc execute_load_package(plan_value: types.BuildPlan, node: types.PlanNode, repo_root: Path) -> Result[types.Package] {
@@ -99,6 +119,45 @@ proc execute_compose_root(target: types.Target, root: Path, artifacts: List[type
   }
 }
 
+proc execute_run_confined_build(
+  context: ExecuteContext,
+  node: types.PlanNode,
+  work: Path,
+  build_root: Path,
+  recipe_dir: Path,
+  source: Path,
+  dest: Path,
+  payload: Path,
+) -> Result[Unit] {
+  let confinement = context.confinement
+
+  if confinement == null {
+    return Err(types.PmError.PackageContract(f"build of {node.package_id} has no confinement profile"))
+  }
+
+  let runner = fp"{work}/confined-build.xsh"
+  runner.write(confined_build_runner())?
+  let xsh = execute_xsh_runner()?
+  let command = process.command_argv(
+    xsh,
+    [xsh, runner, recipe_dir, source, dest, payload],
+    cwd: work,
+  )
+  let status = linux.run_confined(
+    command,
+    read: confinement.read + [work, build_root, xsh.parent],
+    write: confinement.write + [work],
+    tcp: confinement.tcp,
+  )?
+  return when status.ok
+
+  if status.exited() {
+    return Err(types.PmError.ExtensionFailed(f"confined package build for {node.name} exited with status {status.exit_code()?}"))
+  }
+
+  Err(types.PmError.ExtensionFailed(f"confined package build for {node.name} was signaled"))
+}
+
 proc execute_stage_local(
   context: ExecuteContext,
   node: types.PlanNode,
@@ -143,7 +202,11 @@ proc execute_stage_local(
     XSH_PM_TARGET_ARCH: target_arch,
   }) {
     ctx f"building package {node.package_id}" {
-      pm_build.build_prepared_package(recipe_dir, source, dest, payload)
+      if context.confinement == null {
+        pm_build.build_prepared_package(recipe_dir, source, dest, payload)
+      } else {
+        execute_run_confined_build(context, node, work, build_root, recipe_dir, source, dest, payload)?
+      }
     }
   }
 
@@ -214,7 +277,12 @@ proc execute_build_local(context: ExecuteContext, node: types.PlanNode) -> Resul
   let pkg = execute_load_package(context.plan, node, context.repo_root)?
   let root_handle = fs.tempdir()?
   let work = root_handle.host_path()?
-  let build_root = fp"{work}/build-root"
+  let substrate_handle: FsRoot? = if context.confinement == null { null } else { fs.tempdir()? }
+  let build_root = if let handle = substrate_handle {
+    fp"{handle.host_path()?}/build-root"
+  } else {
+    fp"{work}/build-root"
+  }
 
   if pkg.kind == types.package_meta() {
     build_root.mkdir()
@@ -443,6 +511,7 @@ export proc build_plan_node(
   store_root: Path,
   remote_repo: Str,
   key: Str,
+  confinement: types.BuildConfinement? = null,
 ) [fs, net, process, env, time, error] -> Result[types.ArtifactReceipt, Error] {
   build_plan.validate(plan_value)
   build_plan.require_current_build_epoch(plan_value)
@@ -464,6 +533,7 @@ export proc build_plan_node(
       null
     },
     published: {},
+    confinement,
   }
   let receipt = execute_node(context, node)?
   execute_require_receipt(plan_value, node, receipt)
@@ -480,7 +550,7 @@ proc execute_plan_builds(plan_value: types.BuildPlan, store_root: Path) -> Resul
   false
 }
 
-## Executes a BuildPlan into `store_root`; `jobs` bounds concurrent package builds and `logs` holds one log per built package. Artifact-store receipts are the only resume state, and results come back in plan order.
+## Executes a BuildPlan into `store_root`; `jobs` bounds concurrent package builds and `logs` holds one log per built package. Artifact-store receipts are the only resume state, and results come back in plan order. `confinement` runs every package build child through `linux.run_confined`; it requires `jobs` of one, because a scheduled `build-node` child cannot carry a profile.
 export proc build_plan(
   plan_value: types.BuildPlan,
   repo_root: Path,
@@ -488,11 +558,13 @@ export proc build_plan(
   remote_repo: Str,
   jobs: Int,
   logs = p"",
+  confinement: types.BuildConfinement? = null,
 ) [fs, net, process, env, time, error] -> Result[types.BuildResult, Error] {
   build_plan.validate(plan_value)
   build_plan.require_current_build_epoch(plan_value)
 
   return Err(types.PmError.Usage("build jobs must be at least one")) when jobs < 1
+  return Err(types.PmError.Usage("confined builds require jobs of one")) when confinement != null and jobs != 1
 
   let context: ExecuteContext = {
     plan: plan_value,
@@ -501,6 +573,7 @@ export proc build_plan(
     remote_repo,
     executor: if execute_plan_builds(plan_value, store_root) { pm_build.executor_provenance()? } else { null },
     published: {},
+    confinement,
   }
   var done: Map[types.ArtifactReceipt] = {}
 
