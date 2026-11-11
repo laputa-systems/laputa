@@ -12,7 +12,7 @@ scratch = root / ".work/tmp"
 scratch.mkdir(parents=True, exist_ok=True)
 env = dict(os.environ, XSH_MODULE_PATH=str(root), TMPDIR=str(scratch))
 fixture = root / "tests/integration/fixtures/activation-recovery.xsh"
-binary = root / ".out/host/x86_64/xsh"
+binary = pathlib.Path(os.environ.get("LAPUTA_XSH", root / ".out/host/x86_64/xsh"))
 
 
 def command(operation, state):

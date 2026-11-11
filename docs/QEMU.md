@@ -359,7 +359,8 @@ collection, closes reply pipes before acknowledgments, and fills an isolated
 record; freeing space permits retry. Reply loss is reconciled by reading status.
 These checks establish process-death recovery, local reply-loss handling, and
 full-filesystem behavior. They do not simulate power loss or filesystem write
-reordering.
+reordering. `LAPUTA_XSH` selects the host XSH when it is not
+`.out/host/x86_64/xsh`; the G2 drill passes the same binary there.
 
 Run `python3 tests/integration/activation_ssh.py XSH PORT KEY PIN` against a
 disposable maintained guest with a `probe` account, a maintained generation
@@ -382,6 +383,62 @@ The fixture invokes production host APIs over SSH, not an installed activation
 CLI. This covers one disconnect during staging and does not establish physical
 power-loss behavior. [Testing](TESTING.md#run-the-vm-storage-publication-fault-cases)
 records separate VM filesystem publication cases.
+
+### G2 integrated lifecycle
+
+`tests/integration/g2_lifecycle.py` runs roadmap G2 steps 1-5 on one installed
+x86_64/KVM VM:
+
+```sh
+python3 tests/integration/g2_lifecycle.py --xsh PATH/TO/xsh \
+  --bundle target/laputa/qemu-maintained/current \
+  [--dropbearkey PATH/TO/dropbearkey] [--keep]
+```
+
+Without `--dropbearkey` the test extracts `usr/bin/dropbearkey` from the
+Dropbear package artifact under `LAPUTA_ARTIFACT_STORE` (default
+`.out/artifacts/x86_64/v2/sha256`). The host needs KVM, `strace`, `unshare`,
+`mount`, `ssh-keygen`, and the bundle's `vmlinuz`, `disk.img`, and
+`generation.json`. The artifact store must hold `baselayout`, `musl`, `xsh`,
+`xinit`, and `e2fsprogs` for the chained rescue drill; when it does not, the run
+prints that rescue is unverified and continues. `--keep` retains consoles, the
+state image, generation bundles, and the host activation record.
+
+The test provisions a fresh state disk with a unique Dropbear host key, a
+locked-password `probe` account, and a key-only UID 0 `g2admin` account with
+separate keys, and checks that the immutable generation disk contains neither
+account's authorized public key nor either private key body.
+It installs generation A from the bundle under policy revision 1, runs the
+existing `rescue_guest.py` for an independently composed rescue root
+(clean/repaired/unrecoverable disks), and boots A through the launcher. Over the
+verified native SSH path it checks the pinned
+host key, running receipt and health report, critical service states, the bound
+lease and dhcpc-owned resolver, the observed clock-service state, and redacted
+diagnostics. Restarting `logger` and `dhcp-eth0` as `g2admin` rechecks new pids,
+readiness, and a rebound lease; a QMP `set_link` down/up breaks and restores
+SSH and requires a bound lease afterwards.
+
+The test then runs the existing `activation_recovery.py` and
+`activation_ssh.py` drills against the same run, stages generation B (the real
+kernel with a zeroed disk) under policy revision 2, powers A off through PID 1,
+and boots B twice. B never reaches userspace; the host bounds each attempt and
+selects retained A after the cap with `LAPUTA_FAILED_GENERATION=b`. The
+persistent host key and a staged home sentinel survive, and the boot marker
+history names the A boots and failed B. The repaired C is staged from the
+bundle under policy revision 3, booted, checked for a matching running receipt
+and live `dropbear`, `logger`, and `dhcp-eth0`, and only then confirmed through
+`activation_confirm_guest_health`. A further C reboot shows the committed
+record and the retained four-entry history.
+
+On 2026-11-11 this passed on Linux x86_64/KVM against the prebuilt
+`qemu-maintained` generation `07f2eaf08a68…`. It establishes G2 steps 1-5 for
+that bundle only. It does not establish natural T1/T2 lease renewal, physical
+power loss, Linux aarch64, Asterinas, a macOS client, signed release
+authenticity, or step 6 blank-disk restore. The maintained non-root `probe`
+account cannot restart supervised daemons because `/run/xinit` is root-owned,
+so the restart path uses the provisioned UID 0 administrator; non-root
+privilege delegation remains unqualified. Staging digests pin bytes and the PM
+`generation_sha256` is publisher identity, not a signature.
 
 ### Persistent diagnostics
 

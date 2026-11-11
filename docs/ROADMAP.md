@@ -240,7 +240,22 @@ in a quiet-host accounting run.
 
 ## G2: The remotely maintainable VM
 
-**Status: planned.** This is the organizing product milestone, not a new manager,
+**Status: steps 1-5 pass on Linux x86_64/KVM for one prebuilt `qemu-maintained`
+generation; step 6 and the open items below remain.** `tests/integration/g2_lifecycle.py`
+provisions a unique host key and key-only credentials on a fresh state disk,
+installs A and boots the independent rescue root, inspects services, lease,
+resolver and diagnostics over verified native SSH, restarts supervised services
+and survives a link loss, stages B while chaining the existing recovery and SSH
+disconnect drills, falls back to A after two bounded B startup failures with
+identity and state preserved, then health-confirms and commits a repaired C and
+reads its boot history across a reboot. Open: step 6 blank-disk restore in the
+same run, natural T1/T2 lease renewal, non-root restart authority (`/run/xinit`
+is root-owned, so the drill uses a key-only UID 0 administrator), a host record
+that names the failed generation after fallback, `ntpd-rs` readiness in this
+profile, physical power loss, Linux aarch64, Asterinas, a macOS client, and
+signed release authenticity.
+
+This is the organizing product milestone, not a new manager,
 new test framework, or a claim that every R1-R7 capability has shipped. The unit
 of delivery is one installed VM that can be maintained through its full lifecycle.
 Reuse the current image builder, PM receipts, xinit, launcher, and guest harness.
@@ -604,6 +619,13 @@ Every recoverable case selects a complete admissible bundle with preserved
 mutable state. Rescue still works when neither normal generation boots. Linux
 and Asterinas results are recorded separately; Linux aarch64 is deferred pending
 a macOS aarch64 host via Docker.
+
+`tests/integration/g2_lifecycle.py` drives the integrated install, stage, two
+bounded startup failures, fallback with preserved state, and a health-confirmed
+commit through the same host APIs on one KVM guest, chaining
+`activation_recovery.py` and `activation_ssh.py`. After fallback the host record
+keeps current, fallback and policy but not the failed generation id; only the
+launcher selection and the guest boot markers carry it.
 
 `system/activation.xsh` records install, stage, pending boot, guest health
 confirmation, and fallback after two attempts. Versioned activation records bind

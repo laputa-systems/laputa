@@ -76,6 +76,14 @@ collects diagnostics naming the dead service. It does not cover macOS or
 aarch64 clients, reboot identity, network loss, privilege delegation or
 activation of the staged candidate.
 
+`tests/integration/g2_lifecycle.py` reuses this library for the roadmap G2
+inspect/run/stage/diagnose and link-loss work on the same maintained guest (see
+[maintained activation](QEMU.md#maintained-vm-activation)). Its supervised
+`xinit restart` calls run as a key-only UID 0 administrator provisioned on the
+state disk: the maintained non-root operator cannot write `/run/xinit`, so
+non-root privilege delegation is still unqualified. The drill also does not
+establish macOS or aarch64 clients.
+
 The harness formats the state disk with `system/maintained_state_image.xsh`, so the
 operator keeps the id `first_boot.apply` allocates (1001 beside baselayout's `laputa`)
 and owns `home/admin`, `.ssh` and `authorized_keys` in the image.
