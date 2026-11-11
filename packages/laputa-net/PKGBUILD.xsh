@@ -17,9 +17,10 @@ export let deps = []
 ## Exported declaration `mkdeps_host`.
 export let mkdeps_host = []
 
-## The build installs the service modules and interface config. At runtime
-## xinit runs the services: net drives the xsh core applets ifup/ifdown for
-## loopback, dhcp-eth0 supervises dhcpc for the virtual Ethernet lease, and
+## The build installs the service modules, interface config, and the IPv6
+## policy drop-in rc.boot loads from /usr/lib/sysctl.d. At runtime xinit runs
+## the services: net drives the xsh core applets ifup/ifdown for loopback,
+## dhcp-eth0 supervises dhcpc for the virtual Ethernet lease, and
 ## wpa_supplicant provides Wi-Fi association for wireless interfaces.
 export const runtime_only_deps = ["wpa_supplicant", "xinit", "xsh"]
 
@@ -64,6 +65,19 @@ export const upstream_sources = [
       },
     ],
   },
+  {
+    source: p"ipv6.conf",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "SKIP",
+      },
+    ],
+  },
 ]
 
 ## Exported declaration `filetree`.
@@ -93,6 +107,10 @@ export const filetree = [
     kind: "file",
   },
   {
+    path: p"usr/lib/sysctl.d/20-ipv6.conf",
+    kind: "file",
+  },
+  {
     path: p"usr/lib/xinit/services/net.xsh",
     kind: "file",
   },
@@ -107,6 +125,7 @@ export proc build(dest: Path) [fs, error] {
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/net.xsh", 0o644, parents: true, overwrite: true)
   fs.install(p"dhcp-eth0.xsh", fp"{dest}/usr/lib/xinit/services/dhcp-eth0.xsh", 0o644, parents: true, overwrite: true)
   fs.install(p"interfaces", fp"{dest}/etc/network/interfaces", 0o644, parents: true, overwrite: true)
+  fs.install(p"ipv6.conf", fp"{dest}/usr/lib/sysctl.d/20-ipv6.conf", 0o644, parents: true, overwrite: true)
   fp"{dest}/etc/network/if-pre-up.d".mkdir()
   fp"{dest}/etc/network/if-up.d".mkdir()
   fp"{dest}/etc/network/if-down.d".mkdir()

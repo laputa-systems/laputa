@@ -161,6 +161,37 @@ proc resolve(name: Str) -> Result[Record, Error] {
   Ok({exit: status.exit_code()?, stdout: text_of(out, 8192)?.trim(), stderr: text_of(err, 8192)?.trim()})
 }
 
+proc ipv6_state() -> Result[Record, Error] {
+  let dump = linux.network_dump()?
+  var addresses = 0
+  var routes = 0
+  for address in dump.addresses {
+    if address.family == "inet6" {
+      addresses += 1
+    }
+  }
+  for route in dump.routes {
+    if route.family == "inet6" {
+      routes += 1
+    }
+  }
+  let policy = p"/usr/lib/sysctl.d/20-ipv6.conf"
+  let all_switch = p"/proc/sys/net/ipv6/conf/all/disable_ipv6"
+  let default_switch = p"/proc/sys/net/ipv6/conf/default/disable_ipv6"
+  let accept_ra = p"/proc/sys/net/ipv6/conf/all/accept_ra"
+  let autoconf = p"/proc/sys/net/ipv6/conf/all/autoconf"
+  Ok({
+    policy: policy.exists()?,
+    all_switch: text_of(all_switch, 8)?.trim(),
+    default_switch: text_of(default_switch, 8)?.trim(),
+    accept_ra: text_of(accept_ra, 8)?.trim(),
+    autoconf: text_of(autoconf, 8)?.trim(),
+    addresses,
+    routes,
+    enumeration: dump.enumeration_succeeded,
+  })
+}
+
 proc handle(fd: Int, line: Str) -> Result[Unit, Error] {
   let request = json.decode(line)?.require(Record)?
   let op = json.get(request, ["op"], "").require(Str)?
@@ -175,6 +206,8 @@ proc handle(fd: Int, line: Str) -> Result[Unit, Error] {
   } else if op == "resolve" {
     let name = json.get(request, ["name"], "").require(Str)?
     reply(fd, {ok: true, result: resolve(name)?})?
+  } else if op == "ipv6" {
+    reply(fd, {ok: true, result: ipv6_state()?})?
   } else if op == "ntp" {
     reply(fd, {ok: true, result: ntp_status()?})?
   } else if op == "log" {

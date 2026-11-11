@@ -76,6 +76,18 @@ collects diagnostics naming the dead service. It does not cover macOS or
 aarch64 clients, reboot identity, network loss, privilege delegation or
 activation of the staged candidate.
 
+`tests/integration/ssh_network_recovery.py` qualifies the same client over the
+network under test rather than a forwarded port. A scripted DHCPv4 server
+declares one address on a tap owned by an unprivileged user+network namespace,
+and the client connects to that address inside the namespace with the pinned
+Dropbear host key. After link loss, lease expiry and re-acquisition, a supervised
+`dhcp-eth0` restart, and NIC reappearance on a new ifindex, it requires a fresh
+verified connection to recover on the declared address and reads the guest's own
+`xinit status dhcp-eth0` there. The same run proves the profile's IPv6 policy:
+the packaged drop-in disables IPv6 autoconfiguration, no IPv6 address or route
+exists, and the status reports `ipv6=unsupported` explicitly. It does not add
+IPv6 support.
+
 `tests/integration/g2_lifecycle.py` reuses this library for the roadmap G2
 inspect/run/stage/diagnose and link-loss work on the same maintained guest (see
 [maintained activation](QEMU.md#maintained-vm-activation)). Its supervised

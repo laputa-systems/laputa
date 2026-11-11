@@ -386,16 +386,39 @@ that SSH administration recovers through the declared network behavior. Boot and
 local rescue still work offline. Qualify IPv4 and IPv6 separately and report
 unsupported modes explicitly.
 
-**Status: IPv4 lifecycle proven on Linux x86_64/KVM; IPv6 and SSH recovery
-open.** `tests/integration/dhcp_lifecycle.py` boots the built `qemu-maintained`
+**Status: IPv4 lifecycle, SSH recovery through the declared network, and an
+explicit IPv6 policy are proven on Linux x86_64/KVM.** `tests/integration/dhcp_lifecycle.py`
+boots the built `qemu-maintained`
 image against a scripted DHCPv4/DNS server with short leases and passes initial
 bind, renewal with changed DNS and routes, rebind, NAK, a replacement lease,
 expiry, daemon restart with INIT-REBOOT from the saved lease, link loss, NIC
 reappearance after a PCI remove and rescan, pause and resume, a steady-state
 sample with no duplicate or stale configuration, and an offline boot that stays
 locally administrable. The run found two XSH client defects, fixed upstream: a
-negative wait after a slow re-acquisition and a re-created NIC left down. SSH
-recovery through the declared network and IPv6 policy are not yet qualified.
+negative wait after a slow re-acquisition and a re-created NIC left down.
+
+`tests/integration/ssh_network_recovery.py` reaches the same guest over XSH's
+native SSH client on the address the scripted server declares (`192.0.2.100/24`
+on the tap), not over the control channel, with a pinned Dropbear host key. It
+proves a verified session, then a fresh verified connection after each
+disruption: link loss, lease expiry and re-acquisition, a supervised DHCP client
+restart that keeps the saved address, and NIC reappearance on a new ifindex. The
+guest's own `xinit status dhcp-eth0` over that SSH session names the declared
+address both times.
+
+The maintained profile makes IPv6 explicit rather than silently empty.
+`packages/laputa-net/ipv6.conf` installs as `/usr/lib/sysctl.d/20-ipv6.conf`, so
+`rc.boot` disables IPv6 on `all` and `default`, clears router advertisements and
+autoconfiguration, and therefore applies the same state to any interface that
+appears later, including a re-enumerated NIC. There is no DHCPv6 or
+router-advertisement handling. The DHCP service's `status()` always names the
+verdict: `ipv6=unsupported` with `disabled=1 policy=installed sysctl=1
+addresses=0 routes=0 enumerated=1` when the policy holds, and `ipv6=unexpected`
+on any deviation, so an empty IPv6 cohort is never confused with a configured
+dual-stack and a failed observation is never presented as success. The guest
+test asserts no SLAAC address and no IPv6 route exists and that the status
+reports it. IPv6 support remains out of scope; this only reports the mode as
+unsupported.
 
 ### Time discipline and bootstrap
 
