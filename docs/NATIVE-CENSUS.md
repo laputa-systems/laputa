@@ -218,8 +218,8 @@ names GCC 9.4.0; which objects it compiled is unknown (compare the `.comment`
 of the three C archives in the XSH cargo target). The xz-utils revision inside
 `liblzma-sys` is also unread.
 
-**Existing closure audit.** `qualification/ghostty-shared/closure.xsh` passes
-on this root. The Rust packages (doas, mdevd, seatd, tinyland, and the other
+**Existing closure audit.** The shared-stack closure audit passed on this
+root before its candidate recipe was removed. The Rust packages (doas, mdevd, seatd, tinyland, and the other
 Rust daemons) no longer pass `-rpath /usr/lib`, which the default search path
 made redundant. The audit accepts a `RUNPATH` only when it is exactly
 `$ORIGIN/../lib` on a `usr/bin` file or `$ORIGIN` on a `usr/lib` file, both of

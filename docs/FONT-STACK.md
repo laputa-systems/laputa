@@ -118,16 +118,9 @@ The PM-stripped candidate binary SHA-256 was
 The checked-in package still uses the published artifact and its original
 checksum. The local archive is not a published release.
 
-To qualify another x86_64 archive on a Linux KVM host, run
-`qualification/ghostty-shared/run.sh /absolute/path/to/ghostty.tar.gz` from
-this checkout. Set `XSH_ROOT` if the XSH checkout is not the adjacent `xsh`
-directory. The command creates an isolated checkout under `.work/tmp`, hashes
-the supplied archive, replaces the x86_64 release source and SHA-256 in the
-checked-in `ghostty-custom` recipe with the archive, and runs
-`make profile-test`. The checked-in recipe and proof are otherwise unchanged.
-It reuses the existing seed, source cache, and package artifact cache. The
-archive must contain the candidate executable named `ghostty`. The command
-does not publish or change the release package pin.
+The candidate qualifier that rewrote the checked-in recipe from a supplied
+archive was removed as dead code. The checked-in release pin and package proof
+were never changed by it.
 
 The qualification recipe therefore declares FreeType, HarfBuzz, and
 rust-fontconfig as link dependencies, with Hack as a runtime-only font. Its
@@ -138,16 +131,12 @@ networkless composed root also ran the candidate and failed to load it when
 `libharfbuzz.so.0` was absent. An unprivileged Fontconfig consumer selected an
 Arabic fallback and populated its XDG cache with an unwritable system cache.
 
-For a composed candidate root, run
-`xsh qualification/ghostty-shared/closure.xsh -- /absolute/path/to/root`.
-The audit requires one independently owned provider for each font SONAME,
-checks loader symlinks, rejects private library search paths, and checks every
-ELF dependency against the installed provider and declared dependency closure.
-Musl library aliases resolve to their actual package owner. The current root
-passes with 19 packages and 26 ELF files. Negative checks reject an added
-duplicate FreeType provider and a removed FreeType dependency declaration.
-The [native-code census](NATIVE-CENSUS.md) extends this provider audit to
-statically incorporated C and C++.
+The provider audit that accompanied that candidate was removed with it. The
+package proofs assert each consumer's font SONAMEs, the absence of
+`libfontconfig.so.1`, and the absence of RPATH and RUNPATH; the composed final
+root below records the provider set for the shipped stack. The
+[native-code census](NATIVE-CENSUS.md) extends that accounting to statically
+incorporated C and C++.
 
 Ghostty's existing font-filtered Zig tests also run against that composed
 runtime: 206 pass, 13 skip, and zero fail. The test executable imports the
@@ -311,13 +300,65 @@ The Ghostty change in executable size, from 30,787,208 to 27,206,776 bytes
 rust-fontconfig. The measurement does not separate them. Play moves from
 0.43.1 (9,578,712 bytes) to 0.43.2 (9,574,616 bytes), a change of -4,096 bytes.
 
-Pending:
+### Final composed root
 
-- The composed final root (total bytes, unique regular files, ELF count, and
-  the DT_NEEDED census). Ten packages must be rebuilt, because the RUNPATH
-  change re-keyed them and their final artifacts are not in the store: `doas-rs`
-  0.1.0-2, `mdevd-rs` 0.1.0-2, `seatd-rs` 0.9.3-2, `tinyland` 0.1.0-2,
-  `libdrm` 2.4.134-1, `libva` 2.24.1-2, `ffmpeg` 9.0.2-2, `mesa` 26.2.4-3,
-  `ghostty-custom` 1.4.1-5, and `play` 0.43.2-1.
+Composed at `6254ae4` from the artifact store with the canonical 11 roots:
+`baselayout`, `ca-certificates`, `xsh`, `laputa-pm`, `xinit`, `mdevd-rs`,
+`seatd-rs`, `doas-rs`, `tinyland`, `ghostty-custom`, and `play`. The store was
+not complete for this revision: 35 of the 50 plan nodes needed building, not
+the ten listed at `3c1797e`. After that measurement the gluon migration
+(`104cbf2`) re-keyed the Meson and CMake packages, and the LLVM seed moved to
+release `dc0d9b9` (`523bf1a`).
+
+```bash
+make build PKGS="baselayout ca-certificates xsh laputa-pm xinit mdevd-rs seatd-rs doas-rs tinyland ghostty-custom play" JOBS=2
+# exit 0; repo build c28e34ce… 50 artifacts
+xsh pm.xsh -- root compose .out/world/x86_64/plan.json --store .out/artifacts/x86_64 \
+  --runtime-root baselayout --runtime-root ca-certificates --runtime-root xsh \
+  --runtime-root laputa-pm --runtime-root xinit --runtime-root mdevd-rs \
+  --runtime-root seatd-rs --runtime-root doas-rs --runtime-root tinyland \
+  --runtime-root ghostty-custom --runtime-root play \
+  --output .out/world/x86_64/final-root
+# exit 0; root compose e558062bbe12d188523017593c4c5c55e2c1252ca598b50c4df33cf2de6d3f9b 570b054ede9d5725c37643d05c88b6102c3ae58e08acc8ab6854ba36f67f63c4
+xsh pm.xsh -- root inspect .out/world/x86_64/final-root
+# exit 0; runtime-roots 11; artifacts 31
+```
+
+The measurement walks the composed generation, skips symlinks and directories,
+counts each regular path once, and reads `DT_NEEDED` with `readelf -dW`.
+
+| Measurement | Baseline `fe1912a` | Final `6254ae4` | Change |
+|---|---:|---:|---:|
+| Packages | 32 | 31 | -1 |
+| Unique regular files | 1,548 | 1,630 | +82 |
+| Installed bytes | 336,210,344 | 335,939,380 | -270,964 |
+| ELF files | 49 | 48 | -1 |
+
+Package payloads in the final root total 1,535 regular files and 335,314,089
+bytes; the remaining 95 regular files and 625,291 bytes are PM metadata and
+receipts under `var/lib`.
+
+| Package | Regular files | Package bytes | Executable bytes |
+|---|---:|---:|---:|
+| `rust-fontconfig` 5.0.2-3 | 5 (plus one symlink) | 1,152,798 | |
+| `ghostty-custom` 1.4.1-5, `usr/bin/ghostty-custom` | 3 | 27,214,528 | 27,206,760 |
+| `play` 0.43.2-1, `usr/bin/player` | 1 | 9,574,616 | 9,574,616 |
+| `fontconfig` | absent | 0 | |
+| `expat` | absent | 0 | |
+
+The composed root has 31 runtime artifacts and no `fontconfig` or `expat`
+package directory. No installed ELF has a `DT_NEEDED` entry for
+`libfontconfig.so.1` or `libexpat.so.1`. The `rust-fontconfig`,
+`ghostty-custom`, and `play` package proofs pass against the rebuilt artifacts;
+Ghostty and Play both import `librust_fontconfig.so.5.0.2`.
+
+The earlier per-package table measured `rust-fontconfig` at 8 regular files and
+1,153,681 bytes; the composed root has 5 regular files plus one symlink and
+1,152,798 bytes. The Ghostty executable measures 27,206,760 bytes here versus
+27,206,776 in that table, a 16-byte difference. Play matches exactly.
+
+Remaining:
+
 - Cache-build peak RSS: deferred; no harness exists, and the package set ships no `fc-cache`.
-- Font cache build time and first-query latency: deferred; perf gate reported host busy (`perf-gate-ready` exit 75, load 46 to 47 on 32 cores).
+- Font cache build time and first-query latency: timing deferred by the owner, not measured.
+- aarch64 Ghostty and Play qualification: deferred with the rest of the campaign.
