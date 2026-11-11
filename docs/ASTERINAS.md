@@ -20,8 +20,11 @@ obligations.
   attributes, partitions, and device numbers that match Linux; the packaged
   `mdevd` and `mdevd-coldplug` coldplug at boot and after a daemon restart.
 - Clock: `clock_settime`, `adjtimex`, and `clock_adjtime` make CLOCK_REALTIME
-  settable and steerable; `ntpd-rs` converges from positive and negative
-  offsets, frequency error, pause and resume, and a jump.
+  settable and steerable. `STA_INS` and `STA_DEL` schedule a leap second at
+  the next UTC day boundary, which CLOCK_REALTIME repeats or skips and which
+  moves the TAI offset as Linux does. `ntpd-rs` converges from positive and
+  negative offsets, frequency error, pause and resume, and a jump, and its
+  `leap_update` accepts the leap status it reports.
 - IPv4 state: netlink addresses, routes, rules, and route-netlink
   notifications, and the packaged `dhcpc` across acquire, renewal,
   reconfigure, NAK, restart, and carrier loss against a scripted server.
