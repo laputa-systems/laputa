@@ -383,6 +383,70 @@ CLI. This covers one disconnect during staging and does not establish physical
 power-loss behavior. [Testing](TESTING.md#run-the-vm-storage-publication-fault-cases)
 records separate VM filesystem publication cases.
 
+### Persistent diagnostics
+
+`packages/laputa-diagnostics` installs `usr/lib/laputa/diagnostics.xsh` and a
+boot oneshot `usr/lib/xinit/services/diagnostics.xsh`. The oneshot runs
+`/usr/bin/xsh /usr/lib/laputa/diagnostics.xsh --phase boot` with
+`XSH_MODULE_PATH=/usr/lib/xsh/core` and `after` on `logger`; it never gates
+boot, rescue, or login. The profile must select the package; its package-root
+list is profile-owned.
+
+One collection writes `/var/log/diagnostics/` on the maintained state disk:
+
+- `events.log` is JSON Lines with boot id, `CLOCK_BOOTTIME` nanoseconds,
+  wall-clock nanoseconds, generation id, boot serial, failed generation, kind,
+  and detail. A stable key makes repeated collection idempotent. The newest
+  512 lines and 64 KiB are kept.
+- `boot-history.json` reduces the health reporter's `/var/log/boot-markers.log`
+  to the newest 20 activation entries with generation id, boot serial, failed
+  generation, profile, root digest, and named service states.
+- `lease.json` keeps only `state`, `address`, and `prefix`; client
+  identifiers, server ids, and the raw lease file never enter the store.
+- `support.tar.gz` is the bounded redacted bundle described below.
+
+A collection reads the existing syslog path (`/var/log/logger/current`),
+`/dev/kmsg`, `/run/laputa-running-generation.json`,
+`/run/laputa-health.json`, `/run/xinit/*.json`, and
+`/run/dhcpc/eth0.status`. It does not start another logger or replace xinit's
+capture. Timestamps pair `boot_id` with `boottime_ns`, so a pre-sync wall clock
+does not make boot and service order ambiguous; `wall_ns` is retained only as a
+display and calendar hint. The failed generation comes from the launcher's
+`LAPUTA_FAILED_GENERATION` token and from the persisted boot markers.
+
+The support bundle runs the existing XSH `system-report --json --section`
+collectors for `identity`, `kernel`, `storage`, `network`, and `processes`.
+Sections are redacted by `system-report` by default; `--sensitive` is never
+passed. Each section is capped at 32 KiB, the staging tree at 240 KiB, and the
+published `support.tar.gz` at 256 KiB. Optional sections are dropped in
+`processes`, `network`, `storage`, `kernel`, `identity` order when the cap would
+be exceeded and are named in the manifest. The whole store is bounded at
+384 KiB. `diagnostics --canary PATH` reads a test secret from `PATH` only to
+prove it never reaches the store or bundle; a normal collection passes no
+canary.
+
+A failed write leaves the previous file in place: replacement is one atomic
+rename and each file is fsynced with its parent. A full state disk reports
+`LAPUTA_DIAGNOSTICS_DEGRADED ... preserved=1` and leaves the prior bundle and
+events intact; freeing space lets the next collection publish again. This is
+bounded retention, not lossless logging. xinit copies `current` to `current.1`
+and truncates in place, so a write between copy and truncate can be lost; a
+failed rotation leaves `current` in place and keeps the supervisor alive. The
+syslog receiver drops datagrams from a full socket queue, by sender/global
+rate, by oversize, by descriptor passing, and at a blocked sink, and counts
+each. Kernel records the ring has already overwritten are reported as an
+overrun rather than reconstructed. No remote syslog, fleet collector, or
+journald-compatible store is implied.
+
+`tests/system/diagnostics.xsh` covers redaction, retention, history, lease
+projection, bundle bounds, and write-failure preservation offline.
+`tests/integration/diagnostics_reboot.py` boots a maintained generation,
+kills QEMU twice while generation B is pending, and proves on the fallback
+boot that the persistent store names failed generation B with its service
+history, stays inside the declared bounds while the state disk is filled to
+ENOSPC, recovers after space is freed, and publishes no canary secret. It uses
+`LAPUTA_XSH` and `LAPUTA_QEMU_OUTPUTS` to select the host tools and built image.
+
 `guest/qemu-maintained-proof.xsh` runs only with
 `LAPUTA_MAINTAINED_PROOF_FLAG=1`. It saves seven identity/account hashes on the
 state disk, requests reboot through PID 1, and compares the hashes on the next
