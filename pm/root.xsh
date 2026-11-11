@@ -933,8 +933,8 @@ proc root_require_index_tool_closure(output: FsRoot, arch: Str) {
 }
 
 ## Generates a manual index in an unpublished staging root and records its generated contents.
-## Every read and mutation goes through `output`. Only the final makewhatis process addresses
-## `output.host_path()`, because a process cannot start from a directory handle.
+## Every read and mutation goes through `output`; the index tool is its `makewhatis` opened
+## beneath `output`, while the tool's manpath, libraries and ELF interpreter are host paths.
 export proc root_index_manual_pages(output: FsRoot, receipt: types.RootReceipt) [fs, process, error] -> Result[types.RootReceipt, Error] {
   root_validate_receipt(receipt)
   if root_read_receipt_in(output)? != receipt {

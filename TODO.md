@@ -53,7 +53,7 @@ qualification remains open; manual cross-build evidence is bounded in
   - Durability: `strace` shows every staged file and directory fsynced before the `RENAME_NOREPLACE` publish and the parent fsynced after it. Power loss is untested.
   - Against the pre-change code, the suite found no escape from hostile entries, conflicts, kills or full disks. It had no retained-root composition to test against ancestor replacement.
 - **Remaining:**
-  - The selected-root `makewhatis` process still starts from the staging root's host path, because XSH cannot start a process from an `FsRoot`; its precondition reads and ELF walk are now rooted. Closing this needs an XSH exec-from-handle primitive.
+  - `c1b407a` starts the musl loader beneath the staging root with `FsRoot.command` (`execveat`). The loader still opens `makewhatis`, its libraries and the manpath by host path, so a swap of those paths between the rooted precondition checks and the loader's opens is not excluded.
   - One fsync per staged entry is unmeasured on large generations; owner timing gates are deferred (perf gate deferred: host busy).
 - **Coordination:** Roadmap R4/R5; XSH-37 owns reusable host operations, not package policy.
 - **Fix with:** isolate-effects
