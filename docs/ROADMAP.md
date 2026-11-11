@@ -533,6 +533,14 @@ already-running services are restarted by the operator, not by a cutover layer.
 Missing owner-held keys remain an external prerequisite; never invent production
 credentials or commit private keys to satisfy a test.
 
+**Status: acceptance met on Linux x86_64/KVM.** Each clause maps to a passing
+host or guest test in the [R4 acceptance matrix](CERTIFICATE-TRUST.md#r4-acceptance-matrix),
+including a guest repository key rotation and revocation with recovery, a power
+cut after each trust-journal fsync, and fail-closed verification clocks. Open:
+the installed maintained-image drill was not rerun, there is no aarch64 or
+Asterinas guest run, and one of four `trust_guest.xsh` runs on a loaded host
+failed without a captured cause.
+
 ## R5: Activate installed generations and roll back safely
 
 This is the centerpiece after the first useful remote-administration slice.
