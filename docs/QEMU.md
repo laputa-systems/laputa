@@ -179,7 +179,7 @@ and routes scanner diagnostics to ttyS0. `laputa.xsh -- build qemu-maintained`
 builds the immutable generation image. The image contains no operator keys or
 machine host key.
 
-The boot target supervises two foreground services from the XSH core. The
+The boot target supervises three foreground XSH services. The
 `logger` service runs `syslogd --state /run --socket /dev/log` with notify
 readiness and always-restart; its captured output lands in
 `/var/log/logger/current` on the state disk under xinit's bounded
@@ -190,9 +190,10 @@ static file at `/etc/dhcpc/resolv.static` is read-only input, so dhcpc is the
 single owner of `resolv.conf`. The DHCP service uses notify readiness: the
 fixed XSH client writes its readiness byte to the supervisor pipe once the
 interface is resolved and its loop is armed, before it acquires a lease. The
-syslog receiver writes its readiness byte directly and keeps notify. Neither
-service blocks boot, rescue, or login:
-dependents use `after` at most, and Dropbear's `need` set stays
+syslog receiver writes its readiness byte directly and keeps notify. The
+third service is `laputa-timers`, the supervised scheduler described under
+[persistent timers](#persistent-timers). None of them blocks boot, rescue,
+or login: dependents use `after` at most, and Dropbear's `need` set stays
 `firewall`, `dropbear-keygen`, and `net`. The loopback-only `net` oneshot is
 unchanged and the interfaces file carries no `eth0` or `inet6` stanza, so no
 second client contends for the lease. IPv6 stays unsupported on this profile:
@@ -519,6 +520,47 @@ boot that the persistent store names failed generation B with its service
 history, stays inside the declared bounds while the state disk is filled to
 ENOSPC, recovers after space is freed, and publishes no canary secret. It uses
 `LAPUTA_XSH` and `LAPUTA_QEMU_OUTPUTS` to select the host tools and built image.
+
+### Persistent timers
+
+`packages/laputa-timers` installs `/usr/lib/laputa/timers.xsh` (the scheduler
+and its pure decision core), `/usr/lib/laputa/timers-run.xsh` (the entry point
+that owns the termination hook), the xinit service
+`/usr/lib/xinit/services/laputa-timers.xsh`, the generation job directory
+`/etc/laputa/timers/jobs.d`, and a link to the pinned core
+`lib/monotonic.xsh`. The service is one foreground process on target `boot`
+with notify readiness and always-restart. Readiness means the definitions,
+state, and cancellation markers are loaded and the live snapshot is published,
+not that a job has run. Nothing takes `need` on it. The profile overlay ships a
+real calendar job definition, `daily-sync`, which runs `/usr/bin/sync` daily at
+03:17 UTC.
+
+Job definitions are generation input under `/etc`; the maintained state disk
+carries the administered copy. Durable run state is
+`/var/lib/laputa-timers/state.json` on the state disk, and the live snapshot
+and lock are under `/run/laputa-timers`. Interval deadlines use the process
+monotonic clock, calendar deadlines use UTC wall time, overlap is `skip` or
+`queue` per job, and missed occurrences collapse into at most one run. The
+full contract, including the clock-step and VM-pause behavior, is in
+[timers](TIMERS.md).
+
+`tests/integration/timers_guest.py` provisions a disposable state disk with a
+three-second interval job, a calendar definition, and a failing job with two
+bounded retries, then boots the rebuilt `qemu-maintained` generation under KVM.
+It asserts: the shipped `daily-sync` next occurrence, interval runs, at most
+three attempts per failing occurrence, cancellation holding for two intervals
+and resuming, a 20-second QMP pause with no catch-up burst, a cold boot of the
+same state disk with a coalesced catch-up and a persisted calendar anchor, an
+`xinit restart` that reloads state and keeps running, and the same status
+through the existing fixed remote program's `run` operation. On 2026-11-11 the
+run passed with exit 0: the QMP pause froze every guest clock (`resume=steady`;
+7.29 s of both wall and boottime elapsed across the post-pause window), so the
+guest observed no elapsed time, no occurrence was due, and the interval job ran
+normally with no burst. The cold boot's 13 missed intervals produced one
+catch-up (`coalesced=13`, three runs in the window) and the calendar anchor was
+unchanged. A guest whose clock instead advances across a pause is classified
+as a gap or wall step and coalesces in the same way; neither case can produce a
+burst.
 
 `guest/qemu-maintained-proof.xsh` runs only with
 `LAPUTA_MAINTAINED_PROOF_FLAG=1`. It saves seven identity/account hashes on the

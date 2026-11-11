@@ -1,0 +1,10 @@
+{
+  "format": "laputa-timer-job-1",
+  "name": "daily-sync",
+  "schedule": {"kind": "calendar", "hour": 3, "minute": 17},
+  "command": ["/usr/bin/sync"],
+  "timeout_ms": 60000,
+  "overlap": "skip",
+  "missed": "coalesce",
+  "retries": {"max": 1, "delay_ms": 1000}
+}

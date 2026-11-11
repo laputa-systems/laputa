@@ -810,6 +810,35 @@ side effects across crashes; use idempotent jobs or explicit reconciliation.
 Scheduling is a follow-up to working manual maintenance, not an entry fee for
 remote inspection, diagnostics, or restore.
 
+**Timers status: supervised scheduler proven on Linux x86_64/KVM; no backup
+or pruning job is scheduled.** `packages/laputa-timers` installs one foreground
+XSH scheduler as an xinit boot service, and `qemu-maintained` selects it. The
+profile overlay ships one real calendar job (`daily-sync`, `/usr/bin/sync` daily
+at 03:17 UTC) under `/etc/laputa/timers/jobs.d`. Job definitions are generation
+input; durable last/next state and cancellation markers are on the state disk;
+the scheduler never writes a definition. Interval deadlines use the process
+monotonic clock and calendar deadlines use UTC wall time. Each job chooses
+`skip` or `queue` overlap and `coalesce` or `skip` missed runs; retries are
+bounded; any number of missed occurrences produces at most one run; a wall step
+re-evaluates calendar schedules and never moves an interval deadline;
+cancellation terminates a running process group and survives reboot. The local
+status (last/next, counters, invalid definitions) is the same data read through
+the existing remote `run` operation. `tests/system/timers.xsh` covers the pure
+decisions with an injected clock, including forward and backward wall steps and
+bounded retries. `tests/integration/timers_guest.py` on a rebuilt
+`qemu-maintained` image runs a three-second interval job, bounds a failing job
+at three attempts, holds cancellation for two intervals and resumes, pauses the
+VM through QMP, cold-boots the same state disk, restarts the scheduler through
+xinit, and reads the status through the existing remote program; it exits 0.
+The QMP pause froze every guest clock (`resume=steady`; 7.29 s of both wall and
+boottime elapsed only across the post-pause window), so no guest time passed,
+no occurrence was due, and no burst occurred. The cold boot's 13 missed
+intervals coalesced into one catch-up with the calendar anchor unchanged. Open:
+aarch64 and Asterinas guests, and the actual backup/pruning jobs with their
+quiescence and retention policy remain a later slice. Jobs must be idempotent;
+exactly-once side effects across a crash are not promised. See
+[timers](TIMERS.md) for the contract.
+
 **Diagnostics.** Roll out the implemented XSH syslog service through xinit and
 extend its existing log path rather than replacing it. Reuse XSH's system-report
 collectors for bounded, redacted local/remote support bundles. Capture persistent
