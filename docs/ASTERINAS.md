@@ -1,6 +1,6 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `2ae01fac2`, the kernel log slice, with XSH `d520fbcc5`, recorded with the other inputs in
+The checked-in kernel pin is `2167b6eb3`, with XSH `d520fbcc5`, recorded with the other inputs in
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
@@ -39,6 +39,12 @@ obligations.
   follow Linux. The ring carries the kernel's own records down to info level,
   so `dmesg` shows them; `loglevel=` sets only what the console prints.
 - Memory: allocation survives cross-CPU frame-pool fragmentation.
+- Storage: a writable ext2 mount records the mount in the superblock, clears
+  the clean-unmount flag and bumps the mount count before serving writes, and
+  the final unmount flushes the volume and restores the state observed at
+  mount, so an unchecked volume stays unchecked until an offline checker
+  repairs it. `fsync` of file data and its directory survives a VMM kill, and
+  a full volume reports `ENOSPC` without leaving the image inconsistent.
 - Native suite: not a full pass. The original 1,281 A0 passes are preserved
   (`infra/asterinas/a0-baseline.json`) and most of the 15,255 discovered
   cases remain unexecuted; a failure that Linux also shows is environment
@@ -196,6 +202,34 @@ with the case's `syslog-client` C program and one kernel-ring record, and compar
 records it writes apart from times, sequence numbers and process ids.
 The `NET_` transcripts of the two kernels must match. A mode takes 40 to 80 s per backend.
 
+Run the ext2 storage cohort with
+`bash infra/asterinas/qualify.sh storage --backend both [--case dirty|full|unclean|corrupt]`.
+It creates disposable 4096-byte-block ext2 images and runs the
+`regression/storage/qualify` witness on both backends. `dirty` writes and
+fsyncs a known payload, then the VMM is killed while the guest extends a churn
+file; `full` fills the volume until `write` returns `ENOSPC` and unmounts;
+`unclean` syncs the payload and is killed without an unmount, leaving a
+consistent volume whose clean flag is clear; `corrupt` cleanly prepares a
+payload image, then replaces the primary group descriptor's inode-bitmap
+pointer on a disposable copy and requires both guests to refuse a writable
+mount without changing the image. The host classifies every image with
+`e2fsck -fn`, then `e2fsck -fy` on a fresh copy when the first pass reports
+errors: exit 0 is clean, 1 or 2 is repaired, and anything else is
+unrecoverable. A dirty image that is unrecoverable fails the cohort, as does a
+corrupt image that e2fsck calls clean. Every clean or repaired result is
+booted again on the same backend, which re-reads the payload hash and mode,
+writes one verification file, and unmounts; the host then requires a clean
+`e2fsck -fn`, the same clean-unmount flag the image had at mount, and an
+incremented mount count. The two backends must produce identical `STORAGE_`
+guest transcripts. Two fields are normalized because the Linux reference
+mounts through the ext4 driver's ext2 mode: the exact `STORAGE_FULL_DONE` byte
+count, since a write that cannot cover its whole range is rolled back by the
+Asterinas ext2 driver but completed partially by ext4, and the
+`STORAGE_CORRUPT_REFUSED` errno, where ext4 returns `EUCLEAN` and Asterinas
+returns `EIO` before its descriptor-range check. Both backends still have to
+report `ENOSPC`, refuse the corrupt mount, leave the corrupt image byte for
+byte unchanged, and pass the same classification.
+
 The remaining cohorts run the same way. `device` runs the baseline boot proof, whose
 guest coldplugs three times and after a daemon restart, the `device/block_uevent`, `device/kmsg` and `fs/sync/writeback` witnesses and
 the modes of `guest/asterinas/device`: `sysfs`, `add` and `nodes` compare the device paths,
@@ -207,7 +241,7 @@ missing add event on both backends. `clock-abi` runs the `time/clock_adjust` wit
 `behind`, `ahead`, `frequency`, `pause` and `jump` (the last two on a TAP-backed network
 with an outside peer). `recovery` repeats the boot proof and the DHCP `restart` and
 `carrier` modes `LAPUTA_RECOVERY_REPEATS` times (10 by default). `all` runs `baseline`,
-`device`, `clock-abi`, `clock`, `network-state`, `network` and `recovery` serially and
+`device`, `clock-abi`, `clock`, `network-state`, `network`, `storage` and `recovery` serially and
 exits nonzero if any cohort failed. The wrapper exports `ASTERINAS_EXTRA_PACKAGES=ntpd-rs`
 unless the caller sets it, because the clock cases need the daemon in the generation and a
 bundle built without it would replace the current one. A cohort names each case it passes

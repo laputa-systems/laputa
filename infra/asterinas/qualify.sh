@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "$repo_root/infra/asterinas/run-cancellable.sh"
 export ASTERINAS_EXTRA_PACKAGES="${ASTERINAS_EXTRA_PACKAGES-ntpd-rs}"
 cohort="${1:-}"
-case "$cohort" in baseline|device|clock-abi|clock|network-state|network|recovery|resources|published-inputs|all) ;; *) printf 'qualification: unsupported cohort\n' >&2; exit 2 ;; esac
+case "$cohort" in baseline|device|clock-abi|clock|network-state|network|storage|recovery|resources|published-inputs|all) ;; *) printf 'qualification: unsupported cohort\n' >&2; exit 2 ;; esac
 shift
 backend=""
 case_name=""
@@ -30,7 +30,7 @@ case "$cohort" in
         esac
         exit 0
         ;;
-    clock-abi|clock|network-state|network)
+    clock-abi|clock|network-state|network|storage)
         run_cancellable "" bash "$cohort_runner" "$cohort" "$backend" "$case_name"
         exit $?
         ;;
@@ -49,7 +49,7 @@ case "$cohort" in
         [[ "$repeats" =~ ^[1-9][0-9]*$ ]] || { printf 'qualification: invalid LAPUTA_RECOVERY_REPEATS: %s\n' "$repeats" >&2; exit 2; }
         failures=()
         if [[ "$cohort" == all ]]; then
-            for step in baseline device clock-abi clock network-state network; do
+            for step in baseline device clock-abi clock network-state network storage; do
                 run_cancellable "" bash "$self" "$step" --backend "$backend" || failures+=("$step")
             done
         fi

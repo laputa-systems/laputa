@@ -508,8 +508,14 @@ host publishes it as a new generation and proves a healthy boot and fallback.
 A separate raw ext4 publication fixture recovers the old record after a staged
 write, an old complete record after an unsynced rename, and the new record after
 a directory fsync. QEMU is killed at each point before a recovery boot. These VM
-checks do not establish physical host-storage power-loss durability. Independent
-Asterinas qualification remains unproved.
+checks do not establish physical host-storage power-loss durability. On
+Asterinas, `qualify.sh storage --backend both` pairs every case with Linux:
+a VMM kill during writes keeps the fsynced payload, a full volume reports
+`ENOSPC` without damage, an unclean volume is flagged for checking because a
+writable mount now clears the clean flag and counts the mount (kernel
+`2167b6eb3`), and a corrupted image is refused a writable mount and left
+unchanged; host `e2fsck` classifies each image and every recoverable one boots
+again with its payload hash and mode intact.
 See the
 [detached rescue proof](INSTALLER.md#detached-rescue-guest-proof).
 
