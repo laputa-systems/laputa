@@ -1,4 +1,5 @@
 ##! Package recipe for bounded persistent diagnostics.
+## Package name.
 export const name = "laputa-diagnostics"
 
 ## Payload package.
