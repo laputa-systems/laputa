@@ -79,12 +79,12 @@ fn simd_check(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, St
                     link_depends: Vec::new(),
                     c_args: vec![flag.to_string()],
                     cpp_args: Vec::new(),
+                    objc_args: Vec::new(),
+                    objcpp_args: Vec::new(),
                     rust_args: Vec::new(),
                     install: false,
                     install_dir: None,
                     install_mode: None,
-                    version: None,
-                    soversion: None,
                     install_rpath: String::new(),
                     build_rpath: String::new(),
                     pic: None,
@@ -101,6 +101,15 @@ fn simd_check(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, St
                     build_by_default: true,
                     subdir: vm.current_subdir.clone(),
                     output_name: target_name.clone(),
+                    project_name: vm
+                        .project
+                        .as_ref()
+                        .map(|p| p.name.clone())
+                        .unwrap_or_default(),
+                    ltversion: None,
+                    soversion: None,
+                    darwin_versions: None,
+                    shared_library_only: false,
                 };
 
                 let target_ref = BuildTargetRef {

@@ -1,0 +1,1 @@
+int shlib_value(void) { return 42; }

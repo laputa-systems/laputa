@@ -92,19 +92,42 @@ run_compare_meson() {
   ref_build="$work/build"
   cand_build="$cand_work/builddir"
   mkdir -p "$ref_build" "$cand_build"
+  setup_args=()
+  if [ -f "$src/setup-args.txt" ]; then
+    while IFS= read -r line; do
+      [ -z "$line" ] && continue
+      setup_args+=("$line")
+    done <"$src/setup-args.txt"
+  fi
+  setup_env=()
+  if [ -f "$src/setup-env.txt" ]; then
+    while IFS= read -r line; do
+      [ -z "$line" ] && continue
+      setup_env+=("$line")
+    done <"$src/setup-env.txt"
+  fi
   setup_path=$PATH
   [ -d "$src_copy/bin" ] && setup_path="$src_copy/bin:$PATH"
-  PATH=$setup_path meson setup "$ref_build" "$src_copy" >"$work/setup.log" 2>&1
+  PATH=$setup_path env ${setup_env[@]+"${setup_env[@]}"} meson setup "$ref_build" "$src_copy" ${setup_args[@]+"${setup_args[@]}"} >"$work/setup.log" 2>&1
   ref_setup=$?
-  (cd "$cand_work" && PATH=$setup_path "$GLUON_MESON" setup "$src_copy" >"$work/cand_setup.log" 2>&1)
+  (cd "$cand_work" && PATH=$setup_path env ${setup_env[@]+"${setup_env[@]}"} "$GLUON_MESON" setup "$src_copy" ${setup_args[@]+"${setup_args[@]}"} >"$work/cand_setup.log" 2>&1)
   cand_setup=$?
   if [ "$ref_setup" != "$cand_setup" ]; then
     printf 'FAIL %s setup exit ref=%s cand=%s\n' "$id" "$ref_setup" "$cand_setup" >>"$TMPBASE/results.log"
     return 1
   fi
+  stray=$(cd "$cand_work" && ls -A | grep -vx builddir)
+  if [ -n "$stray" ]; then
+    printf 'FAIL %s setup wrote outside the build directory: %s\n' "$id" "$stray" >>"$TMPBASE/results.log"
+    return 1
+  fi
   if [ "$ref_setup" != "0" ]; then
     printf 'PASS %s setup-both-fail (both exit %s)\n' "$id" "$ref_setup" >>"$TMPBASE/results.log"
     return 0
+  fi
+  skip_edges=0
+  if [ -f "$src/skip-edge-count" ]; then
+    skip_edges=1
   fi
   ninja -C "$ref_build" >"$work/build.log" 2>&1
   ref_build_exit=$?
@@ -118,14 +141,31 @@ run_compare_meson() {
     printf 'PASS %s build-both-fail (both exit %s)\n' "$id" "$ref_build_exit" >>"$TMPBASE/results.log"
     return 0
   fi
+  if [ -f "$src/expect-flags.txt" ]; then
+    grep -E '^[[:space:]]*(LINK_)?ARGS = ' "$ref_build/build.ninja" >"$work/ref_args.txt" 2>/dev/null || true
+    grep -E '^[[:space:]]*(LINK_)?ARGS = ' "$cand_build/build.ninja" >"$work/cand_args.txt" 2>/dev/null || true
+    while IFS= read -r flag; do
+      [ -z "$flag" ] && continue
+      if ! grep -F -- "$flag" "$work/ref_args.txt" >/dev/null 2>&1; then
+        printf 'FAIL %s reference ARGS missing %s\n' "$id" "$flag" >>"$TMPBASE/results.log"
+        return 1
+      fi
+      if ! grep -F -- "$flag" "$work/cand_args.txt" >/dev/null 2>&1; then
+        printf 'FAIL %s candidate ARGS missing %s\n' "$id" "$flag" >>"$TMPBASE/results.log"
+        return 1
+      fi
+    done <"$src/expect-flags.txt"
+  fi
   # compare executed edges (counts) and final artifacts (symbols); rule
   # definitions differ by design (P-6), so defined-command sets are not compared.
   # Final outputs: executables, shared libs, static libs (exclude intermediates).
-  ref_edges=$(grep -c '^\[[0-9]*\/' "$work/build.log" || true)
-  cand_edges=$(grep -c '^\[[0-9]*\/' "$work/cand_build.log" || true)
-  if [ "$ref_edges" != "$cand_edges" ]; then
-    printf 'FAIL %s edge count ref=%s cand=%s\n' "$id" "$ref_edges" "$cand_edges" >>"$TMPBASE/results.log"
-    return 1
+  if [ "$skip_edges" -eq 0 ]; then
+    ref_edges=$(grep -c '^\[[0-9]*\/' "$work/build.log" || true)
+    cand_edges=$(grep -c '^\[[0-9]*\/' "$work/cand_build.log" || true)
+    if [ "$ref_edges" != "$cand_edges" ]; then
+      printf 'FAIL %s edge count ref=%s cand=%s\n' "$id" "$ref_edges" "$cand_edges" >>"$TMPBASE/results.log"
+      return 1
+    fi
   fi
   # find final outputs (exclude .o, .d, build.ninja, meson-info/logs/private,
   # compile_commands.json, ninja logs)
@@ -175,11 +215,46 @@ run_compare_meson() {
     printf 'FAIL %s no-op exit ref=%s cand=%s\n' "$id" "$ref_noop" "$cand_noop" >>"$TMPBASE/results.log"
     return 1
   fi
-  ref_edges=$(grep -c '^\[[0-9]*\/' "$work/build.log" || true)
-  cand_edges=$(grep -c '^\[[0-9]*\/' "$work/cand_build.log" || true)
-  if [ "$ref_edges" != "$cand_edges" ]; then
-    printf 'FAIL %s edge count ref=%s cand=%s\n' "$id" "$ref_edges" "$cand_edges" >>"$TMPBASE/results.log"
-    return 1
+  if [ "$skip_edges" -eq 0 ]; then
+    ref_edges=$(grep -c '^\[[0-9]*\/' "$work/build.log" || true)
+    cand_edges=$(grep -c '^\[[0-9]*\/' "$work/cand_build.log" || true)
+    if [ "$ref_edges" != "$cand_edges" ]; then
+      printf 'FAIL %s edge count ref=%s cand=%s\n' "$id" "$ref_edges" "$cand_edges" >>"$TMPBASE/results.log"
+      return 1
+    fi
+  fi
+  if [ -f "$src/compare-install" ]; then
+    ref_dest="$work/dest"
+    cand_dest="$cand_work/dest"
+    rm -rf "$ref_dest" "$cand_dest"
+    DESTDIR="$ref_dest" ninja -C "$ref_build" install >"$work/install.log" 2>&1
+    ref_install=$?
+    DESTDIR="$cand_dest" "$GLUON_NINJA" -C "$cand_build" install >"$work/cand_install.log" 2>&1
+    cand_install=$?
+    if [ "$ref_install" != "$cand_install" ]; then
+      printf 'FAIL %s install exit ref=%s cand=%s\n' "$id" "$ref_install" "$cand_install" >>"$TMPBASE/results.log"
+      return 1
+    fi
+    if [ "$ref_install" != "0" ]; then
+      printf 'FAIL %s install failed (both exit %s)\n' "$id" "$ref_install" >>"$TMPBASE/results.log"
+      return 1
+    fi
+    python3 "$DIFF_DIR/install_snapshot.py" "$ref_dest" >"$work/install_tree.txt"
+    python3 "$DIFF_DIR/install_snapshot.py" "$cand_dest" >"$work/cand_install_tree.txt"
+    if ! diff -q "$work/install_tree.txt" "$work/cand_install_tree.txt" >/dev/null 2>&1; then
+      printf 'FAIL %s installed tree mismatch\n' "$id" >>"$TMPBASE/results.log"
+      diff "$work/install_tree.txt" "$work/cand_install_tree.txt" >>"$TMPBASE/results.log" || true
+      return 1
+    fi
+    if [ -f "$src/compare-install-ids" ]; then
+      python3 "$DIFF_DIR/install_ids.py" "$ref_dest" >"$work/install_ids.txt"
+      python3 "$DIFF_DIR/install_ids.py" "$cand_dest" >"$work/cand_install_ids.txt"
+      if ! diff -q "$work/install_ids.txt" "$work/cand_install_ids.txt" >/dev/null 2>&1; then
+        printf 'FAIL %s installed library ids mismatch\n' "$id" >>"$TMPBASE/results.log"
+        diff "$work/install_ids.txt" "$work/cand_install_ids.txt" >>"$TMPBASE/results.log" || true
+        return 1
+      fi
+    fi
   fi
   printf 'PASS %s\n' "$id" >>"$TMPBASE/results.log"
   return 0

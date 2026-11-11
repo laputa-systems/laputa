@@ -13,17 +13,16 @@ const JSON_PRETTY: SerializerConfig =
 pub struct NinjaBackend {
     pub source_root: String,
     pub build_root: String,
+    pub meson_command: String,
+    pub install_aliases: bool,
     pub toolchain: Toolchain,
 }
 
-/// The programs generated rules run: the detected compilers, the archiver
-/// and this meson, which provides the `--internal` helpers.
 #[derive(Clone, Debug)]
 pub struct Toolchain {
     pub c: Vec<String>,
     pub cpp: Vec<String>,
     pub archiver: Vec<String>,
-    pub meson: String,
 }
 
 impl Default for Toolchain {
@@ -32,7 +31,6 @@ impl Default for Toolchain {
             c: vec!["cc".to_string()],
             cpp: vec!["c++".to_string()],
             archiver: vec!["ar".to_string()],
-            meson: "meson".to_string(),
         }
     }
 }
@@ -42,8 +40,20 @@ impl NinjaBackend {
         Self {
             source_root: source_root.to_string(),
             build_root: build_root.to_string(),
+            meson_command: "meson".to_string(),
+            install_aliases: false,
             toolchain: Toolchain::default(),
         }
+    }
+
+    pub fn with_meson_command(mut self, meson_command: &str) -> Self {
+        self.meson_command = meson_command.to_string();
+        self
+    }
+
+    pub fn with_install_aliases(mut self) -> Self {
+        self.install_aliases = true;
+        self
     }
 
     pub fn with_toolchain(mut self, toolchain: Toolchain) -> Self {
@@ -94,317 +104,14 @@ impl NinjaBackend {
         self.write_test_targets(&mut out, build_data)?;
 
         // Install target
-        self.write_install_target(&mut out, build_data)?;
+        if self.install_aliases {
+            self.write_install_target(&mut out, build_data)?;
+        }
 
         // Default targets
         self.write_defaults(&mut out, build_data)?;
 
         Ok(out)
-    }
-
-    pub fn build_state(&self, build_data: &BuildData, project: &ProjectInfo) -> graph::State {
-        let text = self.generate(build_data, project).unwrap_or_default();
-        let _ = text;
-        let mut state = graph::State::default();
-        state.pools.insert("console".to_string(), 1);
-        // Rules (subset: compiler/linker/custom as written)
-        let mut add_rule = |s: &mut graph::State, name: &str, bindings: Vec<(&str, &str)>| {
-            let mut map = std::collections::HashMap::new();
-            for (k, v) in bindings {
-                map.insert(k.to_string(), v.to_string());
-            }
-            s.rules.insert(
-                name.to_string(),
-                graph::Rule {
-                    name: name.to_string(),
-                    bindings: map,
-                },
-            );
-        };
-        add_rule(
-            &mut state,
-            "c_COMPILER",
-            vec![("command", "cc $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in"), ("deps", "gcc"), ("depfile", "$DEPFILE"), ("description", "Compiling C object $out")],
-        );
-        add_rule(
-            &mut state,
-            "cpp_COMPILER",
-            vec![("command", "c++ $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in"), ("deps", "gcc"), ("depfile", "$DEPFILE"), ("description", "Compiling C++ object $out")],
-        );
-        add_rule(
-            &mut state,
-            "c_LINKER",
-            vec![("command", "cc $ARGS -o $out $in $LINK_ARGS"), ("description", "Linking target $out")],
-        );
-        add_rule(
-            &mut state,
-            "cpp_LINKER",
-            vec![("command", "c++ $ARGS -o $out $in $LINK_ARGS"), ("description", "Linking target $out")],
-        );
-        add_rule(
-            &mut state,
-            "STATIC_LINKER",
-            vec![("command", "rm -f $out && ar rcs $out $in"), ("description", "Linking static target $out")],
-        );
-        add_rule(
-            &mut state,
-            "CUSTOM_COMMAND",
-            vec![("command", "$COMMAND"), ("description", "$DESC"), ("restat", "1")],
-        );
-        add_rule(
-            &mut state,
-            "CUSTOM_COMMAND_DEP",
-            vec![("command", "$COMMAND"), ("description", "$DESC"), ("deps", "gcc"), ("depfile", "$DEPFILE"), ("restat", "1")],
-        );
-        add_rule(
-            &mut state,
-            "REGENERATE_BUILD",
-            vec![("command", "meson setup --reconfigure"), ("description", "Regenerating build files."), ("generator", "1")],
-        );
-        // Edges for targets (compile + link) mirroring write_target
-        for target in &build_data.targets {
-            let target_dir = if target.subdir.is_empty() {
-                String::new()
-            } else {
-                format!("{}/", target.subdir)
-            };
-            let lang = self.detect_target_language(target);
-            let mut object_files: Vec<String> = Vec::new();
-            let mut gen_order: Vec<String> = Vec::new();
-            for s in &target.sources {
-                if let Some(inner) = s.strip_prefix("<orderonly:").and_then(|v| v.strip_suffix('>')) {
-                    gen_order.push(inner.to_string());
-                }
-            }
-            for source in &target.sources {
-                if source.starts_with("<generated:") || source.starts_with("<orderonly:") {
-                    continue;
-                }
-                let lower = source.to_lowercase();
-                if lower.ends_with(".h") || lower.ends_with(".hpp") || lower.ends_with(".hh") || lower.ends_with(".hxx") {
-                    continue;
-                }
-                let genout = source.strip_prefix("<genout:").and_then(|s| s.strip_suffix('>'));
-                let source_path = if let Some(gout) = genout {
-                    gout.to_string()
-                } else if Path::new(source).is_absolute() {
-                    source.to_string()
-                } else if target.subdir.is_empty() {
-                    format!("{}/{}", self.source_root, source)
-                } else {
-                    format!("{}/{}/{}", self.source_root, target.subdir, source)
-                };
-                let obj_src = self.object_source_name(genout.as_deref().unwrap_or(source));
-                let Some(obj_path) = self.target_object_path(target, source) else { continue };
-                let file_lang = self.detect_file_language(obj_src, &lang);
-                let file_rule = format!("{}_COMPILER", file_lang);
-                let mut bindings = std::collections::HashMap::new();
-                bindings.insert("DEPFILE".to_string(), format!("{}.d", obj_path));
-                let mut args = Vec::new();
-                if target.implicit_include_directories {
-                    args.push(format!("-I{}", self.source_root));
-                    if !target.subdir.is_empty() {
-                        args.push(format!("-I{}/{}", self.source_root, target.subdir));
-                    }
-                    args.push(format!("-I{}", self.build_root));
-                    if !target.subdir.is_empty() {
-                        args.push(format!("-I{}/{}", self.build_root, target.subdir));
-                    }
-                }
-                for inc in &target.include_dirs {
-                    args.extend(self.include_arguments(inc));
-                }
-                args.extend(self.compiler_base_args(&file_lang, build_data, &target.override_options));
-                args.extend(Self::target_picture_args(target, build_data));
-                args.extend(Self::target_visibility_args(target, &file_lang));
-                for dep in &target.dependencies {
-                    if let Object::Dependency(d) = dep {
-                        args.extend(d.compile_args.iter().cloned());
-                        for inc in &d.include_dirs {
-                            args.extend(self.include_arguments(inc));
-                        }
-                    }
-                }
-                match file_lang.as_str() {
-                    "c" => args.extend(target.c_args.iter().cloned()),
-                    "cpp" => args.extend(target.cpp_args.iter().cloned()),
-                    "rust" => args.extend(target.rust_args.iter().cloned()),
-                    _ => {}
-                }
-                if !args.is_empty() {
-                    bindings.insert("ARGS".to_string(), shell_escape_command(&args));
-                }
-                let edge = graph::Edge {
-                    rule: file_rule,
-                    outputs: vec![obj_path.clone()],
-                    implicit_outputs: vec![],
-                    inputs: vec![source_path],
-                    implicit_inputs: vec![],
-                    order_only_inputs: gen_order.clone(),
-                    bindings,
-                    dyndep: None,
-                };
-                let idx = state.edges.len();
-                for o in &edge.outputs {
-                    state.producers.insert(o.clone(), idx);
-                }
-                state.edges.push(edge);
-                object_files.push(obj_path);
-            }
-            let output_path = format!("{}{}", target_dir, target.output_name);
-            match target.target_type {
-                TargetType::Executable => {
-                    let link_rule = format!("{}_LINKER", self.link_language(build_data, target, &lang));
-                    let mut link_args = Vec::new();
-                    for dep in &target.dependencies {
-                        if let Object::Dependency(d) = dep {
-                            link_args.extend(d.link_args.iter().cloned());
-                        }
-                    }
-                    link_args.extend(target.link_args.iter().cloned());
-                    let mut bindings = std::collections::HashMap::new();
-                    if !link_args.is_empty() {
-                        bindings.insert("LINK_ARGS".to_string(), link_args.join(" "));
-                    }
-                    let edge = graph::Edge {
-                        rule: link_rule,
-                        outputs: vec![output_path.clone()],
-                        implicit_outputs: vec![],
-                        inputs: object_files.clone(),
-                        implicit_inputs: vec![],
-                        order_only_inputs: vec![],
-                        bindings,
-                        dyndep: None,
-                    };
-                    let idx = state.edges.len();
-                    for o in &edge.outputs {
-                        state.producers.insert(o.clone(), idx);
-                    }
-                    state.edges.push(edge);
-                    if target.build_by_default {
-                        state.defaults.push(output_path);
-                    }
-                }
-                TargetType::StaticLibrary | TargetType::SharedLibrary | TargetType::SharedModule => {
-                    let link_rule = if target.target_type == TargetType::StaticLibrary {
-                        object_files.extend(self.absorbed_whole_archive_objects(build_data, target));
-                        "STATIC_LINKER".to_string()
-                    } else {
-                        format!("{}_LINKER", self.link_language(build_data, target, &lang))
-                    };
-                    let edge = graph::Edge {
-                        rule: link_rule,
-                        outputs: vec![output_path.clone()],
-                        implicit_outputs: vec![],
-                        inputs: object_files.clone(),
-                        implicit_inputs: vec![],
-                        order_only_inputs: vec![],
-                        bindings: std::collections::HashMap::new(),
-                        dyndep: None,
-                    };
-                    let idx = state.edges.len();
-                    for o in &edge.outputs {
-                        state.producers.insert(o.clone(), idx);
-                    }
-                    state.edges.push(edge);
-                    if target.build_by_default {
-                        state.defaults.push(output_path);
-                    }
-                }
-                _ => {}
-            }
-        }
-        // Custom targets as edges (order-only deps preserved)
-        for ct in &build_data.custom_targets {
-            let target_dir = if ct.subdir.is_empty() {
-                String::new()
-            } else {
-                format!("{}/", ct.subdir)
-            };
-            let outputs: Vec<String> = ct.output.iter().map(|o| format!("{}{}", target_dir, o)).collect();
-            let inputs: Vec<String> = ct
-                .input
-                .iter()
-                .map(|i| {
-                    if Path::new(i).is_absolute() {
-                        i.clone()
-                    } else if ct.subdir.is_empty() {
-                        format!("{}/{}", self.source_root, i)
-                    } else {
-                        format!("{}/{}/{}", self.source_root, ct.subdir, i)
-                    }
-                })
-                .collect();
-            let mut order_only: Vec<String> = Vec::new();
-            for dep in &ct.depends {
-                match dep {
-                    Object::CustomTarget(r) => {
-                        let d = if r.subdir.is_empty() { String::new() } else { format!("{}/", r.subdir) };
-                        for o in &r.outputs {
-                            order_only.push(format!("{}{}", d, o));
-                        }
-                    }
-                    Object::CustomTargetIndex(r, idx) => {
-                        let d = if r.subdir.is_empty() { String::new() } else { format!("{}/", r.subdir) };
-                        if let Some(o) = r.outputs.get(*idx) {
-                            order_only.push(format!("{}{}", d, o));
-                        }
-                    }
-                    Object::File(f) => {
-                        if f.is_built {
-                            let d = if f.subdir.is_empty() { String::new() } else { format!("{}/", f.subdir) };
-                            order_only.push(format!("{}{}", d, f.path));
-                        } else if f.subdir.is_empty() {
-                            order_only.push(format!("{}/{}", self.source_root, f.path));
-                        } else {
-                            order_only.push(format!("{}/{}/{}", self.source_root, f.subdir, f.path));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            let mut bindings = std::collections::HashMap::new();
-            bindings.insert("COMMAND".to_string(), shell_escape_command(&ct.command));
-            bindings.insert("DESC".to_string(), format!("Generating {}", ct.name));
-            if let Some(ref depfile) = ct.depfile {
-                bindings.insert("DEPFILE".to_string(), format!("{}{}", target_dir, depfile));
-            }
-            let rule = if ct.depfile.is_some() { "CUSTOM_COMMAND_DEP" } else { "CUSTOM_COMMAND" };
-            let edge = graph::Edge {
-                rule: rule.to_string(),
-                outputs: outputs.clone(),
-                implicit_outputs: vec![],
-                inputs,
-                implicit_inputs: vec![],
-                order_only_inputs: order_only,
-                bindings,
-                dyndep: None,
-            };
-            let idx = state.edges.len();
-            for o in &edge.outputs {
-                state.producers.insert(o.clone(), idx);
-            }
-            state.edges.push(edge);
-            if ct.build_by_default {
-                for o in outputs {
-                    state.defaults.push(o);
-                }
-            }
-        }
-        let all = graph::Edge {
-            rule: "phony".to_string(),
-            outputs: vec!["all".to_string()],
-            implicit_outputs: vec![],
-            inputs: std::mem::take(&mut state.defaults),
-            implicit_inputs: vec![],
-            order_only_inputs: vec![],
-            bindings: std::collections::HashMap::new(),
-            dyndep: None,
-        };
-        state.producers.insert("all".to_string(), state.edges.len());
-        state.edges.push(all);
-        state.defaults.push("all".to_string());
-        state
     }
 
     fn write_rules(
@@ -418,12 +125,41 @@ impl NinjaBackend {
             writeln!(out, "rule c_COMPILER").unwrap();
             writeln!(
                 out,
-                "  command = {} $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in", shell_escape_command(&self.toolchain.c)
+                "  command = {} $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in",
+                shell_escape_command(&self.toolchain.c)
             )
             .unwrap();
             writeln!(out, "  deps = gcc").unwrap();
             writeln!(out, "  depfile = $DEPFILE").unwrap();
             writeln!(out, "  description = Compiling C object $out").unwrap();
+            writeln!(out).unwrap();
+        }
+
+        let has_objc_sources = build_data
+            .targets
+            .iter()
+            .any(|t| t.sources.iter().any(|s| s.ends_with(".m") || s.ends_with(".mm")));
+        if project.languages.iter().any(|l| l == "objc") || has_objc_sources {
+            writeln!(out, "rule objc_COMPILER").unwrap();
+            writeln!(
+                out,
+                "  command = clang $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in"
+            )
+            .unwrap();
+            writeln!(out, "  deps = gcc").unwrap();
+            writeln!(out, "  depfile = $DEPFILE").unwrap();
+            writeln!(out, "  description = Compiling Objective-C object $out").unwrap();
+            writeln!(out).unwrap();
+
+            writeln!(out, "rule objcpp_COMPILER").unwrap();
+            writeln!(
+                out,
+                "  command = clang++ $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in"
+            )
+            .unwrap();
+            writeln!(out, "  deps = gcc").unwrap();
+            writeln!(out, "  depfile = $DEPFILE").unwrap();
+            writeln!(out, "  description = Compiling Objective-C++ object $out").unwrap();
             writeln!(out).unwrap();
         }
 
@@ -436,7 +172,8 @@ impl NinjaBackend {
             writeln!(out, "rule cpp_COMPILER").unwrap();
             writeln!(
                 out,
-                "  command = {} $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in", shell_escape_command(&self.toolchain.cpp)
+                "  command = {} $ARGS -MD -MQ $out -MF $DEPFILE -o $out -c $in",
+                shell_escape_command(&self.toolchain.cpp)
             )
             .unwrap();
             writeln!(out, "  deps = gcc").unwrap();
@@ -513,12 +250,22 @@ impl NinjaBackend {
 
         // Linker rules
         writeln!(out, "rule c_LINKER").unwrap();
-        writeln!(out, "  command = {} $ARGS -o $out $in $LINK_ARGS", shell_escape_command(&self.toolchain.c)).unwrap();
+        writeln!(
+            out,
+            "  command = {} $ARGS -o $out $in $LINK_ARGS",
+            shell_escape_command(&self.toolchain.c)
+        )
+        .unwrap();
         writeln!(out, "  description = Linking target $out").unwrap();
         writeln!(out).unwrap();
 
         writeln!(out, "rule cpp_LINKER").unwrap();
-        writeln!(out, "  command = {} $ARGS -o $out $in $LINK_ARGS", shell_escape_command(&self.toolchain.cpp)).unwrap();
+        writeln!(
+            out,
+            "  command = {} $ARGS -o $out $in $LINK_ARGS",
+            shell_escape_command(&self.toolchain.cpp)
+        )
+        .unwrap();
         writeln!(out, "  description = Linking target $out").unwrap();
         writeln!(out).unwrap();
 
@@ -527,7 +274,7 @@ impl NinjaBackend {
         writeln!(
             out,
             "  command = {} --internal static-link $out -- {} csrD $out $in",
-            quote_argument(&self.toolchain.meson),
+            quote_argument(&self.meson_command),
             shell_escape_command(&self.toolchain.archiver)
         )
         .unwrap();
@@ -579,9 +326,7 @@ impl NinjaBackend {
 
         let mut object_files = Vec::new();
 
-        // Determine language for compile rule
         let lang = self.detect_target_language(target);
-        let compile_rule = format!("{}_COMPILER", lang);
         let mut gen_order: Vec<String> = Vec::new();
         let mut gen_include_dirs: Vec<String> = Vec::new();
         for s in &target.sources {
@@ -608,12 +353,10 @@ impl NinjaBackend {
         gen_include_dirs.sort();
         gen_include_dirs.dedup();
 
-        // Compile each source file
         for source in &target.sources {
             if source.starts_with("<generated:") || source.starts_with("<orderonly:") {
                 continue;
             }
-            // Headers are not compiled (Meson reference skips .h/.hpp/.hh).
             {
                 let lower = source.to_lowercase();
                 if lower.ends_with(".h")
@@ -634,13 +377,13 @@ impl NinjaBackend {
             } else {
                 format!("{}/{}/{}", self.source_root, target.subdir, source)
             };
-
             let obj_src = self.object_source_name(genout.as_deref().unwrap_or(source));
-            let Some(obj_path) = self.target_object_path(target, source) else { continue };
+            let Some(obj_path) = self.target_object_path(target, source) else {
+                continue;
+            };
             let file_lang = self.detect_file_language(obj_src, &lang);
             let file_compile_rule = format!("{}_COMPILER", file_lang);
 
-            // Collect compile args
             let mut args = Vec::new();
             if target.implicit_include_directories {
                 args.push(format!("-I{}", self.source_root));
@@ -664,12 +407,15 @@ impl NinjaBackend {
                 }
             }
 
-            // Language-specific args (per-file)
-            args.extend(self.compiler_base_args(&file_lang, build_data, &target.override_options));
+            args.extend(self.compiler_base_args(
+                &file_lang,
+                build_data,
+                Some(&target.project_name),
+                &target.override_options,
+            ));
             args.extend(Self::target_picture_args(target, build_data));
             args.extend(Self::target_visibility_args(target, &file_lang));
 
-            // Dependency compile args
             for dep in &target.dependencies {
                 if let Object::Dependency(d) = dep {
                     args.extend(d.compile_args.iter().cloned());
@@ -682,13 +428,22 @@ impl NinjaBackend {
             match file_lang.as_str() {
                 "c" => args.extend(target.c_args.iter().cloned()),
                 "cpp" => args.extend(target.cpp_args.iter().cloned()),
+                "objc" => args.extend(target.objc_args.iter().cloned()),
+                "objcpp" => args.extend(target.objcpp_args.iter().cloned()),
                 "rust" => args.extend(target.rust_args.iter().cloned()),
                 _ => {}
             }
 
             let depfile = format!("{}.d", obj_path);
 
-            write!(out, "build {}: {} {}", obj_path, file_compile_rule, self.edge_path(&source_path)).unwrap();
+            write!(
+                out,
+                "build {}: {} {}",
+                obj_path,
+                file_compile_rule,
+                self.edge_path(&source_path)
+            )
+            .unwrap();
             if !gen_order.is_empty() {
                 write!(out, " || {}", gen_order.join(" ")).unwrap();
             }
@@ -702,7 +457,6 @@ impl NinjaBackend {
             object_files.push(obj_path);
         }
 
-        // Link step
         let output_path = format!("{}{}", target_dir, target.output_name);
 
         match target.target_type {
@@ -807,7 +561,6 @@ impl NinjaBackend {
             })
             .collect();
 
-        // Substitute placeholders in command
         let mut command_parts = Vec::new();
         for part in &ct.command {
             match part.as_str() {
@@ -927,7 +680,11 @@ impl NinjaBackend {
             "build {}: {} {}",
             outputs.join(" "),
             rule,
-            inputs.iter().map(|i| self.edge_path(i)).collect::<Vec<_>>().join(" ")
+            inputs
+                .iter()
+                .map(|i| self.edge_path(i))
+                .collect::<Vec<_>>()
+                .join(" ")
         )
         .unwrap();
         if !order_only.is_empty() {
@@ -939,13 +696,21 @@ impl NinjaBackend {
         let wrapped = !env_keys.is_empty() || ct.capture || ct.feed;
         let mut argv: Vec<String> = Vec::new();
         if wrapped {
-            argv.extend([self.toolchain.meson.clone(), "--internal".to_string(), "exe".to_string()]);
+            argv.extend([
+                self.meson_command.clone(),
+                "--internal".to_string(),
+                "exe".to_string(),
+            ]);
             if ct.capture {
-                let output = outputs.first().ok_or_else(|| format!("custom target {} captures output but has none", ct.name))?;
+                let output = outputs
+                    .first()
+                    .ok_or_else(|| format!("custom target {} captures output but has none", ct.name))?;
                 argv.extend(["--capture".to_string(), output.clone()]);
             }
             if ct.feed {
-                let input = inputs.first().ok_or_else(|| format!("custom target {} feeds input but has none", ct.name))?;
+                let input = inputs
+                    .first()
+                    .ok_or_else(|| format!("custom target {} feeds input but has none", ct.name))?;
                 argv.extend(["--feed".to_string(), input.clone()]);
             }
             for k in env_keys {
@@ -1005,7 +770,7 @@ impl NinjaBackend {
                 }
             }
         }
-        args.extend(self.compiler_base_args(&pp.language, build_data, &[]));
+        args.extend(self.compiler_base_args(&pp.language, build_data, None, &[]));
         args.extend(pp.compile_args.iter().cloned());
 
         let order_only = self.order_only_paths(&pp.depends);
@@ -1159,29 +924,23 @@ impl NinjaBackend {
         Ok(())
     }
 
-    fn write_install_target(&self, out: &mut String, build_data: &BuildData) -> Result<(), String> {
-        let mut install_deps = Vec::new();
-
-        for target in &build_data.targets {
-            if target.install {
-                let dir = if target.subdir.is_empty() {
-                    String::new()
-                } else {
-                    format!("{}/", target.subdir)
-                };
-                install_deps.push(format!("{}{}", dir, target.output_name));
-            }
-        }
-
-        if !install_deps.is_empty() {
-            writeln!(
-                out,
-                "build meson-install-prereq: phony {}",
-                install_deps.join(" ")
-            )
-            .unwrap();
-            writeln!(out).unwrap();
-        }
+    fn write_install_target(&self, out: &mut String, _build_data: &BuildData) -> Result<(), String> {
+        writeln!(out, "build install: phony meson-internal__install").unwrap();
+        writeln!(out).unwrap();
+        writeln!(out, "build meson-internal__install: CUSTOM_COMMAND PHONY | all").unwrap();
+        writeln!(out, "  DESC = Installing files").unwrap();
+        writeln!(
+            out,
+            "  COMMAND = {}",
+            shell_escape_command(&[
+                self.meson_command.clone(),
+                "install".to_string(),
+                "--no-rebuild".to_string(),
+            ])
+        )
+        .unwrap();
+        writeln!(out, "  pool = console").unwrap();
+        writeln!(out).unwrap();
         Ok(())
     }
 
@@ -1217,6 +976,65 @@ impl NinjaBackend {
         Ok(())
     }
 
+    fn detect_file_language(&self, source: &str, fallback: &str) -> String {
+        let lower = source.to_lowercase();
+        if lower.ends_with(".cc")
+            || lower.ends_with(".cpp")
+            || lower.ends_with(".cxx")
+            || lower.ends_with(".c++")
+        {
+            "cpp".to_string()
+        } else if lower.ends_with(".mm") {
+            "objcpp".to_string()
+        } else if lower.ends_with(".m") {
+            "objc".to_string()
+        } else if lower.ends_with(".rs") {
+            "rust".to_string()
+        } else if lower.ends_with(".f") || lower.ends_with(".f90") || lower.ends_with(".f95") {
+            "fortran".to_string()
+        } else if lower.ends_with(".d") && !lower.ends_with(".h") {
+            "d".to_string()
+        } else if lower.ends_with(".vala") {
+            "vala".to_string()
+        } else if lower.ends_with(".c") {
+            "c".to_string()
+        } else if lower.ends_with(".h")
+            || lower.ends_with(".hpp")
+            || lower.ends_with(".hh")
+        {
+            fallback.to_string()
+        } else {
+            fallback.to_string()
+        }
+    }
+
+    fn detect_target_language(&self, target: &BuildTarget) -> String {
+        // Check source file extensions
+        let has_cpp = target.sources.iter().any(|s| {
+            s.ends_with(".cpp") || s.ends_with(".cc") || s.ends_with(".cxx") || s.ends_with(".C")
+        });
+        let has_rust = target.sources.iter().any(|s| s.ends_with(".rs"));
+        let has_fortran = target
+            .sources
+            .iter()
+            .any(|s| s.ends_with(".f") || s.ends_with(".f90") || s.ends_with(".f95"));
+        let has_d = target.sources.iter().any(|s| s.ends_with(".d"));
+        let has_vala = target.sources.iter().any(|s| s.ends_with(".vala"));
+
+        if has_rust {
+            "rust".to_string()
+        } else if has_cpp {
+            "cpp".to_string()
+        } else if has_fortran {
+            "fortran".to_string()
+        } else if has_d {
+            "d".to_string()
+        } else if has_vala {
+            "vala".to_string()
+        } else {
+            "c".to_string()
+        }
+    }
     fn link_target_path(target: &BuildTarget) -> String {
         let dir = if target.subdir.is_empty() {
             String::new()
@@ -1260,8 +1078,17 @@ impl NinjaBackend {
         }
         let genout = source.strip_prefix("<genout:").and_then(|s| s.strip_suffix('>'));
         let obj_src = self.object_source_name(genout.unwrap_or(source));
-        let target_dir = if target.subdir.is_empty() { String::new() } else { format!("{}/", target.subdir) };
-        Some(format!("{}{}.p/{}.o", target_dir, target.output_name, obj_src.replace('/', "_")))
+        let target_dir = if target.subdir.is_empty() {
+            String::new()
+        } else {
+            format!("{}/", target.subdir)
+        };
+        Some(format!(
+            "{}{}.p/{}.o",
+            target_dir,
+            target.output_name,
+            obj_src.replace('/', "_")
+        ))
     }
 
     fn absorbed_whole_archive_objects(&self, build_data: &BuildData, target: &BuildTarget) -> Vec<String> {
@@ -1275,14 +1102,17 @@ impl NinjaBackend {
                 },
                 _ => continue,
             };
-            let Some(library) = build_data
-                .targets
-                .iter()
-                .find(|candidate| candidate.id == reference.id && candidate.target_type == TargetType::StaticLibrary)
-            else {
+            let Some(library) = build_data.targets.iter().find(|candidate| {
+                candidate.id == reference.id && candidate.target_type == TargetType::StaticLibrary
+            }) else {
                 continue;
             };
-            objects.extend(library.sources.iter().filter_map(|source| self.target_object_path(library, source)));
+            objects.extend(
+                library
+                    .sources
+                    .iter()
+                    .filter_map(|source| self.target_object_path(library, source)),
+            );
             objects.extend(self.absorbed_whole_archive_objects(build_data, library));
         }
         objects
@@ -1387,6 +1217,8 @@ impl NinjaBackend {
         language: &str,
         link_targets: &[&BuildTarget],
     ) -> Vec<String> {
+        let options = &build_data.options;
+        let language_key = if language == "c++" { "cpp" } else { language };
         let mut link_args = Vec::new();
         link_args.push("-Wl,--as-needed".to_string());
         if target.target_type == TargetType::SharedModule {
@@ -1397,7 +1229,10 @@ impl NinjaBackend {
 
         match target.target_type {
             TargetType::Executable => {
-                if target.pie.unwrap_or(build_data.b_pie) {
+                if target
+                    .pie
+                    .unwrap_or_else(|| option_bool(options, "b_pie", false))
+                {
                     link_args.push("-pie".to_string());
                 }
             }
@@ -1408,9 +1243,38 @@ impl NinjaBackend {
                 }
                 if target.target_type == TargetType::SharedLibrary {
                     if cfg!(target_os = "macos") {
-                        link_args.push(format!("-Wl,-install_name,{}", target.shared_library_soname().unwrap_or_else(|| target.output_name.clone())));
+                        let mut install_name =
+                            format!("@rpath/{}{}", target.file_prefix(), target.name);
+                        if let Some(soversion) = &target.soversion {
+                            install_name.push('.');
+                            install_name.push_str(soversion);
+                        }
+                        install_name.push('.');
+                        install_name.push_str(&target.file_suffix());
+                        let mut parts = vec![
+                            "-Wl".to_string(),
+                            "-install_name".to_string(),
+                            install_name,
+                        ];
+                        if let Some((compatibility, current)) = &target.darwin_versions {
+                            parts.push("-compatibility_version".to_string());
+                            parts.push(compatibility.clone());
+                            parts.push("-current_version".to_string());
+                            parts.push(current.clone());
+                        }
+                        link_args.push(parts.join(","));
                     } else {
-                        link_args.push(format!("-Wl,-soname,{}", target.shared_library_soname().unwrap_or_else(|| target.output_name.clone())));
+                        let mut soname = format!(
+                            "{}{}.{}",
+                            target.file_prefix(),
+                            target.name,
+                            target.file_suffix()
+                        );
+                        if let Some(soversion) = &target.soversion {
+                            soname.push('.');
+                            soname.push_str(soversion);
+                        }
+                        link_args.push(format!("-Wl,-soname,{}", soname));
                     }
                 }
             }
@@ -1428,15 +1292,18 @@ impl NinjaBackend {
             link_args.push("-Wl,--no-whole-archive".to_string());
         }
 
-        link_args.extend(Self::args_for_language(
-            &build_data.project_link_args,
-            language,
+        if let Some(per_language) = build_data.project_link_args.get(&target.project_name) {
+            if let Some(project_args) = per_language.get(language_key) {
+                link_args.extend(project_args.iter().cloned());
+            }
+        }
+        if let Some(global_args) = build_data.global_link_args.get(language_key) {
+            link_args.extend(global_args.iter().cloned());
+        }
+        link_args.extend(option_string_array(
+            options,
+            &format!("{}_link_args", language_key),
         ));
-        link_args.extend(Self::args_for_language(
-            &build_data.global_link_args,
-            language,
-        ));
-        link_args.extend(Self::args_for_language(&build_data.option_link_args, language));
 
         link_args.extend(self.rpath_arguments(target, link_targets));
 
@@ -1447,11 +1314,7 @@ impl NinjaBackend {
         link_args.extend(target.link_args.iter().cloned());
 
         let mut seen = Vec::new();
-        Self::dependency_link_arguments(
-            target.dependencies.iter(),
-            &mut link_args,
-            &mut seen,
-        );
+        Self::dependency_link_arguments(target.dependencies.iter(), &mut link_args, &mut seen);
         for linked in link_targets {
             if linked.target_type == TargetType::StaticLibrary {
                 Self::dependency_link_arguments(
@@ -1479,70 +1342,136 @@ impl NinjaBackend {
         args
     }
 
-    fn args_for_language(
-        map: &std::collections::HashMap<String, Vec<String>>,
+    fn compiler_base_args(
+        &self,
         language: &str,
+        build_data: &BuildData,
+        project_name: Option<&str>,
+        overrides: &[String],
     ) -> Vec<String> {
-        map.get(language).cloned().unwrap_or_default()
-    }
-
-    fn compiler_base_args(&self, language: &str, build_data: &BuildData, overrides: &[String]) -> Vec<String> {
-        let option = |name: &str, project: &str| -> String {
-            overrides
-                .iter()
-                .find_map(|o| o.strip_prefix(name).and_then(|rest| rest.strip_prefix('=')))
-                .unwrap_or(project)
-                .to_string()
+        let options = &build_data.options;
+        let override_value = |name: &str| -> Option<String> {
+            overrides.iter().find_map(|entry| {
+                entry
+                    .strip_prefix(name)
+                    .and_then(|rest| rest.strip_prefix('='))
+                    .map(str::to_string)
+            })
         };
+        let option = |name: &str, default: &str| -> String {
+            override_value(name).unwrap_or_else(|| option_string(options, name, default))
+        };
+        let language_key = if language == "c++" { "cpp" } else { language };
         let mut args = Vec::new();
-        if language == "c" || language == "cpp" {
-            match build_data.b_colorout.as_str() {
-                "always" => args.push("-fdiagnostics-color=always".to_string()),
+        if matches!(language_key, "c" | "cpp" | "objc" | "objcpp") {
+            match option("b_colorout", "always").as_str() {
                 "auto" => args.push("-fdiagnostics-color=auto".to_string()),
                 "never" => args.push("-fdiagnostics-color=never".to_string()),
-                _ => {}
+                _ => args.push("-fdiagnostics-color=always".to_string()),
             }
-            args.push("-D_FILE_OFFSET_BITS=64".to_string());
-            let warning_level = option("warning_level", &build_data.warning_level);
-            let warnings: &[&str] = match warning_level.as_str() {
-                "0" => &[],
-                "1" => &["-Wall", "-Winvalid-pch"],
-                "2" => &["-Wall", "-Winvalid-pch", "-Wextra"],
-                "everything" => &["-Weverything"],
-                _ => &["-Wall", "-Winvalid-pch", "-Wextra", "-Wpedantic"],
+            if matches!(language_key, "c" | "cpp") {
+                args.push("-D_FILE_OFFSET_BITS=64".to_string());
+            }
+            let compiler_id = build_data
+                .compiler_ids
+                .get(language_key)
+                .or_else(|| build_data.compiler_ids.get("c"))
+                .map(String::as_str)
+                .unwrap_or("gcc");
+            let warning_level = option("warning_level", "1");
+            match warning_level.as_str() {
+                "0" => {}
+                "everything" if compiler_id == "clang" => {
+                    args.push("-Weverything".to_string())
+                }
+                "everything" => {
+                    args.push("-Wall".to_string());
+                    args.push("-Wextra".to_string());
+                    args.push("-Wpedantic".to_string());
+                }
+                "3" => {
+                    args.push("-Wall".to_string());
+                    args.push("-Winvalid-pch".to_string());
+                    args.push("-Wextra".to_string());
+                    args.push("-Wpedantic".to_string());
+                }
+                "2" => {
+                    args.push("-Wall".to_string());
+                    args.push("-Winvalid-pch".to_string());
+                    args.push("-Wextra".to_string());
+                }
+                _ => {
+                    args.push("-Wall".to_string());
+                    args.push("-Winvalid-pch".to_string());
+                }
+            }
+            let werror = match override_value("werror") {
+                Some(value) => value == "true",
+                None => option_bool(options, "werror", false),
             };
-            args.extend(warnings.iter().map(|w| w.to_string()));
-            if option("werror", &build_data.werror.to_string()) == "true" {
+            if werror {
                 args.push("-Werror".to_string());
             }
-            let std = match language {
-                "c" => option("c_std", &build_data.c_std),
-                _ => option("cpp_std", &build_data.cpp_std),
+            let std = match language_key {
+                "c" | "objc" => override_value("c_std")
+                    .unwrap_or_else(|| build_data.c_std.clone()),
+                _ => override_value("cpp_std")
+                    .unwrap_or_else(|| build_data.cpp_std.clone()),
             };
             if !std.is_empty() && std != "none" {
                 args.push(format!("-std={}", std));
             }
-            if language == "cpp" {
-                if option("cpp_eh", &build_data.cpp_eh) == "none" {
+            if matches!(language_key, "cpp" | "objcpp") {
+                if option("cpp_eh", "default") == "none" {
                     args.push("-fno-exceptions".to_string());
                 }
-                if option("cpp_rtti", &build_data.cpp_rtti.to_string()) == "false" {
+                let rtti = match override_value("cpp_rtti") {
+                    Some(value) => value != "false",
+                    None => option_bool(options, "cpp_rtti", true),
+                };
+                if !rtti {
                     args.push("-fno-rtti".to_string());
                 }
             }
-            let optimization = option("optimization", &build_data.optimization);
+            let optimization = override_value("optimization")
+                .unwrap_or_else(|| crate::options::effective_optimization(options));
             match optimization.as_str() {
-                "0" | "1" | "2" | "3" | "s" => args.push(format!("-O{}", optimization)),
+                "plain" => {}
                 "g" => args.push("-Og".to_string()),
-                _ => {}
+                "s" if compiler_id == "clang" => args.push("-Oz".to_string()),
+                level => args.push(format!("-O{}", level)),
             }
-            if option("debug", &build_data.debug.to_string()) == "true" {
+            let debug = match override_value("debug") {
+                Some(value) => value == "true",
+                None => crate::options::effective_debug(options),
+            };
+            if debug {
                 args.push("-g".to_string());
             }
         }
-        args.extend(Self::args_for_language(&build_data.project_args, language));
-        args.extend(Self::args_for_language(&build_data.global_args, language));
-        args.extend(Self::args_for_language(&build_data.option_args, language));
+        match project_name {
+            Some(name) => {
+                if let Some(per_language) = build_data.project_args.get(name) {
+                    if let Some(project_args) = per_language.get(language_key) {
+                        args.extend(project_args.iter().cloned());
+                    }
+                }
+            }
+            None => {
+                for per_language in build_data.project_args.values() {
+                    if let Some(project_args) = per_language.get(language_key) {
+                        args.extend(project_args.iter().cloned());
+                    }
+                }
+            }
+        }
+        if let Some(global_args) = build_data.global_args.get(language_key) {
+            args.extend(global_args.iter().cloned());
+        }
+        args.extend(option_string_array(
+            options,
+            &format!("{}_args", language_key),
+        ));
         args
     }
 
@@ -1569,50 +1498,26 @@ impl NinjaBackend {
                 }
             }
             TargetType::StaticLibrary => {
-                if target.pic.unwrap_or(build_data.b_staticpic) {
+                if target
+                    .pic
+                    .unwrap_or_else(|| option_bool(&build_data.options, "b_staticpic", true))
+                {
                     vec!["-fPIC".to_string()]
                 } else {
                     Vec::new()
                 }
             }
             TargetType::Executable => {
-                if target.pie.unwrap_or(build_data.b_pie) {
+                if target
+                    .pie
+                    .unwrap_or_else(|| option_bool(&build_data.options, "b_pie", false))
+                {
                     vec!["-fPIE".to_string()]
                 } else {
                     Vec::new()
                 }
             }
             _ => Vec::new(),
-        }
-    }
-
-    fn detect_file_language(&self, source: &str, fallback: &str) -> String {
-        let lower = source.to_lowercase();
-        if lower.ends_with(".cc")
-            || lower.ends_with(".cpp")
-            || lower.ends_with(".cxx")
-            || lower.ends_with(".c++")
-        {
-            "cpp".to_string()
-        } else if lower.ends_with(".m") || lower.ends_with(".mm") {
-            if lower.ends_with(".mm") { "cpp".to_string() } else { "c".to_string() }
-        } else if lower.ends_with(".rs") {
-            "rust".to_string()
-        } else if lower.ends_with(".f") || lower.ends_with(".f90") || lower.ends_with(".f95") {
-            "fortran".to_string()
-        } else if lower.ends_with(".d") && !lower.ends_with(".h") {
-            "d".to_string()
-        } else if lower.ends_with(".vala") {
-            "vala".to_string()
-        } else if lower.ends_with(".c") {
-            "c".to_string()
-        } else if lower.ends_with(".h")
-            || lower.ends_with(".hpp")
-            || lower.ends_with(".hh")
-        {
-            fallback.to_string()
-        } else {
-            fallback.to_string()
         }
     }
 
@@ -1624,36 +1529,13 @@ impl NinjaBackend {
             .collect_link_targets(build_data, target)
             .iter()
             .any(|linked| self.detect_target_language(linked) == "cpp");
-        if links_cpp { "cpp".to_string() } else { own.to_string() }
-    }
-
-    fn detect_target_language(&self, target: &BuildTarget) -> String {
-        // Check source file extensions
-        let has_cpp = target.sources.iter().any(|s| {
-            s.ends_with(".cpp") || s.ends_with(".cc") || s.ends_with(".cxx") || s.ends_with(".C")
-        });
-        let has_rust = target.sources.iter().any(|s| s.ends_with(".rs"));
-        let has_fortran = target
-            .sources
-            .iter()
-            .any(|s| s.ends_with(".f") || s.ends_with(".f90") || s.ends_with(".f95"));
-        let has_d = target.sources.iter().any(|s| s.ends_with(".d"));
-        let has_vala = target.sources.iter().any(|s| s.ends_with(".vala"));
-
-        if has_rust {
-            "rust".to_string()
-        } else if has_cpp {
+        if links_cpp {
             "cpp".to_string()
-        } else if has_fortran {
-            "fortran".to_string()
-        } else if has_d {
-            "d".to_string()
-        } else if has_vala {
-            "vala".to_string()
         } else {
-            "c".to_string()
+            own.to_string()
         }
     }
+
 }
 
 fn preprocess_language_flag(language: &str) -> &'static str {
@@ -1739,17 +1621,28 @@ fn group_libraries(args: Vec<String>) -> Vec<String> {
     grouped
 }
 
-fn shell_escape_command(parts: &[String]) -> String {
-    parts.iter().map(|part| quote_argument(part)).collect::<Vec<_>>().join(" ")
-}
-
 fn quote_argument(argument: &str) -> String {
     let needs_quotes = argument.is_empty()
         || argument.chars().any(|c| {
             c.is_whitespace()
                 || matches!(
                     c,
-                    '"' | '\'' | '$' | '\\' | '&' | '|' | ';' | '<' | '>' | '(' | ')' | '*' | '?' | '[' | ']' | '#' | '~'
+                    '"' | '\''
+                        | '$'
+                        | '\\'
+                        | '&'
+                        | '|'
+                        | ';'
+                        | '<'
+                        | '>'
+                        | '('
+                        | ')'
+                        | '*'
+                        | '?'
+                        | '['
+                        | ']'
+                        | '#'
+                        | '~'
                         | '`'
                 )
         });
@@ -1760,11 +1653,49 @@ fn quote_argument(argument: &str) -> String {
     }
 }
 
+fn option_string(options: &HashMap<String, Object>, key: &str, default: &str) -> String {
+    match options.get(key) {
+        Some(Object::String(value)) => value.clone(),
+        Some(Object::Int(value)) => value.to_string(),
+        _ => default.to_string(),
+    }
+}
+
+fn option_bool(options: &HashMap<String, Object>, key: &str, default: bool) -> bool {
+    match options.get(key) {
+        Some(Object::Bool(value)) => *value,
+        _ => default,
+    }
+}
+
+fn option_string_array(options: &HashMap<String, Object>, key: &str) -> Vec<String> {
+    match options.get(key) {
+        Some(Object::Array(items)) => items
+            .iter()
+            .filter_map(|item| match item {
+                Object::String(value) => Some(value.clone()),
+                _ => None,
+            })
+            .collect(),
+        Some(Object::String(value)) => vec![value.clone()],
+        _ => Vec::new(),
+    }
+}
+
+fn shell_escape_command(parts: &[String]) -> String {
+    parts
+        .iter()
+        .map(|part| quote_argument(part))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Write the introspection data files in the build directory
 pub fn write_introspection(
     build_root: &str,
     build_data: &BuildData,
     project: &ProjectInfo,
+    install_plan: &crate::install::InstallPlan,
 ) -> Result<(), String> {
     let intro_dir = format!("{}/meson-info", build_root);
     std::fs::create_dir_all(&intro_dir)
@@ -1851,6 +1782,19 @@ pub fn write_introspection(
     std::fs::write(
         format!("{}/intro-dependencies.json", intro_dir),
         JSON_PRETTY.to_string(&deser_value::Value::from(deps)).unwrap(),
+    )
+    .map_err(|e| format!("Cannot write introspection: {}", e))?;
+
+    // intro-installed.json
+    let mut installed = deser_value::Map::new();
+    for (source, destination) in crate::install::installed_entries(install_plan) {
+        installed.insert(source, destination);
+    }
+    std::fs::write(
+        format!("{}/intro-installed.json", intro_dir),
+        JSON_PRETTY
+            .to_string(&deser_value::Value::from(installed))
+            .unwrap(),
     )
     .map_err(|e| format!("Cannot write introspection: {}", e))?;
 

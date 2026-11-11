@@ -62,9 +62,7 @@ fn run_pkgconfig(cmd: &str, args: &[&str]) -> Option<std::process::Output> {
     }
 }
 
-/// Build a dependency object for Meson's builtin/system dependency families
-/// (dl, threads, iconv, intl, openmp, atomic). These are not pkg-config
-/// lookups; Meson resolves them from the C compiler.
+/// Try to find a dependency using various methods.
 fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
     let compiler = match vm.globals.get("compiler_c") {
         Some(Object::Compiler(c)) => Some(c.clone()),
@@ -85,6 +83,7 @@ fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
             include_dirs: Vec::new(),
             dependencies: Vec::new(),
             variables: HashMap::new(),
+            version_reqs: Vec::new(),
             is_internal: false,
             kind: "system".to_string(),
             config_tool: None,
@@ -133,7 +132,8 @@ fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
         "iconv" => {
             if wants_builtin {
                 if let Some(c) = &compiler {
-                    let code = "#include <iconv.h>\nint main(void) { iconv_open(\"\", \"\"); return 0; }";
+                    let code =
+                        "#include <iconv.h>\nint main(void) { iconv_open(\"\", \"\"); return 0; }";
                     if crate::compilers::try_link(c, code, &[]) {
                         return Some(dependency(Vec::new(), Vec::new()));
                     }
@@ -180,11 +180,7 @@ fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
                 "gcc" | "clang" => vec!["-fopenmp".to_string()],
                 _ => return None,
             };
-            let date = crate::compilers::get_define(
-                c,
-                "_OPENMP",
-                &[args_arg(&["-fopenmp"])],
-            );
+            let date = crate::compilers::get_define(c, "_OPENMP", &[args_arg(&["-fopenmp"])]);
             let version = match date.trim() {
                 "202411" => "6.0",
                 "202111" => "5.2",
@@ -237,7 +233,6 @@ fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
     }
 }
 
-/// Try to find a dependency using various methods.
 pub fn find_dependency(vm: &mut VM, name: &str, args: &[CallArg]) -> Option<Object> {
     let method = VM::get_arg_str(args, "method", usize::MAX).unwrap_or("auto");
     let version_req = VM::get_arg_str(args, "version", usize::MAX);
@@ -260,16 +255,18 @@ pub fn find_dependency(vm: &mut VM, name: &str, args: &[CallArg]) -> Option<Obje
             version: String::new(),
             compile_args: Vec::new(),
             link_args,
-            link_with: Vec::new(),
-            link_whole: Vec::new(),
             sources: Vec::new(),
             include_dirs: Vec::new(),
             dependencies: Vec::new(),
             variables: HashMap::new(),
+            version_reqs: Vec::new(),
             is_internal: false,
             kind: String::new(),
-            config_tool: None,
-        }));
+
+                link_with: Vec::new(),
+                link_whole: Vec::new(),
+                config_tool: None,
+            }));
     }
 
     // Check for internal/declared dependencies first
@@ -290,24 +287,20 @@ pub fn find_dependency(vm: &mut VM, name: &str, args: &[CallArg]) -> Option<Obje
 
     match method {
         "pkg-config" => find_pkgconfig(vm, name, version_req),
-        "cmake" => find_cmake(name, version_req, &components),
+        "cmake" => find_cmake(vm, name, version_req, &components),
         "config-tool" => find_config_tool(name, version_req),
         "system" => find_system_library(name),
         "auto" | _ => {
             // Try methods in order
             find_pkgconfig(vm, name, version_req)
-                .or_else(|| find_cmake(name, version_req, &components))
+                .or_else(|| find_cmake(vm, name, version_req, &components))
                 .or_else(|| find_config_tool(name, version_req))
                 .or_else(|| find_system_library(name))
         }
     }
 }
 
-fn find_pkgconfig(
-    vm: &VM,
-    name: &str,
-    version_req: Option<&str>,
-) -> Option<Object> {
+fn find_pkgconfig(vm: &VM, name: &str, version_req: Option<&str>) -> Option<Object> {
     let pkg_name = name.to_string();
 
     let pkgconfig_cmd = pkgconfig_command(vm);
@@ -352,7 +345,6 @@ fn find_pkgconfig(
             }
         }
     }
-    let link_args = resolve_library_arguments(vm, link_args);
 
     // Get variables
     let mut variables = HashMap::new();
@@ -383,20 +375,30 @@ fn find_pkgconfig(
         version,
         compile_args,
         link_args,
-        link_with: Vec::new(),
-        link_whole: Vec::new(),
         sources: Vec::new(),
         include_dirs,
         dependencies: Vec::new(),
         variables,
+        version_reqs: version_req.map(|req| vec![req.to_string()]).unwrap_or_default(),
         is_internal: false,
-        kind: String::new(),
-        config_tool: None,
-    }))
+        kind: "pkgconfig".to_string(),
+
+            link_with: Vec::new(),
+            link_whole: Vec::new(),
+            config_tool: None,
+        }))
 }
 
-fn find_cmake(name: &str, version_req: Option<&str>, components: &[String]) -> Option<Object> {
-    // Try cmake --find-package
+fn find_cmake(
+    vm: &VM,
+    name: &str,
+    version_req: Option<&str>,
+    components: &[String],
+) -> Option<Object> {
+    let probe_dir = std::path::Path::new(&vm.top_build_root)
+        .join("meson-private")
+        .join(format!("cmake_{}", name));
+    std::fs::create_dir_all(&probe_dir).ok()?;
     let mut args = vec![
         "--find-package".to_string(),
         format!("-DNAME={}", name),
@@ -409,7 +411,11 @@ fn find_cmake(name: &str, version_req: Option<&str>, components: &[String]) -> O
         args.push(format!("-DCOMPONENTS={}", components.join(";")));
     }
 
-    let output = Command::new("cmake").args(&args).output().ok()?;
+    let output = Command::new("cmake")
+        .args(&args)
+        .current_dir(&probe_dir)
+        .output()
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -423,6 +429,7 @@ fn find_cmake(name: &str, version_req: Option<&str>, components: &[String]) -> O
             "-DLANGUAGE=C",
             "-DMODE=COMPILE",
         ])
+        .current_dir(&probe_dir)
         .output()
         .ok()?;
 
@@ -444,6 +451,7 @@ fn find_cmake(name: &str, version_req: Option<&str>, components: &[String]) -> O
             "-DLANGUAGE=C",
             "-DMODE=LINK",
         ])
+        .current_dir(&probe_dir)
         .output()
         .ok()?;
 
@@ -462,16 +470,18 @@ fn find_cmake(name: &str, version_req: Option<&str>, components: &[String]) -> O
         version: String::new(),
         compile_args,
         link_args,
-        link_with: Vec::new(),
-        link_whole: Vec::new(),
         sources: Vec::new(),
         include_dirs: Vec::new(),
         dependencies: Vec::new(),
         variables: HashMap::new(),
+        version_reqs: Vec::new(),
         is_internal: false,
         kind: String::new(),
-        config_tool: None,
-    }))
+
+            link_with: Vec::new(),
+            link_whole: Vec::new(),
+            config_tool: None,
+        }))
 }
 
 fn find_config_tool(name: &str, version_req: Option<&str>) -> Option<Object> {
@@ -520,14 +530,15 @@ fn find_config_tool(name: &str, version_req: Option<&str>) -> Option<Object> {
         version,
         compile_args,
         link_args,
-        link_with: Vec::new(),
-        link_whole: Vec::new(),
         sources: Vec::new(),
         include_dirs: Vec::new(),
         dependencies: Vec::new(),
         variables: HashMap::new(),
+        version_reqs: Vec::new(),
         is_internal: false,
         kind: String::new(),
+        link_with: Vec::new(),
+        link_whole: Vec::new(),
         config_tool: Some(config_tool),
     }))
 }
@@ -572,7 +583,9 @@ fn find_llvm_config_tool(vm: &VM, args: &[CallArg], version_req: Option<&str>) -
         }
     }
 
-    let provided: HashSet<String> = llvm_config_words(&tool, &["--components"])?.into_iter().collect();
+    let provided: HashSet<String> = llvm_config_words(&tool, &["--components"])?
+        .into_iter()
+        .collect();
     let sorted_unique = |modules: Vec<String>| -> Vec<String> {
         let mut modules = modules;
         modules.sort();
@@ -598,11 +611,16 @@ fn find_llvm_config_tool(vm: &VM, args: &[CallArg], version_req: Option<&str>) -
         .collect();
 
     let static_link = VM::get_arg_bool(args, "static", false);
-    let shared_mode = llvm_config_words(&tool, &["--shared-mode"])?.into_iter().next()?;
-    let link_args = if !static_link && shared_mode == "static"
+    let shared_mode = llvm_config_words(&tool, &["--shared-mode"])?
+        .into_iter()
+        .next()?;
+    let link_args = if !static_link
+        && shared_mode == "static"
         && llvm_config_words(&tool, &["--libfiles", "--link-shared"]).is_none()
     {
-        let libdir = llvm_config_words(&tool, &["--libdir"])?.into_iter().next()?;
+        let libdir = llvm_config_words(&tool, &["--libdir"])?
+            .into_iter()
+            .next()?;
         let mut shared_libs: Vec<String> = std::fs::read_dir(&libdir)
             .ok()?
             .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
@@ -611,7 +629,10 @@ fn find_llvm_config_tool(vm: &VM, args: &[CallArg], version_req: Option<&str>) -
         shared_libs.sort();
         let library = shared_libs.first()?;
         let mut link_args = llvm_config_words(&tool, &["--ldflags"])?;
-        link_args.push(format!("-l{}", &library["lib".len()..library.len() - ".so".len()]));
+        link_args.push(format!(
+            "-l{}",
+            &library["lib".len()..library.len() - ".so".len()]
+        ));
         link_args
     } else {
         if static_link && shared_mode == "shared" {
@@ -633,10 +654,9 @@ fn find_llvm_config_tool(vm: &VM, args: &[CallArg], version_req: Option<&str>) -
             .collect()
     };
 
-    let mut dependencies = Vec::new();
-    if let Some(threads) = special_dependency(vm, "threads", "auto") {
-        dependencies.push(threads);
-    }
+    let dependencies: Vec<Object> = special_dependency(vm, "threads", "auto")
+        .into_iter()
+        .collect();
 
     Some(Object::Dependency(DependencyData {
         name: "llvm".to_string(),
@@ -650,6 +670,7 @@ fn find_llvm_config_tool(vm: &VM, args: &[CallArg], version_req: Option<&str>) -
         include_dirs: Vec::new(),
         dependencies,
         variables: HashMap::new(),
+        version_reqs: Vec::new(),
         is_internal: false,
         kind: "config-tool".to_string(),
         config_tool: Some(tool),
@@ -671,90 +692,20 @@ fn find_system_library(name: &str) -> Option<Object> {
             version: String::new(),
             compile_args: Vec::new(),
             link_args: vec![format!("-l{}", name)],
-            link_with: Vec::new(),
-            link_whole: Vec::new(),
             sources: Vec::new(),
             include_dirs: Vec::new(),
             dependencies: Vec::new(),
             variables: HashMap::new(),
+            version_reqs: Vec::new(),
             is_internal: false,
             kind: String::new(),
-            config_tool: None,
-        })),
+
+                link_with: Vec::new(),
+                link_whole: Vec::new(),
+                config_tool: None,
+            })),
         _ => None,
     }
-}
-
-/// Like Meson, a `-lname` from pkg-config becomes the library's path only
-/// when it lives in one of the `-L` directories the same output names and
-/// that directory is not one the compiler already searches. A library in
-/// the compiler's own library directories stays `-lname`, so the linker
-/// records its SONAME instead of a build-root path.
-fn resolve_library_arguments(vm: &VM, link_args: Vec<String>) -> Vec<String> {
-    let system = compiler_library_dirs(vm);
-    let search_dirs: Vec<String> = link_args
-        .iter()
-        .filter_map(|argument| argument.strip_prefix("-L").map(str::to_string))
-        .filter(|dir| !dir.is_empty() && !system.contains(&normalize_absolute_path(dir)))
-        .collect();
-    link_args
-        .into_iter()
-        .map(|argument| {
-            let Some(name) = argument.strip_prefix("-l") else {
-                return argument;
-            };
-            if name.is_empty() || name.starts_with(':') {
-                return argument;
-            }
-            library_in_dirs(&search_dirs, name).unwrap_or(argument)
-        })
-        .collect()
-}
-
-/// The library directories the C compiler searches by default, from
-/// `-print-search-dirs`.
-fn compiler_library_dirs(vm: &VM) -> Vec<String> {
-    let Some(Object::Compiler(c)) = vm.globals.get("compiler_c") else {
-        return Vec::new();
-    };
-    let Ok(output) = Command::new(&c.cmd[0]).args(&c.cmd[1..]).arg("-print-search-dirs").output() else {
-        return Vec::new();
-    };
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .find_map(|line| line.strip_prefix("libraries: ="))
-        .map(|dirs| dirs.split(':').filter(|d| !d.is_empty()).map(normalize_absolute_path).collect())
-        .unwrap_or_default()
-}
-
-fn library_in_dirs(dirs: &[String], name: &str) -> Option<String> {
-    for dir in dirs {
-        for suffix in [".so", ".a"] {
-            let candidate = std::path::Path::new(dir).join(format!("lib{name}{suffix}"));
-            if candidate.is_file() {
-                return Some(normalize_absolute_path(&candidate.to_string_lossy()));
-            }
-        }
-    }
-    None
-}
-
-fn normalize_absolute_path(path: &str) -> String {
-    let mut parts: Vec<&str> = Vec::new();
-    for component in path.split('/') {
-        match component {
-            "" | "." => {}
-            ".." => {
-                if parts.last().is_some_and(|last| *last != "..") {
-                    parts.pop();
-                } else {
-                    parts.push("..");
-                }
-            }
-            other => parts.push(other),
-        }
-    }
-    format!("/{}", parts.join("/"))
 }
 
 fn try_fallback(_vm: &mut VM, _name: &str, fallback: &Object) -> Option<Object> {
@@ -768,23 +719,5 @@ fn try_fallback(_vm: &mut VM, _name: &str, fallback: &Object) -> Option<Object> 
             None
         }
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod library_argument_tests {
-    use super::*;
-
-    #[test]
-    fn only_libraries_in_the_named_search_dirs_become_paths() {
-        let dir = std::env::temp_dir().join(format!("gluon-libdir-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("libfoo.so"), b"").unwrap();
-        let vm = VM::new();
-        let args = vec![format!("-L{}", dir.display()), "-lfoo".to_string(), "-lm".to_string()];
-        let resolved = resolve_library_arguments(&vm, args);
-        assert_eq!(resolved[1], dir.join("libfoo.so").to_string_lossy());
-        assert_eq!(resolved[2], "-lm");
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

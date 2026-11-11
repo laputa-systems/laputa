@@ -178,12 +178,12 @@ fn python_extension_module(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Resu
         link_depends: Vec::new(),
         c_args: Vec::new(),
         cpp_args: Vec::new(),
+        objc_args: Vec::new(),
+        objcpp_args: Vec::new(),
         rust_args: Vec::new(),
         install,
         install_dir,
         install_mode: None,
-        version: None,
-        soversion: None,
         install_rpath: String::new(),
         build_rpath: String::new(),
         pic: Some(true),
@@ -204,6 +204,15 @@ fn python_extension_module(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Resu
             subdir
         },
         output_name,
+        project_name: vm
+            .project
+            .as_ref()
+            .map(|p| p.name.clone())
+            .unwrap_or_default(),
+        ltversion: None,
+        soversion: None,
+        darwin_versions: None,
+        shared_library_only: false,
     };
 
     let target_ref = BuildTargetRef {

@@ -1,6 +1,6 @@
 #!/bin/bash
 # musl.sh (S6): build static-musl gluon bins in pinned Docker image and verify
-# they run --version in the container. OD-6: --platform linux/amd64, rust:1.98.
+# they run --version in the container. OD-6: --platform linux/amd64, rust:nightly-2026-09-15.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)

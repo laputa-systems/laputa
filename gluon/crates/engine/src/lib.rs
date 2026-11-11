@@ -32,13 +32,6 @@ impl QueueScheduler {
     }
 }
 
-// Queue rather than a fresh full scan per dispatch: pull next ready edge
-// in order pushed (producers complete), preserving dependency order.
-
-pub fn execute(state: &graph::State, opts: &ninja::cli::Options) -> Result<u8, String> {
-    ninja::build::run(state, opts)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -18,9 +18,9 @@ Published as GitHub prereleases: tags `release-<commit-sha>`, with
 plus `SHA256SUMS`. Verify with:
 
 ```sh
-tag=$(gh release list --repo joshuarli/gluon --limit 1 --json tagName -q '.[0].tagName')
-gh release download "$tag" --repo joshuarli/gluon --pattern 'gluon-aarch64-apple-darwin.zip'
-gh release download "$tag" --repo joshuarli/gluon --pattern 'SHA256SUMS'
+tag=$(gh release list --repo laputa-systems/gluon --limit 1 --json tagName -q '.[0].tagName')
+gh release download "$tag" --repo laputa-systems/gluon --pattern 'gluon-aarch64-apple-darwin.zip'
+gh release download "$tag" --repo laputa-systems/gluon --pattern 'SHA256SUMS'
 grep -F 'gluon-aarch64-apple-darwin.zip' SHA256SUMS | shasum -a 256 -c -
 ```
 

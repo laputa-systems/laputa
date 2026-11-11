@@ -1,0 +1,4 @@
+--prefix=/gluon-diff-prefix
+--libdir=lib64
+--buildtype=release
+--default-library=shared

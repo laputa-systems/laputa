@@ -441,39 +441,8 @@ fn builtin_project(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
 
     // Apply default_options AFTER loading option files.
     // Priority: CLI > caller subproject() default_options > project() default_options > option file defaults.
-    // - For keys in caller_option_keys (set by caller subproject() kwargs): use or_insert to preserve.
+    // - For keys set on the command line or by the caller subproject(): use or_insert to preserve.
     // - For all other keys: use insert to override option file defaults and inherited parent values.
-    // Known string-typed built-in options that should not be parsed as integers
-    let string_typed_builtins = [
-        "buildtype",
-        "optimization",
-        "warning_level",
-        "default_library",
-        "b_sanitize",
-        "b_pgo",
-        "b_ndebug",
-        "unity",
-        "layout",
-        "wrap_mode",
-        "backend",
-        "install_umask",
-        "prefix",
-        "bindir",
-        "libdir",
-        "libexecdir",
-        "includedir",
-        "datadir",
-        "mandir",
-        "infodir",
-        "localedir",
-        "sysconfdir",
-        "localstatedir",
-        "sharedstatedir",
-        "sbindir",
-        "cpp_std",
-        "c_std",
-        "cpp_eh",
-    ];
     for opt_str in &default_options {
         if let Some(eq_pos) = opt_str.find('=') {
             let key = opt_str[..eq_pos].trim().to_string();
@@ -487,13 +456,13 @@ fn builtin_project(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
             } else {
                 key
             };
-            let obj = if string_typed_builtins.contains(&key.as_str()) {
-                crate::objects::Object::String(val.to_string())
+            let obj = if crate::options::builtin_option_key(&key).is_some() {
+                crate::options::parse_builtin_option_value(&key, val)
             } else {
                 crate::options::parse_option_value(val)
             };
-            if vm.caller_option_keys.contains(&key) || vm.explicit_option_keys.contains(&key) {
-                // Caller subproject() defaults or an explicit -D value take priority.
+            if vm.caller_option_keys.contains(&key) || vm.cmdline_option_keys.contains(&key) {
+                // Command line and caller subproject() default_options take priority
                 vm.options.entry(key).or_insert(obj);
             } else {
                 // Override option file defaults and inherited parent values
@@ -636,64 +605,6 @@ fn builtin_project(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
         vm.build_data.cpp_std = s;
     }
 
-    let option_string = |vm: &VM, name: &str, default: &str| -> String {
-        match vm.options.get(name) {
-            Some(Object::String(s)) => s.clone(),
-            Some(Object::Int(n)) => n.to_string(),
-            Some(Object::Bool(b)) => b.to_string(),
-            Some(Object::Feature(FeatureState::Enabled)) => "enabled".to_string(),
-            Some(Object::Feature(FeatureState::Disabled)) => "disabled".to_string(),
-            Some(Object::Feature(FeatureState::Auto)) => "auto".to_string(),
-            _ => default.to_string(),
-        }
-    };
-    let option_bool = |vm: &VM, name: &str, default: bool| -> bool {
-        match vm.options.get(name) {
-            Some(Object::Bool(b)) => *b,
-            Some(Object::String(s)) => s != "false",
-            Some(Object::Feature(FeatureState::Enabled)) => true,
-            Some(Object::Feature(FeatureState::Disabled)) => false,
-            _ => default,
-        }
-    };
-
-    vm.build_data.warning_level = option_string(vm, "warning_level", "1");
-    vm.build_data.werror = option_bool(vm, "werror", false);
-    vm.build_data.b_colorout = option_string(vm, "b_colorout", "always");
-    vm.build_data.b_staticpic = option_bool(vm, "b_staticpic", true);
-    vm.build_data.cpp_rtti = option_bool(vm, "cpp_rtti", true);
-    vm.build_data.cpp_eh = option_string(vm, "cpp_eh", "default");
-    for language in ["c", "cpp", "objc", "objcpp", "rust"] {
-        for (suffix, link) in [("args", false), ("link_args", true)] {
-            let mut values = Vec::new();
-            if let Some(value) = vm.options.get(&format!("{}_{}", language, suffix)) {
-                flatten_string_objects(value, &mut values);
-            }
-            let map = if link { &mut vm.build_data.option_link_args } else { &mut vm.build_data.option_args };
-            map.insert(language.to_string(), values);
-        }
-    }
-    vm.build_data.b_pie = option_bool(vm, "b_pie", false);
-
-    let buildtype = option_string(vm, "buildtype", "debug");
-    let (buildtype_optimization, buildtype_debug) = match buildtype.as_str() {
-        "release" => ("3", false),
-        "debugoptimized" => ("2", true),
-        "minsize" => ("s", true),
-        "plain" => ("0", false),
-        _ => ("0", true),
-    };
-    vm.build_data.optimization = if vm.options.contains_key("optimization") {
-        option_string(vm, "optimization", buildtype_optimization)
-    } else {
-        buildtype_optimization.to_string()
-    };
-    vm.build_data.debug = if vm.options.contains_key("debug") {
-        option_bool(vm, "debug", buildtype_debug)
-    } else {
-        buildtype_debug
-    };
-
     Ok(Object::None)
 }
 
@@ -788,7 +699,7 @@ fn build_target_common(
     for arg in positional.iter().skip(1) {
         collect_sources(arg, &vm.source_root, &mut sources);
     }
-    // Also collect from 'sources' kwarg (a single value or an array)
+    // Also collect from 'sources' kwarg
     if let Some(value) = VM::get_arg_value(args, "sources") {
         collect_sources(&value, &vm.source_root, &mut sources);
     }
@@ -830,9 +741,7 @@ fn build_target_common(
 
     let install = VM::get_arg_bool(args, "install", false);
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX).map(String::from);
-    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
-    let version = VM::get_arg_str(args, "version", usize::MAX).map(String::from);
-    let soversion = VM::get_arg_str(args, "soversion", usize::MAX).map(String::from);
+    let install_mode = get_install_mode(args);
     let install_rpath = VM::get_arg_str(args, "install_rpath", usize::MAX)
         .unwrap_or("")
         .to_string();
@@ -845,8 +754,10 @@ fn build_target_common(
         .map(|dir| normalize_subdir_path(&dir))
         .collect();
 
-    let c_args = VM::get_arg_string_array(args, "c_args");
-    let cpp_args = VM::get_arg_string_array(args, "cpp_args");
+    let mut c_args = VM::get_arg_string_array(args, "c_args");
+    let mut cpp_args = VM::get_arg_string_array(args, "cpp_args");
+    let mut objc_args = VM::get_arg_string_array(args, "objc_args");
+    let mut objcpp_args = VM::get_arg_string_array(args, "objcpp_args");
     let rust_args = VM::get_arg_string_array(args, "rust_args");
     let link_args = VM::get_arg_string_array(args, "link_args");
     let link_depends = {
@@ -886,6 +797,26 @@ fn build_target_common(
         depends
     };
     let override_options = VM::get_arg_string_array(args, "override_options");
+    let per_kind = match target_type {
+        TargetType::StaticLibrary => "static",
+        TargetType::SharedLibrary | TargetType::SharedModule => "shared",
+        _ => "",
+    };
+    if !per_kind.is_empty() {
+        c_args.extend(VM::get_arg_string_array(args, &format!("c_{}_args", per_kind)));
+        cpp_args.extend(VM::get_arg_string_array(
+            args,
+            &format!("cpp_{}_args", per_kind),
+        ));
+        objc_args.extend(VM::get_arg_string_array(
+            args,
+            &format!("objc_{}_args", per_kind),
+        ));
+        objcpp_args.extend(VM::get_arg_string_array(
+            args,
+            &format!("objcpp_{}_args", per_kind),
+        ));
+    }
     let gnu_symbol_visibility = VM::get_arg_str(args, "gnu_symbol_visibility", usize::MAX)
         .unwrap_or("")
         .to_string();
@@ -898,6 +829,28 @@ fn build_target_common(
     let name_suffix = VM::get_arg_str(args, "name_suffix", usize::MAX).map(String::from);
     let rust_crate_type = VM::get_arg_str(args, "rust_crate_type", usize::MAX).map(String::from);
     let implicit_include_directories = VM::get_arg_bool(args, "implicit_include_directories", true);
+
+    let (ltversion, soversion, darwin_versions) = if matches!(
+        target_type,
+        TargetType::SharedLibrary | TargetType::SharedModule
+    ) {
+        let ltversion = VM::get_arg_str(args, "version", usize::MAX).map(String::from);
+        let soversion = match VM::get_arg_value(args, "soversion") {
+            Some(Object::String(value)) => Some(value.clone()),
+            Some(Object::Int(value)) => Some(value.to_string()),
+            _ => None,
+        }
+        .or_else(|| {
+            ltversion
+                .as_ref()
+                .map(|version| version.split('.').next().unwrap_or(version).to_string())
+        });
+        let darwin_versions = parse_darwin_versions(VM::get_arg_value(args, "darwin_versions"))
+            .or_else(|| soversion.as_ref().map(|value| (value.clone(), value.clone())));
+        (ltversion, soversion, darwin_versions)
+    } else {
+        (None, None, None)
+    };
 
     let pic = VM::get_arg_value(args, "pic").and_then(|v| {
         if let Object::Bool(b) = v {
@@ -926,30 +879,21 @@ fn build_target_common(
     let id = format!("{}@{}", name, vm.current_subdir);
     let subdir = vm.current_subdir.clone();
 
-    let version = VM::get_arg_str(args, "version", usize::MAX).map(String::from);
-    let soversion = match VM::get_arg_value(args, "soversion") {
-        Some(Object::String(s)) => Some(s.clone()),
-        Some(Object::Int(i)) => Some(i.to_string()),
-        _ => None,
-    };
-
     // Compute output name
-    let mut output_name = compute_output_name(
+    let output_name = compute_output_name(
         &name,
         &target_type,
         name_prefix.as_deref(),
         name_suffix.as_deref(),
+        ltversion.as_deref(),
+        soversion.as_deref(),
     );
-    if target_type == TargetType::SharedLibrary {
-        if let Some(ref v) = version {
-            output_name = format!("{}.{}", output_name, v);
-        } else if let Some(ref v) = soversion {
-            output_name = format!("{}.{}", output_name, v);
-        }
-    }
 
     let mut seen_sources = std::collections::HashSet::new();
-    let sources: Vec<String> = sources.into_iter().filter(|s| seen_sources.insert(s.clone())).collect();
+    let sources: Vec<String> = sources
+        .into_iter()
+        .filter(|source| seen_sources.insert(source.clone()))
+        .collect();
     let target = BuildTarget {
         name: name.clone(),
         id: id.clone(),
@@ -964,12 +908,12 @@ fn build_target_common(
         link_depends,
         c_args,
         cpp_args,
+        objc_args,
+        objcpp_args,
         rust_args,
         install,
         install_dir,
         install_mode,
-        version,
-        soversion,
         install_rpath,
         build_rpath,
         pic,
@@ -986,12 +930,18 @@ fn build_target_common(
         build_by_default,
         subdir: subdir.clone(),
         output_name: output_name.clone(),
+        project_name: vm
+            .project
+            .as_ref()
+            .map(|p| p.name.clone())
+            .unwrap_or_default(),
+        ltversion,
+        soversion,
+        darwin_versions,
+        shared_library_only,
     };
 
     vm.build_data.targets.push(target);
-    if shared_library_only {
-        vm.build_data.shared_library_only.insert(id.clone());
-    }
 
     Ok(Object::BuildTarget(BuildTargetRef {
         name,
@@ -1002,11 +952,34 @@ fn build_target_common(
     }))
 }
 
+fn parse_darwin_versions(value: Option<&Object>) -> Option<(String, String)> {
+    let values: Vec<String> = match value? {
+        Object::Array(items) => items
+            .iter()
+            .filter_map(|item| match item {
+                Object::String(value) => Some(value.clone()),
+                Object::Int(value) => Some(value.to_string()),
+                _ => None,
+            })
+            .collect(),
+        Object::String(value) => vec![value.clone()],
+        Object::Int(value) => vec![value.to_string()],
+        _ => return None,
+    };
+    match values.len() {
+        0 => None,
+        1 => Some((values[0].clone(), values[0].clone())),
+        _ => Some((values[0].clone(), values[1].clone())),
+    }
+}
+
 fn compute_output_name(
     name: &str,
     target_type: &TargetType,
     name_prefix: Option<&str>,
     name_suffix: Option<&str>,
+    ltversion: Option<&str>,
+    soversion: Option<&str>,
 ) -> String {
     let prefix = name_prefix.unwrap_or_else(|| match target_type {
         TargetType::Executable => "",
@@ -1047,31 +1020,53 @@ fn compute_output_name(
         _ => "",
     });
     if suffix.is_empty() {
-        format!("{}{}", prefix, name)
-    } else {
-        format!("{}{}.{}", prefix, name, suffix)
+        return format!("{}{}", prefix, name);
     }
-}
-
-
-fn is_compilable_source(path: &str) -> bool {
-    let lower = path.to_lowercase();
-    lower.ends_with(".c")
-        || lower.ends_with(".cc")
-        || lower.ends_with(".cpp")
-        || lower.ends_with(".cxx")
-        || lower.ends_with(".m")
-        || lower.ends_with(".mm")
-}
-
-fn normalize_install_mode(value: Option<&Object>) -> Option<Vec<String>> {
-    match value {
-        Some(Object::String(s)) => Some(vec![s.clone()]),
-        Some(Object::Array(items)) => {
-            Some(items.iter().map(|v| v.to_string_value()).collect())
+    match target_type {
+        TargetType::SharedLibrary | TargetType::SharedModule if !cfg!(target_os = "windows") => {
+            if cfg!(target_os = "macos") {
+                match soversion {
+                    Some(version) => format!("{}{}.{}.{}", prefix, name, version, suffix),
+                    None => format!("{}{}.{}", prefix, name, suffix),
+                }
+            } else {
+                match ltversion.or(soversion) {
+                    Some(version) => format!("{}{}.{}.{}", prefix, name, suffix, version),
+                    None => format!("{}{}.{}", prefix, name, suffix),
+                }
+            }
         }
-        _ => None,
+        _ => format!("{}{}.{}", prefix, name, suffix),
     }
+}
+
+fn join_subdir(subdir: &str, path: &str) -> String {
+    if path.starts_with('/') || subdir.is_empty() {
+        path.to_string()
+    } else {
+        format!("{}/{}", subdir, path)
+    }
+}
+
+fn normalize_subdir_path(path: &str) -> String {
+    if path.starts_with('/') {
+        return path.to_string();
+    }
+    let mut parts: Vec<&str> = Vec::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                if parts.last().is_some_and(|last| *last != "..") {
+                    parts.pop();
+                } else {
+                    parts.push("..");
+                }
+            }
+            other => parts.push(other),
+        }
+    }
+    parts.join("/")
 }
 
 fn target_include_dirs(vm: &VM, value: Option<&Object>) -> Result<Vec<String>, String> {
@@ -1084,10 +1079,25 @@ fn target_include_dirs(vm: &VM, value: Option<&Object>) -> Result<Vec<String>, S
         match item {
             Object::IncludeDirs(d) => dirs.extend(d.dirs.clone()),
             Object::String(s) => dirs.push(join_subdir(&vm.current_subdir, &s)),
-            other => return Err(format!("include_directories takes strings or include_directories objects, not {}", other.type_name())),
+            other => {
+                return Err(format!(
+                    "include_directories takes strings or include_directories objects, not {}",
+                    other.type_name()
+                ))
+            }
         }
     }
     Ok(dirs)
+}
+
+fn is_compilable_source(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    lower.ends_with(".c")
+        || lower.ends_with(".cc")
+        || lower.ends_with(".cpp")
+        || lower.ends_with(".cxx")
+        || lower.ends_with(".m")
+        || lower.ends_with(".mm")
 }
 
 fn collect_sources(obj: &Object, source_root: &str, sources: &mut Vec<String>) {
@@ -1217,7 +1227,7 @@ fn builtin_both_libraries(vm: &mut VM, args: &[CallArg]) -> Result<Object, Strin
 }
 
 fn builtin_shared_module(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    build_target_common(vm, args, TargetType::SharedModule, true)
+    build_target_common(vm, args, TargetType::SharedModule, false)
 }
 
 fn dependency_identity(args: &[CallArg]) -> String {
@@ -1279,9 +1289,6 @@ fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
         Some(Object::Bool(b)) => Some(*b),
         _ => None,
     };
-
-    // Threads and OpenMP are builtin/system dependencies resolved from the
-    // C compiler by the dependency lookup.
 
     // Build cache key from name + method to avoid cross-method cache hits
     let method = VM::get_arg_str(args, "method", usize::MAX).unwrap_or("auto");
@@ -1827,9 +1834,9 @@ fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
         for n in &names {
             if *n != name {
                 let ck = if method != "auto" {
-                    format!("{}:{}", n, method)
+                    format!("{}:{}{}", n, method, identity)
                 } else {
-                    n.clone()
+                    format!("{}{}", n, identity)
                 };
                 vm.build_data
                     .dependencies
@@ -1847,62 +1854,9 @@ fn builtin_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     Ok(obj)
 }
 
-fn flatten_objects(value: &Object, out: &mut Vec<Object>) {
-    match value {
-        Object::Array(items) => {
-            for item in items {
-                flatten_objects(item, out);
-            }
-        }
-        Object::None => {}
-        other => out.push(other.clone()),
-    }
-}
-
-fn append_dependency_tree(dep: &Object, out: &mut Vec<Object>) {
-    out.push(dep.clone());
-    if let Object::Dependency(d) = dep {
-        for nested in &d.dependencies {
-            if matches!(nested, Object::Dependency(_)) {
-                append_dependency_tree(nested, out);
-            }
-        }
-    }
-}
-
-fn join_subdir(subdir: &str, path: &str) -> String {
-    if path.starts_with('/') || subdir.is_empty() {
-        path.to_string()
-    } else {
-        format!("{}/{}", subdir, path)
-    }
-}
-
-fn normalize_subdir_path(path: &str) -> String {
-    if path.starts_with('/') {
-        return path.to_string();
-    }
-    let mut parts: Vec<&str> = Vec::new();
-    for component in path.split('/') {
-        match component {
-            "" | "." => {}
-            ".." => {
-                if parts.last().is_some_and(|last| *last != "..") {
-                    parts.pop();
-                } else {
-                    parts.push("..");
-                }
-            }
-            other => parts.push(other),
-        }
-    }
-    parts.join("/")
-}
-
 fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     let compile_args = VM::get_arg_string_array(args, "compile_args");
     let link_args = VM::get_arg_string_array(args, "link_args");
-
     let mut link_with = Vec::new();
     if let Some(value) = VM::get_arg_value(args, "link_with") {
         flatten_objects(&value, &mut link_with);
@@ -1970,6 +1924,7 @@ fn builtin_declare_dependency(vm: &mut VM, args: &[CallArg]) -> Result<Object, S
         include_dirs,
         dependencies,
         variables,
+        version_reqs: Vec::new(),
         is_internal: true,
         kind: String::new(),
         config_tool: None,
@@ -2274,225 +2229,6 @@ fn builtin_find_program(vm: &mut VM, args: &[CallArg]) -> Result<Object, String>
     }))
 }
 
-pub(crate) fn resolved_file_path(vm: &VM, f: &FileData) -> String {
-    if Path::new(&f.path).is_absolute() {
-        f.path.clone()
-    } else if f.is_built {
-        if f.subdir.is_empty() {
-            format!("{}/{}", vm.build_root, f.path)
-        } else {
-            format!("{}/{}/{}", vm.build_root, f.subdir, f.path)
-        }
-    } else if f.subdir.is_empty() {
-        format!("{}/{}", vm.source_root, f.path)
-    } else {
-        format!("{}/{}/{}", vm.source_root, f.subdir, f.path)
-    }
-}
-
-fn target_output_path(root: &str, subdir: &str, output: &str) -> String {
-    if Path::new(output).is_absolute() {
-        output.to_string()
-    } else if subdir.is_empty() {
-        format!("{}/{}", root, output)
-    } else {
-        format!("{}/{}/{}", root, subdir, output)
-    }
-}
-
-fn collect_command_parts(
-    vm: &VM,
-    obj: &Object,
-    command: &mut Vec<String>,
-    deps: &mut Vec<Object>,
-) {
-    match obj {
-        Object::Array(items) => {
-            for item in items {
-                collect_command_parts(vm, item, command, deps);
-            }
-        }
-        Object::File(f) => {
-            let path = resolved_file_path(vm, f);
-            deps.push(Object::File(FileData {
-                path: path.clone(),
-                subdir: String::new(),
-                is_built: false,
-            }));
-            command.push(path);
-        }
-        Object::ExternalProgram(p) => {
-            command.push(p.path.clone());
-            if std::path::Path::new(&p.path).is_absolute() {
-                deps.push(Object::File(FileData {
-                    path: p.path.clone(),
-                    subdir: String::new(),
-                    is_built: false,
-                }));
-            }
-        }
-        Object::BuildTarget(t) => {
-            let output = t.outputs.first().cloned().unwrap_or_else(|| t.name.clone());
-            deps.push(Object::File(FileData {
-                path: output.clone(),
-                subdir: t.subdir.clone(),
-                is_built: true,
-            }));
-            command.push(target_output_path(&vm.build_root, &t.subdir, &output));
-        }
-        Object::CustomTarget(r) => {
-            if let Some(output) = r.outputs.first() {
-                deps.push(Object::File(FileData {
-                    path: output.clone(),
-                    subdir: r.subdir.clone(),
-                    is_built: true,
-                }));
-                command.push(target_output_path(&vm.build_root, &r.subdir, output));
-            }
-        }
-        Object::CustomTargetIndex(r, idx) => {
-            if let Some(output) = r.outputs.get(*idx) {
-                deps.push(Object::File(FileData {
-                    path: output.clone(),
-                    subdir: r.subdir.clone(),
-                    is_built: true,
-                }));
-                command.push(target_output_path(&vm.build_root, &r.subdir, output));
-            }
-        }
-        other => command.push(other.to_string_value()),
-    }
-}
-
-fn collect_input_parts(vm: &VM, obj: &Object, input: &mut Vec<String>) {
-    match obj {
-        Object::Array(items) => {
-            for item in items {
-                collect_input_parts(vm, item, input);
-            }
-        }
-        Object::File(f) => input.push(resolved_file_path(vm, f)),
-        Object::CustomTarget(r) => {
-            for output in &r.outputs {
-                input.push(target_output_path(&vm.build_root, &r.subdir, output));
-            }
-        }
-        Object::CustomTargetIndex(r, idx) => {
-            if let Some(output) = r.outputs.get(*idx) {
-                input.push(target_output_path(&vm.build_root, &r.subdir, output));
-            }
-        }
-        other => input.push(other.to_string_value()),
-    }
-}
-
-fn script_interpreter(path: &str) -> Option<Vec<String>> {
-    let meta = std::fs::metadata(path).ok()?;
-    if !meta.is_file() {
-        return None;
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if meta.permissions().mode() & 0o111 != 0 {
-            return None;
-        }
-    }
-    let content = std::fs::read_to_string(path).ok()?;
-    let shebang = content.lines().next()?.strip_prefix("#!")?.trim();
-    let mut parts: Vec<String> = shebang.split_whitespace().map(String::from).collect();
-    if parts.is_empty() {
-        return None;
-    }
-    if parts[0].ends_with("/env") && parts.len() > 1 {
-        let program = parts[1].clone();
-        if let Ok(path_env) = std::env::var("PATH") {
-            for dir in path_env.split(':') {
-                let candidate = format!("{}/{}", dir, program);
-                if std::path::Path::new(&candidate).is_file() {
-                    return Some(vec![candidate]);
-                }
-            }
-        }
-        return Some(vec![program]);
-    }
-    Some(parts)
-}
-
-pub(crate) fn wrap_script_command(command: &mut Vec<String>) {
-    if let Some(first) = command.first() {
-        if let Some(interpreter) = script_interpreter(first) {
-            let script = first.clone();
-            let mut wrapped = interpreter;
-            wrapped.push(script);
-            command.splice(0..1, wrapped);
-        }
-    }
-}
-
-fn resolve_program_path(vm: &VM, name: &str) -> Option<String> {
-    if name.starts_with('/') {
-        return Path::new(name).is_file().then(|| name.to_string());
-    }
-    let in_subdir = if vm.current_subdir.is_empty() {
-        format!("{}/{}", vm.source_root, name)
-    } else {
-        format!("{}/{}/{}", vm.source_root, vm.current_subdir, name)
-    };
-    if Path::new(&in_subdir).is_file() {
-        return Some(in_subdir);
-    }
-    let in_root = format!("{}/{}", vm.source_root, name);
-    if Path::new(&in_root).is_file() {
-        return Some(in_root);
-    }
-    if let Ok(path_env) = std::env::var("PATH") {
-        for dir in path_env.split(':') {
-            let candidate = format!("{}/{}", dir, name);
-            if Path::new(&candidate).is_file() {
-                return Some(candidate);
-            }
-        }
-    }
-    None
-}
-
-pub(crate) fn resolve_command_program(vm: &VM, name: &str) -> Result<Object, String> {
-    if let Some(prog) = vm.build_data.find_program_overrides.get(name) {
-        return Ok(prog.clone());
-    }
-    match resolve_program_path(vm, name) {
-        Some(path) => Ok(Object::ExternalProgram(ExternalProgramData {
-            name: name.to_string(),
-            path,
-            found: true,
-            version: None,
-        })),
-        None => Err(format!("Program '{}' not found or not executable", name)),
-    }
-}
-
-fn resolve_command_first(vm: &VM, obj: &Object) -> Result<Object, String> {
-    match obj {
-        Object::Array(items) => {
-            let mut items = items.clone();
-            if let Some(Object::String(name)) = items.first().cloned() {
-                items[0] = resolve_command_program(vm, &name)?;
-            }
-            Ok(Object::Array(items))
-        }
-        Object::String(name) => resolve_command_program(vm, name),
-        other => Ok(other.clone()),
-    }
-}
-
-fn same_dependency(a: &Object, b: &Object) -> bool {
-    match (a, b) {
-        (Object::File(x), Object::File(y)) => x.path == y.path && x.subdir == y.subdir,
-        _ => a == b,
-    }
-}
-
 fn builtin_custom_target(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
     // Disabler propagation: if any argument is a Disabler, return Disabler
     for arg in args {
@@ -2567,7 +2303,10 @@ fn builtin_custom_target(vm: &mut VM, args: &[CallArg]) -> Result<Object, String
         }
     }
     for dep in command_deps {
-        if !ct_depends.iter().any(|existing| same_dependency(existing, &dep)) {
+        if !ct_depends
+            .iter()
+            .any(|existing| same_dependency(existing, &dep))
+        {
             ct_depends.push(dep);
         }
     }
@@ -2697,11 +2436,17 @@ fn builtin_configure_file(vm: &mut VM, args: &[CallArg]) -> Result<Object, Strin
     let encoding = VM::get_arg_str(args, "encoding", usize::MAX)
         .unwrap_or("utf-8")
         .to_string();
-    let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX).map(String::from);
-    let install = match VM::get_arg_value(args, "install") {
-        Some(Object::Bool(explicit)) => *explicit,
-        _ => install_dir.as_deref().is_some_and(|dir| !dir.is_empty()),
+    let install_flag = match VM::get_arg_value(args, "install") {
+        Some(Object::Bool(value)) => Some(*value),
+        _ => None,
     };
+    let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX).map(String::from);
+    let install = install_flag.unwrap_or_else(|| {
+        install_dir
+            .as_deref()
+            .map(|dir| !dir.is_empty())
+            .unwrap_or(false)
+    });
     let install_tag = VM::get_arg_str(args, "install_tag", usize::MAX).map(String::from);
     let capture = VM::get_arg_bool(args, "capture", false);
     let depfile = VM::get_arg_str(args, "depfile", usize::MAX).map(String::from);
@@ -3027,26 +2772,27 @@ fn builtin_install_headers(vm: &mut VM, args: &[CallArg]) -> Result<Object, Stri
     let positional = VM::get_positional_args(args);
     let mut sources = Vec::new();
     for arg in &positional {
-        collect_sources(arg, &vm.source_root, &mut sources);
+        collect_install_sources(vm, arg, &mut sources);
     }
-    let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
-        .unwrap_or("include")
-        .to_string();
-    let subdir = VM::get_arg_str(args, "subdir", usize::MAX)
-        .unwrap_or("")
-        .to_string();
-    let full_dir = if subdir.is_empty() {
-        install_dir
-    } else {
-        format!("{}/{}", install_dir, subdir)
-    };
+    let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX).map(String::from);
+    let subdir = VM::get_arg_str(args, "subdir", usize::MAX).map(String::from);
+    if install_dir.is_some() && subdir.is_some() {
+        return Err(
+            "install_headers: cannot specify both \"install_dir\" and \"subdir\". Use only \"install_dir\"."
+                .to_string(),
+        );
+    }
+    let mut full_dir = install_dir
+        .unwrap_or_else(|| crate::options::builtin_string(&vm.options, "includedir"));
+    if let Some(subdir) = subdir {
+        full_dir = crate::options::join_install_path(&full_dir, &subdir);
+    }
     let preserve_path = VM::get_arg_bool(args, "preserve_path", false);
-    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
 
     vm.build_data.install_headers.push(InstallData {
         sources,
         install_dir: full_dir,
-        install_mode,
+        install_mode: get_install_mode(args),
         rename: Vec::new(),
         subdir: vm.current_subdir.clone(),
         preserve_path,
@@ -3062,24 +2808,39 @@ fn builtin_install_data(vm: &mut VM, args: &[CallArg]) -> Result<Object, String>
     let positional = VM::get_positional_args(args);
     let mut sources = Vec::new();
     for arg in &positional {
-        collect_sources(arg, &vm.source_root, &mut sources);
+        collect_install_sources(vm, arg, &mut sources);
     }
     if let Some(Object::Array(arr)) = VM::get_arg_value(args, "sources") {
         for s in arr {
-            collect_sources(s, &vm.source_root, &mut sources);
+            collect_install_sources(vm, s, &mut sources);
         }
     }
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
-        .unwrap_or("share")
-        .to_string();
+        .map(String::from)
+        .unwrap_or_else(|| {
+            let project_name = vm
+                .project
+                .as_ref()
+                .map(|project| project.name.clone())
+                .unwrap_or_default();
+            crate::options::join_install_path(
+                &crate::options::builtin_string(&vm.options, "datadir"),
+                &project_name,
+            )
+        });
     let rename = VM::get_arg_string_array(args, "rename");
+    if !rename.is_empty() && rename.len() != sources.len() {
+        return Err(
+            "\"rename\" and \"sources\" argument lists must be the same length if \"rename\" is given."
+                .to_string(),
+        );
+    }
     let preserve_path = VM::get_arg_bool(args, "preserve_path", false);
-    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
 
     vm.build_data.install_data.push(InstallData {
         sources,
         install_dir,
-        install_mode,
+        install_mode: get_install_mode(args),
         rename,
         subdir: vm.current_subdir.clone(),
         preserve_path,
@@ -3104,17 +2865,16 @@ fn builtin_install_subdir(vm: &mut VM, args: &[CallArg]) -> Result<Object, Strin
         })
         .ok_or("install_subdir requires directory name")?;
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
-        .unwrap_or("share")
+        .ok_or("install_subdir requires install_dir")?
         .to_string();
     let strip_directory = VM::get_arg_bool(args, "strip_directory", false);
     let exclude_files = VM::get_arg_string_array(args, "exclude_files");
     let exclude_directories = VM::get_arg_string_array(args, "exclude_directories");
-    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
 
     vm.build_data.install_subdirs.push(InstallData {
         sources: vec![dir],
         install_dir,
-        install_mode,
+        install_mode: get_install_mode(args),
         rename: Vec::new(),
         subdir: vm.current_subdir.clone(),
         preserve_path: false,
@@ -3130,17 +2890,16 @@ fn builtin_install_man(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> 
     let positional = VM::get_positional_args(args);
     let mut sources = Vec::new();
     for arg in &positional {
-        collect_sources(arg, &vm.source_root, &mut sources);
+        collect_install_sources(vm, arg, &mut sources);
     }
     let install_dir = VM::get_arg_str(args, "install_dir", usize::MAX)
-        .unwrap_or("share/man")
-        .to_string();
-    let install_mode = normalize_install_mode(VM::get_arg_value(args, "install_mode"));
+        .map(String::from)
+        .unwrap_or_default();
 
     vm.build_data.install_man.push(InstallData {
         sources,
         install_dir,
-        install_mode,
+        install_mode: get_install_mode(args),
         rename: Vec::new(),
         subdir: vm.current_subdir.clone(),
         preserve_path: false,
@@ -3152,49 +2911,44 @@ fn builtin_install_man(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> 
     Ok(Object::None)
 }
 
-/// Meson's documented special cases: with prefix /usr the state and
-/// configuration directories are the system ones, and with /usr/local the
-/// state directories move under /var/local.
-fn prefix_dependent_default(prefix: &str, option: &str) -> Option<&'static str> {
-    match (prefix, option) {
-        ("/usr", "sysconfdir") => Some("/etc"),
-        ("/usr", "localstatedir") => Some("/var"),
-        ("/usr", "sharedstatedir") => Some("/var/lib"),
-        ("/usr/local", "localstatedir") => Some("/var/local"),
-        ("/usr/local", "sharedstatedir") => Some("/var/local/lib"),
-        _ => None,
-    }
+fn get_install_mode(args: &[CallArg]) -> Option<Vec<String>> {
+    let mode = match VM::get_arg_value(args, "install_mode") {
+        Some(Object::Array(items)) => items
+            .iter()
+            .filter_map(|item| match item {
+                Object::String(value) => Some(value.clone()),
+                Object::Int(value) => Some(value.to_string()),
+                _ => None,
+            })
+            .collect(),
+        Some(Object::String(value)) => vec![value.clone()],
+        _ => Vec::new(),
+    };
+    if mode.is_empty() { None } else { Some(mode) }
 }
 
-pub(crate) fn builtin_dir_option(vm: &VM, name: &str) -> String {
-    if let Some(Object::String(value)) = vm.options.get(name) {
-        return value.clone();
+fn collect_install_sources(vm: &VM, obj: &Object, sources: &mut Vec<String>) {
+    match obj {
+        Object::String(value) => sources.push(value.clone()),
+        Object::File(file) => {
+            if file.is_built {
+                let path = if file.subdir.is_empty() {
+                    file.path.clone()
+                } else {
+                    format!("{}/{}", file.subdir, file.path)
+                };
+                sources.push(format!("{}/{}", vm.build_root, path));
+            } else {
+                sources.push(file.path.clone());
+            }
+        }
+        Object::Array(items) => {
+            for item in items {
+                collect_install_sources(vm, item, sources);
+            }
+        }
+        _ => {}
     }
-    let prefix = match vm.options.get("prefix") {
-        Some(Object::String(p)) => p.trim_end_matches('/').to_string(),
-        _ => "/usr/local".to_string(),
-    };
-    if let Some(dir) = prefix_dependent_default(&prefix, name) {
-        return dir.to_string();
-    }
-    match name {
-        "prefix" => "/usr/local",
-        "bindir" => "bin",
-        "libdir" => "lib",
-        "libexecdir" => "libexec",
-        "includedir" => "include",
-        "datadir" => "share",
-        "mandir" => "share/man",
-        "infodir" => "share/info",
-        "localedir" => "share/locale",
-        "sysconfdir" => "etc",
-        "localstatedir" => "var",
-        "sharedstatedir" => "com",
-        "sbindir" => "sbin",
-        "licensedir" => "",
-        _ => "",
-    }
-    .to_string()
 }
 
 fn builtin_install_emptydir(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
@@ -4163,7 +3917,12 @@ fn collect_files(vm: &VM, arg: &Object, files: &mut Vec<Object>) -> Result<(), S
                 collect_files(vm, item, files)?;
             }
         }
-        other => return Err(format!("files() takes strings or files, not {}", other.type_name())),
+        other => {
+            return Err(format!(
+                "files() takes strings or files, not {}",
+                other.type_name()
+            ))
+        }
     }
     Ok(())
 }
@@ -4242,32 +4001,19 @@ fn builtin_get_option(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
         return Ok(val.clone());
     }
 
-    let prefix = match vm.options.get("prefix") {
-        Some(Object::String(p)) => p.trim_end_matches('/').to_string(),
-        _ => "/usr/local".to_string(),
-    };
-    if let Some(dir) = prefix_dependent_default(&prefix, &name) {
-        return Ok(Object::String(dir.to_string()));
-    }
-
     // Return defaults for well-known options
     match name.as_str() {
-        "prefix" => Ok(Object::String("/usr/local".to_string())),
-        "bindir" => Ok(Object::String("bin".to_string())),
-        "libdir" => Ok(Object::String("lib".to_string())),
-        "libexecdir" => Ok(Object::String("libexec".to_string())),
-        "includedir" => Ok(Object::String("include".to_string())),
-        "datadir" => Ok(Object::String("share".to_string())),
-        "mandir" => Ok(Object::String("share/man".to_string())),
-        "infodir" => Ok(Object::String("share/info".to_string())),
-        "localedir" => Ok(Object::String("share/locale".to_string())),
-        "sysconfdir" => Ok(Object::String("etc".to_string())),
-        "localstatedir" => Ok(Object::String("var".to_string())),
-        "sharedstatedir" => Ok(Object::String("com".to_string())),
-        "sbindir" => Ok(Object::String("sbin".to_string())),
+        "prefix" | "bindir" | "libdir" | "libexecdir" | "includedir" | "datadir" | "mandir"
+        | "infodir" | "localedir" | "sysconfdir" | "localstatedir" | "sharedstatedir"
+        | "sbindir" | "licensedir" => Ok(Object::String(crate::options::builtin_string(
+            &vm.options,
+            &name,
+        ))),
         "buildtype" => Ok(Object::String("debug".to_string())),
-        "debug" => Ok(Object::Bool(true)),
-        "optimization" => Ok(Object::String("0".to_string())),
+        "debug" => Ok(Object::Bool(crate::options::effective_debug(&vm.options))),
+        "optimization" => Ok(Object::String(crate::options::effective_optimization(
+            &vm.options,
+        ))),
         "warning_level" => Ok(Object::String("1".to_string())),
         "werror" => Ok(Object::Bool(false)),
         "default_library" => Ok(Object::String("shared".to_string())),
@@ -4477,59 +4223,92 @@ fn builtin_structured_sources(vm: &mut VM, args: &[CallArg]) -> Result<Object, S
     Ok(Object::StructuredSources(groups))
 }
 
-fn flatten_string_objects(value: &Object, out: &mut Vec<String>) {
-    match value {
+fn collect_argument_strings(obj: &Object, out: &mut Vec<String>) {
+    match obj {
         Object::String(s) => out.push(s.clone()),
+        Object::File(f) => out.push(f.path.clone()),
         Object::Array(items) => {
             for item in items {
-                flatten_string_objects(item, out);
+                collect_argument_strings(item, out);
             }
         }
-        Object::File(f) => out.push(f.path.clone()),
-        _ => {}
+        Object::None => {}
+        other => out.push(other.to_string_value()),
     }
 }
 
-fn add_arguments_to_project_or_global(
+fn argument_languages(args: &[CallArg]) -> Result<Vec<String>, String> {
+    let mut languages = Vec::new();
+    match VM::get_arg_value(args, "language") {
+        Some(Object::String(language)) => languages.push(language.clone()),
+        Some(Object::Array(items)) => {
+            for item in items {
+                if let Object::String(language) = item {
+                    languages.push(language.clone());
+                }
+            }
+        }
+        _ => return Err("missing required keyword argument \"language\"".to_string()),
+    }
+    Ok(languages)
+}
+
+fn add_arguments(
     vm: &mut VM,
     args: &[CallArg],
-    link: bool,
     global: bool,
+    link: bool,
 ) -> Result<Object, String> {
     let mut values = Vec::new();
-    for value in VM::get_positional_args(args) {
-        flatten_string_objects(&value, &mut values);
+    for arg in VM::get_positional_args(args) {
+        collect_argument_strings(arg, &mut values);
     }
-    let languages = VM::get_arg_string_array(args, "language");
-    if languages.is_empty() {
-        return Err("Missing required keyword argument \"language\"".to_string());
-    }
-    let map = match (link, global) {
-        (false, false) => &mut vm.build_data.project_args,
-        (true, false) => &mut vm.build_data.project_link_args,
-        (false, true) => &mut vm.build_data.global_args,
-        (true, true) => &mut vm.build_data.global_link_args,
-    };
-    for lang in languages {
-        map.entry(lang).or_default().extend(values.iter().cloned());
+    let languages = argument_languages(args)?;
+    if global {
+        let target = if link {
+            &mut vm.build_data.global_link_args
+        } else {
+            &mut vm.build_data.global_args
+        };
+        for language in languages {
+            target.entry(language).or_default().extend(values.clone());
+        }
+    } else {
+        let project = vm
+            .project
+            .as_ref()
+            .map(|p| p.name.clone())
+            .unwrap_or_default();
+        let target = if link {
+            &mut vm.build_data.project_link_args
+        } else {
+            &mut vm.build_data.project_args
+        };
+        let per_language = target.entry(project).or_default();
+        for language in languages {
+            per_language
+                .entry(language)
+                .or_default()
+                .extend(values.clone());
+        }
     }
     Ok(Object::None)
 }
 
 fn builtin_add_project_arguments(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    add_arguments_to_project_or_global(vm, args, false, false)
+    add_arguments(vm, args, false, false)
 }
 
 fn builtin_add_project_link_arguments(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    add_arguments_to_project_or_global(vm, args, true, false)
+    add_arguments(vm, args, false, true)
 }
 
 fn builtin_add_global_arguments(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    add_arguments_to_project_or_global(vm, args, false, true)
+    add_arguments(vm, args, true, false)
 }
 
 fn builtin_add_global_link_arguments(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
-    add_arguments_to_project_or_global(vm, args, true, true)
+    add_arguments(vm, args, true, true)
 }
 
 fn builtin_add_languages(vm: &mut VM, args: &[CallArg]) -> Result<Object, String> {
@@ -4612,17 +4391,244 @@ fn builtin_add_project_dependencies(_vm: &mut VM, _args: &[CallArg]) -> Result<O
     Ok(Object::None)
 }
 
-#[cfg(test)]
-mod prefix_default_tests {
-    use super::prefix_dependent_default;
+fn flatten_objects(value: &Object, out: &mut Vec<Object>) {
+    match value {
+        Object::Array(items) => {
+            for item in items {
+                flatten_objects(item, out);
+            }
+        }
+        Object::None => {}
+        other => out.push(other.clone()),
+    }
+}
 
-    #[test]
-    fn system_prefixes_use_the_system_state_and_configuration_directories() {
-        assert_eq!(prefix_dependent_default("/usr", "sysconfdir"), Some("/etc"));
-        assert_eq!(prefix_dependent_default("/usr", "localstatedir"), Some("/var"));
-        assert_eq!(prefix_dependent_default("/usr", "sharedstatedir"), Some("/var/lib"));
-        assert_eq!(prefix_dependent_default("/usr/local", "localstatedir"), Some("/var/local"));
-        assert_eq!(prefix_dependent_default("/usr/local", "sysconfdir"), None);
-        assert_eq!(prefix_dependent_default("/opt/x", "sysconfdir"), None);
+pub(crate) fn resolved_file_path(vm: &VM, f: &FileData) -> String {
+    if Path::new(&f.path).is_absolute() {
+        f.path.clone()
+    } else if f.is_built {
+        if f.subdir.is_empty() {
+            format!("{}/{}", vm.build_root, f.path)
+        } else {
+            format!("{}/{}/{}", vm.build_root, f.subdir, f.path)
+        }
+    } else if f.subdir.is_empty() {
+        format!("{}/{}", vm.source_root, f.path)
+    } else {
+        format!("{}/{}/{}", vm.source_root, f.subdir, f.path)
+    }
+}
+
+fn resolve_program_path(vm: &VM, name: &str) -> Option<String> {
+    if name.starts_with('/') {
+        return Path::new(name).is_file().then(|| name.to_string());
+    }
+    let in_subdir = if vm.current_subdir.is_empty() {
+        format!("{}/{}", vm.source_root, name)
+    } else {
+        format!("{}/{}/{}", vm.source_root, vm.current_subdir, name)
+    };
+    if Path::new(&in_subdir).is_file() {
+        return Some(in_subdir);
+    }
+    let in_root = format!("{}/{}", vm.source_root, name);
+    if Path::new(&in_root).is_file() {
+        return Some(in_root);
+    }
+    if let Ok(path_env) = std::env::var("PATH") {
+        for dir in path_env.split(':') {
+            let candidate = format!("{}/{}", dir, name);
+            if Path::new(&candidate).is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+pub(crate) fn resolve_command_program(vm: &VM, name: &str) -> Result<Object, String> {
+    if let Some(prog) = vm.build_data.find_program_overrides.get(name) {
+        return Ok(prog.clone());
+    }
+    match resolve_program_path(vm, name) {
+        Some(path) => Ok(Object::ExternalProgram(ExternalProgramData {
+            name: name.to_string(),
+            path,
+            found: true,
+            version: None,
+        })),
+        None => Err(format!("Program '{}' not found or not executable", name)),
+    }
+}
+
+fn script_interpreter(path: &str) -> Option<Vec<String>> {
+    let meta = std::fs::metadata(path).ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if meta.permissions().mode() & 0o111 != 0 {
+            return None;
+        }
+    }
+    let content = std::fs::read_to_string(path).ok()?;
+    let shebang = content.lines().next()?.strip_prefix("#!")?.trim();
+    let mut parts: Vec<String> = shebang.split_whitespace().map(String::from).collect();
+    if parts.is_empty() {
+        return None;
+    }
+    if parts[0].ends_with("/env") && parts.len() > 1 {
+        let program = parts[1].clone();
+        if let Ok(path_env) = std::env::var("PATH") {
+            for dir in path_env.split(':') {
+                let candidate = format!("{}/{}", dir, program);
+                if Path::new(&candidate).is_file() {
+                    return Some(vec![candidate]);
+                }
+            }
+        }
+        return Some(vec![program]);
+    }
+    Some(parts)
+}
+
+pub(crate) fn wrap_script_command(command: &mut Vec<String>) {
+    if let Some(first) = command.first() {
+        if let Some(interpreter) = script_interpreter(first) {
+            let script = first.clone();
+            let mut wrapped = interpreter;
+            wrapped.push(script);
+            command.splice(0..1, wrapped);
+        }
+    }
+}
+
+fn target_output_path(root: &str, subdir: &str, output: &str) -> String {
+    if Path::new(output).is_absolute() {
+        output.to_string()
+    } else if subdir.is_empty() {
+        format!("{}/{}", root, output)
+    } else {
+        format!("{}/{}/{}", root, subdir, output)
+    }
+}
+
+fn collect_command_parts(
+    vm: &VM,
+    obj: &Object,
+    command: &mut Vec<String>,
+    deps: &mut Vec<Object>,
+) {
+    match obj {
+        Object::Array(items) => {
+            for item in items {
+                collect_command_parts(vm, item, command, deps);
+            }
+        }
+        Object::File(f) => {
+            let path = resolved_file_path(vm, f);
+            deps.push(Object::File(FileData {
+                path: path.clone(),
+                subdir: String::new(),
+                is_built: false,
+            }));
+            command.push(path);
+        }
+        Object::ExternalProgram(p) => {
+            command.push(p.path.clone());
+            if Path::new(&p.path).is_absolute() {
+                deps.push(Object::File(FileData {
+                    path: p.path.clone(),
+                    subdir: String::new(),
+                    is_built: false,
+                }));
+            }
+        }
+        Object::BuildTarget(t) => {
+            let output = t.outputs.first().cloned().unwrap_or_else(|| t.name.clone());
+            deps.push(Object::File(FileData {
+                path: output.clone(),
+                subdir: t.subdir.clone(),
+                is_built: true,
+            }));
+            command.push(target_output_path(&vm.build_root, &t.subdir, &output));
+        }
+        Object::CustomTarget(r) => {
+            if let Some(output) = r.outputs.first() {
+                deps.push(Object::File(FileData {
+                    path: output.clone(),
+                    subdir: r.subdir.clone(),
+                    is_built: true,
+                }));
+                command.push(target_output_path(&vm.build_root, &r.subdir, output));
+            }
+        }
+        Object::CustomTargetIndex(r, idx) => {
+            if let Some(output) = r.outputs.get(*idx) {
+                deps.push(Object::File(FileData {
+                    path: output.clone(),
+                    subdir: r.subdir.clone(),
+                    is_built: true,
+                }));
+                command.push(target_output_path(&vm.build_root, &r.subdir, output));
+            }
+        }
+        other => command.push(other.to_string_value()),
+    }
+}
+
+fn collect_input_parts(vm: &VM, obj: &Object, input: &mut Vec<String>) {
+    match obj {
+        Object::Array(items) => {
+            for item in items {
+                collect_input_parts(vm, item, input);
+            }
+        }
+        Object::File(f) => input.push(resolved_file_path(vm, f)),
+        Object::CustomTarget(r) => {
+            for output in &r.outputs {
+                input.push(target_output_path(&vm.build_root, &r.subdir, output));
+            }
+        }
+        Object::CustomTargetIndex(r, idx) => {
+            if let Some(output) = r.outputs.get(*idx) {
+                input.push(target_output_path(&vm.build_root, &r.subdir, output));
+            }
+        }
+        other => input.push(other.to_string_value()),
+    }
+}
+
+fn resolve_command_first(vm: &VM, obj: &Object) -> Result<Object, String> {
+    match obj {
+        Object::Array(items) => {
+            let mut items = items.clone();
+            if let Some(Object::String(name)) = items.first().cloned() {
+                items[0] = resolve_command_program(vm, &name)?;
+            }
+            Ok(Object::Array(items))
+        }
+        Object::String(name) => resolve_command_program(vm, name),
+        other => Ok(other.clone()),
+    }
+}
+
+fn same_dependency(a: &Object, b: &Object) -> bool {
+    match (a, b) {
+        (Object::File(x), Object::File(y)) => x.path == y.path && x.subdir == y.subdir,
+        _ => a == b,
+    }
+}
+
+fn append_dependency_tree(dep: &Object, out: &mut Vec<Object>) {
+    out.push(dep.clone());
+    if let Object::Dependency(d) = dep {
+        for nested in &d.dependencies {
+            if matches!(nested, Object::Dependency(_)) {
+                append_dependency_tree(nested, out);
+            }
+        }
     }
 }

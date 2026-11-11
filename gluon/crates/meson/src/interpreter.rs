@@ -37,7 +37,11 @@ impl Interpreter {
             "objcpp_link_args",
         ];
         for (key, value) in opts {
-            let obj = options::parse_option_value(value);
+            let obj = if options::builtin_option_key(key).is_some() {
+                options::parse_builtin_option_value(key, value)
+            } else {
+                options::parse_option_value(value)
+            };
             // Wrap scalar values in arrays for known array-type options
             let obj = if ARRAY_OPTIONS.contains(&key.as_str()) {
                 match obj {
@@ -48,7 +52,7 @@ impl Interpreter {
                 obj
             };
             self.vm.options.insert(key.clone(), obj);
-            self.vm.explicit_option_keys.insert(key.clone());
+            self.vm.cmdline_option_keys.insert(key.clone());
         }
     }
 

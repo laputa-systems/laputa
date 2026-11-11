@@ -13,8 +13,6 @@ pub struct CallArg {
     pub value: Object,
 }
 
-/// Pairs argument names with values, expanding a `kwargs` dictionary into
-/// keyword arguments the way Meson does.
 pub fn call_args(names: Vec<Option<String>>, values: Vec<Object>) -> Result<Vec<CallArg>, String> {
     let mut args = Vec::with_capacity(values.len());
     let mut expanded = Vec::new();
@@ -133,11 +131,10 @@ pub struct VM {
     pub top_subproject_dir: String,
     /// Option keys explicitly set by the caller of subproject() (to prevent subproject own defaults from overriding them)
     pub caller_option_keys: HashSet<String>,
-    /// Option keys set from the command line or a machine file. Meson gives
-    /// these priority over project()/subproject() default_options.
-    pub explicit_option_keys: HashSet<String>,
     /// Native file properties (from --native-file [properties] section)
     pub native_properties: HashMap<String, Object>,
+    /// Options set explicitly on the command line, which outrank project defaults.
+    pub cmdline_option_keys: HashSet<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -176,23 +173,13 @@ pub struct BuildData {
     pub dependency_overrides: HashMap<String, Vec<(Option<bool>, Object)>>,
     pub c_std: String,
     pub cpp_std: String,
-    pub warning_level: String,
-    pub werror: bool,
-    pub optimization: String,
-    pub debug: bool,
-    pub b_colorout: String,
-    pub cpp_rtti: bool,
-    pub cpp_eh: String,
-    pub option_args: HashMap<String, Vec<String>>,
-    pub option_link_args: HashMap<String, Vec<String>>,
-    pub b_staticpic: bool,
-    pub b_pie: bool,
-    pub project_args: HashMap<String, Vec<String>>,
+    pub compiler_ids: HashMap<String, String>,
+    pub project_args: HashMap<String, HashMap<String, Vec<String>>>,
+    pub project_link_args: HashMap<String, HashMap<String, Vec<String>>>,
     pub global_args: HashMap<String, Vec<String>>,
-    pub project_link_args: HashMap<String, Vec<String>>,
     pub global_link_args: HashMap<String, Vec<String>>,
+    pub options: HashMap<String, Object>,
     pub pkgconfig_metadata: HashMap<String, (String, String)>,
-    pub shared_library_only: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -210,12 +197,12 @@ pub struct BuildTarget {
     pub link_depends: Vec<String>,
     pub c_args: Vec<String>,
     pub cpp_args: Vec<String>,
+    pub objc_args: Vec<String>,
+    pub objcpp_args: Vec<String>,
     pub rust_args: Vec<String>,
     pub install: bool,
     pub install_dir: Option<String>,
     pub install_mode: Option<Vec<String>>,
-    pub version: Option<String>,
-    pub soversion: Option<String>,
     pub install_rpath: String,
     pub build_rpath: String,
     pub pic: Option<bool>,
@@ -232,6 +219,99 @@ pub struct BuildTarget {
     pub build_by_default: bool,
     pub subdir: String,
     pub output_name: String,
+    pub project_name: String,
+    pub ltversion: Option<String>,
+    pub soversion: Option<String>,
+    pub darwin_versions: Option<(String, String)>,
+    pub shared_library_only: bool,
+}
+
+impl BuildTarget {
+    pub fn file_prefix(&self) -> String {
+        self.name_prefix.clone().unwrap_or_else(|| match self.target_type {
+            TargetType::Executable => String::new(),
+            TargetType::SharedLibrary
+            | TargetType::SharedModule
+            | TargetType::StaticLibrary => {
+                if cfg!(target_os = "windows") {
+                    String::new()
+                } else {
+                    "lib".to_string()
+                }
+            }
+            _ => String::new(),
+        })
+    }
+
+    pub fn file_suffix(&self) -> String {
+        self.name_suffix.clone().unwrap_or_else(|| match self.target_type {
+            TargetType::Executable => {
+                if cfg!(target_os = "windows") {
+                    "exe".to_string()
+                } else {
+                    String::new()
+                }
+            }
+            TargetType::SharedLibrary | TargetType::SharedModule => {
+                if cfg!(target_os = "windows") {
+                    "dll".to_string()
+                } else if cfg!(target_os = "macos") {
+                    "dylib".to_string()
+                } else {
+                    "so".to_string()
+                }
+            }
+            TargetType::StaticLibrary => "a".to_string(),
+            _ => String::new(),
+        })
+    }
+
+    pub fn unversioned_output_name(&self) -> String {
+        let suffix = self.file_suffix();
+        if suffix.is_empty() {
+            format!("{}{}", self.file_prefix(), self.name)
+        } else {
+            format!("{}{}.{}", self.file_prefix(), self.name, suffix)
+        }
+    }
+
+    /// Install symlinks Meson creates for a versioned shared library.
+    /// Each entry is (alias name, relative target name).
+    pub fn install_aliases(&self) -> Vec<(String, String)> {
+        let mut aliases = Vec::new();
+        let Some(soversion) = &self.soversion else {
+            return aliases;
+        };
+        if !matches!(
+            self.target_type,
+            TargetType::SharedLibrary | TargetType::SharedModule
+        ) {
+            return aliases;
+        }
+        let suffix = self.file_suffix();
+        if suffix != "so" && suffix != "dylib" {
+            return aliases;
+        }
+        let basic = self.unversioned_output_name();
+        if suffix == "so" {
+            if let Some(ltversion) = &self.ltversion {
+                if ltversion != soversion {
+                    let soversion_name = format!(
+                        "{}{}.{}.{}",
+                        self.file_prefix(),
+                        self.name,
+                        suffix,
+                        soversion
+                    );
+                    aliases.push((soversion_name.clone(), self.output_name.clone()));
+                    aliases.push((basic, soversion_name));
+                    return aliases;
+                }
+            }
+        }
+        aliases.push((basic, self.output_name.clone()));
+        aliases
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -242,56 +322,6 @@ pub enum TargetType {
     SharedModule,
     BothLibraries,
     Jar,
-}
-
-impl BuildTarget {
-    fn shared_library_file_version(&self) -> Option<&String> {
-        self.version.as_ref().or(self.soversion.as_ref())
-    }
-
-    pub fn shared_library_base(&self) -> Option<String> {
-        let version = self.shared_library_file_version()?;
-        let suffix = format!(".{}", version);
-        self.output_name
-            .strip_suffix(&suffix)
-            .map(|s| s.to_string())
-    }
-
-    pub fn shared_library_soname(&self) -> Option<String> {
-        let version = self.version.as_ref();
-        let base = self.shared_library_base()?;
-        let soversion = match version {
-            Some(version) => self
-                .soversion
-                .clone()
-                .unwrap_or_else(|| version.split('.').next().unwrap_or(version).to_string()),
-            None => self.soversion.clone()?,
-        };
-        Some(format!("{}.{}", base, soversion))
-    }
-
-    /// (link name, link target) pairs installed alongside the real file.
-    pub fn shared_library_symlinks(&self) -> Vec<(String, String)> {
-        let mut links = Vec::new();
-        if self.target_type != TargetType::SharedLibrary {
-            return links;
-        }
-        let base = match self.shared_library_base() {
-            Some(base) => base,
-            None => return links,
-        };
-        let soname = match self.shared_library_soname() {
-            Some(soname) => soname,
-            None => return links,
-        };
-        if soname != self.output_name {
-            links.push((soname.clone(), self.output_name.clone()));
-        }
-        if base != soname {
-            links.push((base, soname));
-        }
-        links
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -458,8 +488,8 @@ impl VM {
             top_build_root: String::new(),
             top_subproject_dir: "subprojects".to_string(),
             caller_option_keys: HashSet::new(),
-            explicit_option_keys: HashSet::new(),
             native_properties: HashMap::new(),
+            cmdline_option_keys: HashSet::new(),
         }
     }
 

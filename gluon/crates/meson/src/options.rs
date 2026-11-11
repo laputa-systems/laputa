@@ -4,6 +4,287 @@ use crate::objects::{FeatureState, Object};
 /// cross/native files, and version comparison.
 use std::collections::HashMap;
 
+const BUILTIN_OPTION_KEYS: &[&str] = &[
+    "prefix",
+    "bindir",
+    "datadir",
+    "includedir",
+    "infodir",
+    "libdir",
+    "licensedir",
+    "libexecdir",
+    "localedir",
+    "localstatedir",
+    "mandir",
+    "sbindir",
+    "sharedstatedir",
+    "sysconfdir",
+    "auto_features",
+    "backend",
+    "genvslite",
+    "buildtype",
+    "debug",
+    "default_library",
+    "default_both_libraries",
+    "errorlogs",
+    "install_umask",
+    "layout",
+    "namingscheme",
+    "optimization",
+    "prefer_static",
+    "stdsplit",
+    "strip",
+    "unity",
+    "unity_size",
+    "warning_level",
+    "werror",
+    "wrap_mode",
+    "force_fallback_for",
+    "vsenv",
+    "os2_emxomf",
+    "pkgconfig.relocatable",
+    "python.bytecompile",
+    "python.install_env",
+    "python.platlibdir",
+    "python.purelibdir",
+    "python.allow_limited_api",
+    "python.build_config",
+    "pkg_config_path",
+    "build.pkg_config_path",
+    "cmake_prefix_path",
+    "build.cmake_prefix_path",
+];
+
+pub fn builtin_option_key(flag: &str) -> Option<String> {
+    let key = if flag == "warnlevel" {
+        "warning_level".to_string()
+    } else {
+        flag.replace('-', "_")
+    };
+    if BUILTIN_OPTION_KEYS.contains(&key.as_str()) {
+        Some(key)
+    } else {
+        None
+    }
+}
+
+fn builtin_option_kind(key: &str) -> &'static str {
+    match key {
+        "debug" | "errorlogs" | "prefer_static" | "stdsplit" | "strip" | "werror" | "vsenv"
+        | "os2_emxomf" | "pkgconfig.relocatable" | "python.allow_limited_api" => "bool",
+        "unity_size" | "python.bytecompile" => "integer",
+        "force_fallback_for" | "pkg_config_path" | "build.pkg_config_path"
+        | "cmake_prefix_path" | "build.cmake_prefix_path" => "array",
+        _ => "string",
+    }
+}
+
+pub fn builtin_option_is_boolean(key: &str) -> bool {
+    builtin_option_kind(key) == "bool"
+}
+
+fn builtin_string_default(key: &str) -> Option<&'static str> {
+    match key {
+        "prefix" => Some("/usr/local"),
+        "bindir" => Some("bin"),
+        "libdir" => Some("lib"),
+        "libexecdir" => Some("libexec"),
+        "includedir" => Some("include"),
+        "datadir" => Some("share"),
+        "mandir" => Some("share/man"),
+        "infodir" => Some("share/info"),
+        "localedir" => Some("share/locale"),
+        "sysconfdir" => Some("etc"),
+        "localstatedir" => Some("var"),
+        "sharedstatedir" => Some("com"),
+        "sbindir" => Some("sbin"),
+        "licensedir" => Some("share/licenses"),
+        "install_umask" => Some("0022"),
+        _ => None,
+    }
+}
+
+fn prefix_dependent_default(prefix: &str, key: &str) -> Option<&'static str> {
+    match (prefix.trim_end_matches('/'), key) {
+        ("/usr", "sysconfdir") => Some("/etc"),
+        ("/usr", "localstatedir") => Some("/var"),
+        ("/usr", "sharedstatedir") => Some("/var/lib"),
+        ("/usr/local", "localstatedir") => Some("/var/local"),
+        ("/usr/local", "sharedstatedir") => Some("/var/local/lib"),
+        _ => None,
+    }
+}
+
+pub fn builtin_string(options: &HashMap<String, Object>, key: &str) -> String {
+    match options.get(key) {
+        Some(Object::String(value)) => value.clone(),
+        Some(Object::Int(value)) => value.to_string(),
+        _ => {
+            let prefix = match options.get("prefix") {
+                Some(Object::String(prefix)) => prefix.as_str(),
+                _ => "/usr/local",
+            };
+            prefix_dependent_default(prefix, key)
+                .or_else(|| builtin_string_default(key))
+                .unwrap_or("")
+                .to_string()
+        }
+    }
+}
+
+pub fn join_install_path(base: &str, child: &str) -> String {
+    if child.is_empty() {
+        return base.to_string();
+    }
+    if std::path::Path::new(child).is_absolute() || base.is_empty() || base == "." {
+        return child.to_string();
+    }
+    format!("{}/{}", base.trim_end_matches('/'), child)
+}
+
+pub fn parse_builtin_option_value(key: &str, value: &str) -> Object {
+    match builtin_option_kind(key) {
+        "bool" => Object::Bool(value == "true" || value == "1"),
+        "integer" => value
+            .parse::<i64>()
+            .map(Object::Int)
+            .unwrap_or(Object::Int(0)),
+        "array" => Object::Array(
+            value
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| Object::String(s.to_string()))
+                .collect(),
+        ),
+        _ => Object::String(value.to_string()),
+    }
+}
+
+pub fn buildtype_dependents(buildtype: &str) -> Option<(&'static str, bool)> {
+    match buildtype {
+        "plain" => Some(("plain", false)),
+        "debug" => Some(("0", true)),
+        "debugoptimized" => Some(("2", true)),
+        "release" => Some(("3", false)),
+        "minsize" => Some(("s", true)),
+        _ => None,
+    }
+}
+
+pub fn effective_optimization(options: &HashMap<String, Object>) -> String {
+    if let Some(value) = options.get("optimization") {
+        if let Object::String(s) = value {
+            return s.clone();
+        }
+    }
+    if let Some(Object::String(buildtype)) = options.get("buildtype") {
+        if let Some((optimization, _)) = buildtype_dependents(buildtype) {
+            return optimization.to_string();
+        }
+    }
+    "0".to_string()
+}
+
+pub fn effective_debug(options: &HashMap<String, Object>) -> bool {
+    if let Some(Object::Bool(debug)) = options.get("debug") {
+        return *debug;
+    }
+    if let Some(Object::String(buildtype)) = options.get("buildtype") {
+        if let Some((_, debug)) = buildtype_dependents(buildtype) {
+            return debug;
+        }
+    }
+    true
+}
+
+pub fn split_shell_args(value: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_arg = false;
+    let mut chars = value.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\'' => {
+                in_arg = true;
+                for q in chars.by_ref() {
+                    if q == '\'' {
+                        break;
+                    }
+                    current.push(q);
+                }
+            }
+            '"' => {
+                in_arg = true;
+                while let Some(q) = chars.next() {
+                    match q {
+                        '"' => break,
+                        '\\' => match chars.next() {
+                            Some(e @ ('"' | '\\' | '$' | '`')) => current.push(e),
+                            Some('\n') => {}
+                            Some(e) => {
+                                current.push('\\');
+                                current.push(e);
+                            }
+                            None => current.push('\\'),
+                        },
+                        other => current.push(other),
+                    }
+                }
+            }
+            '\\' => {
+                in_arg = true;
+                match chars.next() {
+                    Some('\n') => {}
+                    Some(e) => current.push(e),
+                    None => {}
+                }
+            }
+            c if c.is_whitespace() => {
+                if in_arg {
+                    args.push(std::mem::take(&mut current));
+                    in_arg = false;
+                }
+            }
+            other => {
+                in_arg = true;
+                current.push(other);
+            }
+        }
+    }
+    if in_arg {
+        args.push(current);
+    }
+    args
+}
+
+/// Compiler and linker options Meson seeds from CPPFLAGS, CFLAGS, CXXFLAGS,
+/// OBJCFLAGS, OBJCXXFLAGS, and LDFLAGS for a native build.
+pub fn env_flag_options(env: impl Fn(&str) -> Option<String>) -> Vec<(String, Vec<String>)> {
+    const LANGUAGES: &[(&str, &str)] = &[
+        ("c", "CFLAGS"),
+        ("cpp", "CXXFLAGS"),
+        ("objc", "OBJCFLAGS"),
+        ("objcpp", "OBJCXXFLAGS"),
+    ];
+    let split = |name: &str| env(name).map(|value| split_shell_args(&value));
+    let cppflags = split("CPPFLAGS");
+    let ldflags = split("LDFLAGS");
+    let mut options = Vec::new();
+    for (lang, var) in LANGUAGES {
+        let langflags = split(var);
+        if cppflags.is_some() || langflags.is_some() {
+            let mut args = cppflags.clone().unwrap_or_default();
+            args.extend(langflags.unwrap_or_default());
+            options.push((format!("{}_args", lang), args));
+        }
+        if let Some(ldflags) = &ldflags {
+            options.push((format!("{}_link_args", lang), ldflags.clone()));
+        }
+    }
+    options
+}
+
 /// Parse a value string into an Object
 pub fn parse_option_value(value: &str) -> Object {
     match value {
@@ -445,4 +726,57 @@ pub fn parse_machine_file(path: &str) -> HashMap<String, HashMap<String, String>
     }
 
     sections
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_shell_args_follows_posix_quoting() {
+        assert_eq!(
+            split_shell_args(r#"-O2  -DA="b c" '-DD=$e' -DF=g\ h"#),
+            vec!["-O2", "-DA=b c", "-DD=$e", "-DF=g h"]
+        );
+        assert_eq!(split_shell_args("  "), Vec::<String>::new());
+        assert_eq!(split_shell_args("''"), vec![""]);
+    }
+
+    #[test]
+    fn builtin_directory_defaults_follow_the_prefix() {
+        let options = |prefix: &str| {
+            let mut options = HashMap::new();
+            options.insert("prefix".to_string(), Object::String(prefix.to_string()));
+            options
+        };
+        assert_eq!(builtin_string(&options("/usr"), "sysconfdir"), "/etc");
+        assert_eq!(builtin_string(&options("/usr"), "localstatedir"), "/var");
+        assert_eq!(builtin_string(&options("/usr"), "sharedstatedir"), "/var/lib");
+        assert_eq!(
+            builtin_string(&options("/usr/local"), "localstatedir"),
+            "/var/local"
+        );
+        assert_eq!(
+            builtin_string(&options("/usr/local"), "sharedstatedir"),
+            "/var/local/lib"
+        );
+        assert_eq!(builtin_string(&options("/usr/local"), "sysconfdir"), "etc");
+        assert_eq!(builtin_string(&options("/opt/x"), "sysconfdir"), "etc");
+    }
+
+    #[test]
+    fn env_flag_options_prepends_cppflags_and_shares_ldflags() {
+        let env = |name: &str| match name {
+            "CPPFLAGS" => Some("-DX".to_string()),
+            "CFLAGS" => Some("-O2 -ffile-prefix-map=/w=.".to_string()),
+            "LDFLAGS" => Some("-Wl,-z,now".to_string()),
+            _ => None,
+        };
+        let options: HashMap<_, _> = env_flag_options(env).into_iter().collect();
+        assert_eq!(options["c_args"], vec!["-DX", "-O2", "-ffile-prefix-map=/w=."]);
+        assert_eq!(options["cpp_args"], vec!["-DX"]);
+        assert_eq!(options["c_link_args"], vec!["-Wl,-z,now"]);
+        assert_eq!(options["objcpp_link_args"], vec!["-Wl,-z,now"]);
+        assert!(env_flag_options(|_| None).is_empty());
+    }
 }

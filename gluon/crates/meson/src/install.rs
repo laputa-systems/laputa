@@ -1,63 +1,87 @@
 use crate::objects::Object;
-use crate::vm::*;
+use crate::options;
+use crate::vm::{BuildData, BuildTarget, TargetType};
 use deser_json::{Indent, SerializerConfig};
-use deser_value::value;
+use deser_value::{Map, Value};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::process::Command;
 
+const PLAN_FILE: &str = "meson-private/install_plan.json";
 const JSON_PRETTY: SerializerConfig =
     SerializerConfig::builder().pretty(Indent::Spaces(2)).build();
 
-#[derive(Debug, Clone)]
-pub enum InstallSource {
-    File(String),
-    Symlink(String),
-    Directory {
-        path: String,
-        exclude_files: Vec<String>,
-        exclude_directories: Vec<String>,
-        follow_symlinks: bool,
-    },
-    EmptyDir,
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct InstallPlan {
+    pub prefix: String,
+    pub umask: String,
+    pub files: Vec<InstallFile>,
+    pub symlinks: Vec<InstallSymlink>,
+    pub directories: Vec<InstallDirectory>,
+    pub subdirs: Vec<InstallSubdir>,
 }
 
-#[derive(Debug, Clone)]
-pub struct InstallEntry {
-    pub source: InstallSource,
+#[derive(Debug, Clone, PartialEq)]
+pub struct InstallFile {
+    pub source: String,
     pub destination: String,
-    pub mode: Option<u32>,
-    pub tag: String,
-    pub built: bool,
+    pub mode: Option<String>,
+    pub kind: String,
+    pub follow_symlinks: Option<bool>,
     pub install_rpath: Option<String>,
     pub build_rpaths: Vec<String>,
 }
 
-pub struct InstallContext<'a> {
-    pub source_root: &'a str,
-    pub build_root: &'a str,
-    pub options: &'a HashMap<String, Object>,
+#[derive(Debug, Clone, PartialEq)]
+pub struct InstallSymlink {
+    pub target: String,
+    pub destination: String,
 }
 
-pub fn build_install_plan(build_data: &BuildData, ctx: &InstallContext<'_>) -> Vec<InstallEntry> {
-    let mut plan = Vec::new();
-    let prefix = option_string(ctx.options, "prefix", "/usr/local");
+#[derive(Debug, Clone, PartialEq)]
+pub struct InstallDirectory {
+    pub destination: String,
+    pub mode: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct InstallSubdir {
+    pub source: String,
+    pub destination: String,
+    pub mode: Option<String>,
+    pub exclude_files: Vec<String>,
+    pub exclude_directories: Vec<String>,
+    pub follow_symlinks: Option<bool>,
+}
+
+pub fn generate(
+    build_data: &BuildData,
+    options: &HashMap<String, Object>,
+    source_root: &str,
+    build_root: &str,
+) -> Result<InstallPlan, String> {
+    let mut plan = InstallPlan {
+        prefix: options::builtin_string(options, "prefix"),
+        umask: options::builtin_string(options, "install_umask"),
+        ..InstallPlan::default()
+    };
 
     for target in &build_data.targets {
         if !target.install {
             continue;
         }
-        let install_dir = target
-            .install_dir
-            .clone()
-            .unwrap_or_else(|| default_target_dir(&target.target_type, ctx.options));
-        let source = join(ctx.build_root, &join(&target.subdir, &target.output_name));
-        let destination_path = destination(&prefix, &install_dir, &target.output_name);
-        plan.push(InstallEntry {
-            source: InstallSource::File(source),
-            destination: destination_path,
-            mode: install_mode_bits(&target.install_mode),
-            tag: "runtime".to_string(),
-            built: true,
+        let dir = match &target.install_dir {
+            Some(dir) => dir.clone(),
+            None => default_target_dir(&target.target_type, options),
+        };
+        plan.files.push(InstallFile {
+            source: build_output_path(build_root, &target.subdir, &target.output_name),
+            destination: options::join_install_path(&dir, &target.output_name),
+            mode: first_permission(target.install_mode.as_deref()),
+            kind: "target".to_string(),
+            follow_symlinks: None,
             install_rpath: if target.install_rpath.is_empty() {
                 None
             } else {
@@ -65,86 +89,85 @@ pub fn build_install_plan(build_data: &BuildData, ctx: &InstallContext<'_>) -> V
             },
             build_rpaths: rpath_dirs_to_remove(target),
         });
-        for (link_name, link_target) in target.shared_library_symlinks() {
-            plan.push(InstallEntry {
-                source: InstallSource::Symlink(link_target),
-                destination: destination(&prefix, &install_dir, &link_name),
+        for (alias, alias_target) in target.install_aliases() {
+            plan.symlinks.push(InstallSymlink {
+                target: alias_target,
+                destination: options::join_install_path(&dir, &alias),
+            });
+        }
+    }
+
+    for target in &build_data.custom_targets {
+        if !target.install {
+            continue;
+        }
+        if target.install_dir.is_empty() {
+            return Err(format!(
+                "custom_target '{}' has install: true but no install_dir",
+                target.name
+            ));
+        }
+        for (index, output) in target.output.iter().enumerate() {
+            let dir = if target.install_dir.len() == 1 {
+                target.install_dir[0].clone()
+            } else if target.install_dir.len() == target.output.len() {
+                target.install_dir[index].clone()
+            } else {
+                return Err(format!(
+                    "custom_target '{}' has {} outputs but {} install_dir values",
+                    target.name,
+                    target.output.len(),
+                    target.install_dir.len()
+                ));
+            };
+            plan.files.push(InstallFile {
+                source: build_output_path(build_root, &target.subdir, output),
+                destination: options::join_install_path(&dir, output),
                 mode: None,
-                tag: "runtime".to_string(),
-                built: false,
+                kind: "target".to_string(),
+                follow_symlinks: None,
                 install_rpath: None,
                 build_rpaths: Vec::new(),
             });
         }
     }
 
-    for ct in &build_data.custom_targets {
-        if !ct.install {
+    for configure in &build_data.configure_files {
+        if !configure.install {
             continue;
         }
-        for (index, output) in ct.output.iter().enumerate() {
-            let install_dir = ct
-                .install_dir
-                .get(index)
-                .or_else(|| ct.install_dir.first())
-                .cloned()
-                .unwrap_or_default();
-            if install_dir.is_empty() {
-                continue;
-            }
-            let source = join(ctx.build_root, &join(&ct.subdir, output));
-            let name = basename(output);
-            plan.push(InstallEntry {
-                source: InstallSource::File(source),
-                destination: destination(&prefix, &install_dir, &name),
-                mode: None,
-                tag: ct
-                    .install_tag
-                    .get(index)
-                    .or_else(|| ct.install_tag.first())
-                    .cloned()
-                    .unwrap_or_else(|| "runtime".to_string()),
-                built: true,
-                install_rpath: None,
-                build_rpaths: Vec::new(),
-            });
-        }
-    }
-
-    for cf in &build_data.configure_files {
-        if !cf.install {
-            continue;
-        }
-        let install_dir = cf.install_dir.clone().unwrap_or_default();
-        if install_dir.is_empty() {
-            continue;
-        }
-        let source = join(ctx.build_root, &join(&cf.subdir, &cf.output));
-        let name = basename(&cf.output);
-        plan.push(InstallEntry {
-            source: InstallSource::File(source),
-            destination: destination(&prefix, &install_dir, &name),
+        let dir = configure.install_dir.clone().ok_or_else(|| {
+            format!(
+                "configure_file '{}' has install: true but no install_dir",
+                configure.output
+            )
+        })?;
+        let output = substitute_placeholders(&configure.output, configure.input.as_deref());
+        plan.files.push(InstallFile {
+            source: build_output_path(build_root, &configure.subdir, &configure.output),
+            destination: options::join_install_path(&dir, &output),
             mode: None,
-            tag: cf
-                .install_tag
-                .clone()
-                .unwrap_or_else(|| "runtime".to_string()),
-            built: true,
+            kind: "configure".to_string(),
+            follow_symlinks: None,
             install_rpath: None,
             build_rpaths: Vec::new(),
         });
     }
 
-    for data in &build_data.install_headers {
-        for raw in &data.sources {
-            let source = resolve_source(ctx, &data.subdir, raw);
-            let name = source_name(ctx, &data.subdir, raw, data.preserve_path);
-            plan.push(InstallEntry {
-                source: InstallSource::File(source),
-                destination: destination(&prefix, &data.install_dir, &name),
-                mode: install_mode_bits(&data.install_mode),
-                tag: "devel".to_string(),
-                built: false,
+    for headers in &build_data.install_headers {
+        for source in &headers.sources {
+            let child = if headers.preserve_path {
+                parent_directory(source)
+            } else {
+                ""
+            };
+            let dir = options::join_install_path(&headers.install_dir, child);
+            plan.files.push(InstallFile {
+                source: source_file_path(source_root, &headers.subdir, source),
+                destination: options::join_install_path(&dir, &file_name(source)),
+                mode: first_permission(headers.install_mode.as_deref()),
+                kind: "headers".to_string(),
+                follow_symlinks: headers.follow_symlinks,
                 install_rpath: None,
                 build_rpaths: Vec::new(),
             });
@@ -152,443 +175,542 @@ pub fn build_install_plan(build_data: &BuildData, ctx: &InstallContext<'_>) -> V
     }
 
     for data in &build_data.install_data {
-        for (index, raw) in data.sources.iter().enumerate() {
-            let source = resolve_source(ctx, &data.subdir, raw);
-            let name = data
-                .rename
-                .get(index)
-                .filter(|s| !s.is_empty())
-                .cloned()
-                .unwrap_or_else(|| source_name(ctx, &data.subdir, raw, data.preserve_path));
-            plan.push(InstallEntry {
-                source: InstallSource::File(source),
-                destination: destination(&prefix, &data.install_dir, &name),
-                mode: install_mode_bits(&data.install_mode),
-                tag: "runtime".to_string(),
-                built: false,
-                install_rpath: None,
-                build_rpaths: Vec::new(),
-            });
-        }
-    }
-
-    for data in &build_data.install_man {
-        for raw in &data.sources {
-            let source = resolve_source(ctx, &data.subdir, raw);
-            let file_name = basename(unwrap_source(raw));
-            let section = man_section(&file_name)
-                .map(|s| format!("man{}", s))
-                .unwrap_or_default();
-            let install_dir = if section.is_empty() {
-                data.install_dir.clone()
+        for (index, source) in data.sources.iter().enumerate() {
+            let renamed = data.rename.get(index).map(String::as_str);
+            let child = if data.preserve_path {
+                parent_directory(source)
             } else {
-                join(&data.install_dir, &section)
+                ""
             };
-            plan.push(InstallEntry {
-                source: InstallSource::File(source),
-                destination: destination(&prefix, &install_dir, &file_name),
-                mode: install_mode_bits(&data.install_mode),
-                tag: "runtime".to_string(),
-                built: false,
+            let dir = options::join_install_path(&data.install_dir, child);
+            plan.files.push(InstallFile {
+                source: source_file_path(source_root, &data.subdir, source),
+                destination: options::join_install_path(
+                    &dir,
+                    renamed.unwrap_or_else(|| file_name(source)),
+                ),
+                mode: first_permission(data.install_mode.as_deref()),
+                kind: "data".to_string(),
+                follow_symlinks: data.follow_symlinks,
                 install_rpath: None,
                 build_rpaths: Vec::new(),
             });
         }
     }
 
-    for data in &build_data.install_subdirs {
-        for raw in &data.sources {
-            let source = resolve_source(ctx, &data.subdir, raw);
-            let install_dir = if data.strip_directory {
-                data.install_dir.clone()
+    for man in &build_data.install_man {
+        for source in &man.sources {
+            let section = man_section(source)?;
+            let dir = if man.install_dir.is_empty() {
+                options::join_install_path(
+                    &options::builtin_string(options, "mandir"),
+                    &format!("man{}", section),
+                )
             } else {
-                join(&data.install_dir, &basename(raw))
+                man.install_dir.clone()
             };
-            plan.push(InstallEntry {
-                source: InstallSource::Directory {
-                    path: source,
-                    exclude_files: data.exclude_files.clone(),
-                    exclude_directories: data.exclude_directories.clone(),
-                    follow_symlinks: data.follow_symlinks.unwrap_or(false),
-                },
-                destination: destination(&prefix, &install_dir, ""),
-                mode: install_mode_bits(&data.install_mode),
-                tag: "runtime".to_string(),
-                built: false,
+            plan.files.push(InstallFile {
+                source: source_file_path(source_root, &man.subdir, source),
+                destination: options::join_install_path(&dir, &file_name(source)),
+                mode: first_permission(man.install_mode.as_deref()),
+                kind: "man".to_string(),
+                follow_symlinks: None,
                 install_rpath: None,
                 build_rpaths: Vec::new(),
             });
         }
     }
 
-    for symlink in &build_data.install_symlinks {
-        plan.push(InstallEntry {
-            source: InstallSource::Symlink(symlink.target.clone()),
-            destination: destination(&prefix, &symlink.install_dir, &symlink.name),
-            mode: None,
-            tag: "runtime".to_string(),
-            built: false,
-            install_rpath: None,
-            build_rpaths: Vec::new(),
+    for subdir in &build_data.install_subdirs {
+        let source = match subdir.sources.first() {
+            Some(source) => source,
+            None => continue,
+        };
+        let directory = source_file_path(source_root, &subdir.subdir, source);
+        let base = subdir.install_dir.clone();
+        let destination = if subdir.strip_directory {
+            base
+        } else {
+            options::join_install_path(&base, Path::new(&directory).file_name().map(|n| n.to_string_lossy().to_string()).as_deref().unwrap_or(""))
+        };
+        plan.subdirs.push(InstallSubdir {
+            source: directory,
+            destination,
+            mode: first_permission(subdir.install_mode.as_deref()),
+            exclude_files: subdir.exclude_files.clone(),
+            exclude_directories: subdir.exclude_directories.clone(),
+            follow_symlinks: subdir.follow_symlinks,
         });
     }
 
-    for dir in &build_data.install_empty_dirs {
-        plan.push(InstallEntry {
-            source: InstallSource::EmptyDir,
-            destination: destination(&prefix, dir, ""),
+    for directory in &build_data.install_empty_dirs {
+        plan.directories.push(InstallDirectory {
+            destination: directory.clone(),
             mode: None,
-            tag: "runtime".to_string(),
-            built: false,
-            install_rpath: None,
-            build_rpaths: Vec::new(),
         });
     }
 
-    plan
+    for link in &build_data.install_symlinks {
+        plan.symlinks.push(InstallSymlink {
+            target: link.target.clone(),
+            destination: options::join_install_path(&link.install_dir, &link.name),
+        });
+    }
+
+    Ok(plan)
 }
 
-pub fn write_install_metadata(build_root: &str, plan: &[InstallEntry]) -> Result<(), String> {
-    let intro_dir = format!("{}/meson-info", build_root);
-    std::fs::create_dir_all(&intro_dir)
-        .map_err(|e| format!("Cannot create introspection dir: {}", e))?;
+fn default_target_dir(target_type: &TargetType, options: &HashMap<String, Object>) -> String {
+    match target_type {
+        TargetType::Executable => options::builtin_string(options, "bindir"),
+        TargetType::SharedLibrary | TargetType::StaticLibrary | TargetType::SharedModule => {
+            options::builtin_string(options, "libdir")
+        }
+        TargetType::BothLibraries => options::builtin_string(options, "libdir"),
+        TargetType::Jar => options::join_install_path(
+            &options::builtin_string(options, "datadir"),
+            "java",
+        ),
+    }
+}
 
-    let mut installed = deser_value::Map::new();
-    for entry in plan {
-        match &entry.source {
-            InstallSource::File(path) | InstallSource::Directory { path, .. } => {
-                installed.insert(path.clone(), entry.destination.clone());
-            }
-            InstallSource::Symlink(_) => {
-                installed.insert(basename(&entry.destination), entry.destination.clone());
-            }
-            InstallSource::EmptyDir => {}
+fn first_permission(mode: Option<&[String]>) -> Option<String> {
+    mode.and_then(|parts| parts.first().cloned())
+}
+
+fn parent_directory(path: &str) -> &str {
+    Path::new(path)
+        .parent()
+        .and_then(|parent| parent.to_str())
+        .unwrap_or("")
+}
+
+fn file_name(path: &str) -> &str {
+    Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(path)
+}
+
+fn man_section(source: &str) -> Result<u32, String> {
+    let section = source.rsplit('.').next().unwrap_or("");
+    match section.parse::<u32>() {
+        Ok(section) if (1..=9).contains(&section) => Ok(section),
+        _ => Err(format!(
+            "Man file '{}' must have a file extension of a number between 1 and 9",
+            source
+        )),
+    }
+}
+
+fn substitute_placeholders(output: &str, input: Option<&str>) -> String {
+    let Some(input) = input else {
+        return output.to_string();
+    };
+    let plain = file_name(input);
+    let base = Path::new(plain)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or(plain);
+    output
+        .replace("@PLAINNAME@", plain)
+        .replace("@BASENAME@", base)
+}
+
+fn source_file_path(source_root: &str, subdir: &str, source: &str) -> String {
+    if Path::new(source).is_absolute() {
+        return source.to_string();
+    }
+    if subdir.is_empty() {
+        format!("{}/{}", source_root, source)
+    } else {
+        format!("{}/{}/{}", source_root, subdir, source)
+    }
+}
+
+fn build_output_path(build_root: &str, subdir: &str, output: &str) -> String {
+    if subdir.is_empty() {
+        format!("{}/{}", build_root, output)
+    } else {
+        format!("{}/{}/{}", build_root, subdir, output)
+    }
+}
+
+pub fn installed_path(prefix: &str, destination: &str) -> String {
+    if Path::new(destination).is_absolute() {
+        destination.to_string()
+    } else if prefix.is_empty() {
+        destination.to_string()
+    } else {
+        format!("{}/{}", prefix.trim_end_matches('/'), destination)
+    }
+}
+
+pub fn installed_entries(plan: &InstallPlan) -> Vec<(String, String)> {
+    let mut entries = Vec::new();
+    for kind in ["target", "configure", "data", "headers", "man"] {
+        for file in plan.files.iter().filter(|file| file.kind == kind) {
+            entries.push((
+                file.source.clone(),
+                installed_path(&plan.prefix, &file.destination),
+            ));
         }
     }
-    let installed = deser_value::Value::from(installed);
-    std::fs::write(
-        format!("{}/intro-installed.json", intro_dir),
-        JSON_PRETTY
-            .to_string(&installed)
-            .map_err(|e| format!("Cannot serialize installed data: {}", e))?,
-    )
-    .map_err(|e| format!("Cannot write introspection: {}", e))?;
-
-    let entries: Vec<deser_value::Value> = plan.iter().map(entry_to_value).collect();
-    let private_dir = format!("{}/meson-private", build_root);
-    std::fs::create_dir_all(&private_dir)
-        .map_err(|e| format!("Cannot create meson-private: {}", e))?;
-    std::fs::write(
-        format!("{}/install_plan.json", private_dir),
-        JSON_PRETTY
-            .to_string(&deser_value::Value::from(entries))
-            .map_err(|e| format!("Cannot serialize install plan: {}", e))?,
-    )
-    .map_err(|e| format!("Cannot write install plan: {}", e))?;
-
-    Ok(())
+    for subdir in &plan.subdirs {
+        entries.push((
+            subdir.source.clone(),
+            installed_path(&plan.prefix, &subdir.destination),
+        ));
+    }
+    for link in &plan.symlinks {
+        entries.push((
+            file_name(&link.destination).to_string(),
+            installed_path(&plan.prefix, &link.destination),
+        ));
+    }
+    entries
 }
 
-fn entry_to_value(entry: &InstallEntry) -> deser_value::Value {
-    match &entry.source {
-        InstallSource::File(path) => value!({
-            "kind": "file",
-            "source": path.clone(),
-            "dest": entry.destination.clone(),
-            "mode": entry.mode,
-            "tag": entry.tag.clone(),
-            "built": entry.built,
-            "install_rpath": entry.install_rpath.clone(),
-            "build_rpaths": entry.build_rpaths.clone(),
-        }),
-        InstallSource::Symlink(target) => value!({
-            "kind": "symlink",
-            "target": target.clone(),
-            "dest": entry.destination.clone(),
-            "tag": entry.tag.clone(),
-        }),
-        InstallSource::Directory {
-            path,
-            exclude_files,
-            exclude_directories,
-            follow_symlinks,
-        } => value!({
-            "kind": "directory",
-            "source": path.clone(),
-            "dest": entry.destination.clone(),
-            "mode": entry.mode,
-            "tag": entry.tag.clone(),
-            "exclude_files": exclude_files.clone(),
-            "exclude_directories": exclude_directories.clone(),
-            "follow_symlinks": *follow_symlinks,
-        }),
-        InstallSource::EmptyDir => value!({
-            "kind": "emptydir",
-            "dest": entry.destination.clone(),
-            "tag": entry.tag.clone(),
-        }),
+pub fn write_plan(build_root: &str, plan: &InstallPlan) -> Result<(), String> {
+    let path = format!("{}/{}", build_root, PLAN_FILE);
+    let parent = Path::new(&path).parent().unwrap_or(Path::new("."));
+    fs::create_dir_all(parent).map_err(|e| format!("Cannot create {}: {}", parent.display(), e))?;
+    fs::write(&path, JSON_PRETTY.to_string(&plan.to_value()).unwrap())
+        .map_err(|e| format!("Cannot write {}: {}", path, e))
+}
+
+pub fn read_plan(build_root: &str) -> Result<InstallPlan, String> {
+    let path = format!("{}/{}", build_root, PLAN_FILE);
+    let text = fs::read_to_string(&path)
+        .map_err(|e| format!("Cannot read install plan {}: {}", path, e))?;
+    let value: Value =
+        deser_json::from_str(&text).map_err(|e| format!("Cannot parse {}: {}", path, e))?;
+    InstallPlan::from_value(&value).map_err(|e| format!("Invalid install plan {}: {}", path, e))
+}
+
+impl InstallPlan {
+    fn to_value(&self) -> Value {
+        let mut map = Map::new();
+        map.insert("prefix", self.prefix.clone());
+        map.insert("umask", self.umask.clone());
+        map.insert(
+            "files",
+            Value::from(self.files.iter().map(InstallFile::to_value).collect::<Vec<_>>()),
+        );
+        map.insert(
+            "symlinks",
+            Value::from(
+                self.symlinks
+                    .iter()
+                    .map(InstallSymlink::to_value)
+                    .collect::<Vec<_>>(),
+            ),
+        );
+        map.insert(
+            "directories",
+            Value::from(
+                self.directories
+                    .iter()
+                    .map(InstallDirectory::to_value)
+                    .collect::<Vec<_>>(),
+            ),
+        );
+        map.insert(
+            "subdirs",
+            Value::from(
+                self.subdirs
+                    .iter()
+                    .map(InstallSubdir::to_value)
+                    .collect::<Vec<_>>(),
+            ),
+        );
+        Value::from(map)
+    }
+
+    fn from_value(value: &Value) -> Result<Self, String> {
+        Ok(InstallPlan {
+            prefix: string_field(value, "prefix")?,
+            umask: string_field(value, "umask")?,
+            files: sequence(value, "files")?
+                .iter()
+                .map(InstallFile::from_value)
+                .collect::<Result<_, _>>()?,
+            symlinks: sequence(value, "symlinks")?
+                .iter()
+                .map(InstallSymlink::from_value)
+                .collect::<Result<_, _>>()?,
+            directories: sequence(value, "directories")?
+                .iter()
+                .map(InstallDirectory::from_value)
+                .collect::<Result<_, _>>()?,
+            subdirs: sequence(value, "subdirs")?
+                .iter()
+                .map(InstallSubdir::from_value)
+                .collect::<Result<_, _>>()?,
+        })
     }
 }
 
-pub fn run_install(
+impl InstallFile {
+    fn to_value(&self) -> Value {
+        let mut map = Map::new();
+        map.insert("source", self.source.clone());
+        map.insert("destination", self.destination.clone());
+        map.insert("mode", option_value(self.mode.as_deref()));
+        map.insert("kind", self.kind.clone());
+        map.insert("follow_symlinks", option_bool_value(self.follow_symlinks));
+        map.insert("install_rpath", option_value(self.install_rpath.as_deref()));
+        map.insert(
+            "build_rpaths",
+            Value::from(
+                self.build_rpaths
+                    .iter()
+                    .map(|path| Value::from(path.clone()))
+                    .collect::<Vec<_>>(),
+            ),
+        );
+        Value::from(map)
+    }
+
+    fn from_value(value: &Value) -> Result<Self, String> {
+        Ok(InstallFile {
+            source: string_field(value, "source")?,
+            destination: string_field(value, "destination")?,
+            mode: optional_string(value, "mode"),
+            kind: string_field(value, "kind")?,
+            follow_symlinks: optional_bool(value, "follow_symlinks"),
+            install_rpath: optional_string(value, "install_rpath"),
+            build_rpaths: string_sequence(value, "build_rpaths"),
+        })
+    }
+}
+
+impl InstallSymlink {
+    fn to_value(&self) -> Value {
+        let mut map = Map::new();
+        map.insert("target", self.target.clone());
+        map.insert("destination", self.destination.clone());
+        Value::from(map)
+    }
+
+    fn from_value(value: &Value) -> Result<Self, String> {
+        Ok(InstallSymlink {
+            target: string_field(value, "target")?,
+            destination: string_field(value, "destination")?,
+        })
+    }
+}
+
+impl InstallDirectory {
+    fn to_value(&self) -> Value {
+        let mut map = Map::new();
+        map.insert("destination", self.destination.clone());
+        map.insert("mode", option_value(self.mode.as_deref()));
+        Value::from(map)
+    }
+
+    fn from_value(value: &Value) -> Result<Self, String> {
+        Ok(InstallDirectory {
+            destination: string_field(value, "destination")?,
+            mode: optional_string(value, "mode"),
+        })
+    }
+}
+
+impl InstallSubdir {
+    fn to_value(&self) -> Value {
+        let mut map = Map::new();
+        map.insert("source", self.source.clone());
+        map.insert("destination", self.destination.clone());
+        map.insert("mode", option_value(self.mode.as_deref()));
+        map.insert(
+            "exclude_files",
+            Value::from(self.exclude_files.iter().map(|s| Value::from(s.clone())).collect::<Vec<_>>()),
+        );
+        map.insert(
+            "exclude_directories",
+            Value::from(
+                self.exclude_directories
+                    .iter()
+                    .map(|s| Value::from(s.clone()))
+                    .collect::<Vec<_>>(),
+            ),
+        );
+        map.insert("follow_symlinks", option_bool_value(self.follow_symlinks));
+        Value::from(map)
+    }
+
+    fn from_value(value: &Value) -> Result<Self, String> {
+        Ok(InstallSubdir {
+            source: string_field(value, "source")?,
+            destination: string_field(value, "destination")?,
+            mode: optional_string(value, "mode"),
+            exclude_files: string_sequence(value, "exclude_files"),
+            exclude_directories: string_sequence(value, "exclude_directories"),
+            follow_symlinks: optional_bool(value, "follow_symlinks"),
+        })
+    }
+}
+
+fn string_field(value: &Value, field: &str) -> Result<String, String> {
+    value
+        .get(field)
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| format!("missing string field '{}'", field))
+}
+
+fn optional_string(value: &Value, field: &str) -> Option<String> {
+    value.get(field).and_then(|v| v.as_str()).map(str::to_string)
+}
+
+fn optional_bool(value: &Value, field: &str) -> Option<bool> {
+    value.get(field).and_then(|v| v.as_bool())
+}
+
+fn sequence<'a>(value: &'a Value, field: &str) -> Result<&'a deser_value::Seq, String> {
+    value
+        .get(field)
+        .and_then(|v| v.as_seq())
+        .ok_or_else(|| format!("missing sequence field '{}'", field))
+}
+
+fn string_sequence(value: &Value, field: &str) -> Vec<String> {
+    value
+        .get(field)
+        .and_then(|v| v.as_seq())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|v| v.as_str())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn option_value(value: Option<&str>) -> Value {
+    match value {
+        Some(value) => Value::from(value),
+        None => Value::from(()),
+    }
+}
+
+fn option_bool_value(value: Option<bool>) -> Value {
+    match value {
+        Some(value) => Value::from(value),
+        None => Value::from(()),
+    }
+}
+
+pub fn execute(
+    plan: &InstallPlan,
     build_dir: &str,
     destdir: &str,
     strip: bool,
     strip_program: &str,
 ) -> Result<(), String> {
-    let plan_file = format!("{}/meson-private/install_plan.json", build_dir);
-    let text = std::fs::read_to_string(&plan_file)
-        .map_err(|e| format!("Cannot read install plan {}: {}", plan_file, e))?;
-    let entries: Vec<deser_value::Value> = deser_json::from_str(&text)
-        .map_err(|e| format!("Cannot parse install plan {}: {}", plan_file, e))?;
+    let destdir = if destdir.is_empty() {
+        String::new()
+    } else if Path::new(destdir).is_absolute() {
+        destdir.to_string()
+    } else {
+        format!("{}/{}", build_dir.trim_end_matches('/'), destdir)
+    };
+    let umask = parse_umask(&plan.umask);
 
-    let destdir = normalize_destdir(destdir);
-    for entry in &entries {
-        let kind = entry.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-        let dest = entry_dest(entry)?;
-        let target = prefixed(&destdir, &dest);
-        match kind {
-            "file" => {
-                let source = entry.get("source").and_then(|v| v.as_str()).unwrap_or("");
-                let mode = entry.get("mode").and_then(|v| v.as_i64()).map(|v| v as u32);
-                install_file(source, &target, mode)?;
-                let built = entry
-                    .get("built")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                if built {
-                    let install_rpath = entry
-                        .get("install_rpath")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    let build_rpaths = string_seq(entry.get("build_rpaths"));
-                    if strip {
-                        strip_file(&target, strip_program)?;
-                    }
-                    adjust_rpath(&target, install_rpath, &build_rpaths)?;
-                }
-            }
-            "symlink" => {
-                let link_target = entry.get("target").and_then(|v| v.as_str()).unwrap_or("");
-                install_symlink(link_target, &target)?;
-            }
-            "directory" => {
-                let source = entry.get("source").and_then(|v| v.as_str()).unwrap_or("");
-                let mode = entry.get("mode").and_then(|v| v.as_i64()).map(|v| v as u32);
-                let exclude_files = string_seq(entry.get("exclude_files"));
-                let exclude_directories = string_seq(entry.get("exclude_directories"));
-                let follow = entry
-                    .get("follow_symlinks")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                install_directory(
-                    source,
-                    &target,
-                    mode,
-                    &exclude_files,
-                    &exclude_directories,
-                    follow,
-                )?;
-            }
-            "emptydir" => {
-                std::fs::create_dir_all(&target)
-                    .map_err(|e| format!("Cannot create {}: {}", target.display(), e))?;
-                set_mode(&target, 0o755)?;
-            }
-            _ => {}
+    for subdir in &plan.subdirs {
+        let destination = destdir_path(&destdir, &plan.prefix, &subdir.destination);
+        copy_directory(subdir, &destination, umask)?;
+    }
+    for file in &plan.files {
+        let destination = destdir_path(&destdir, &plan.prefix, &file.destination);
+        copy_installed_file(
+            &file.source,
+            &destination,
+            file.mode.as_deref(),
+            umask,
+            file.follow_symlinks,
+        )?;
+        if file.kind == "target" && cfg!(target_os = "macos") {
+            let final_path = installed_path(&plan.prefix, &file.destination);
+            fix_install_name(&file.source, &destination, &final_path)?;
         }
-    }
-
-    Ok(())
-}
-
-fn entry_dest(entry: &deser_value::Value) -> Result<String, String> {
-    entry
-        .get("dest")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| "install plan entry without destination".to_string())
-}
-
-fn install_file(source: &str, target: &Path, mode: Option<u32>) -> Result<(), String> {
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Cannot create {}: {}", parent.display(), e))?;
-    }
-    remove_existing(target);
-    std::fs::copy(source, target).map_err(|e| {
-        format!(
-            "Cannot copy {} to {}: {}",
-            source,
-            target.display(),
-            e
-        )
-    })?;
-    if let Some(mode) = mode {
-        set_mode(target, mode)?;
-    }
-    Ok(())
-}
-
-fn install_symlink(link_target: &str, target: &Path) -> Result<(), String> {
-    if let Some(parent) = target.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Cannot create {}: {}", parent.display(), e))?;
-    }
-    remove_existing(target);
-    std::os::unix::fs::symlink(link_target, target).map_err(|e| {
-        format!(
-            "Cannot create symlink {} -> {}: {}",
-            target.display(),
-            link_target,
-            e
-        )
-    })
-}
-
-fn install_directory(
-    source: &str,
-    target: &Path,
-    mode: Option<u32>,
-    exclude_files: &[String],
-    exclude_directories: &[String],
-    follow_symlinks: bool,
-) -> Result<(), String> {
-    std::fs::create_dir_all(target)
-        .map_err(|e| format!("Cannot create {}: {}", target.display(), e))?;
-    copy_directory(
-        Path::new(source),
-        target,
-        "",
-        mode,
-        exclude_files,
-        exclude_directories,
-        follow_symlinks,
-    )
-}
-
-fn copy_directory(
-    source: &Path,
-    destination: &Path,
-    relative: &str,
-    mode: Option<u32>,
-    exclude_files: &[String],
-    exclude_directories: &[String],
-    follow_symlinks: bool,
-) -> Result<(), String> {
-    let entries = std::fs::read_dir(source)
-        .map_err(|e| format!("Cannot read directory {}: {}", source.display(), e))?;
-    let mut names: Vec<String> = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("Cannot read directory {}: {}", source.display(), e))?;
-        names.push(entry.file_name().to_string_lossy().to_string());
-    }
-    names.sort();
-    for name in names {
-        let source_path = source.join(&name);
-        let relative_path = if relative.is_empty() {
-            name.clone()
-        } else {
-            format!("{}/{}", relative, name)
-        };
-        let target_path = destination.join(&relative_path);
-        let metadata = std::fs::symlink_metadata(&source_path)
-            .map_err(|e| format!("Cannot stat {}: {}", source_path.display(), e))?;
-        let file_type = metadata.file_type();
-        if file_type.is_symlink() {
-            if let Some(parent) = target_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("Cannot create {}: {}", parent.display(), e))?;
+        if file.kind == "target" || file.kind == "configure" {
+            if strip {
+                strip_file(Path::new(&destination), strip_program)?;
             }
-            remove_existing(&target_path);
-            if follow_symlinks {
-                if let Ok(resolved) = std::fs::canonicalize(&source_path) {
-                    std::fs::copy(&resolved, &target_path).map_err(|e| {
-                        format!(
-                            "Cannot copy {} to {}: {}",
-                            resolved.display(),
-                            target_path.display(),
-                            e
-                        )
-                    })?;
-                    if let Some(mode) = mode {
-                        set_mode(&target_path, mode)?;
-                    }
-                    continue;
-                }
-            }
-            let target = std::fs::read_link(&source_path)
-                .map_err(|e| format!("Cannot read symlink {}: {}", source_path.display(), e))?;
-            std::os::unix::fs::symlink(&target, &target_path).map_err(|e| {
-                format!(
-                    "Cannot create symlink {} -> {}: {}",
-                    target_path.display(),
-                    target.display(),
-                    e
-                )
-            })?;
-            continue;
-        }
-        if file_type.is_dir() {
-            if exclude_directories.iter().any(|d| d == &relative_path) {
-                continue;
-            }
-            std::fs::create_dir_all(&target_path)
-                .map_err(|e| format!("Cannot create {}: {}", target_path.display(), e))?;
-            copy_directory(
-                &source_path,
-                destination,
-                &relative_path,
-                mode,
-                exclude_files,
-                exclude_directories,
-                follow_symlinks,
+            adjust_rpath(
+                Path::new(&destination),
+                file.install_rpath.as_deref().unwrap_or(""),
+                &file.build_rpaths,
             )?;
-            continue;
-        }
-        if exclude_files.iter().any(|f| f == &relative_path) {
-            continue;
-        }
-        if let Some(parent) = target_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Cannot create {}: {}", parent.display(), e))?;
-        }
-        remove_existing(&target_path);
-        std::fs::copy(&source_path, &target_path).map_err(|e| {
-            format!(
-                "Cannot copy {} to {}: {}",
-                source_path.display(),
-                target_path.display(),
-                e
-            )
-        })?;
-        if let Some(mode) = mode {
-            set_mode(&target_path, mode)?;
         }
     }
+    for directory in &plan.directories {
+        let destination = destdir_path(&destdir, &plan.prefix, &directory.destination);
+        create_directories(&destination, umask)?;
+        apply_directory_mode(&destination, directory.mode.as_deref(), umask)?;
+    }
+    for link in &plan.symlinks {
+        let destination = destdir_path(&destdir, &plan.prefix, &link.destination);
+        install_symlink(&link.target, &destination, umask)?;
+    }
+
     Ok(())
 }
 
-fn remove_existing(path: &Path) {
-    if let Ok(metadata) = std::fs::symlink_metadata(path) {
-        if metadata.file_type().is_dir() {
-            let _ = std::fs::remove_dir_all(path);
-        } else {
-            let _ = std::fs::remove_file(path);
-        }
+fn fix_install_name(source: &str, destination: &str, final_path: &str) -> Result<(), String> {
+    if !source.ends_with(".dylib") || !is_mach_o(destination) {
+        return Ok(());
+    }
+    match Command::new("install_name_tool")
+        .args(["-id", final_path, destination])
+        .output()
+    {
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => Err(format!(
+            "install_name_tool failed for {}: {}",
+            destination,
+            String::from_utf8_lossy(&output.stderr).trim()
+        )),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "Cannot run install_name_tool for {}: {}",
+            destination, error
+        )),
     }
 }
 
-fn set_mode(path: &Path, mode: u32) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
-        .map_err(|e| format!("Cannot set mode on {}: {}", path.display(), e))
+fn is_mach_o(path: &str) -> bool {
+    use std::io::Read;
+    let mut magic = [0u8; 4];
+    fs::File::open(path)
+        .and_then(|mut file| file.read_exact(&mut magic))
+        .is_ok()
+        && matches!(
+            u32::from_be_bytes(magic),
+            0xfeed_face | 0xfeed_facf | 0xcefa_edfe | 0xcffa_edfe | 0xcafe_babe | 0xbeba_feca
+        )
+}
+
+fn destdir_path(destdir: &str, prefix: &str, destination: &str) -> String {
+    let path = installed_path(prefix, destination);
+    if destdir.is_empty() {
+        path
+    } else {
+        format!(
+            "{}/{}",
+            destdir.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        )
+    }
 }
 
 fn is_elf(path: &Path) -> bool {
     use std::io::Read;
     let mut magic = [0u8; 4];
-    match std::fs::File::open(path) {
+    match fs::File::open(path) {
         Ok(mut file) => file.read_exact(&mut magic).is_ok() && magic == [0x7f, b'E', b'L', b'F'],
         Err(_) => false,
     }
@@ -606,7 +728,7 @@ fn strip_file(target: &Path, strip_program: &str) -> Result<(), String> {
     if !is_elf(target) {
         return Ok(());
     }
-    let mut command = std::process::Command::new(strip_program);
+    let mut command = Command::new(strip_program);
     if cfg!(target_os = "macos") {
         command.arg("-S").arg("-x");
     }
@@ -628,129 +750,6 @@ fn strip_file(target: &Path, strip_program: &str) -> Result<(), String> {
         ));
     }
     Ok(())
-}
-
-fn normalize_destdir(destdir: &str) -> String {
-    if destdir.is_empty() {
-        return String::new();
-    }
-    let path = Path::new(destdir);
-    let resolved = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        std::env::current_dir()
-            .unwrap_or_default()
-            .join(path)
-    };
-    resolved.to_string_lossy().trim_end_matches('/').to_string()
-}
-
-fn prefixed(destdir: &str, dest: &str) -> PathBuf {
-    if destdir.is_empty() {
-        PathBuf::from(dest)
-    } else if dest.starts_with('/') {
-        PathBuf::from(format!("{}{}", destdir, dest))
-    } else {
-        PathBuf::from(format!("{}/{}", destdir, dest))
-    }
-}
-
-fn string_seq(value: Option<&deser_value::Value>) -> Vec<String> {
-    value
-        .and_then(|v| v.as_seq())
-        .map(|seq| {
-            seq.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn option_string(options: &HashMap<String, Object>, name: &str, default: &str) -> String {
-    match options.get(name) {
-        Some(Object::String(s)) => s.clone(),
-        _ => default.to_string(),
-    }
-}
-
-fn default_target_dir(target_type: &TargetType, options: &HashMap<String, Object>) -> String {
-    match target_type {
-        TargetType::Executable => option_string(options, "bindir", "bin"),
-        TargetType::SharedLibrary
-        | TargetType::StaticLibrary
-        | TargetType::SharedModule
-        | TargetType::BothLibraries
-        | TargetType::Jar => option_string(options, "libdir", "lib"),
-    }
-}
-
-fn install_mode_bits(mode: &Option<Vec<String>>) -> Option<u32> {
-    let spec = mode.as_ref()?.first()?.trim();
-    parse_mode(spec)
-}
-
-pub fn parse_mode(spec: &str) -> Option<u32> {
-    if spec.is_empty() {
-        return None;
-    }
-    if spec.chars().all(|c| c.is_ascii_digit() && c < '8') {
-        return u32::from_str_radix(spec, 8).ok();
-    }
-    if spec.len() == 9 {
-        let mut mode = 0u32;
-        for (index, c) in spec.chars().enumerate() {
-            let bit = match c {
-                'r' | 'w' | 'x' | 's' | 't' => 1u32 << (8 - index),
-                '-' | 'S' | 'T' => 0,
-                _ => return None,
-            };
-            mode |= bit;
-        }
-        return Some(mode);
-    }
-    None
-}
-
-fn resolve_source(ctx: &InstallContext<'_>, subdir: &str, raw: &str) -> String {
-    if let Some(inner) = raw
-        .strip_prefix("<orderonly:")
-        .and_then(|s| s.strip_suffix('>'))
-        .or_else(|| raw.strip_prefix("<genout:").and_then(|s| s.strip_suffix('>')))
-    {
-        return join(ctx.build_root, inner);
-    }
-    if Path::new(raw).is_absolute() {
-        return raw.to_string();
-    }
-    join(ctx.source_root, &join(subdir, raw))
-}
-
-fn source_name(ctx: &InstallContext<'_>, subdir: &str, raw: &str, preserve_path: bool) -> String {
-    if preserve_path {
-        if raw.starts_with("<orderonly:") || raw.starts_with("<genout:") {
-            return basename(unwrap_source(raw));
-        }
-        return raw.to_string();
-    }
-    let _ = ctx;
-    let _ = subdir;
-    basename(unwrap_source(raw))
-}
-
-fn unwrap_source(raw: &str) -> &str {
-    raw.strip_prefix("<orderonly:")
-        .and_then(|s| s.strip_suffix('>'))
-        .or_else(|| raw.strip_prefix("<genout:").and_then(|s| s.strip_suffix('>')))
-        .unwrap_or(raw)
-}
-
-fn man_section(file_name: &str) -> Option<String> {
-    let extension = Path::new(file_name).extension()?.to_string_lossy().to_string();
-    if extension.chars().next().map(|c| c.is_ascii_digit()) == Some(true) {
-        Some(extension)
-    } else {
-        None
-    }
 }
 
 fn split_paths(value: &str) -> Vec<String> {
@@ -782,7 +781,9 @@ fn collect_link_directories(objects: &[&Object], directories: &mut Vec<String>) 
     for object in objects {
         match object {
             Object::BuildTarget(target) => {
-                if target.target_type != "static_library" && !directories.contains(&target.subdir) {
+                if target.target_type != "static_library"
+                    && !directories.contains(&target.subdir)
+                {
                     directories.push(target.subdir.clone());
                 }
             }
@@ -822,257 +823,272 @@ fn origin_relative(from: &str, to: &str) -> String {
     }
 }
 
-fn basename(path: &str) -> String {
-    Path::new(path)
-        .file_name()
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.to_string())
+fn parse_umask(value: &str) -> Option<u32> {
+    if value == "preserve" {
+        return None;
+    }
+    u32::from_str_radix(value.trim_start_matches("0o"), 8).ok()
 }
 
-fn destination(prefix: &str, install_dir: &str, name: &str) -> String {
-    let base = if install_dir.starts_with('/') {
-        install_dir.to_string()
-    } else {
-        join(prefix, install_dir)
+fn create_directories(path: &str, umask: Option<u32>) -> Result<(), String> {
+    let umask = match umask {
+        Some(umask) => umask,
+        None => {
+            return fs::create_dir_all(path)
+                .map_err(|e| format!("Cannot create directory {}: {}", path, e));
+        }
     };
-    if name.is_empty() {
-        base
-    } else {
-        join(&base, name)
+    let mut missing = Vec::new();
+    let mut current = std::path::PathBuf::from(path);
+    while !current.exists() {
+        missing.push(current.clone());
+        match current.parent() {
+            Some(parent) => current = parent.to_path_buf(),
+            None => break,
+        }
     }
+    fs::create_dir_all(path).map_err(|e| format!("Cannot create directory {}: {}", path, e))?;
+    for directory in missing {
+        fs::set_permissions(
+            &directory,
+            fs::Permissions::from_mode(0o777 & !umask),
+        )
+        .map_err(|e| format!("Cannot set mode on {}: {}", directory.display(), e))?;
+    }
+    Ok(())
 }
 
-fn join(left: &str, right: &str) -> String {
-    if left.is_empty() {
-        return right.to_string();
+fn copy_installed_file(
+    source: &str,
+    destination: &str,
+    mode: Option<&str>,
+    umask: Option<u32>,
+    follow_symlinks: Option<bool>,
+) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(source)
+        .map_err(|e| format!("Cannot read install source {}: {}", source, e))?;
+    if metadata.is_dir() {
+        return Err(format!(
+            "Tried to install directory {} as a file",
+            source
+        ));
     }
-    if right.is_empty() {
-        return left.to_string();
+    let parent = Path::new(destination)
+        .parent()
+        .ok_or_else(|| format!("Invalid install destination {}", destination))?;
+    create_directories(&parent.to_string_lossy(), umask)?;
+    if let Ok(existing) = fs::symlink_metadata(destination) {
+        if existing.is_dir() {
+            return Err(format!(
+                "Destination {} already exists and is not a file",
+                destination
+            ));
+        }
     }
-    format!(
-        "{}/{}",
-        left.trim_end_matches('/'),
-        right.trim_start_matches('/')
-    )
+
+    if metadata.file_type().is_symlink() && follow_symlinks == Some(false) {
+        let target = fs::read_link(source)
+            .map_err(|e| format!("Cannot read symlink {}: {}", source, e))?;
+        install_symlink(&target.to_string_lossy(), destination, umask)?;
+        return Ok(());
+    }
+
+    let temporary = temporary_path(destination);
+    let _ = fs::remove_file(&temporary);
+    fs::copy(source, &temporary)
+        .map_err(|e| format!("Cannot install {} to {}: {}", source, destination, e))?;
+    let executable = fs::metadata(source)
+        .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false);
+    if let Err(error) = apply_file_mode(&temporary, mode, umask, executable) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error);
+    }
+    if let Err(error) = fs::rename(&temporary, destination) {
+        let _ = fs::remove_file(&temporary);
+        return Err(format!(
+            "Cannot move {} to {}: {}",
+            temporary, destination, error
+        ));
+    }
+    Ok(())
+}
+
+fn temporary_path(destination: &str) -> String {
+    format!("{}.meson-tmp-{}", destination, std::process::id())
+}
+
+fn apply_file_mode(
+    path: &str,
+    mode: Option<&str>,
+    umask: Option<u32>,
+    executable: bool,
+) -> Result<(), String> {
+    let permissions = match mode.and_then(symbolic_permissions) {
+        Some(permissions) => permissions,
+        None => match umask {
+            Some(umask) if executable => 0o777 & !umask,
+            Some(umask) => 0o666 & !umask,
+            None => return Ok(()),
+        },
+    };
+    fs::set_permissions(path, fs::Permissions::from_mode(permissions))
+        .map_err(|e| format!("Cannot set mode on {}: {}", path, e))
+}
+
+fn apply_directory_mode(path: &str, mode: Option<&str>, umask: Option<u32>) -> Result<(), String> {
+    let permissions = match mode.and_then(symbolic_permissions) {
+        Some(permissions) => permissions,
+        None => match umask {
+            Some(umask) => 0o777 & !umask,
+            None => return Ok(()),
+        },
+    };
+    fs::set_permissions(path, fs::Permissions::from_mode(permissions))
+        .map_err(|e| format!("Cannot set mode on {}: {}", path, e))
+}
+
+fn symbolic_permissions(perms: &str) -> Option<u32> {
+    if perms.len() != 9 {
+        return None;
+    }
+    let mut bits = 0u32;
+    let shifts = [6u32, 3, 0];
+    for (index, shift) in shifts.iter().enumerate() {
+        let chars: Vec<char> = perms.chars().skip(index * 3).take(3).collect();
+        if chars.len() != 3 {
+            return None;
+        }
+        if chars[0] == 'r' {
+            bits |= 0o4 << shift;
+        }
+        if chars[1] == 'w' {
+            bits |= 0o2 << shift;
+        }
+        match chars[2] {
+            'x' => bits |= 0o1 << shift,
+            's' => {
+                bits |= 0o1 << shift;
+                if index == 0 {
+                    bits |= 0o4000;
+                } else if index == 1 {
+                    bits |= 0o2000;
+                }
+            }
+            'S' => {
+                if index == 0 {
+                    bits |= 0o4000;
+                } else if index == 1 {
+                    bits |= 0o2000;
+                }
+            }
+            't' => {
+                bits |= 0o1 << shift;
+                bits |= 0o1000;
+            }
+            'T' => bits |= 0o1000,
+            _ => {}
+        }
+    }
+    Some(bits)
+}
+
+fn install_symlink(target: &str, destination: &str, umask: Option<u32>) -> Result<(), String> {
+    let parent = Path::new(destination)
+        .parent()
+        .ok_or_else(|| format!("Invalid symlink destination {}", destination))?;
+    create_directories(&parent.to_string_lossy(), umask)?;
+    if let Ok(existing) = fs::symlink_metadata(destination) {
+        if !existing.file_type().is_symlink() {
+            return Err(format!(
+                "Destination {} already exists and is not a symlink",
+                destination
+            ));
+        }
+        fs::remove_file(destination)
+            .map_err(|e| format!("Cannot replace symlink {}: {}", destination, e))?;
+    }
+    let temporary = temporary_path(destination);
+    let _ = fs::remove_file(&temporary);
+    std::os::unix::fs::symlink(target, &temporary)
+        .map_err(|e| format!("Cannot create symlink {}: {}", temporary, e))?;
+    fs::rename(&temporary, destination)
+        .map_err(|e| format!("Cannot move symlink to {}: {}", destination, e))
+}
+
+fn copy_directory(subdir: &InstallSubdir, destination: &str, umask: Option<u32>) -> Result<(), String> {
+    create_directories(destination, umask)?;
+    apply_directory_mode(destination, subdir.mode.as_deref(), umask)?;
+    copy_directory_contents(Path::new(&subdir.source), Path::new(destination), subdir, umask)
+}
+
+fn copy_directory_contents(
+    source: &Path,
+    destination: &Path,
+    subdir: &InstallSubdir,
+    umask: Option<u32>,
+) -> Result<(), String> {
+    let entries = fs::read_dir(source)
+        .map_err(|e| format!("Cannot read directory {}: {}", source.display(), e))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Cannot read directory {}: {}", source.display(), e))?;
+        let path = entry.path();
+        let relative = path
+            .strip_prefix(Path::new(&subdir.source))
+            .map_err(|_| format!("Cannot relativize {}", path.display()))?
+            .to_string_lossy()
+            .to_string();
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|e| format!("Cannot read {}: {}", path.display(), e))?;
+        if metadata.is_dir() && !metadata.file_type().is_symlink() {
+            if subdir.exclude_directories.iter().any(|dir| dir == &relative) {
+                continue;
+            }
+            let target = destination.join(&relative);
+            create_directories(&target.to_string_lossy(), umask)?;
+            apply_directory_mode(
+                target.to_str().unwrap_or(""),
+                subdir.mode.as_deref(),
+                umask,
+            )?;
+            copy_directory_contents(&path, destination, subdir, umask)?;
+            continue;
+        }
+        if subdir.exclude_files.iter().any(|file| file == &relative) {
+            continue;
+        }
+        if metadata.is_dir() {
+            continue;
+        }
+        let target = destination.join(&relative);
+        let source_str = path.to_string_lossy().to_string();
+        let target_str = target.to_string_lossy().to_string();
+        copy_installed_file(
+            &source_str,
+            &target_str,
+            subdir.mode.as_deref(),
+            umask,
+            subdir.follow_symlinks,
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objects::Object;
-    use crate::vm::{BuildData, BuildTarget, InstallData, TargetType};
-    use std::os::unix::fs::PermissionsExt;
 
-    fn options() -> HashMap<String, Object> {
-        let mut options = HashMap::new();
-        options.insert("prefix".to_string(), Object::String("/usr".to_string()));
-        options.insert("libdir".to_string(), Object::String("lib".to_string()));
-        options
-    }
-
-    fn shared_library() -> BuildTarget {
-        BuildTarget {
-            name: "foo".to_string(),
-            id: "foo@".to_string(),
-            target_type: TargetType::SharedLibrary,
-            sources: vec!["foo.c".to_string()],
-            objects: Vec::new(),
-            dependencies: Vec::new(),
-            include_dirs: Vec::new(),
-            link_with: Vec::new(),
-            link_whole: Vec::new(),
-            link_args: Vec::new(),
-            link_depends: Vec::new(),
-            c_args: Vec::new(),
-            cpp_args: Vec::new(),
-            rust_args: Vec::new(),
-            install: true,
-            install_dir: None,
-            install_mode: None,
-            version: Some("1.2.3".to_string()),
-            soversion: Some("1".to_string()),
-            install_rpath: String::new(),
-            build_rpath: String::new(),
-            pic: Some(true),
-            pie: None,
-            override_options: Vec::new(),
-            gnu_symbol_visibility: String::new(),
-            native: false,
-            extra_files: Vec::new(),
-            implicit_include_directories: true,
-            win_subsystem: "console".to_string(),
-            name_prefix: None,
-            name_suffix: None,
-            rust_crate_type: None,
-            build_by_default: true,
-            subdir: String::new(),
-            output_name: "libfoo.so.1.2.3".to_string(),
-        }
-    }
-
-    fn plan_with(roots: (&str, &str)) -> Vec<InstallEntry> {
-        let options = options();
-        let mut data = BuildData::default();
-        data.targets.push(shared_library());
-        data.install_headers.push(InstallData {
-            sources: vec!["include/foo/foo.h".to_string()],
-            install_dir: "include/foo".to_string(),
-            install_mode: None,
-            rename: Vec::new(),
-            subdir: String::new(),
-            preserve_path: false,
-            strip_directory: false,
-            exclude_files: Vec::new(),
-            exclude_directories: Vec::new(),
-            follow_symlinks: None,
-        });
-        data.install_data.push(InstallData {
-            sources: vec![format!("{}/meson-private/foo.pc", roots.1)],
-            install_dir: "lib/pkgconfig".to_string(),
-            install_mode: None,
-            rename: Vec::new(),
-            subdir: String::new(),
-            preserve_path: false,
-            strip_directory: false,
-            exclude_files: Vec::new(),
-            exclude_directories: Vec::new(),
-            follow_symlinks: None,
-        });
-        build_install_plan(
-            &data,
-            &InstallContext {
-                source_root: roots.0,
-                build_root: roots.1,
-                options: &options,
-            },
-        )
+    #[test]
+    fn symbolic_permissions_match_meson_modes() {
+        assert_eq!(symbolic_permissions("rw-r--r--"), Some(0o644));
+        assert_eq!(symbolic_permissions("rwxr-xr-x"), Some(0o755));
+        assert_eq!(symbolic_permissions("rwsr-sr-t"), Some(0o7755));
     }
 
     #[test]
-    fn versioned_library_installs_symlinks() {
-        let plan = plan_with(("/src", "/build"));
-        let links: Vec<(String, String)> = plan
-            .iter()
-            .filter_map(|entry| match &entry.source {
-                InstallSource::Symlink(target) => {
-                    Some((basename(&entry.destination), target.clone()))
-                }
-                _ => None,
-            })
-            .collect();
-        assert_eq!(
-            links,
-            vec![
-                ("libfoo.so.1".to_string(), "libfoo.so.1.2.3".to_string()),
-                ("libfoo.so".to_string(), "libfoo.so.1".to_string()),
-            ]
-        );
-        let file = plan
-            .iter()
-            .find(|entry| matches!(entry.source, InstallSource::File(_)) && entry.built)
-            .expect("library file entry");
-        assert_eq!(file.destination, "/usr/lib/libfoo.so.1.2.3");
-    }
-
-    #[test]
-    fn soversion_without_version_links_base_only() {
-        let mut target = shared_library();
-        target.version = None;
-        target.soversion = Some("1".to_string());
-        target.output_name = "libfoo.so.1".to_string();
-        assert_eq!(target.shared_library_soname().as_deref(), Some("libfoo.so.1"));
-        assert_eq!(
-            target.shared_library_symlinks(),
-            vec![("libfoo.so".to_string(), "libfoo.so.1".to_string())]
-        );
-    }
-
-    #[test]
-    fn install_mode_parsing() {
-        assert_eq!(parse_mode("rwxr-xr-x"), Some(0o755));
-        assert_eq!(parse_mode("644"), Some(0o644));
-        assert_eq!(parse_mode("0755"), Some(0o755));
-        assert_eq!(parse_mode("preserve"), None);
-    }
-
-    #[test]
-    fn install_writes_files_symlinks_modes_and_introspection() {
-        let root = std::env::temp_dir().join(format!(
-            "gluon-install-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        let src = root.join("src");
-        let build = root.join("build");
-        let dest = root.join("dest");
-        std::fs::create_dir_all(src.join("include/foo")).unwrap();
-        std::fs::create_dir_all(build.join("meson-private")).unwrap();
-        let library = build.join("libfoo.so.1.2.3");
-        std::fs::write(&library, b"library").unwrap();
-        std::fs::set_permissions(&library, std::fs::Permissions::from_mode(0o755)).unwrap();
-        std::fs::write(src.join("include/foo/foo.h"), b"header").unwrap();
-        std::fs::write(build.join("meson-private/foo.pc"), b"prefix=/usr\n").unwrap();
-
-        let roots = (src.to_str().unwrap(), build.to_str().unwrap());
-        let plan = plan_with(roots);
-        write_install_metadata(roots.1, &plan).unwrap();
-        run_install(roots.1, dest.to_str().unwrap(), false, "strip").unwrap();
-
-        let installed = dest.join("usr/lib/libfoo.so.1.2.3");
-        assert_eq!(std::fs::read(&installed).unwrap(), b"library");
-        assert_eq!(
-            std::fs::metadata(&installed).unwrap().permissions().mode() & 0o777,
-            0o755
-        );
-        assert_eq!(
-            std::fs::read_link(dest.join("usr/lib/libfoo.so.1")).unwrap(),
-            PathBuf::from("libfoo.so.1.2.3")
-        );
-        assert_eq!(
-            std::fs::read_link(dest.join("usr/lib/libfoo.so")).unwrap(),
-            PathBuf::from("libfoo.so.1")
-        );
-        assert_eq!(
-            std::fs::metadata(dest.join("usr/include/foo/foo.h"))
-                .unwrap()
-                .permissions()
-                .mode()
-                & 0o777,
-            0o644
-        );
-        assert!(dest.join("usr/lib/pkgconfig/foo.pc").is_file());
-
-        let intro = std::fs::read_to_string(build.join("meson-info/intro-installed.json")).unwrap();
-        assert!(intro.contains("\"/usr/lib/libfoo.so.1.2.3\""));
-        assert!(intro.contains("\"libfoo.so\""));
-        assert!(intro.contains("\"/usr/include/foo/foo.h\""));
-
-        std::fs::remove_dir_all(&root).ok();
-    }
-
-    #[test]
-    fn strip_failure_is_reported() {
-        let root = std::env::temp_dir().join(format!(
-            "gluon-strip-test-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::create_dir_all(&root).unwrap();
-        let file = root.join("app");
-        std::fs::write(&file, b"\x7fELF\x02\x01\x01").unwrap();
-        let strip = root.join("failing-strip");
-        std::fs::write(&strip, b"#!/bin/sh\nexit 1\n").unwrap();
-        std::fs::set_permissions(&strip, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let error = strip_file(&file, strip.to_str().unwrap()).unwrap_err();
-        assert!(error.contains("failed on"));
-        std::fs::remove_dir_all(&root).ok();
+    fn installed_path_prefixes_relative_destinations() {
+        assert_eq!(installed_path("/usr/local", "lib/libfoo.a"), "/usr/local/lib/libfoo.a");
+        assert_eq!(installed_path("/usr/local", "/opt/libfoo.a"), "/opt/libfoo.a");
+        assert_eq!(installed_path("/usr/local", "bin/tool"), "/usr/local/bin/tool");
     }
 }
-

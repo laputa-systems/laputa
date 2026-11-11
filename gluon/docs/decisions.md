@@ -28,7 +28,7 @@ reverses.
   `scripts/build-deps.sh`); Vulkan-Headers/Loader and shaderc come via
   bottles; SPIRV-Cross and libplacebo build via Meson. No CMake front end.
 - **OD-5 Pushing.** Verified commits on `main` are pushed to `origin`
-  (`git@github.com:joshuarli/gluon`) as they land. Never force-push. Red
+  (`git@github.com:laputa-systems/gluon`) as they land. Never force-push. Red
   work never lands on `main`, so never reaches `origin`.
 - **OD-6 Musl via Docker.** The static-musl artifact builds in a pinned
   Linux container (Docker, `--platform linux/amd64`, `tests/upstream/musl.sh`
@@ -41,6 +41,8 @@ reverses.
   informational; its divergences are logged, never gating. The pin file is
   `tests/upstream/PINS` (reference versions, import SHAs, Docker image,
   libplacebo hash). Every reference update needs differential tests first.
+  Rust toolchain is `nightly-2026-09-15` via `rust-toolchain.toml` (also in
+  `tests/upstream/PINS`).
 - **P-4 Dependency gate.** New crates must show build-time, binary-size, and
   startup deltas and be the smallest viable option; no
   `-C target-cpu=native` in portable artifacts. The `meson` crate's
@@ -48,8 +50,9 @@ reverses.
   `deser-value` on owner direction (2026-11-09); the `sha2` entry was
   removed as unused. Measured delta at replacement: `meson` 1.51 MB →
   1.70 MB, `gluon-build` 1.75 MB → 1.94 MB (dist profile, macOS arm64),
-  accepted on owner direction. `serde` 1.0.229 remains in `Cargo.lock`
-  because `rust_decimal` depends on it. `deser-value` is the only JSON/XML context:
+  accepted on owner direction. `serde` left `Cargo.lock` when `deser-json` /
+  `deser-value` moved to `default-features = false` (measured `meson`
+  1,695,264 → 1,695,248 bytes; `gluon-build` unchanged). `deser-value` is the only JSON/XML context:
   introspection and `cmd_line.txt` round-trips run through it.
 - **Releases.** The `dist` profile (`[profile.dist]` in `Cargo.toml`,
   inheriting `release` with one codegen unit and `strip`) is what CI and

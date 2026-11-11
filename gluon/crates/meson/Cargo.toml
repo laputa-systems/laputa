@@ -7,10 +7,9 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 glob = "0.3"
-graph = { path = "../graph" }
 regex-lite = "0.1"
-deser-json = "0.10.2"
-deser-value = "0.10.2"
+deser-json = { version = "0.10.2", default-features = false }
+deser-value = { version = "0.10.2", default-features = false }
 
 [dev-dependencies]
 rustybench = { version = "0.1" }

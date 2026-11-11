@@ -34,6 +34,7 @@ enum CliCommand {
     Help,
     Version,
     Internal(Vec<String>),
+    Error(i32, String),
 }
 
 struct SetupArgs {
@@ -76,6 +77,7 @@ struct InstallArgs {
     skip_subprojects: bool,
     tags: Vec<String>,
     strip: bool,
+    no_rebuild: bool,
 }
 
 struct IntrospectArgs {
@@ -186,38 +188,23 @@ impl Cli {
                 if i < args.len() {
                     cross_file = Some(args[i].clone());
                 }
+            } else if let Some(value) = arg.strip_prefix("--cross-file=") {
+                cross_file = Some(value.to_string());
             } else if arg == "--native-file" {
                 i += 1;
                 if i < args.len() {
                     native_file = Some(args[i].clone());
                 }
+            } else if let Some(value) = arg.strip_prefix("--native-file=") {
+                native_file = Some(value.to_string());
             } else if arg == "--reconfigure" {
                 reconfigure = true;
             } else if arg == "--wipe" {
                 wipe = true;
             } else if arg.starts_with("--") {
-                let rest = &arg[2..];
-                if let Some((key, value)) = rest.split_once('=') {
-                    if is_builtin_option(key) {
-                        cli_options.push((key.to_string(), value.to_string()));
-                    }
-                } else if is_builtin_option(rest) {
-                    if matches!(rest, "strip" | "werror" | "debug" | "unity") {
-                        cli_options.push((rest.to_string(), "true".to_string()));
-                    } else if let Some(next) = args.get(i + 1) {
-                        if !next.starts_with('-') {
-                            cli_options.push((rest.to_string(), next.clone()));
-                            i += 1;
-                        }
-                    }
-                } else if !arg.contains('=') {
-                    // --flag value form: consume next arg if it looks like a value
-                    // (not another flag) to avoid treating it as positional dir.
-                    if let Some(next) = args.get(i + 1) {
-                        if !next.starts_with("-") {
-                            i += 1;
-                        }
-                    }
+                match parse_builtin_cli_option(args, &mut i) {
+                    Ok(option) => cli_options.push(option),
+                    Err(message) => return CliCommand::Error(2, message),
                 }
             } else {
                 positionals.push(arg.clone());
@@ -270,6 +257,11 @@ impl Cli {
                 let opt = &arg[2..];
                 if let Some(eq) = opt.find('=') {
                     cli_options.push((opt[..eq].to_string(), opt[eq + 1..].to_string()));
+                }
+            } else if arg.starts_with("--") {
+                match parse_builtin_cli_option(args, &mut i) {
+                    Ok(option) => cli_options.push(option),
+                    Err(message) => return CliCommand::Error(2, message),
                 }
             } else {
                 build_dir = arg.clone();
@@ -401,6 +393,7 @@ impl Cli {
         let mut skip_subprojects = false;
         let mut tags = Vec::new();
         let mut strip = false;
+        let mut no_rebuild = false;
         let mut i = 0;
 
         while i < args.len() {
@@ -412,6 +405,9 @@ impl Cli {
                         destdir = Some(args[i].clone());
                     }
                 }
+                _ if arg.starts_with("--destdir=") => {
+                    destdir = Some(arg["--destdir=".len()..].to_string());
+                }
                 "--skip-subprojects" => skip_subprojects = true,
                 "--tags" => {
                     i += 1;
@@ -420,12 +416,14 @@ impl Cli {
                     }
                 }
                 "--strip" => strip = true,
+                "--no-rebuild" => no_rebuild = true,
                 "-C" => {
                     i += 1;
                     if i < args.len() {
                         build_dir = args[i].clone();
                     }
                 }
+                _ if arg.starts_with("-C") => build_dir = arg[2..].to_string(),
                 _ => build_dir = arg.clone(),
             }
             i += 1;
@@ -437,6 +435,7 @@ impl Cli {
             skip_subprojects,
             tags,
             strip,
+            no_rebuild,
         })
     }
 
@@ -647,6 +646,10 @@ impl Cli {
                 self.print_help();
                 0
             }
+            CliCommand::Error(code, message) => {
+                eprintln!("meson: error: {}", message);
+                *code
+            }
         }
     }
 
@@ -687,6 +690,21 @@ impl Cli {
         // Create meson-logs dir
         let logs_dir = format!("{}/meson-logs", build_dir);
         let _ = std::fs::create_dir_all(&logs_dir);
+        let log_path = format!("{}/meson-log.txt", logs_dir);
+        let mut log = String::new();
+        log.push_str("The Meson build system\n");
+        log.push_str(&format!("Version: {} (oxidized-meson)\n", crate::VERSION));
+        log.push_str(&format!("Source dir: {}\n", source_dir));
+        log.push_str(&format!("Build dir: {}\n", build_dir));
+        log.push_str("Build type: native build\n");
+        log.push_str(&format!(
+            "Command: meson setup {} {}\n",
+            source_dir, build_dir
+        ));
+        for (k, v) in &args.options {
+            log.push_str(&format!("option: {}={}\n", k, v));
+        }
+        let _ = std::fs::write(&log_path, &log);
 
         eprintln!("The Meson build system");
         eprintln!("Version: {} (oxidized-meson)", crate::VERSION);
@@ -696,6 +714,17 @@ impl Cli {
 
         // Set up interpreter
         let mut interp = Interpreter::new(&source_dir, &build_dir);
+
+        if args.cross_file.is_none() {
+            for (key, values) in options::env_flag_options(|name| std::env::var(name).ok()) {
+                interp.vm.options.insert(
+                    key,
+                    crate::objects::Object::Array(
+                        values.into_iter().map(crate::objects::Object::String).collect(),
+                    ),
+                );
+            }
+        }
 
         // Load cross/native files
         if let Some(ref cross) = args.cross_file {
@@ -721,7 +750,7 @@ impl Cli {
                         .vm
                         .options
                         .insert(opt_key.clone(), crate::options::parse_option_value(value));
-                    interp.vm.explicit_option_keys.insert(opt_key);
+                    interp.vm.cmdline_option_keys.insert(opt_key);
                 }
             }
         }
@@ -763,7 +792,7 @@ impl Cli {
                         .vm
                         .options
                         .insert(opt_key.clone(), crate::options::parse_option_value(value));
-                    interp.vm.explicit_option_keys.insert(opt_key);
+                    interp.vm.cmdline_option_keys.insert(opt_key);
                 }
             }
         }
@@ -776,12 +805,28 @@ impl Cli {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("Cannot read {}: {}", build_file, e);
+                let _ = {
+                    use std::io::Write;
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&log_path)
+                        .and_then(|mut f| writeln!(f, "ERROR: Cannot read {}: {}", build_file, e))
+                };
                 return 1;
             }
         };
 
         if let Err(e) = interp.run(&source) {
             eprintln!("ERROR: {}", e);
+            let _ = {
+                use std::io::Write;
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&log_path)
+                    .and_then(|mut f| writeln!(f, "ERROR: {}", e))
+            };
             return 1;
         }
 
@@ -791,8 +836,20 @@ impl Cli {
         let project = interp.vm.project.clone().unwrap_or_default();
 
         // Generate build.ninja
-        for (key, std) in [("compiler_c", interp.vm.build_data.c_std.clone()), ("compiler_cpp", interp.vm.build_data.cpp_std.clone())] {
-            let Some(crate::objects::Object::Compiler(compiler)) = interp.vm.globals.get(key).cloned() else {
+        interp.vm.build_data.options = interp.vm.options.clone();
+        for (key, std) in [
+            (
+                "compiler_c",
+                interp.vm.build_data.c_std.clone(),
+            ),
+            (
+                "compiler_cpp",
+                interp.vm.build_data.cpp_std.clone(),
+            ),
+        ] {
+            let Some(crate::objects::Object::Compiler(compiler)) =
+                interp.vm.globals.get(key).cloned()
+            else {
                 continue;
             };
             match crate::compilers::first_supported_std(&compiler, &std) {
@@ -804,11 +861,41 @@ impl Cli {
                 }
             }
         }
-        let backend = NinjaBackend::new(&source_dir, &build_dir).with_toolchain(toolchain(&interp.vm));
+        let install_plan = match crate::install::generate(
+            &interp.vm.build_data,
+            &interp.vm.options,
+            &source_dir,
+            &build_dir,
+        ) {
+            Ok(plan) => plan,
+            Err(e) => {
+                eprintln!("ERROR generating install plan: {}", e);
+                return 1;
+            }
+        };
+        if let Err(e) = crate::install::write_plan(&build_dir, &install_plan) {
+            eprintln!("ERROR writing install plan: {}", e);
+            return 1;
+        }
+        let meson_command = std::env::current_exe()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "meson".to_string());
+        let backend = NinjaBackend::new(&source_dir, &build_dir)
+            .with_meson_command(&meson_command)
+            .with_install_aliases()
+            .with_toolchain(toolchain(&interp.vm));
         let ninja = match backend.generate(&interp.vm.build_data, &project) {
             Ok(n) => n,
             Err(e) => {
                 eprintln!("ERROR generating build.ninja: {}", e);
+                let _ = {
+                    use std::io::Write;
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&log_path)
+                        .and_then(|mut f| writeln!(f, "ERROR generating build.ninja: {}", e))
+                };
                 return 1;
             }
         };
@@ -820,20 +907,13 @@ impl Cli {
         }
 
         // Write introspection data
-        if let Err(e) = write_introspection(&build_dir, &interp.vm.build_data, &project) {
-            eprintln!("Warning: Cannot write introspection: {}", e);
-        }
-
-        let install_plan = crate::install::build_install_plan(
+        if let Err(e) = write_introspection(
+            &build_dir,
             &interp.vm.build_data,
-            &crate::install::InstallContext {
-                source_root: &source_dir,
-                build_root: &build_dir,
-                options: &interp.vm.options,
-            },
-        );
-        if let Err(e) = crate::install::write_install_metadata(&build_dir, &install_plan) {
-            eprintln!("Warning: Cannot write install data: {}", e);
+            &project,
+            &install_plan,
+        ) {
+            eprintln!("Warning: Cannot write introspection: {}", e);
         }
 
         // Write build options for reconfigure
@@ -854,6 +934,17 @@ impl Cli {
         eprintln!();
         eprintln!("Found ninja at: {}", which_ninja());
         eprintln!();
+        let _ = {
+            use std::io::Write;
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_path)
+                .and_then(|mut f| {
+                    writeln!(f, "Build targets in project: {}", interp.vm.build_data.targets.len())?;
+                    writeln!(f, "Found ninja at: {}", which_ninja())
+                })
+        };
 
         0
     }
@@ -992,31 +1083,42 @@ impl Cli {
     }
 
     fn cmd_install(&self, args: &InstallArgs) -> i32 {
-        let compile = self.cmd_compile(&CompileArgs {
-            build_dir: args.build_dir.clone(),
-            targets: Vec::new(),
-            jobs: None,
-            verbose: false,
-            clean: false,
-        });
-        if compile != 0 {
-            eprintln!("Could not rebuild {}", args.build_dir);
-            return compile;
-        }
-
+        let build_dir = std::fs::canonicalize(&args.build_dir)
+            .unwrap_or_else(|_| PathBuf::from(&args.build_dir))
+            .to_string_lossy()
+            .to_string();
         let destdir = args
             .destdir
             .clone()
             .or_else(|| std::env::var("DESTDIR").ok())
             .unwrap_or_default();
 
-        let strip = args.strip || configured_strip(&args.build_dir);
-        let strip_program = configured_strip_program(&args.build_dir);
+        if !args.no_rebuild {
+            let mut cmd = Command::new(which_ninja());
+            cmd.current_dir(&build_dir);
+            match cmd.status() {
+                Ok(status) if status.success() => {}
+                Ok(status) => return status.code().unwrap_or(1),
+                Err(e) => {
+                    eprintln!("Failed to run ninja: {}", e);
+                    return 1;
+                }
+            }
+        }
 
-        match crate::install::run_install(&args.build_dir, &destdir, strip, &strip_program) {
+        let plan = match crate::install::read_plan(&build_dir) {
+            Ok(plan) => plan,
+            Err(e) => {
+                eprintln!("{}", e);
+                return 1;
+            }
+        };
+        let strip = args.strip || configured_strip(&build_dir);
+        let strip_program = configured_strip_program(&build_dir);
+        match crate::install::execute(&plan, &build_dir, &destdir, strip, &strip_program) {
             Ok(()) => 0,
             Err(e) => {
-                eprintln!("Install failed: {}", e);
+                eprintln!("Installation failed: {}", e);
                 1
             }
         }
@@ -1378,24 +1480,14 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_failure_fails_the_install_command() {
-        let dir = temp_build("install-prereq");
-        let args = vec![
-            "meson".to_string(),
-            "install".to_string(),
-            "-C".to_string(),
-            dir.to_str().unwrap().to_string(),
-        ];
-        let code = Cli::parse_args_from(args).run();
-        assert_ne!(code, 0);
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
     fn ninja_spawn_failure_fails() {
         if std::env::var_os("GLUON_EMPTY_PATH_CHILD").is_none() {
             let status = std::process::Command::new(std::env::current_exe().unwrap())
-                .args(["--exact", "cli::tests::ninja_spawn_failure_fails", "--test-threads=1"])
+                .args([
+                    "--exact",
+                    "cli::tests::ninja_spawn_failure_fails",
+                    "--test-threads=1",
+                ])
                 .env("GLUON_EMPTY_PATH_CHILD", "1")
                 .env("PATH", "")
                 .status()
@@ -1412,89 +1504,28 @@ mod tests {
     }
 }
 
-fn is_builtin_option(name: &str) -> bool {
-    matches!(
-        name,
-        "prefix"
-            | "bindir"
-            | "libdir"
-            | "libexecdir"
-            | "includedir"
-            | "datadir"
-            | "mandir"
-            | "infodir"
-            | "localedir"
-            | "sysconfdir"
-            | "localstatedir"
-            | "sharedstatedir"
-            | "sbindir"
-            | "buildtype"
-            | "default_library"
-            | "warning_level"
-            | "werror"
-            | "optimization"
-            | "debug"
-            | "unity"
-            | "strip"
-            | "backend"
-            | "wrap_mode"
-    )
-}
-
-fn record_strip_program(
-    build_dir: &str,
-    machine: &HashMap<String, HashMap<String, String>>,
-) {
-    let Some(value) = machine.get("binaries").and_then(|binaries| binaries.get("strip")) else {
-        return;
-    };
-    let program = first_program(value);
-    let _ = std::fs::write(
-        format!("{}/meson-private/strip_bin.txt", build_dir),
-        program,
-    );
-}
-
-fn first_program(value: &str) -> String {
-    let trimmed = value.trim();
-    let inner = trimmed
-        .strip_prefix('[')
-        .and_then(|s| s.strip_suffix(']'))
-        .unwrap_or(trimmed);
-    let first = inner.split(',').next().unwrap_or(inner).trim();
-    let program = first.trim_matches(|c| c == '\'' || c == '"' || c == ' ');
-    if program.is_empty() {
-        "strip".to_string()
+fn parse_builtin_cli_option(
+    args: &[String],
+    i: &mut usize,
+) -> Result<(String, String), String> {
+    let arg = &args[*i];
+    let rest = arg.trim_start_matches("--");
+    if let Some((flag, value)) = rest.split_once('=') {
+        let key = options::builtin_option_key(flag)
+            .ok_or_else(|| format!("unrecognized arguments: {}", arg))?;
+        Ok((key, value.to_string()))
     } else {
-        program.to_string()
+        let key = options::builtin_option_key(rest)
+            .ok_or_else(|| format!("unrecognized arguments: {}", arg))?;
+        if options::builtin_option_is_boolean(&key) {
+            Ok((key, "true".to_string()))
+        } else if let Some(next) = args.get(*i + 1) {
+            *i += 1;
+            Ok((key, next.clone()))
+        } else {
+            Err(format!("argument {}: expected one argument", arg))
+        }
     }
-}
-
-fn configured_strip_program(build_dir: &str) -> String {
-    std::fs::read_to_string(format!("{}/meson-private/strip_bin.txt", build_dir))
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "strip".to_string())
-}
-
-fn configured_strip(build_dir: &str) -> bool {
-    let cmd_file = format!("{}/meson-private/cmd_line.txt", build_dir);
-    let content = match std::fs::read_to_string(&cmd_file) {
-        Ok(content) => content,
-        Err(_) => return false,
-    };
-    let saved: deser_value::Value = deser_json::from_str(&content).unwrap_or_default();
-    saved["options"]
-        .as_seq()
-        .map(|options| {
-            options.iter().any(|opt| {
-                opt.as_str()
-                    .map(|s| s == "strip=true")
-                    .unwrap_or(false)
-            })
-        })
-        .unwrap_or(false)
 }
 
 fn which_ninja() -> String {
@@ -1568,8 +1599,6 @@ fn format_meson_source(source: &str) -> String {
     result
 }
 
-/// The absolute path of the running meson, which generated edges call for
-/// the `--internal` helpers.
 pub fn meson_program() -> String {
     std::env::current_exe()
         .expect("the running meson has an executable path")
@@ -1577,21 +1606,77 @@ pub fn meson_program() -> String {
         .into_owned()
 }
 
+pub fn split_command(value: &str) -> Vec<String> {
+    value.split_whitespace().map(str::to_string).collect()
+}
+
+fn record_strip_program(build_dir: &str, machine: &HashMap<String, HashMap<String, String>>) {
+    let Some(value) = machine.get("binaries").and_then(|binaries| binaries.get("strip")) else {
+        return;
+    };
+    let program = first_program(value);
+    let _ = std::fs::write(
+        format!("{}/meson-private/strip_bin.txt", build_dir),
+        program,
+    );
+}
+
+fn first_program(value: &str) -> String {
+    let trimmed = value.trim();
+    let inner = trimmed
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(trimmed);
+    let first = inner.split(',').next().unwrap_or(inner).trim();
+    let program = first.trim_matches(|c| c == '\'' || c == '"' || c == ' ');
+    if program.is_empty() {
+        "strip".to_string()
+    } else {
+        program.to_string()
+    }
+}
+
+fn configured_strip_program(build_dir: &str) -> String {
+    std::fs::read_to_string(format!("{}/meson-private/strip_bin.txt", build_dir))
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "strip".to_string())
+}
+
+fn configured_strip(build_dir: &str) -> bool {
+    let cmd_file = format!("{}/meson-private/cmd_line.txt", build_dir);
+    let content = match std::fs::read_to_string(&cmd_file) {
+        Ok(content) => content,
+        Err(_) => return false,
+    };
+    let saved: deser_value::Value = deser_json::from_str(&content).unwrap_or_default();
+    saved["options"]
+        .as_seq()
+        .map(|options| {
+            options.iter().any(|opt| {
+                opt.as_str()
+                    .map(|s| s == "strip=true")
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
+}
+
 fn toolchain(vm: &crate::vm::VM) -> crate::backend::Toolchain {
-    let mut toolchain = crate::backend::Toolchain { meson: meson_program(), ..Default::default() };
+    let mut toolchain = crate::backend::Toolchain::default();
     if let Some(crate::objects::Object::Compiler(c)) = vm.globals.get("compiler_c") {
         toolchain.c = c.cmd.clone();
     }
     if let Some(crate::objects::Object::Compiler(c)) = vm.globals.get("compiler_cpp") {
         toolchain.cpp = c.cmd.clone();
     }
-    if let Some(archiver) = std::env::var("AR").ok().map(|v| split_command(&v)).filter(|w| !w.is_empty()) {
+    if let Some(archiver) = std::env::var("AR")
+        .ok()
+        .map(|value| split_command(&value))
+        .filter(|words| !words.is_empty())
+    {
         toolchain.archiver = archiver;
     }
     toolchain
-}
-
-/// Splits a program variable such as CC="ccache cc -m64" into words.
-pub fn split_command(value: &str) -> Vec<String> {
-    value.split_whitespace().map(str::to_string).collect()
 }

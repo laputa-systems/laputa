@@ -4,12 +4,8 @@ version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
 
-[dependencies]
-graph = { path = "../graph" }
-ninja = { path = "../ninja" }
-state = { path = "../state" }
-
 [dev-dependencies]
+ninja = { path = "../ninja" }
 meson = { path = "../meson" }
 rustybench = { version = "0.1" }
 
