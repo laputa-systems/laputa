@@ -317,10 +317,13 @@ acceptance characterization with enforcement regressions.
   persistence, staged/committed/unknown journal recovery, stale-journal
   rejection with zero mutation, monotonic accepted persistence, expired
   staged-adoption refusal with already-activated roll-forward preserved,
-  torn-journal refusal, and kill -9 at random points converging on re-run.
+  torn-journal refusal, missing/negative/expired verification clocks, and
+  kill -9 at random points converging on re-run.
 - `tests/pm/trust_update_cli.xsh`: entrypoint wiring, usage errors,
   `--url` convergence with `--from`, trickle-download kill with no store
-  mutation, and killed-mid-transaction recovery.
+  mutation, killed-mid-transaction recovery, and an update that changes
+  admissions while a PATH-visible `xinit`/`systemctl`/`service` is never
+  invoked.
 - `tests/pm/trust_update_tls.xsh`: trusted-chain acceptance, untrusted-chain
   rejection, pinned-snapshot poison requiring client recreation, and an
   unblocked control pair — all against fixture PKI, never touching host
@@ -339,7 +342,52 @@ acceptance characterization with enforcement regressions.
   SIGKILLs the guest mid-download and requires forward-only recovery to
   generation 3; a third test crafts a stale generation-1 committed journal on
   the booted generation-2 store and requires refusal with the store
-  untouched. Serial markers carry the exact bundle and policy digests,
-  which the host recomputes from fixtures.
+  untouched. A fourth test prepares generation 2, then kills QEMU immediately
+  after each of the `staged`, `committed`, `activated`, and `persisted` journal
+  fsync boundaries. Each rebuilt guest must recover to generation 3 with the
+  release-C bundle digest, policy generation 3, and the signed publication
+  floor intact; the `staged` cut removes owned staging before the same update
+  proceeds. Serial markers carry the exact bundle and policy digests and the
+  floor, which the host recomputes from fixtures.
 - `packages/ca-certificates/proof.xsh`: layout, pinned roots, blocked SPKIs,
   provisioned key format, and an actually seeded store.
+
+## R4 acceptance matrix
+
+The rows below cover every clause of
+[ROADMAP R4 acceptance](ROADMAP.md#r4-authenticate-repository-and-trust-delivery).
+Each row cites a test that passed on Linux x86_64; guest rows require KVM.
+"Installed generation intact" means the test asserts the active and accepted
+generations and canonical bytes did not move.
+
+| Acceptance clause | Passing evidence |
+|---|---|
+| Tampered objects and indexes fail closed without damaging the installed generation | `tests/pm/pm_repo_snapshot.xsh::test_snapshot_verify_rejects_wrong_signer_and_tampering`; `tests/pm/pm_store.xsh::test_store_rejects_remote_hash_and_metadata_mismatches`; `tests/pm/pm_store.xsh::test_store_detects_payload_receipt_and_key_corruption`; `tests/pm/trust_update.xsh::trust_update_rejects_bad_signatures_and_keys`; `tests/pm/trust_update.xsh::trust_update_rejects_digest_mismatches`; `tests/system/repo_snapshot_guest.xsh::signed_repo_fetch_survives_reboot_and_rejects_tamper_and_rollback` |
+| Stale or replayed metadata fails closed without damaging the installed generation | `tests/pm/pm_repo_snapshot.xsh::test_snapshot_verify_enforces_accepted_floor_and_clock`; `tests/pm/pm_repo_snapshot.xsh::test_verified_fetch_rejects_rollback_of_accepted_file_repository`; `tests/pm/pm_repo_snapshot.xsh::test_persist_accepted_refuses_generation_rollback_and_never_lowers_bound`; `tests/pm/trust_update.xsh::trust_update_rejects_stale_and_conflicting_releases`; `tests/pm/trust_update.xsh::trust_update_rejects_stale_staged_journal_without_mutation`; `tests/pm/trust_update.xsh::trust_update_rejects_stale_committed_journal_without_mutation`; `tests/system/repo_snapshot_guest.xsh::signed_repo_fetch_survives_reboot_and_rejects_tamper_and_rollback` |
+| Interrupted publication fails closed without damaging the installed generation | `tests/pm/pm_publish.xsh::test_publish_conflict_and_failed_object_do_not_switch_file_index`; `tests/pm/pm_repo_snapshot.xsh::test_snapshot_publication_retry_repairs_missing_commit_signature`; `tests/pm/pm_confined_publication.xsh::test_killed_composition_publishes_nothing_partial`; `tests/pm/trust_update.xsh::trust_update_recovers_interrupted_staging`; `tests/pm/trust_update_cli.xsh::trust_update_interrupted_download_leaves_no_store_mutation`; `tests/system/trust_guest.xsh::trust_guest_power_cut_at_every_journal_fsync_recovers_forward` |
+| Missing or incorrect clocks fail per policy without damaging the installed generation | `tests/pm/pm_repo_snapshot.xsh::test_snapshot_verify_fails_closed_on_a_missing_or_incorrect_clock`; `tests/pm/pm_repo_snapshot.xsh::test_snapshot_verify_rejects_expiry_bounds`; `tests/pm/trust_update.xsh::trust_release_verify_fails_closed_on_a_missing_or_incorrect_clock`; `tests/pm/trust_update.xsh::trust_update_rejects_releases_behind_the_time_lower_bound`; `tests/pm/trust_update.xsh::trust_update_rejects_legacy_wall_clock_floor` |
+| Reboot preserves the accepted trust floor | `tests/system/trust_guest.xsh::trust_guest_reboot_replays_clean_generation`; `tests/system/repo_snapshot_guest.xsh::signed_repo_fetch_survives_reboot_and_rejects_tamper_and_rollback`; `tests/system/repo_snapshot_guest.xsh::signed_repo_key_rotation_and_recovery_survive_reboot` |
+| Trust updates prove reboot replay and power-cut recovery without rolling back distrust | `tests/system/trust_guest.xsh::trust_guest_reboot_replays_clean_generation`; `tests/system/trust_guest.xsh::trust_guest_power_cut_recovers_forward`; `tests/system/trust_guest.xsh::trust_guest_power_cut_at_every_journal_fsync_recovers_forward`; `tests/system/trust_guest.xsh::trust_guest_rejects_stale_journal_without_mutation` |
+| Key rotation and recovery are proved | `tests/pm/trust_update.xsh::trust_update_rotates_keys_package_only`; `tests/system/first_boot.xsh::test_repo_keys_provision_the_snapshot_key_set_and_rotate_by_reapplication`; `tests/pm/pm_repo_snapshot.xsh::test_snapshot_verify_accepts_rotation_window_and_rejects_superseded_keys`; `tests/pm/pm_repo_snapshot.xsh::test_publish_snapshot_binds_index_advances_and_freezes`; `tests/system/repo_snapshot_guest.xsh::signed_repo_key_rotation_and_recovery_survive_reboot` |
+| A trust update changes new admissions; running services are restarted by the operator, not a cutover layer | `tests/pm/trust_update_cli.xsh::trust_update_changes_admissions_without_restarting_services`; `tests/pm/trust_update.xsh::trust_update_advances_generations_and_removes_old_roots` |
+
+Focused commands, run from the repository root with the current host tools:
+
+```sh
+"$XSHT" test tests/pm/trust_update.xsh
+"$XSHT" test tests/pm/trust_update_cli.xsh
+"$XSHT" test tests/pm/pm_repo_snapshot.xsh
+"$XSHT" test tests/pm/pm_store.xsh
+"$XSHT" test tests/pm/pm_publish.xsh
+"$XSHT" test --timeout 300s tests/pm/pm_confined_publication.xsh
+"$XSHT" test tests/system/first_boot.xsh
+"$XSHT" test --timeout 240s tests/system/trust_guest.xsh
+"$XSHT" test --timeout 240s tests/system/repo_snapshot_guest.xsh
+```
+
+The three new coverage families (missing/incorrect clock, repository key
+rotation and recovery, and journal-fsync power cuts) were also run with a
+deliberately inverted expectation; each failed, so the checks are sensitive to
+the behavior they claim. Every case uses fixture public keys or public halves
+only; no owner-held production key, private signing key, or credential is
+added.

@@ -295,6 +295,36 @@ proc store_snapshot(root: Path) [fs, error] -> Result[Str, Error] {
   entries.join("\n")
 }
 
+test trust_update_changes_admissions_without_restarting_services [fs, process, env, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-update-no-cutover", "signing-key")?
+  let source = stage_release(ctx, "trust-update-no-cutover-source", "release-b")?
+  let fake_path = test.temp_dir(ctx, name: "trust-update-no-cutover-path")?
+  let sentinel = fp"{fake_path}/service-restarted"
+  for name in ["xinit", "systemctl", "service"] {
+    let launcher = fp"{fake_path}/{name}"
+    launcher.write(bytes.from_text(f"#!/bin/sh\ntouch {sentinel.display()}\n"))?
+    launcher.chmod(0o755)
+  }
+  let xsh = runner()?
+  let modules = module_root()?
+  let out = test.temp_path(ctx, name: "trust-update-no-cutover.out")
+  let err = test.temp_path(ctx, name: "trust-update-no-cutover.err")
+  let command = process.command_argv(
+    xsh.display(),
+    [xsh.display(), fp"{modules}/trust.xsh".display(), "--", "update", "--from", source.display(), "--root", root.display()],
+    modules,
+    {PATH: fake_path.display(), XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display()},
+    stdout: out,
+    stderr: err,
+  )
+  let status = process.run(command)?
+  assert status.ok, err.read_text()?
+  assert ! sentinel.exists()?
+  assert "restart TLS-caching services" in out.read_text()?
+  assert trust_update.trust_status(root)?.generation == "2"
+  assert active_bundle(root)? == fixture("release-b/ca-certificates.crt").read_bytes()?
+}
+
 test trust_cli_status_is_read_only_under_concurrency [fs, process, env, time, error] { |ctx|
   let root = stage_system(ctx, "trust-cli-status-race", "signing-key")?
   let source = stage_release(ctx, "trust-cli-status-race-source", "release-b")?

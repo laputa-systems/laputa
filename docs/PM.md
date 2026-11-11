@@ -501,9 +501,16 @@ are captured, so concurrent planners cannot mix cache identities.
 
 Linux x86_64/KVM `tests/system/repo_snapshot_guest.xsh` exercises the real
 HTTP fetch boundary, rejects index tampering, and retains generation 2 across
-reboot before rejecting generation 1 from the same URL. This tests the fetch
-API with provisioned fixture keys and time, not a production publisher or guest
-CLI installation.
+reboot before rejecting generation 1 from the same URL. A second guest boots
+the provisioned key set through four images: signing key A accepts generation
+1; the A+B rotation window accepts generation 2 signed by B while A still
+verifies generation 1; revoking A rejects A-signed generation 1 and recovers
+delivery with generation 3 signed by B; a further reboot keeps the accepted
+generation and the greatest authenticated publication time. This tests the
+fetch API with provisioned fixture keys and time, not a production publisher or
+guest CLI installation. `tests/pm/pm_repo_snapshot.xsh` additionally rejects
+missing, negative, expired, and floor-behind verification clocks without
+changing accepted state.
 
 `tests/integration/repo_snapshot_installed.py` runs the same fetch inside the
 installed maintained image (the image's own `laputa-pm`, `guest/qemu-maintained-repo.xsh`

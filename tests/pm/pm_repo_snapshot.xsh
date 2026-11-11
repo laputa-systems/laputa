@@ -137,6 +137,22 @@ test test_snapshot_verify_rejects_expiry_bounds [fs, error] { |_|
   expect_snapshot_rejected({...base, metadata: snapshot_bytes("snapshot-overlong", "metadata")?, signature: snapshot_bytes("snapshot-overlong", "metadata.sig")?}, "exceeds the 90-day validity limit")
 }
 
+test test_snapshot_verify_fails_closed_on_a_missing_or_incorrect_clock [fs, error] { |ctx|
+  let base = verify_input([key_bytes("signing-key")?], null)?
+  expect_snapshot_rejected({...base, now_epoch_seconds: 0}, "issued after the current UTC time")
+  expect_snapshot_rejected({...base, now_epoch_seconds: -1}, "current UTC time is invalid")
+  expect_snapshot_rejected({...base, now_epoch_seconds: reference_expires()}, "has expired")
+  expect_snapshot_rejected({...base, now_epoch_seconds: reference_expires() + 86400}, "has expired")
+
+  let state = repo_snapshot.snapshot_state_paths(test.temp_dir(ctx, name: "snapshot-missing-clock")?, "https://example.invalid/repo")
+  let verified = repo_snapshot.snapshot_verify(base)?
+  repo_snapshot.snapshot_persist_accepted(state, verified)?
+  let persisted = state.accepted.read_bytes()?
+  let ahead_of_clock = {...base, accepted: {generation: verified.generation, index_sha256: verified.index_sha256, time_floor: reference_now() + 1}}
+  expect_snapshot_rejected(ahead_of_clock, "behind the authenticated repository publication time")
+  assert state.accepted.read_bytes()? == persisted
+}
+
 test test_snapshot_verify_rejects_a_validly_signed_v1_snapshot [fs, error] { |_|
   let base = verify_input([key_bytes("legacy-key")?], null)?
   expect_snapshot_rejected({...base, metadata: snapshot_bytes("snapshot-v1", "metadata")?, signature: snapshot_bytes("snapshot-v1", "metadata.sig")?}, "header or field count")

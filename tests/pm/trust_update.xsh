@@ -260,6 +260,45 @@ test trust_update_rejects_expired_and_overlong_releases [fs, process, time, erro
   }
 }
 
+test trust_release_verify_fails_closed_on_a_missing_or_incorrect_clock [fs, process, time, error] { |ctx|
+  let root = stage_system(ctx, "trust-release-clock", "signing-key")?
+  let metadata = fixture("release-b/metadata").read_bytes()?
+  let parsed = trust_release.release_parse_metadata(metadata)?
+  let input = {
+    metadata,
+    signature: fixture("release-b/metadata.sig").read_bytes()?,
+    provisioned_public_key: key_bytes("signing-key")?,
+    root_bundle: fixture("release-b/ca-certificates.crt").read_bytes()?,
+    next_policy: fixture("release-b/trust-policy").read_bytes()?,
+    installed_policy_snapshot: fp"{root}/usr/share/laputa/trust/seed/trust-policy".read_bytes()?,
+    now_epoch_seconds: 0,
+  }
+  match trust_release.release_verify(input) {
+    Ok(_) => test.fail("a release was verified without a usable clock"),
+    Err(problem) => assert "issued-at is in the future" in problem.message
+  }
+  match trust_release.release_verify({...input, now_epoch_seconds: -1}) {
+    Ok(_) => test.fail("a release was verified with a negative clock"),
+    Err(problem) => assert "current UTC time is invalid" in problem.message
+  }
+  match trust_release.release_verify({...input, now_epoch_seconds: parsed.expires_at}) {
+    Ok(_) => test.fail("an expired release was verified at its expiry"),
+    Err(problem) => assert "has expired" in problem.message
+  }
+
+  let paths = trust_store.trust_store_paths(root)
+  let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
+  trust_store.trust_store_persist_signed_floor(paths, time.now() / 1000 + 100000)?
+  let source = stage_release(ctx, "trust-release-clock-source", "release-b")?
+  match trust_update.trust_update_from_dir(root, source) {
+    Ok(_) => test.fail("a release was applied with a clock behind the signed floor"),
+    Err(problem) => assert "system clock reads behind" in problem.message
+  }
+  assert trust_store.trust_store_read_active(paths)? == "1"
+  assert trust_store.trust_store_read_accepted(paths)? == "1"
+  assert active_bundle(root)? == p"packages/ca-certificates/files/cacert.pem".read_bytes()?
+}
+
 test trust_update_rejects_unparseable_seed_bundle [fs, process, time, error] { |ctx|
   let root = stage_system(ctx, "trust-update-bad-seed", "signing-key")?
   fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt".write(bytes.from_text("not a bundle\n"))

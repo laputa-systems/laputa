@@ -109,7 +109,13 @@ proc guest_xsh() [fs, process, env, error] -> Result[Path, Error] {
   }
 }
 
-proc stage_initramfs(ctx: TestContext, name: Str, xsh: Path, modules_dir: Path) [fs, process, env, error] -> Result[Path, Error] {
+proc stage_initramfs(
+  ctx: TestContext,
+  name: Str,
+  xsh: Path,
+  modules_dir: Path,
+  main_script: Str = "",
+) [fs, process, env, error] -> Result[Path, Error] {
   let root = test.temp_dir(ctx, name: name)?
   let key_bytes = fixture("keys/signing-key.public.base64").read_text()?.trim().base64_decode()?
   guard key_bytes.len() == 32 else {
@@ -125,7 +131,11 @@ proc stage_initramfs(ctx: TestContext, name: Str, xsh: Path, modules_dir: Path) 
   fp"{root}/bin/xsh".chmod(0o755)
   p"guest/trust-guest-init.xsh".copy(to: fp"{root}/init", overwrite: true)?
   fp"{root}/init".chmod(0o755)
-  p"guest/trust-guest.xsh".copy(to: fp"{root}/guest/main.xsh", overwrite: true)?
+  if main_script == "" {
+    p"guest/trust-guest.xsh".copy(to: fp"{root}/guest/main.xsh", overwrite: true)?
+  } else {
+    fp"{root}/guest/main.xsh".write(bytes.from_text(main_script))
+  }
   fp"{root}/guest/main.xsh".chmod(0o755)
   for entry in fs.children(p"trust")? {
     if entry.name.ends_with(".xsh") {
@@ -218,7 +228,7 @@ proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] ->
         return text
       }
 
-      if "LAPUTA_TRUST_GUEST FAIL" in text {
+      if "LAPUTA_TRUST_GUEST FAIL" in text or "LAPUTA_TRUST_CUT FAIL" in text {
         assert false, f"guest reported failure before {marker}: {text}"
       }
     }
@@ -366,6 +376,281 @@ proc assert_clean_markers(text: Str, digests: GuestDigests, phase0: Bool) [error
   assert "LAPUTA_TRUST_GUEST FAIL" not in text
   if phase0 {
     assert f"PHASE0_OK generation=2 bundle={digests.b_bundle} policy={digests.b_policy}" in text
+  }
+}
+
+const TRUST_CUT_GUEST = """
+use trust.release as trust_release
+use trust.store as trust_store
+use trust.update as trust_update
+
+error CutGuestError = Failed(phase: Str, message: Str)
+
+const GUEST_STORE_DEV = "/dev/vda"
+const GUEST_STORE_MNT = "/store"
+const GUEST_MARKER = "LAPUTA_TRUST_CUT"
+
+type CutRelease = {metadata: Bytes, signature: Bytes, bundle: Bytes, policy: Bytes}
+
+proc say(message: Str) [fs, error] {
+  p"/dev/console".write(bytes.from_text(f"{GUEST_MARKER} {message}\\n"))?
+}
+
+proc fail_phase(phase: Str, message: Str) [fs, error] {
+  say(f"FAIL {phase} {message}")?
+  return Err(CutGuestError.Failed(phase:, message:))
+}
+
+proc wait_for_dev_vda(phase: Str) [fs, time, error] {
+  var elapsed = 0
+  while ! p"/dev/vda".exists()? {
+    guard elapsed < 30 else {
+      return fail_phase(phase, "missing /dev/vda after 30s")
+    }
+
+    time.sleep(1s)?
+    elapsed += 1
+  }
+}
+
+proc insmod_one(name: Str, phase: Str) [fs, process, error] {
+  match linux.insmod(fp"/lib/modules/{name}.ko") {
+    Ok(_) => {},
+    Err(problem) => return fail_phase(phase, f"insmod {name}: {problem.message}"),
+  }
+}
+
+proc load_drivers(phase: Str) [fs, process, error] {
+  for name in [
+    "virtio_ring",
+    "virtio",
+    "virtio_pci_modern_dev",
+    "virtio_pci_legacy_dev",
+    "virtio_pci",
+    "virtio_blk",
+    "failover",
+    "net_failover",
+    "virtio_net",
+    "crc16",
+    "mbcache",
+    "jbd2",
+    "ext4",
+  ] {
+    insmod_one(name, phase)?
+  }
+}
+
+proc mount_store(phase: Str) [fs, process, time, error] {
+  wait_for_dev_vda(phase)?
+  fp"{GUEST_STORE_MNT}".mkdir(parents: true)
+  match linux.mount(bytes.from_text(GUEST_STORE_DEV), fp"{GUEST_STORE_MNT}", fstype: "ext4") {
+    Ok(_) => {},
+    Err(problem) => return fail_phase(phase, f"mount store: {problem.message}"),
+  }
+}
+
+proc cmdline_value(key: Str) [fs, error] -> Result[Str, Error] {
+  for field in p"/proc/cmdline".read_text()?.split(" ") {
+    guard field.starts_with(f"{key}=") else {
+      continue
+    }
+
+    return field.byte_slice(key.byte_len() + 1, field.byte_len()).trim()
+  }
+
+  Err(CutGuestError.Failed(phase: "cmdline", message: f"missing {key} on the kernel command line"))
+}
+
+proc release_c() [fs, error] -> Result[CutRelease, Error] {
+  {
+    metadata: p"/releases/release-c/metadata".read_bytes()?,
+    signature: p"/releases/release-c/metadata.sig".read_bytes()?,
+    bundle: p"/releases/release-c/ca-certificates.crt".read_bytes()?,
+    policy: p"/releases/release-c/trust-policy".read_bytes()?,
+  }
+}
+
+proc cut_here(phase: Str) [fs, time, error] {
+  say(f"CUT {phase}")?
+  while true {
+    time.sleep(1s)?
+  }
+}
+
+proc prepare(paths: trust_store.TrustStorePaths) [fs, process, time, error] {
+  let before = trust_update.trust_status(p"/")?
+  guard before.initialized.require(Bool)? == false else {
+    return fail_phase("prepare", "expected an uninitialized store")
+  }
+  let applied = trust_update.trust_update_from_dir(p"/", p"/releases/release-b")?
+  guard applied.generation.require(Str)? == "2" else {
+    return fail_phase("prepare", "offline release B did not reach generation 2")
+  }
+  guard trust_store.trust_store_read_active(paths)? == "2" else {
+    return fail_phase("prepare", "generation 2 is not active after preparation")
+  }
+  say("PREPARE_OK generation=2")?
+  linux.poweroff()?
+}
+
+proc cut_at(paths: trust_store.TrustStorePaths, key: Bytes, phase: Str) [fs, process, time, error] {
+  guard trust_store.trust_store_read_active(paths)? == "2" else {
+    return fail_phase(phase, "expected active generation 2 before the cut")
+  }
+  guard trust_store.trust_store_read_accepted(paths)? == "2" else {
+    return fail_phase(phase, "expected accepted generation 2 before the cut")
+  }
+  let release = release_c()?
+  let installed = trust_store.canonical_policy_path(p"/").read_bytes()?
+  let verified = trust_release.release_verify({
+    metadata: release.metadata,
+    signature: release.signature,
+    provisioned_public_key: key,
+    root_bundle: release.bundle,
+    next_policy: release.policy,
+    installed_policy_snapshot: installed,
+    now_epoch_seconds: time.now() / 1000,
+  })?
+  let staged = trust_store.trust_store_stage_candidate(
+    paths,
+    "3",
+    verified.root_bundle,
+    verified.trust_policy,
+    release.metadata,
+    release.signature,
+  )?
+  trust_store.trust_store_write_journal(paths, "staged", "3", staged.path, staged.token)?
+  if phase == "staged" {
+    cut_here(phase)?
+  }
+  trust_store.trust_store_commit_generation(paths, staged.path, "3")?
+  trust_store.trust_store_write_journal(paths, "committed", "3", staged.path, staged.token)?
+  if phase == "committed" {
+    cut_here(phase)?
+  }
+  trust_store.trust_store_flip_active(paths, "3")?
+  trust_store.trust_store_write_journal(paths, "activated", "3", "", staged.token)?
+  if phase == "activated" {
+    cut_here(phase)?
+  }
+  trust_store.trust_store_persist_accepted(paths, "3")?
+  trust_store.trust_store_persist_signed_floor(paths, verified.issued_at)?
+  trust_store.trust_store_write_journal(paths, "persisted", "3", "", staged.token)?
+  if phase == "persisted" {
+    cut_here(phase)?
+  }
+  fail_phase(phase, "cut phase did not stop the guest")
+}
+
+proc recover(paths: trust_store.TrustStorePaths) [fs, process, time, error] {
+  let before = match trust_store.trust_store_read_active(paths) {
+    Ok(found) => found,
+    Err(_) => "none",
+  }
+  let applied = trust_update.trust_update_from_dir(p"/", p"/releases/release-c")?
+  guard applied.generation.require(Str)? == "3" else {
+    return fail_phase("recover", "recovery did not reach generation 3")
+  }
+  let status = trust_update.trust_status(p"/")?
+  guard status.generation.require(Str)? == "3" and status.accepted.require(Str)? == "3" and status.pending.require(Str)? == "none" and status.policy_generation.require(Str)? == "3" else {
+    return fail_phase("recover", "status is not a clean generation 3")
+  }
+  let bundle = trust_store.canonical_bundle_path(p"/").read_bytes()?
+  let policy = trust_store.canonical_policy_path(p"/").read_bytes()?
+  let floor = trust_store.trust_store_read_signed_floor(paths)?
+  let issued = trust_release.release_parse_metadata(p"/releases/release-c/metadata".read_bytes()?)?.issued_at
+  guard floor == issued else {
+    return fail_phase("recover", "recovery did not persist the signed publication floor")
+  }
+  say(f"RECOVER_OK before={before} generation=3 bundle={bundle.sha256().hex()} policy={policy.sha256().hex()} floor={floor}")?
+  linux.poweroff()?
+}
+
+proc main() [fs, process, time, error, io] {
+  p"/proc".mkdir(parents: true)
+  p"/sys".mkdir(parents: true)
+  linux.mount(bytes.from_text("devtmpfs"), p"/dev", fstype: "devtmpfs")?
+  linux.mount(bytes.from_text("proc"), p"/proc", fstype: "proc")?
+  linux.mount(bytes.from_text("sysfs"), p"/sys", fstype: "sysfs")?
+  load_drivers("boot")?
+  mount_store("boot")?
+  fp"/store/trust".mkdir(parents: true)?
+  let mode = cmdline_value("trust_mode")?
+  let paths = trust_store.trust_store_paths(p"/")
+  let key = p"/etc/laputa/trust-update-key".read_bytes()?
+  say(f"BOOT mode={mode}")?
+  if mode == "prepare" {
+    prepare(paths)?
+    return
+  }
+  if mode == "recover" {
+    recover(paths)?
+    return
+  }
+  cut_at(paths, key, mode)?
+}
+
+main()?
+"""
+
+proc release_issued(name: Str) -> Result[Int, Error] {
+  let metadata = fixture(f"{name}/metadata").read_text()?
+  metadata.split("\n")[2].split(" ")[1].parse_int_decimal()
+}
+
+proc marker_boot(
+  ctx: TestContext,
+  name: Str,
+  kernel: Path,
+  initramfs: Path,
+  store: Path,
+  mode: Str,
+  marker: Str,
+) [fs, process, env, time, error] -> Result[GuestBoot, Error] {
+  let boot = launch_guest(ctx, name, kernel, initramfs, store, "https://unused.invalid/", mode)?
+  let _ = wait_for_marker(boot.log, marker, 50)?
+  boot
+}
+
+test trust_guest_power_cut_at_every_journal_fsync_recovers_forward [fs, process, env, time, error] { |ctx|
+  guest_file_or_skip(p"/dev/kvm", "KVM")?
+  let kernel = guest_kernel()?
+  let modules_dir = guest_modules_dir()?
+  let xsh = guest_xsh()?
+  let _ = guest_tool_or_skip("cpio")?
+  let _ = guest_tool_or_skip("mke2fs")?
+  let _ = guest_tool_or_skip("gzip")?
+  let digests = expected_digests()?
+  let issued = release_issued("release-c")?
+  let work = test.temp_dir(ctx, name: "trust-cut-work")?
+  let staging = stage_initramfs(ctx, "trust-cut-root", xsh, modules_dir, main_script: TRUST_CUT_GUEST)?
+  let initramfs = fp"{work}/initramfs.cpio"
+  build_initramfs(staging, initramfs)?
+  let base = fp"{work}/base.ext4"
+  build_store_disk(base, 64)?
+
+  let prepared = marker_boot(ctx, "trust-cut-prepare", kernel, initramfs, base, "prepare", "PREPARE_OK generation=2")?
+  wait_for_exit(prepared.pid, 50)?
+  stop_guest(prepared.pid)
+  assert "LAPUTA_TRUST_CUT FAIL" not in prepared.log.read_text()?
+
+  for phase in ["staged", "committed", "activated", "persisted"] {
+    let store = fp"{work}/cut-{phase}.ext4"
+    base.copy(to: store, overwrite: true)?
+
+    let cut = marker_boot(ctx, f"trust-cut-{phase}", kernel, initramfs, store, phase, f"CUT {phase}")?
+    assert f"CUT {phase}" in cut.log.read_text()?
+    stop_guest(cut.pid)
+    wait_for_exit(cut.pid, 30)?
+    assert "LAPUTA_TRUST_CUT FAIL" not in cut.log.read_text()?
+
+    let recovered = marker_boot(ctx, f"trust-recover-{phase}", kernel, initramfs, store, "recover", "RECOVER_OK")?
+    wait_for_exit(recovered.pid, 50)?
+    stop_guest(recovered.pid)
+    let final = recovered.log.read_text()?
+    assert f"RECOVER_OK before=" in final
+    assert f"generation=3 bundle={digests.c_bundle} policy={digests.c_policy} floor={issued}" in final
+    assert "LAPUTA_TRUST_CUT FAIL" not in final
   }
 }
 
