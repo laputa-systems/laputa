@@ -755,6 +755,15 @@ logs. Bound storage, handle disk-full failure, and exclude secrets. No fleet
 observability platform, journald imitation, or per-service logger architecture
 is required. Basic diagnostics arrive before update-failure tests, not after G2.
 
+**Diagnostics status: forced-reboot acceptance met on Linux x86_64/KVM.**
+`packages/laputa-diagnostics` adds a boot oneshot that writes a bounded event
+log, boot history, lease summary and redacted support bundle to
+`/var/log/diagnostics` ([QEMU](QEMU.md#persistent-diagnostics)).
+`tests/integration/diagnostics_reboot.py` forces a generation fallback and
+checks that the store names the failed generation and its service history,
+stays bounded through ENOSPC, and holds no seeded secret. Open: no profile
+selects the package yet, and it does not reuse the XSH system-report collectors.
+
 **Acceptance:** restore selected mutable state and a bootable system onto a blank
 virtual disk from backup plus trusted artifacts, without relying on the original
 VM. Test missed/overlapping jobs and clock changes without duplicate uncontrolled
