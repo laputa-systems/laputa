@@ -1,7 +1,12 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `d59567c40`, with XSH `d7b4c9c85`, recorded with the other inputs in
-`infra/asterinas/inputs.lock`; both are published. It is qualified by
+The checked-in kernel pin is `81e2541ce`, with XSH `d7b4c9c85`, recorded with
+the other inputs in `infra/asterinas/inputs.lock`; both are published.
+The kernel repair preserves CPU affinity across fork and thread creation.
+The focused developer build passes the fork, thread and exec regressions and
+the eleven native fixture cases. Full current-pin qualification remains open.
+
+The maintained cohorts below were qualified at kernel `d59567c40` by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
 identical state transcripts. On 2026-11-12, clean Laputa `33bffe43d` passed
@@ -14,7 +19,7 @@ The [roadmap](ROADMAP.md) owns the successor kernel
 slices and the [TODO queue](../TODO.md) owns the remaining compatibility
 obligations.
 
-## Qualified surface
+## Maintained surface qualified at d59567c40
 
 - Boot and numeric: the pinned PM root boots and passes the numeric native
   tests on both backends.
@@ -219,9 +224,11 @@ On 2026-11-12, XSH `9ba05675c` with the pinned test image and kernel
 `d59567c40` runs the eleven formerly shared minimal-guest failures in this
 fixture. All eleven pass on Linux. Asterinas passes ten and fails the taskset
 affinity case: a later query observes mask `3` after setting mask `1`.
-This is an open kernel compatibility defect, not an accepted limitation or skip.
-The existing CPU-affinity regression checks setting and querying one thread;
-extend it to distinguish inheritance across fork, thread creation and exec.
+Kernel `81e2541ce` fixes this defect by copying the caller's affinity into cloned
+user tasks. Its new regression fails fork and thread inheritance on `d59567c40`
+while exec passes. The patched developer kernel passes all three paths and all
+eleven native cases. Full native qualification and replay of the maintained
+cohorts against the new published pin remain open.
 
 To run a kernel regression witness against the built bundle and against the
 Linux reference with the same memory, run
