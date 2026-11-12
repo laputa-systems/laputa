@@ -56,6 +56,7 @@ export enum SourceKind {
     SourceFile,
     Directory,
     CargoVendor,
+    CargoGitWorkspace,
 }
 
 ## The expected on-disk kind for a declared package output path.
@@ -345,6 +346,11 @@ export pure parse_dependency_kind(raw: Str) -> Result[DependencyKind, Error] {
   }
 }
 
+## Return checksum-pinned GitHub Cargo workspace archive staging.
+export pure source_cargo_git_workspace() -> SourceKind {
+  CargoGitWorkspace
+}
+
 ## Renders a source kind for legacy recipe metadata and source staging.
 export pure source_kind_text(kind: SourceKind) -> Str {
   match kind {
@@ -355,6 +361,7 @@ export pure source_kind_text(kind: SourceKind) -> Str {
     SourceFile => "file"
     Directory => "directory"
     CargoVendor => "cargo-vendor"
+    CargoGitWorkspace => "cargo-git-workspace"
   }
 }
 
@@ -368,6 +375,7 @@ export pure parse_source_kind(raw: Str) -> Result[SourceKind, Error] {
     "file" => SourceFile
     "directory" => Directory
     "cargo-vendor" => CargoVendor
+    "cargo-git-workspace" => CargoGitWorkspace
     else => Err(PmError.PackageContract(f"invalid upstream source kind {raw}"))
   }
 }

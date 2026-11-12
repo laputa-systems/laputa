@@ -229,9 +229,20 @@ build resolves every crate like any URL source before staging anything, then
 extracts each into `DEST/NAME-VERSION/` with the `.cargo-checksum.json`
 cargo's directory sources need, so a recipe builds with `--offline --locked`
 and `source.crates-io.replace-with` naming a directory source at `DEST`.
-Records without `source` (workspace and path packages) are skipped; any other
-non-crates.io record is rejected, because it has no content address. The
-destination may not be the source root.
+Records without `source` (workspace and path packages) are skipped. Other
+sources are rejected unless a selected `cargo-git-workspace` source explicitly
+pins the matching GitHub repository and full commit archive with a sha256.
+The destination may not be the source root.
+
+A `cargo-git-workspace` entry has the form
+`https://github.com/OWNER/REPO/archive/FULL_COMMIT.tar.gz => DIRECTORY`.
+It stages the verified workspace archive and writes Cargo directory-source
+checksums and `DIRECTORY/.cargo-source.toml`. Pass that configuration to Cargo
+with `--config`, alongside the crates.io directory-source configuration.
+The original Git identity remains in Cargo.lock; builds stay offline and
+locked. Undeclared revisions, archives without sha256, and sources selected
+only for another architecture remain rejected. This path supports workspace
+archives whose packages live in child directories.
 
 ## Catalog and graph
 

@@ -219,10 +219,54 @@ pure empty_lock_record() -> LockRecord {
   {name: "", version: "", source: "", checksum: ""}
 }
 
-pure lock_record_crates(lockfile: Path, record: LockRecord) -> Result[List[LockedCrate]] {
+type CargoGitWorkspace = {url: Str, revision: Str, dest: Path}
+
+pure cargo_git_workspace(source: Path, checksum: Str) -> Result[CargoGitWorkspace] {
+  let line = util.parse_source_line(source)?
+  let _ = ensure_source_dest(line.dest)?
+
+  if line.dest.normalize() == "." or ! sha256_hex.matches(checksum) {
+    return Err(types.PmError.SourceChecksum(f"{source}: cargo-git-workspace requires a destination and archive sha256"))
+  }
+
+  if let [_, owner, repository, revision] = rx"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/archive/([0-9a-f]{40})\.tar\.gz$".captures(line.source) {
+    return {url: f"https://github.com/{owner}/{repository}", revision, dest: line.dest}
+  }
+
+  Err(types.PmError.PackageContract(f"{source}: cargo-git-workspace requires a full GitHub commit archive"))
+}
+
+pure cargo_git_lock_sources(sources: List[types.UpstreamSource]) -> Result[List[Str]] {
+  collect {
+    for source in sources {
+      continue unless source.kind == types.source_cargo_git_workspace()
+
+      if source.checksums.is_empty() {
+        return Err(types.PmError.SourceChecksum(f"{source.source}: missing Git workspace archive checksum"))
+      }
+
+      for checksum in source.checksums {
+        let pinned = cargo_git_workspace(source.source, checksum.sha256)?
+        yield f"git+{pinned.url}?rev={pinned.revision}#{pinned.revision}"
+      }
+    }
+  }
+}
+
+pure selected_cargo_git_sources(pkg: types.Package, arch: Str) -> List[types.UpstreamSource] {
+  collect {
+    for source in pkg.upstream_sources {
+      yield source when source.kind == types.source_cargo_git_workspace() and source_selected(source, arch)
+    }
+  }
+}
+
+pure lock_record_crates(lockfile: Path, record: LockRecord, git_sources: List[Str]) -> Result[List[LockedCrate]] {
   return [] when record.source == ""
 
   let label = f"{lockfile}: {record.name} {record.version}"
+
+  return [] when record.source in git_sources
 
   if record.source not in crates_io_lock_sources {
     return Err(
@@ -247,6 +291,10 @@ pure lock_record_crates(lockfile: Path, record: LockRecord) -> Result[List[Locke
 ## `[[package]]` records are flat `key = "value"` lines, so no TOML parser is
 ## needed.
 export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedCrate], Error] {
+  cargo_registry_crates(lockfile, [])
+}
+
+proc cargo_registry_crates(lockfile: Path, git_sources: List[Str]) -> Result[List[LockedCrate]] {
   var crates: List[LockedCrate] = []
   var current = empty_lock_record()
   var in_package = false
@@ -256,7 +304,7 @@ export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedC
 
     if line.starts_with("[") {
       if in_package {
-        crates += lock_record_crates(lockfile, current)?
+        crates += lock_record_crates(lockfile, current, git_sources)?
       }
 
       in_package = line == "[[package]]"
@@ -288,11 +336,12 @@ proc resolve_locked_crates(
   pkg: types.Package,
   resolved: types.ResolvedSource,
   checksum: Str,
+  arch: Str,
 ) -> Result[List[ResolvedCrate]] {
   verify_source_checksum(resolved.path, checksum, resolved.kind)
   var crates: List[ResolvedCrate] = [
     {item, path: resolve_url_source(pkg.name, crate_download_url(item), item.checksum)?}
-    for item in cargo_lock_crates(resolved.path)?
+    for item in cargo_registry_crates(resolved.path, cargo_git_lock_sources(selected_cargo_git_sources(pkg, arch))?)?
   ]
   crates
 }
@@ -356,6 +405,33 @@ export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result
   0
 }
 
+proc stage_cargo_git_workspace(line: types.SourceLine, checksum: Str, source_path: Path, dest: Path) {
+  let pinned = cargo_git_workspace(fp"{line.source} => {line.dest}", checksum)?
+  dest.remove()?
+  dest.parent.mkdir(parents: true)?
+  archive.extract(source_path, dest, .Tar, strip_components: tar_source_strip_components(source_path)?, collision: .Replace)
+
+  for entry in fs.walk(dest, gitignore: false)? {
+    if entry.kind == "file" and entry.name == "Cargo.toml" and entry.path != fp"{dest}/Cargo.toml" {
+      json.write(fp"{entry.path.parent}/.cargo-checksum.json", {files: {}, package: null})?
+    }
+  }
+
+  let source_name = json.encode(f"git+{pinned.url}?rev={pinned.revision}")?
+  let replacement = json.encode(f"archive+{pinned.url}#{pinned.revision}")?
+  let git_url = json.encode(pinned.url)?
+  let revision = json.encode(pinned.revision)?
+  let directory = json.encode(path.absolute(dest)?.display())?
+  fp"{dest}/.cargo-source.toml".write(f"""[source.{source_name}]
+git = {git_url}
+rev = {revision}
+replace-with = {replacement}
+
+[source.{replacement}]
+directory = {directory}
+""")?
+}
+
 proc stage_resolved_source(
   line: types.SourceLine,
   resolved: types.ResolvedSource,
@@ -371,6 +447,11 @@ proc stage_resolved_source(
 
   if source_kind == types.source_cargo_vendor() {
     stage_cargo_vendor(crates, dest)
+    return
+  }
+
+  if source_kind == types.source_cargo_git_workspace() {
+    stage_cargo_git_workspace(line, checksum, source_path, dest)
     return
   }
 
@@ -441,7 +522,7 @@ export proc stage_package_sources(pkg: types.Package, src: Path) [fs, net, env, 
       var crates: List[ResolvedCrate] = []
 
       if source.kind == types.source_cargo_vendor() {
-        crates = resolve_locked_crates(pkg, resolved, checksum)?
+        crates = resolve_locked_crates(pkg, resolved, checksum, arch)?
       }
 
       yield {line, resolved, kind: source.kind, checksum, crates}
@@ -683,7 +764,7 @@ export proc cargo_crate_fetch_items(
         lockfile = resolved.path
       }
 
-      for item in cargo_lock_crates(lockfile)? {
+      for item in cargo_registry_crates(lockfile, cargo_git_lock_sources(selected_cargo_git_sources(pkg, arch))?)? {
         by_sha256 = with_fetch_item(by_sha256, item.checksum, crate_download_url(item), pkg.name)
       }
     }

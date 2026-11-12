@@ -520,3 +520,78 @@ test test_sources_fetch_reads_an_in_tree_lockfile_from_the_repository [fs, proce
 
   assert "1 cached 0 fetched" in output
 }
+
+test test_git_workspace_source_preserves_the_locked_git_identity_offline [fs, net, process, env, error] { |ctx|
+  let revision = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  let git_source = f"git+https://github.com/example/fork?rev={revision}#{revision}"
+  let tree = test.temp_dir(ctx, name: "git-workspace-tree")?
+  let checkout = fp"{tree}/fork-{revision}"
+  fp"{checkout}/forked/src".mkdir(parents: true)?
+  fp"{checkout}/Cargo.toml".write("[workspace]\nmembers = [\"forked\"]\n")
+  fp"{checkout}/forked/Cargo.toml".write("[package]\nname = \"forked\"\nversion = \"0.1.0\"\nedition = \"2021\"\n")
+  fp"{checkout}/forked/src/lib.rs".write("pub fn answer() -> u32 { 42 }\n")
+  let tarball = test.temp_path(ctx, name: "git-workspace.tar.gz")
+  archive.create(tarball, tree, [fp"fork-{revision}"], .Tar)
+  let cache = test.temp_dir(ctx, name: "git-workspace-cache")?
+  let archive_sha256 = cache_file(cache, tarball)?
+  let lockfile = test.temp_path(ctx, name: "Cargo.lock")
+  lockfile.write(f"""version = 4
+
+[[package]]
+name = "consumer"
+version = "0.1.0"
+dependencies = ["forked"]
+
+[[package]]
+name = "forked"
+version = "0.1.0"
+source = "{git_source}"
+""")
+  let lock_sha256 = cache_file(cache, lockfile)?
+  let base = crate_set_package("https://upstream.invalid/Cargo.lock", lock_sha256)
+  let git_archive: types.UpstreamSource = {
+    source: fp"https://github.com/example/fork/archive/{revision}.tar.gz => git-fork",
+    kind: types.CargoGitWorkspace,
+    architectures: ["all"],
+    checksums: [{arch: "all", sha256: archive_sha256}],
+  }
+  let src = test.temp_dir(ctx, name: "git-workspace-src")?
+
+  env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
+    expect_stage_error(base, src, ["only crates.io crates can be vendored"])
+    let wrong_revision = {...git_archive, source: p"https://github.com/example/fork/archive/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.tar.gz => git-fork"}
+    expect_stage_error({...base, upstream_sources: base.upstream_sources.push(wrong_revision)}, src, ["only crates.io crates can be vendored"])
+    expect_stage_error({...base, upstream_sources: base.upstream_sources.push({...git_archive, architectures: ["x86_64"]})}, src, ["only crates.io crates can be vendored"])
+    expect_stage_error({...base, upstream_sources: base.upstream_sources.push({...git_archive, checksums: [{arch: "all", sha256: "SKIP"}]})}, src, ["archive sha256"])
+    sources.stage_package_sources({...base, upstream_sources: base.upstream_sources.push(git_archive)}, src)
+  }
+
+  fp"{src}/Cargo.toml".write(f"""[package]
+name = "consumer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
+""")
+  fp"{src}/src".mkdir()
+  fp"{src}/src/lib.rs".write("pub fn answer() -> u32 { forked::answer() }\n")
+  lockfile.copy(to: fp"{src}/Cargo.lock")?
+  let cargo = process.which("cargo")?
+  let cargo_home = test.temp_dir(ctx, name: "git-workspace-empty-cargo-home")?
+  let config = fp"{src}/git-fork/.cargo-source.toml"
+  let output = run.text CARGO_HOME=$cargo_home $cargo "metadata" "--offline" "--locked" "--format-version" "1" \
+    "--manifest-path" fp"{src}/Cargo.toml" "--config" $config
+  let metadata = json.decode(output)?.require(Record)?
+  let packages: List[Record] = metadata.get("packages")?.require()?
+  let from_git: List[Record] = collect {
+    for package in packages {
+      let name: Str = package.get("name")?.require()?
+      yield package when name == "forked"
+    }
+  }
+  assert from_git.len() == 1
+  let retained: Str = from_git[0].get("source")?.require()?
+  assert retained == git_source
+  assert fp"{src}/Cargo.lock".read_text()? == lockfile.read_text()?
+}

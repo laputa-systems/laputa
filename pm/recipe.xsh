@@ -129,8 +129,8 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
     return Err(types.PmError.PackageContract(f"{name}: upstream source {source} has no target architectures"))
   }
 
-  if kind == types.source_cargo_vendor() and util.parse_source_line(source)?.dest.normalize() == "." {
-    return Err(types.PmError.PackageContract(f"{name}: cargo-vendor source {source} needs a `=> DIR` destination"))
+  if (kind == types.source_cargo_vendor() or kind == types.source_cargo_git_workspace()) and util.parse_source_line(source)?.dest.normalize() == "." {
+    return Err(types.PmError.PackageContract(f"{name}: {raw_kind} source {source} needs a `=> DIR` destination"))
   }
 
   var architecture_seen: Set[Str] = set.empty()
