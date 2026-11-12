@@ -4,7 +4,10 @@ The checked-in kernel pin is `d59567c40`, with XSH `d7b4c9c85`, recorded with th
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
-identical transcripts. Final qualification of this pair is in progress. The Linux
+identical state transcripts. On 2026-11-12, clean Laputa `33bffe43d` passed
+the fresh published-input check and every cohort with
+`LAPUTA_RECOVERY_REPEATS=10 bash infra/asterinas/qualify.sh all --backend both`,
+including all ten paired boot, restart and carrier recovery rounds. The Linux
 reference can still fail the clock `pause` case on a loaded host, because its
 QEMU peer then holds the guest for 12 to 13.5 s against a 5 s margin.
 The [roadmap](ROADMAP.md) owns the successor kernel
@@ -34,7 +37,9 @@ obligations.
   and multicast routes install through a device with their type, scope and
   attributes, and the dump reports them as Linux does. `ip link set` brings a
   link up or down with `RTM_NEWLINK`, which matches Linux's lookup, errno
-  and resulting state.
+  and resulting state. Gateway variants, non-dump output route lookup and finite
+  preferred/valid address lifetimes also match Linux: expiry removes the address
+  and derived routes, and netmask changes retain the original deadlines.
 - Logging: the packaged `syslogd` receives local datagrams with their sender
   credentials and reads `/dev/kmsg`, whose records, positioning and overrun
   follow Linux. The ring carries the kernel's own records down to info level,
@@ -46,10 +51,29 @@ obligations.
   mount, so an unchecked volume stays unchecked until an offline checker
   repairs it. `fsync` of file data and its directory survives a VMM kill, and
   a full volume reports `ENOSPC` without leaving the image inconsistent.
-- Native suite: not a full pass. Final accounting for this pair must preserve
-  the original 1,281 A0 passes (`infra/asterinas/a0-baseline.json`). Most cases
-  discovered by the pinned XSH remain unexecuted. A failure that Linux also
-  shows is environment debt, not an Asterinas defect.
+- Native suite: the final bundle's own `xsht test --list-json` discovers 15,649
+  cases. The bounded 126-module A0 run has 1,330 passed, 29 failed, 49 skipped,
+  14,241 unexecuted and zero unknown cases, with no interrupted batches. It
+  preserves every original 1,281 pass and every later 1,326 pass by exact ID.
+  All 29 failures belong to the original failed set. Four wget fixture cases
+  were unexecuted in the later 25-failure receipt; they now fail because the
+  minimal guest has no Perl. This is not a full native-suite pass.
+
+Final receipts are retained under `.work/wt/final-asterinas/.work/tmp/`:
+`published-inputs-d7.log`, `final-all-both-10.log`, `final-all-both-10.exit`,
+`final-all-both-10.log.sha256`,
+`a0-final/{original-accounting.log,slice5-accounting.log,final-preservation.json}`,
+and `a0-final/results/accounting.json` (SHA-256
+`e4ba100c6af14eb224972fbf70662a37a6f441ec8af98dbaf4eb96cf118b79dc`).
+The standard bundle is `2ee696df0f743ecb67c408934d4091dd8ec1a747ec5b9db82bf6120e5e186dff`;
+the corpus bundle is `1f409124d207e964689f312933b730a277206f95cb1718f95851a21b6f2a4930`.
+Both use kernel ELF SHA-256
+`7f5d46f1608ff5968eccaed8126ef2c1b8c0c12c1a96f6d66687f8608199c5a2`.
+`final-ipv4-evidence/` retains the matching expiry, gateway and lookup
+transcripts and both backends' raw logs.
+
+IPv6 state remains deferred until a consumer needs it. Nonzero `RTA_IIF`
+input-route queries are unsupported.
 
 Known limits that no capability claims: a change to a link's name, hardware
 address, MTU, queue length or link mode, or to any link flag other than
