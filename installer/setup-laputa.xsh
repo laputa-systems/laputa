@@ -384,6 +384,7 @@ pazu:*:0:0:99999:7:::
 nobody:*:0:0:99999:7:::
 """,
   )
+  fp"{root}/etc/shadow".chmod(0o600)
 
   write_file(
     fp"{root}/etc/group",

@@ -441,6 +441,9 @@ def provision(args, work):
     hostname = f"laputa-g2-{os.urandom(3).hex()}"
     run_xsh(args, work, work / "provision.xsh", "--", staging, OPERATOR, hostname, public, timeout=60)
 
+    shadow_mode = (staging / "etc/shadow").stat().st_mode & 0o777
+    assert shadow_mode == 0o600, f"first boot left /etc/shadow at {oct(shadow_mode)}"
+
     install_strace_tools(staging)
 
     shadow_body = (staging / "etc/shadow").read_bytes()
@@ -747,6 +750,9 @@ def step_restore(args, work, state_dir, outputs, state_image, client_key, shadow
             assert services.get(name) == "running", (name, services)
         sentinel_now = remote(args, work, port, client_key, fingerprint, "read", f"/home/{OPERATOR}/g2-state-sentinel")
         assert sentinel_now["stdout"] == reference["sentinel"], sentinel_now
+        shadow_mode = remote(args, work, port, client_key, fingerprint, "run", json.dumps(["/usr/bin/stat", "-c", "%a:%U", "/etc/shadow"]))
+        assert shadow_mode["exit_code"] == 0, shadow_mode
+        assert shadow_mode["stdout"].strip() == "600:root", shadow_mode
         assert restore_identity(args, work, port, client_key, fingerprint) == reference["identity"], "the restored identity files changed"
         markers = boot_markers(args, work, port, client_key, fingerprint)
         pre = reference["markers"]
@@ -792,6 +798,11 @@ def step_remote(args, work, port, key, pin, hostname, digest, console, operator_
     assert inbox_mode["exit_code"] == 0, inbox_mode
     assert inbox_mode["stdout"].strip() == "root:xinit-admin:770", inbox_mode
     log("control inbox: root:xinit-admin mode 0770")
+
+    shadow_mode = remote(args, work, port, key, pin, "run", json.dumps(["/usr/bin/stat", "-c", "%a:%U", "/etc/shadow"]))
+    assert shadow_mode["exit_code"] == 0, shadow_mode
+    assert shadow_mode["stdout"].strip() == "600:root", shadow_mode
+    log("identity: /etc/shadow is root-only at mode 0600")
 
     lease = lease_status(args, work, port, key, pin)
     assert lease["state"] == "bound", lease

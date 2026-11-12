@@ -450,14 +450,17 @@ proc read_optional(rootfs: FsRoot, rel: RelPath) -> Result[Str] {
   }
 }
 
-proc ensure_line(rootfs: FsRoot, rel: RelPath, line: Str) {
+proc ensure_line(rootfs: FsRoot, rel: RelPath, line: Str, mode: Int) {
   return when ! rootfs.exists(rel)
 
   let body = rootfs.read_text(rel)?
+  let current = rootfs.stat(rel, follow_symlinks: false)?.mode.bit_and(0o7777)
 
-  return when line in body.lines()
-
-  write_text(rootfs, rel, append_record(body, line), 0o644)
+  if ! (line in body.lines()) {
+    write_text(rootfs, rel, append_record(body, line), mode)
+  } else if current != mode {
+    rootfs.chmod(rel, mode)
+  }
 }
 
 proc ensure_group_member(rootfs: FsRoot, group_name: Str, member: Str) {
@@ -509,15 +512,15 @@ proc ensure_account(rootfs: FsRoot, name: Str) {
   }
 
   if rootfs.exists(group_rel) {
-    ensure_line(rootfs, group_rel, f"{name}:x:{id}:")
+    ensure_line(rootfs, group_rel, f"{name}:x:{id}:", 0o644)
     ensure_group_member(rootfs, "xinit-admin", name)
   }
 
   if rootfs.exists(shadow_rel) {
-    ensure_line(rootfs, shadow_rel, f"{name}:*:0:0:99999:7:::")
+    ensure_line(rootfs, shadow_rel, f"{name}:*:0:0:99999:7:::", 0o600)
   }
 
-  ensure_line(rootfs, p"etc/shells", operator_shell)
+  ensure_line(rootfs, p"etc/shells", operator_shell, 0o644)
 }
 
 proc identity_ok(key_present: Bool, identity: BootIdentity) {

@@ -358,6 +358,35 @@ test test_new_operator_skips_used_account_ids [fs, error] { |ctx|
   assert snapshot(root)? == after
 }
 
+test test_first_boot_makes_shadow_root_only_and_keeps_public_identity_files_readable [fs, error] { |ctx|
+  let root = prepare(ctx, name: "shadow-mode")?
+  fp"{root}/etc".mkdir()
+  fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\n")
+  fp"{root}/etc/group".write("root:x:0:\nxinit-admin:x:124:\n")
+  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\n")
+  fp"{root}/etc/shadow".chmod(0o644)
+  fp"{root}/etc/shells".write("/bin/xshi\n")
+  first_boot.apply(root, base("new"))
+  assert "pazu:*:0:0:99999:7:::" in fp"{root}/etc/shadow".read_lines()?
+  assert fp"{root}/etc/shadow".metadata()?.mode % 4096 == 0o600
+  assert fp"{root}/etc/passwd".metadata()?.mode % 4096 == 0o644
+  assert fp"{root}/etc/group".metadata()?.mode % 4096 == 0o644
+  assert fp"{root}/etc/shells".metadata()?.mode % 4096 == 0o644
+}
+
+test test_first_boot_tightens_an_existing_shadow_mode_without_appending [fs, error] { |ctx|
+  let root = prepare(ctx, name: "shadow-existing-mode")?
+  fp"{root}/etc".mkdir()
+  fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\npazu:x:1000:1000::/home/pazu:/usr/bin/xsh-login\n")
+  fp"{root}/etc/group".write("root:x:0:\npazu:x:1000:\nxinit-admin:x:124:\n")
+  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\npazu:*:0:0:99999:7:::\n")
+  fp"{root}/etc/shadow".chmod(0o644)
+  fp"{root}/etc/shells".write("/bin/xshi\n")
+  first_boot.apply(root, base("new"))
+  assert fp"{root}/etc/shadow".read_text()? == "root:*:0:0:99999:7:::\npazu:*:0:0:99999:7:::\n"
+  assert fp"{root}/etc/shadow".metadata()?.mode % 4096 == 0o600
+}
+
 test test_firewall_fails_closed_without_a_ruleset [fs, error] {
   match firewall_service.firewall_plan(false) {
     Ok(_) => assert false

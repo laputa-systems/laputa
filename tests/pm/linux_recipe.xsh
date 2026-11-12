@@ -4,6 +4,7 @@ use packages.linux.linux_config
 use pm.build as pm_build
 use pm.catalog
 use pm.fingerprint
+use pm.local
 use pm.plan
 use pm.policy
 use pm.recipe
@@ -255,6 +256,29 @@ test test_baselayout_artifact_archives_empty_boot_mount_directories [fs, net, pr
 
     assert fp"{extracted}/{required}".is_dir()?
   }
+}
+
+test test_baselayout_enforces_a_root_only_shadow_payload [fs, net, process, env, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "baselayout-shadow-mode")?
+  let recipe_dir = fp"{root}/recipe"
+  let source = fp"{root}/source"
+  let dest = fp"{root}/dest"
+  let archive_path = fp"{root}/baselayout.tar.gz"
+  let extracted = fp"{root}/extracted"
+  let _ = fs.copy_tree(p"packages/baselayout", recipe_dir, parents: true, overwrite: true)?
+  fp"{recipe_dir}/files/rootfs/etc/shadow".chmod(0o666)
+  source.mkdir()
+  let pkg = recipe.load_package(recipe_dir)?
+  sources.stage_package_sources(pkg, source)
+  pm_build.build_prepared_package(recipe_dir, source, dest, archive_path)
+
+  assert fp"{dest}/etc/shadow".metadata()?.mode % 4096 == 0o600
+  let entries = local.collect_artifact_entries(dest, pkg.filetree)?
+  let shadow = [entry for entry in entries if entry.path == "etc/shadow"]
+  assert shadow.len() == 1
+  assert shadow[0].mode == 0o600
+  archive.extract(archive_path, extracted, .Tar, modes: .Exact)
+  assert fp"{extracted}/etc/shadow".metadata()?.mode % 4096 == 0o600
 }
 
 test test_xsh_proof_uses_declared_usr_bin_runners_without_baselayout [fs, process, env, error] { |ctx|

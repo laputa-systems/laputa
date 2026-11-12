@@ -9,7 +9,7 @@ export const package_kind = "payload"
 export const ver = "1"
 
 ## Exported declaration `rel`.
-export const rel = "19"
+export const rel = "20"
 
 ## Exported declaration `deps`.
 export let deps = []
@@ -279,6 +279,8 @@ export proc build(dest: Path) [fs, error] {
   for scratch in ["tmp", "var/tmp"] {
     fp"{dest}/{scratch}".chmod(0o1777)
   }
+
+  fp"{dest}/etc/shadow".chmod(0o600)
 
   for keep in fs.walk(dest, hidden: true) |> where .kind == "file" and .name == ".keep" {
     keep.path.remove(missing_ok: false)

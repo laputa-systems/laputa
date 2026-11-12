@@ -255,7 +255,8 @@ through the R7 drill before verifying the restored host key,
 operator-readable identity files, staged home sentinel, committed generation
 and boot history over the same verified SSH path. No UID 0 administrator is
 provisioned; the restored `/etc/shadow` is compared as image bytes on the host,
-not read as root. Open: natural T1/T2 lease renewal, physical power loss, Linux
+not read as root, and the booted guest asserts it is mode `0600` owned by
+`root`. Open: natural T1/T2 lease renewal, physical power loss, Linux
 aarch64, Asterinas, a macOS client, signed release authenticity, and clean
 PID 1 poweroff, which the no-root shutdown path does not exercise.
 
