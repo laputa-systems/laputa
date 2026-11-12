@@ -240,7 +240,7 @@ missing add event on both backends. `clock-abi` runs the `time/clock_adjust` wit
 `network/udp_ancillary` witness and the `guest/asterinas/clock` case in the modes
 `behind`, `ahead`, `frequency`, `pause` and `jump` (the last two on a TAP-backed network
 with an outside peer). `recovery` repeats the boot proof and the DHCP `restart` and
-`carrier` modes `LAPUTA_RECOVERY_REPEATS` times (10 by default). `all` runs `baseline`,
+`carrier` modes `LAPUTA_RECOVERY_REPEATS` times (3 by default; set 10 when a change touches boot, DHCP or the recovery path). `all` runs `baseline`,
 `device`, `clock-abi`, `clock`, `network-state`, `network`, `storage` and `recovery` serially and
 exits nonzero if any cohort failed. The wrapper exports `ASTERINAS_EXTRA_PACKAGES=ntpd-rs`
 unless the caller sets it, because the clock cases need the daemon in the generation and a

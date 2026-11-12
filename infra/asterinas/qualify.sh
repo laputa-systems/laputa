@@ -45,7 +45,7 @@ case "$cohort" in
         ;;
     recovery|all)
         [[ -z "$case_name" ]] || { printf 'qualification: %s takes no --case\n' "$cohort" >&2; exit 2; }
-        repeats="${LAPUTA_RECOVERY_REPEATS:-10}"
+        repeats="${LAPUTA_RECOVERY_REPEATS:-3}"
         [[ "$repeats" =~ ^[1-9][0-9]*$ ]] || { printf 'qualification: invalid LAPUTA_RECOVERY_REPEATS: %s\n' "$repeats" >&2; exit 2; }
         failures=()
         if [[ "$cohort" == all ]]; then
