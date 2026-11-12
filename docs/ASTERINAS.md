@@ -1,6 +1,6 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `d59567c40`, with XSH `ef057ef33`, recorded with the other inputs in
+The checked-in kernel pin is `d59567c40`, with XSH `5cce5ddfd`, recorded with the other inputs in
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
