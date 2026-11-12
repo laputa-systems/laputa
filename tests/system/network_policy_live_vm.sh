@@ -44,7 +44,7 @@ for product in xsh xsht core.tar.xz; do
 done
 tar -xJf "$work/input/tools/core.tar.xz" -C "$work/input/tools"
 sha256sum "$seed/manifest.json" "$seed/xsh" "$seed/xsht" "$seed/core.tar.xz" > "$work/seed-input-hashes.sha256"
-sha256sum "$repository/packages/laputa-net/network_kernel.xsh" "$repository/packages/laputa-net/network_plan.xsh" "$repository/tests/system/fixtures/network-policy-applier.xsh" "$repository/tests/system/fixtures/network-policy-writer.xsh" "$repository/tests/system/fixtures/network-policy-live-entry.xsh" "$repository/tests/system/fixtures/network-policy-live-guest.xsh" "$repository/tests/system/fixtures/network-policy-live-host.xsh" "$repository/tests/system/network_policy_applier.xsh" "$repository/tests/system/network_policy_live_vm.sh" > "$work/source-input-hashes.sha256"
+sha256sum "$repository/packages/laputa-net/network_kernel.xsh" "$repository/packages/laputa-net/network_plan.xsh" "$repository/tests/system/fixtures/network-policy-applier.xsh" "$repository/tests/system/fixtures/network-policy-writer.xsh" "$repository/tests/system/fixtures/network-policy-live-entry.xsh" "$repository/tests/system/fixtures/network-policy-live-verify.xsh" "$repository/tests/system/fixtures/network-policy-live-guest.xsh" "$repository/tests/system/fixtures/network-policy-live-host.xsh" "$repository/tests/system/network_policy_applier.xsh" "$repository/tests/system/network_policy_live_vm.sh" > "$work/source-input-hashes.sha256"
 git -C "$repository" rev-parse HEAD > "$work/source-revision.txt"
 rg --files -uuu -0 "$work/input" | sort -z | xargs -0 sha256sum > "$work/input-files.sha256"
 sha256sum "$original/disk.img" "$original/rootfs.ext4" "$original/vmlinuz" "$original/generation.json" > "$work/original-root-before.sha256"

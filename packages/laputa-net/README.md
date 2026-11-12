@@ -314,7 +314,10 @@ with Linux 7.2.9. The driver owns fresh disk copies and a 2-CPU, 4-GiB guest.
 It validates the clean seed's manifest against the copied runners and core
 archive. The private root receives the matching `xsh`, `xsht`, and complete
 core tree before the witness runs. This is an explicit tool overlay on A.
-The base generation receipt does not attest the overlaid tools.
+The base generation receipt does not attest the overlaid tools. The bootstrap
+uses built-in JSON to guard the exact canonical identity before replacing the
+tools; only then does the replacement interpreter import PM and fully validate
+the generation receipt before running the witness.
 
 The driver prints its evidence directory under `.work/tmp/network-live.*` and
 retains it after completion. `vm/console.log` records the actual transcript,

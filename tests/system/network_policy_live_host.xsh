@@ -29,3 +29,58 @@ print "raw-console-only"
   assert result.success, result.stderr
   assert result.stdout == "raw-console-only\n"
 }
+
+test test_live_network_bootstrap_uses_builtin_json_and_exact_canonical_guards [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "network-live-bootstrap")?
+  let source = p"tests/system/fixtures/network-policy-live-entry.xsh".read_text()?
+  let entry = "proc main(...argv: List[Str])"
+  assert source.split(entry).len() == 2
+  assert "use pm." not in source
+  let driver = source.replace(entry, with: "proc unused_main(...argv: List[Str])") + r"""
+let identity = bootstrap_identity(Path(args[0]), args[1])?
+assert identity.profile == "qemu-self-hosting"
+print "canonical-identity"
+"""
+  let original = p"tests/system/fixtures/network-policy-live-generation.json".read_text()?
+  let receipt = fp"{root}/generation.json"
+  receipt.write(original)
+  let cmdline = "console=ttyS0 LAPUTA_SELF_HOSTING=1\n"
+  let valid = test.run_xsh(ctx, driver, [], [receipt.display(), cmdline], {}, name: "bootstrap-identity.xsh")?
+  assert valid.success and valid.stdout == "canonical-identity\n", valid.stderr
+  for change in [
+    {before: "laputa-generation-1", after: "unknown", expected: "canonical receipt format"},
+    {before: "qemu-self-hosting", after: "other-profile", expected: "canonical self-hosting profile"},
+    {before: "x86_64-linux-musl", after: "other-target", expected: "canonical target"},
+    {before: "906009468ffe783b2078aacfe5f1002e7294a15ac57712e50a2d09766229a8a5", after: "wrong-generation", expected: "canonical A"},
+  ] {
+    assert original.split(change.before).len() == 2
+    receipt.write(original.replace(change.before, with: change.after))
+    let refused = test.run_xsh(ctx, driver, [], [receipt.display(), cmdline], {}, name: "bootstrap-refused.xsh")?
+    assert !refused.success and change.expected in refused.stderr, refused.stderr
+  }
+  receipt.write(original)
+  for bad_cmdline in ["", "prefixLAPUTA_SELF_HOSTING=1", "LAPUTA_SELF_HOSTING=10"] {
+    let refused = test.run_xsh(ctx, driver, [], [receipt.display(), bad_cmdline], {}, name: "bootstrap-cmdline.xsh")?
+    assert !refused.success and "disposable VM kernel token" in refused.stderr, refused.stderr
+  }
+}
+
+test test_live_network_final_reader_validates_more_than_bootstrap_identity [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "network-live-full-receipt")?
+  let original = p"tests/system/fixtures/network-policy-live-generation.json".read_text()?
+  let receipt = fp"{root}/generation.json"
+  receipt.write(original)
+  let driver = r"""use pm.generation
+let receipt = generation.read_generation_receipt_file(Path(args[0]))?
+assert receipt.profile.name == "qemu-self-hosting"
+assert receipt.generation_sha256 == "906009468ffe783b2078aacfe5f1002e7294a15ac57712e50a2d09766229a8a5"
+print "full-receipt"
+"""
+  let valid = test.run_xsh(ctx, driver, [], [receipt.display()], {}, name: "final-receipt.xsh")?
+  assert valid.success and valid.stdout == "full-receipt\n", valid.stderr
+  let root_hash = "cacd9743b4a802722e6e3dab67c536e76f08ac2b1fe0d4067125d26e542c9f88"
+  assert original.split(root_hash).len() == 2
+  receipt.write(original.replace(root_hash, with: "not-a-sha256"))
+  let refused = test.run_xsh(ctx, driver, [], [receipt.display()], {}, name: "final-receipt-refused.xsh")?
+  assert !refused.success and "generation root_sha256" in refused.stderr, refused.stderr
+}
