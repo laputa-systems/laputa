@@ -99,8 +99,9 @@ an existing inbox is retightened the same way before it is widened. A newly
 created inbox is therefore never writable by the group that owned its
 umask-derived mode. The kernel
 therefore permits creation only by root or a member of `xinit-admin`; a
-non-member cannot place a request at all. The scanner re-observes each entry with
-`lstat`, requires a regular single-link file of at most 64 bytes, and accepts it
+non-member cannot place a request at all. The scanner opens each entry through `FsRoot.read_regular`, which refuses
+symlinks in every path component and opens without blocking. It requires a
+regular single-link file of at most 64 bytes and accepts it
 only when the owner uid is 0 or resolves through the account database to a
 current `xinit-admin` member. The file content is only a verb; no field in it
 names a requester. The client writes through a hidden temporary name with mode
@@ -117,17 +118,12 @@ the offending entry; the root scanner stays alive. Accepted and refused requests
 are logged to stdout and stderr respectively. Status, list, logs, and inspect
 reads stay unauthenticated and unchanged.
 
-The observation and the read are not yet the same object. `drain_inbox` reads
-each entry with a no-follow `lstat` and then reads it by path, so a group member
-that swaps the entry between the two can still substitute a symlink that pid 1
-would follow or a FIFO that would make it block. Closing that needs an XSH
-primitive that opens a path without following symlinks and without blocking and
-then reports the opened object's kind, owner, link count, and size; XSH exposes
-`unix.open_fd` with `nofollow` and nonblocking but no metadata call for the
-returned descriptor, and `FsRoot.read_result` bounds the read but opens by
-pathname and blocks on a FIFO. Until that primitive exists, this remains an
-open defect and must not be papered over with a sleep, a timeout, or a second
-path check.
+The request bytes and credential metadata come from the same open descriptor.
+Replacing the directory entry after it is opened cannot change either the
+verb being authorized or its owner. The read is bounded to 64 bytes even if
+another process grows the file. A refused open uses a separate no-follow stat
+only for diagnostics and deciding whether the entry can be removed; that
+observation never authorizes a request.
 
 Group members share write permission on the inbox. One member can therefore
 unlink or replace another member's still-queued request, which is a denial or a

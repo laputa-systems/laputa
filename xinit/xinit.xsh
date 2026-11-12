@@ -1956,8 +1956,8 @@ proc apply_request(units: List[ServiceUnit], name: Str, desired: Str) -> Result[
   [apply_one(unit, name, desired)? for unit in units]
 }
 
-proc read_control_verb(path_value: Path) -> Result[Str] {
-  let desired = path_value.read_text()?.trim()
+pure parse_control_verb(data: Bytes) -> Result[Str] {
+  let desired = data.utf8()?.trim()
 
   guard desired == "up" or desired == "down" or desired == "restart" or desired == "reload" else {
     return Err(XinitError.Failed(kind: "xinit-control-refused", message: "unknown control verb"))
@@ -1971,34 +1971,41 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
 
   return units unless dir.exists()
 
+  let inbox = fs.open_root(dir)?
   var out = units
 
   for entry in fs.children(dir)? |> sort-by .name {
     continue when entry.name.starts_with(".")
 
     let path_value = entry.path
-    let observed = match fs.stat(path_value, follow_symlinks: false) {
-      Ok(info) => info
+    let leaf: RelPath = fp"{entry.name}".require()?
+    let observed = match inbox.read_regular(leaf, max_bytes: control_request_limit) {
+      Ok(opened) => opened
       Err(failure) => {
-        eprint --flush f"xinit-control-refused: service={entry.name} reason={failure.message}"
+        let info = fs.stat(path_value, follow_symlinks: false)
+        let uid = match info { Ok(value) => value.uid, Err(_) => -1 }
+        let kind = match info { Ok(value) => value.kind, Err(_) => "" }
+        let oversized = match info { Ok(value) => value.size > control_request_limit, Err(_) => false }
+        let reason = if kind != "" and kind != "file" {
+          "not-a-single-regular-file"
+        } else if oversized {
+          "oversized"
+        } else {
+          failure.message
+        }
+        eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason={reason}"
+        match info {
+          Ok(value) => { path_value.remove() when value.kind != "dir" }
+          Err(_) => {}
+        }
         continue
       }
     }
 
     let uid = observed.uid
 
-    if observed.kind != "file" or observed.nlink != 1 {
+    if observed.nlink != 1 {
       eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason=not-a-single-regular-file"
-
-      if observed.kind != "dir" {
-        path_value.remove()
-      }
-
-      continue
-    }
-
-    if observed.size > control_request_limit {
-      eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason=oversized"
       path_value.remove()
       continue
     }
@@ -2014,7 +2021,7 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
       continue
     }
 
-    match read_control_verb(path_value) {
+    match parse_control_verb(observed.data) {
       Ok(desired) => {
         print --flush f"xinit-control accepted service={entry.name} uid={uid} verb={desired}"
         out = apply_request(out, entry.name, desired)?

@@ -1016,6 +1016,68 @@ test test_scan_refuses_a_planted_symlink_control_request [fs, process, error] { 
   assert outside.read_text()? == "down"
 }
 
+test test_control_verbs_reject_invalid_text [fs, process, error] { |ctx|
+  let source = xinit_policy_source()? + """
+for verb in ["up", "down", "restart", "reload"] {
+  assert parse_control_verb(bytes.from_text(verb))? == verb
+}
+assert parse_control_verb(b" down\\n")? == "down"
+assert parse_control_verb(b"unknown") is Err(_)
+assert parse_control_verb(b"down\\xff") is Err(_)
+"""
+  let result = test.run_xsh(ctx, source, name: "control-verbs.xsh")?
+  assert result.success, result.stderr
+}
+
+test test_control_read_keeps_the_opened_request_after_replacement [fs, process, error] { |ctx|
+  test.timeout(ctx, 20s)
+  for replacement in ["symlink", "fifo"] {
+    let root = test.temp_dir(ctx, name: f"control-swap-{replacement}")?
+    let inbox = fp"{root}/inbox"
+    inbox.mkdir()
+    fp"{inbox}/app".write("down")
+    fp"{root}/outside".write("restart")
+    let hook = "proc authorize_control(uid: Int) {"
+    let source = xinit_policy_source()?
+    assert source.split(hook).len() == 2
+    let changed = source.replace(hook, with: hook + """
+  let queued = fp"{env.path("XINIT_RUN_DIR")?}/inbox/app"
+  queued.remove()
+  if env.get("XINIT_REPLACEMENT")? == "fifo" {
+    fs.mkfifo(queued, 0o600)
+  } else {
+    queued.symlink(to: fp"{env.path("XINIT_RUN_DIR")?}/outside")
+  }
+""") + "\nlet units: List[ServiceUnit] = []\nlet drained = drain_inbox(units)?\nassert drained.is_empty()\n"
+    let result = test.run_xsh(ctx, changed, env: {
+      XINIT_RUN_DIR: root.display(),
+      XINIT_REPLACEMENT: replacement,
+      XINIT_TEST_ALLOW_NON_PID1: "1",
+    }, name: f"control-swap-{replacement}.xsh")?
+    assert result.success, result.stderr
+    assert "verb=down" in result.stdout, result.stdout
+    assert ! ("verb=restart" in result.stdout), result.stdout
+    assert fp"{root}/outside".read_text()? == "restart"
+    assert ! fp"{inbox}/app".exists()?
+  }
+}
+
+test test_control_read_refuses_hard_linked_requests [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-hardlink")?
+  let inbox = fp"{root}/inbox"
+  inbox.mkdir()
+  fp"{inbox}/app".write("down")
+  fs.link(fp"{inbox}/app", fp"{root}/alias")
+  let result = test.run_xsh(ctx, xinit_policy_source()? + "\nlet units: List[ServiceUnit] = []\nlet drained = drain_inbox(units)?\nassert drained.is_empty()\n", env: {
+    XINIT_RUN_DIR: root.display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+  }, name: "control-hardlink.xsh")?
+  assert result.success, result.stderr
+  assert "reason=not-a-single-regular-file" in result.stderr
+  assert ! ("accepted" in result.stdout)
+  assert ! fp"{inbox}/app".exists()?
+  assert fp"{root}/alias".read_text()? == "down"
+}
+
 test test_prepare_control_inbox_creates_private_then_widens [fs, process, error] { |ctx|
   let root = test.temp_dir(ctx, name: "control-create")?
   let service_dir = fp"{root}/services"
