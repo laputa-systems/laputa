@@ -297,6 +297,8 @@ The output identifies the compiler seed and
 executor provenance. The driver removes its disposable containers, image,
 and working directories on exit.
 
+The 2026-11-12 final rerun uses clean XSH `d7b4c9c85cbeefd20954156bd362805eabf4e35c`, PM source `d3dddf0e3a80040ed577ae53118250e7faa78b0e`, and compiler image `sha256:2d6f716aada6a0161fbf11d9b1a53c16fbc7747ab95c1e339c6aefdc07a56911`. Both independent stores match the C, Rust and XSH artifact keys, payloads and archive bytes. Hostile read, write and TCP probes are denied. Missing Landlock refuses before child execution. Tool, source and compiler-image hashes remain unchanged. Evidence remains at `.work/wt/resume-network-live/.work/tmp/final-closed/`, including `closed-build.log`, the tool snapshot and hash manifests.
+
 This qualifies the bounded cohort invocation. Ordinary package-tools builds
 still run recipes with the host executor's filesystem and environment.
 Their build-root PATH prefix is not confinement. The cohort does not prove

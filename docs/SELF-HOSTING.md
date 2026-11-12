@@ -176,6 +176,8 @@ The clock fixture changes only the disposable guest's wall clock, exercises read
 
 The qualified lifecycle fixture checks canonical descendant cleanup before finish and respawn. Its deliberate wrong-copy replay must report the surviving-descendant invariant and clean up both process groups. The network fixture records one successful address request followed by an invalid-gateway failure and rejects subsequent ownership inference. It does not qualify general network convergence or address withdrawal.
 
+The 2026-11-12 lifecycle rerun uses clean XSH `d7b4c9c85cbeefd20954156bd362805eabf4e35c` as an explicit runtime overlay on canonical A, generation `906009468ffe783b2078aacfe5f1002e7294a15ac57712e50a2d09766229a8a5`. Full PM receipt validation passes after replacement. Canonical cleanup, the surviving-descendant negative control and the LAP-34 marker pass in the Linux 7.2.9 KVM guest. The host accepts complete raw serial lines, verifies all four original-root hashes and reaps QEMU. Evidence remains in XSH `.work/wt/final-system-replay/.work/tmp/`, including `final-vm-result.txt` and `vm/console.log`. This rerun qualifies the final runtime for the lifecycle fixture. The earlier installed-successor and clock results retain their original product identities. The separate [live IPv4 qualification](../packages/laputa-net/README.md#live-ipv4-guest-qualification) qualifies the network controller on the same final runtime.
+
 ## Preserve the execution boundaries
 
 Run the bounded host-lock regression:

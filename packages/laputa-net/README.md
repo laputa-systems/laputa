@@ -335,7 +335,17 @@ KVM witness: five cases passed with no skips. Its installed `xsh` SHA-256 was
 `47658de9489d695c598c6c96edc8a8c2efcb092ff329b9110533ed8c94ec51e1`, and
 `xsht` was `2242b9622ec703fd55db8f4793bfc8035aebf3c8b55b5e2ad059bd4520041d10`.
 The native network-policy suite passed 48 cases with no skips. This evidence
-qualifies that seed. A replacement shared seed requires its own final rerun.
+qualifies that seed.
+
+The final shared clean XSH `d7b4c9c85cbeefd20954156bd362805eabf4e35c` also
+passed all five guest cases with no skips, using Laputa
+`d3dddf0e3a80040ed577ae53118250e7faa78b0e`. Its installed `xsh` SHA-256 was
+`653c12c5b52253afbe43d5454cc68757aa622f6d7ed3826ed74a0286f752ffdd`, and
+`xsht` was `75283c9924f9e85edf5dd611c3137c8a0abba435b203d92df5b282648e86e725`.
+The full PM receipt validation and matching core checks passed after tool
+replacement. Retained evidence is `.work/tmp/network-live.XXIbBAjD`; source,
+staged-input, seed and original-root hashes all verified. The owned QEMU was
+canceled and reaped. This rerun qualifies the final shared seed for this witness.
 
 The witness converges an owned IPv4 address and default route, then plans
 nothing on reapplication. Foreign and peer addresses, an operator default on
