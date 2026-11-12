@@ -146,6 +146,11 @@ verified bundle image. The serial log and result metadata remain under
 `.out/asterinas-firecracker/`; test and interactive boot have separate
 `test-console.log` and `boot-console.log` files.
 
+The maintained viability root is minimal and runs selected tests as root.
+It lacks the shell, Perl and compiler fixtures required by the full corpus.
+Its `XSH_TEST` results establish bounded compatibility, rather than full native
+qualification. Use the separate fixture below for that work.
+
 Run one native XSH test module from the pinned XSH snapshot (paths are relative
 to the XSH repository root) inside the guest with
 `XSH_TEST=tests/xsh/stdlib/numeric.xsh`. A module under `core/tests`,
@@ -166,6 +171,57 @@ stream their results to the guest console. A failed selection is reported after
 every selection has run. The host requires the guest success marker. To test a different
 XSH source revision, update the XSH commit pin in `infra/asterinas/inputs.lock`
 first.
+
+### Full native qualification fixture
+
+`infra/asterinas/build-native-fixture.sh` creates a separate 8 GiB ext2 image
+from an immutable `Dockerfile.test` image, a clean XSH checkout and matching
+verification products. It preserves the test image's Bash, Perl, compiler and
+helper environment. The fixture runs tests as UID and GID 1000, with cleared
+supplementary groups and one test worker. Root-only cases need their own cohort.
+The fixture is not a PM generation or a maintained Laputa boot proof.
+
+Prepare the verification products in the pinned Linux container, then run:
+
+```bash
+bash infra/asterinas/build-native-fixture.sh \
+  /absolute/path/to/xsh \
+  /absolute/path/to/xsh/target/linux-test/x86_64-unknown-linux-musl/verification \
+  "$(docker image inspect --format '{{.Id}}' xsh-test)" \
+  "$PWD/.work/tmp/native-fixture"
+```
+
+The output must not already exist. `fixture.json` identifies the image, XSH
+commit, product hashes, init script and root-image hash. Keep the base image
+read-only. Copy it into each run's private directory, make that copy writable,
+and point a private Firecracker configuration at it. Never reuse the maintained
+bundle's shared writable drive path for a native fixture.
+
+The default `/etc/xsh-native.selection` contains `all`. For a bounded probe,
+replace that file in the private image with exact IDs, one per line, using
+`debugfs`. Read it back and compare it with the requested list before boot.
+The guest executes every selection, rejects empty selections and reports failure
+if any test command fails or discovers no tests. Per-test timeouts stay unchanged.
+
+Pass `native-xsh` as the seventh argument to `infra/asterinas/run-test-vm.sh`.
+For a matched Linux guest, use `infra/asterinas/run-native-linux.xsh` with the
+Linux reference kernel, initramfs, private disk, console path, QEMU log path and
+timeout in seconds. It uses the existing QEMU supervisor with the explicit
+`NativeXsh` proof contract. The default contract remains the maintained Laputa
+proof. Each contract rejects the other contract's completion marker.
+
+The native protocol reports `XSH_NATIVE_CONTEXT`, `XSH_NATIVE_START` and
+`XSH_NATIVE_RESULT`. Preserve those consoles, the requested selections and
+`fixture.json` alongside the result. A passing bounded probe does not establish
+full-corpus qualification or preserve an earlier bundle's pass set by itself.
+
+On 2026-11-12, XSH `9ba05675c` with the pinned test image and kernel
+`d59567c40` runs the eleven formerly shared minimal-guest failures in this
+fixture. All eleven pass on Linux. Asterinas passes ten and fails the taskset
+affinity case: a later query observes mask `3` after setting mask `1`.
+This is an open kernel compatibility defect, not an accepted limitation or skip.
+The existing CPU-affinity regression checks setting and querying one thread;
+extend it to distinguish inheritance across fork, thread creation and exec.
 
 To run a kernel regression witness against the built bundle and against the
 Linux reference with the same memory, run

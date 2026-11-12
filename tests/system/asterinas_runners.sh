@@ -176,6 +176,10 @@ COHORT_STUB=quick bash "$cohort_runner" clock-abi both '' > "$scratch/cohort-ser
 [[ "$(cat "$COHORT_TRACE")" == "linux start
 linux end
 asterinas start
+asterinas end
+linux start
+linux end
+asterinas start
 asterinas end" ]] || fail "the backends did not run one after the other: $(tr '\n' ',' < "$COHORT_TRACE")"
 
 for signal in TERM INT; do
@@ -275,6 +279,25 @@ for kind in CASE WITNESS; do
     FAKE_FIRECRACKER_STATUS=3 run_runner "$kind" 1 "a VMM that fails after the marker" "$scratch/$kind.full"
 done
 run_runner CASE 1 "a guest that never completes" "$scratch/CASE.silent"
+
+run_native_contract() {
+    local proof="$1" expected="$2" console="$3" status=0
+    FAKE_CONSOLE="$console" bash "$infra/run-test-vm.sh" \
+        "$runner_root/.out/asterinas-firecracker/bin/firecracker" "$bundle/firecracker.json" \
+        "$scratch/native.console" "$scratch/native.vmm" 'core/tests/native.xsh::case' 5 "$proof" \
+        > "$scratch/native.command" 2>&1 || status=$?
+    [[ "$status" == "$expected" ]] || { cat "$scratch/native.command" >&2; fail "$proof returned $status for $console, expected $expected"; }
+}
+
+printf 'XSH_NATIVE_CONTEXT uid=1000 gid=1000 jobs=1\nXSH_NATIVE_START core/tests/native.xsh::case\nXSH_NATIVE_RESULT pass\n' > "$scratch/native.pass"
+run_native_contract native-xsh 0 "$scratch/native.pass"
+run_native_contract maintained 1 "$scratch/native.pass"
+run_native_contract native-xsh 1 "$scratch/CASE.full"
+sed 's/uid=1000 gid=1000/uid=0 gid=0/' "$scratch/native.pass" > "$scratch/native.root"
+run_native_contract native-xsh 1 "$scratch/native.root"
+{ printf 'XSH_NATIVE_RESULT fail status=1\n'; cat "$scratch/native.pass"; } > "$scratch/native.failed"
+run_native_contract native-xsh 1 "$scratch/native.failed"
+run_native_contract unsupported 2 "$scratch/native.pass"
 
 rm -f "$docker_state"/* "$scratch/client.pid"
 FAKE_DOCKER_RUN_PID="$scratch/client.pid" LAPUTA_GUEST_NETWORK=tap start_harness bash "$runner_root/infra/asterinas/run-guest-case.sh" \

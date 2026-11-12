@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ $# == 6 ]] || {
-    printf 'usage: run-test-vm.sh FIRECRACKER CONFIG CONSOLE_LOG FIRECRACKER_LOG XSH_TEST_SELECTION MAX_POLLS\n' >&2
+[[ $# == 6 || $# == 7 ]] || {
+    printf 'usage: run-test-vm.sh FIRECRACKER CONFIG CONSOLE_LOG FIRECRACKER_LOG XSH_TEST_SELECTION MAX_POLLS [maintained|native-xsh]\n' >&2
     exit 2
 }
 
@@ -12,6 +12,22 @@ console_log="$3"
 firecracker_log="$4"
 test_selection="$5"
 max_polls="$6"
+proof="${7:-maintained}"
+case "$proof" in
+    maintained)
+        success_marker=LAPUTA_ASTERINAS_TEST_OK
+        failure_marker=LAPUTA_ASTERINAS_TEST_FAILED
+        selection_marker=LAPUTA_ASTERINAS_XSH_TEST_START
+        tests_marker=LAPUTA_ASTERINAS_XSH_TEST_OK
+        ;;
+    native-xsh)
+        success_marker='XSH_NATIVE_RESULT pass'
+        failure_marker='XSH_NATIVE_RESULT fail'
+        selection_marker=XSH_NATIVE_START
+        tests_marker='XSH_NATIVE_CONTEXT uid=1000 gid=1000 jobs=1'
+        ;;
+    *) printf 'asterinas-test: unknown proof contract: %s\n' "$proof" >&2; exit 2 ;;
+esac
 firecracker_pid=""
 poweroff_polls="${LAPUTA_POWEROFF_POLLS:-300}"
 
@@ -42,7 +58,7 @@ fail() {
 }
 
 check_guest_failure() {
-    if grep -Fq LAPUTA_ASTERINAS_TEST_FAILED "$console_log"; then
+    if grep -Fq "$failure_marker" "$console_log" || grep -Fq LAPUTA_ASTERINAS_TEST_FAILED "$console_log"; then
         fail 'guest reported a failed Laputa proof'
     fi
     if grep -Eq 'Kernel panic|panicked at|Uncaught panic|failed to run the init process|Heap allocation error' "$console_log"; then
@@ -88,7 +104,7 @@ complete=false
 for ((attempt = 0; attempt < max_polls; attempt++)); do
     state="$(ps -o stat= -p "$firecracker_pid" 2>/dev/null | tr -d ' ' || true)"
     check_guest_failure
-    if grep -Fq LAPUTA_ASTERINAS_TEST_OK "$console_log"; then
+    if grep -Fq "$success_marker" "$console_log"; then
         complete=true
         break
     fi
@@ -105,10 +121,10 @@ done
 if [[ -n "$test_selection" ]]; then
     read -r -a requested_selections <<< "$test_selection"
     for requested_selection in "${requested_selections[@]}"; do
-        grep -Fq "LAPUTA_ASTERINAS_XSH_TEST_START $requested_selection" "$console_log" || \
+        grep -Fq "$selection_marker $requested_selection" "$console_log" || \
             fail "guest did not start the requested XSH test selection: $requested_selection"
     done
-    grep -Fq LAPUTA_ASTERINAS_XSH_TEST_OK "$console_log" || \
+    grep -Fq "$tests_marker" "$console_log" || \
         fail 'guest did not report the selected XSH test module passing'
 fi
 

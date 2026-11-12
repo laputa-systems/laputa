@@ -188,6 +188,30 @@ test test_qemu_qualification_rejects_a_guest_that_exits_with_failure_after_compl
   }
 }
 
+test test_qemu_qualification_keeps_native_and_laputa_completion_separate [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "qemu-native-proof")?
+  let native = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'XSH_NATIVE_RESULT pass\\n'\nexit 0\n")?
+  qemu.qemu_run_asterinas_reference(native, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2, proof: qemu.NativeXsh)?
+  match qemu.qemu_run_asterinas_reference(native, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
+    Ok(_) => fail "accepted native test completion as the maintained Laputa proof"
+    Err(problem) => assert "before its completion marker" in problem.message
+  }
+  let laputa = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'LAPUTA_ASTERINAS_TEST_OK\\n'\nexit 0\n")?
+  match qemu.qemu_run_asterinas_reference(laputa, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2, proof: qemu.NativeXsh) {
+    Ok(_) => fail "accepted maintained Laputa completion as native test completion"
+    Err(problem) => assert "before its completion marker" in problem.message
+  }
+}
+
+test test_qemu_native_qualification_rejects_failure_before_a_success_marker [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "qemu-native-failure")?
+  let config = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'XSH_NATIVE_RESULT fail status=1\\nXSH_NATIVE_RESULT pass\\n'\nexit 0\n")?
+  match qemu.qemu_run_asterinas_reference(config, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2, proof: qemu.NativeXsh) {
+    Ok(_) => fail "accepted native qualification failure"
+    Err(problem) => assert "reported failure" in problem.message
+  }
+}
+
 proc assert_profile_devices(argv: List[Str]) {
   assert "virtio-net-pci,netdev=net0" in argv, "network"
   assert "virtio-gpu-pci,xres=1280,yres=800" in argv, "gpu"
