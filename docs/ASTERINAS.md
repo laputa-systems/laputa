@@ -1,6 +1,6 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `d59567c40`, with XSH `5cce5ddfd`, recorded with the other inputs in
+The checked-in kernel pin is `d59567c40`, with XSH `d7b4c9c85`, recorded with the other inputs in
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
@@ -58,6 +58,11 @@ address does not pass through `lo` or its counters; `MAP_POPULATE` is ignored,
 which Linux permits; pipe ring buffers and large kernel heap allocations still
 need contiguous frames; anonymous page faults cost about three times the Linux
 reference.
+
+The pinned kernel does not implement Landlock. `linux.run_confined` fails
+closed there. PM therefore refuses a composition requesting a generated manual
+index, which requires Landlock ABI 6. Roots without selected mandoc or manual
+pages do not request that operation. See [the manual-index boundary](PM.md#root-composition).
 
 The Asterinas backend uses the exact kernel, toolchain, Firecracker, and XSH
 versions recorded in `infra/asterinas/inputs.lock`. Start on an x86-64 Linux
