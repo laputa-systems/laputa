@@ -58,10 +58,12 @@ truncate -s 8G /stage/root.ext2
 SOURCE_DATE_EPOCH=1 /sbin/mke2fs -q -F -t ext2 -L XSHNATIVE -d /stage/rootfs -E lazy_itable_init=0 /stage/root.ext2
 /sbin/e2fsck -fn /stage/root.ext2
 rm -r /stage/rootfs
+chown "$HOST_UID:$HOST_GID" /stage/root.ext2
 BUILD
 
 builder="laputa-native-fixture-build-$$"
 run_cancellable "$builder" docker run --name "$builder" --rm --init --network none --cpus=2 --memory=4g --memory-swap=4g \
+    --env "HOST_UID=$(id -u)" --env "HOST_GID=$(id -g)" \
     --mount "type=bind,src=$stage,dst=/stage" \
     --mount "type=bind,src=$repo_root/guest/asterinas/native/init.sh,dst=/inputs/init,readonly" \
     --mount "type=bind,src=$xsh_products,dst=/inputs/products,readonly" \
