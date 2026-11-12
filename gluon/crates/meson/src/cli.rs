@@ -78,6 +78,7 @@ struct InstallArgs {
     tags: Vec<String>,
     strip: bool,
     no_rebuild: bool,
+    quiet: bool,
 }
 
 struct IntrospectArgs {
@@ -394,6 +395,7 @@ impl Cli {
         let mut tags = Vec::new();
         let mut strip = false;
         let mut no_rebuild = false;
+        let mut quiet = false;
         let mut i = 0;
 
         while i < args.len() {
@@ -417,6 +419,7 @@ impl Cli {
                 }
                 "--strip" => strip = true,
                 "--no-rebuild" => no_rebuild = true,
+                "-q" | "--quiet" => quiet = true,
                 "-C" => {
                     i += 1;
                     if i < args.len() {
@@ -436,6 +439,7 @@ impl Cli {
             tags,
             strip,
             no_rebuild,
+            quiet,
         })
     }
 
@@ -927,6 +931,23 @@ impl Cli {
             JSON_PRETTY.to_string(&cmd_line).unwrap(),
         );
 
+        if let Err(e) = crate::install::run_postconf_scripts(
+            &interp.vm.build_data.postconf_scripts,
+            &interp.vm.top_source_root,
+            &build_dir,
+        ) {
+            eprintln!("ERROR: {}", e);
+            let _ = {
+                use std::io::Write;
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&log_path)
+                    .and_then(|mut f| writeln!(f, "ERROR: {}", e))
+            };
+            return 1;
+        }
+
         eprintln!(
             "Build targets in project: {}",
             interp.vm.build_data.targets.len()
@@ -1115,7 +1136,15 @@ impl Cli {
         };
         let strip = args.strip || configured_strip(&build_dir);
         let strip_program = configured_strip_program(&build_dir);
-        match crate::install::execute(&plan, &build_dir, &destdir, strip, &strip_program) {
+        match crate::install::execute(
+            &plan,
+            &build_dir,
+            &destdir,
+            strip,
+            &strip_program,
+            &args.tags,
+            args.quiet,
+        ) {
             Ok(()) => 0,
             Err(e) => {
                 eprintln!("Installation failed: {}", e);

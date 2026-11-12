@@ -162,6 +162,9 @@ pub struct BuildData {
     pub install_subdirs: Vec<InstallData>,
     pub install_symlinks: Vec<SymlinkData>,
     pub install_empty_dirs: Vec<String>,
+    pub install_scripts: Vec<InstallScriptData>,
+    pub postconf_scripts: Vec<Vec<String>>,
+    pub dist_scripts: Vec<Vec<String>>,
     pub configure_files: Vec<ConfigureFile>,
     pub dependencies: HashMap<String, Object>,
     pub subprojects: HashMap<String, Object>,
@@ -180,6 +183,13 @@ pub struct BuildData {
     pub global_link_args: HashMap<String, Vec<String>>,
     pub options: HashMap<String, Object>,
     pub pkgconfig_metadata: HashMap<String, (String, String)>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct InstallScriptData {
+    pub command: Vec<String>,
+    pub skip_if_destdir: bool,
+    pub install_tag: Option<String>,
 }
 
 #[derive(Debug, Clone)]

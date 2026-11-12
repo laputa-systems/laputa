@@ -15,12 +15,21 @@ const JSON_PRETTY: SerializerConfig =
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct InstallPlan {
+    pub source_root: String,
     pub prefix: String,
     pub umask: String,
     pub files: Vec<InstallFile>,
     pub symlinks: Vec<InstallSymlink>,
     pub directories: Vec<InstallDirectory>,
     pub subdirs: Vec<InstallSubdir>,
+    pub scripts: Vec<InstallScript>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct InstallScript {
+    pub command: Vec<String>,
+    pub skip_if_destdir: bool,
+    pub install_tag: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -63,6 +72,7 @@ pub fn generate(
     build_root: &str,
 ) -> Result<InstallPlan, String> {
     let mut plan = InstallPlan {
+        source_root: source_root.to_string(),
         prefix: options::builtin_string(options, "prefix"),
         umask: options::builtin_string(options, "install_umask"),
         ..InstallPlan::default()
@@ -257,6 +267,14 @@ pub fn generate(
         });
     }
 
+    for script in &build_data.install_scripts {
+        plan.scripts.push(InstallScript {
+            command: script.command.clone(),
+            skip_if_destdir: script.skip_if_destdir,
+            install_tag: script.install_tag.clone(),
+        });
+    }
+
     Ok(plan)
 }
 
@@ -391,6 +409,7 @@ pub fn read_plan(build_root: &str) -> Result<InstallPlan, String> {
 impl InstallPlan {
     fn to_value(&self) -> Value {
         let mut map = Map::new();
+        map.insert("source_root", self.source_root.clone());
         map.insert("prefix", self.prefix.clone());
         map.insert("umask", self.umask.clone());
         map.insert(
@@ -424,11 +443,21 @@ impl InstallPlan {
                     .collect::<Vec<_>>(),
             ),
         );
+        map.insert(
+            "scripts",
+            Value::from(
+                self.scripts
+                    .iter()
+                    .map(InstallScript::to_value)
+                    .collect::<Vec<_>>(),
+            ),
+        );
         Value::from(map)
     }
 
     fn from_value(value: &Value) -> Result<Self, String> {
         Ok(InstallPlan {
+            source_root: string_field(value, "source_root")?,
             prefix: string_field(value, "prefix")?,
             umask: string_field(value, "umask")?,
             files: sequence(value, "files")?
@@ -447,6 +476,36 @@ impl InstallPlan {
                 .iter()
                 .map(InstallSubdir::from_value)
                 .collect::<Result<_, _>>()?,
+            scripts: sequence(value, "scripts")?
+                .iter()
+                .map(InstallScript::from_value)
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+impl InstallScript {
+    fn to_value(&self) -> Value {
+        let mut map = Map::new();
+        map.insert(
+            "command",
+            Value::from(
+                self.command
+                    .iter()
+                    .map(|argument| Value::from(argument.clone()))
+                    .collect::<Vec<_>>(),
+            ),
+        );
+        map.insert("skip_if_destdir", self.skip_if_destdir);
+        map.insert("install_tag", option_value(self.install_tag.as_deref()));
+        Value::from(map)
+    }
+
+    fn from_value(value: &Value) -> Result<Self, String> {
+        Ok(InstallScript {
+            command: string_sequence(value, "command"),
+            skip_if_destdir: optional_bool(value, "skip_if_destdir").unwrap_or(false),
+            install_tag: optional_string(value, "install_tag"),
         })
     }
 }
@@ -609,6 +668,8 @@ pub fn execute(
     destdir: &str,
     strip: bool,
     strip_program: &str,
+    tags: &[String],
+    quiet: bool,
 ) -> Result<(), String> {
     let destdir = if destdir.is_empty() {
         String::new()
@@ -657,6 +718,118 @@ pub fn execute(
         install_symlink(&link.target, &destination, umask)?;
     }
 
+    run_install_scripts(plan, build_dir, &destdir, tags, quiet)
+}
+
+fn shell_quote(value: &str) -> String {
+    let safe = !value.is_empty()
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || b"_@%+=:,./-".contains(&byte)
+        });
+    if safe {
+        value.to_string()
+    } else {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
+}
+
+fn introspect_command() -> String {
+    let executable = std::env::current_exe()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "meson".to_string());
+    format!("{} introspect", shell_quote(&executable))
+}
+
+fn script_environment(source_root: &str, build_root: &str) -> Vec<(&'static str, String)> {
+    vec![
+        ("MESON_SOURCE_ROOT", source_root.to_string()),
+        ("MESON_BUILD_ROOT", build_root.to_string()),
+        ("MESONINTROSPECT", introspect_command()),
+    ]
+}
+
+fn script_name(command: &[String]) -> String {
+    command.join(" ")
+}
+
+fn script_failure(kind: &str, name: &str, status: &std::process::ExitStatus) -> String {
+    match status.code() {
+        Some(code) => format!("{} script '{}' failed with exit code {}.", kind, name, code),
+        None => format!("{} script '{}' was terminated by a signal.", kind, name),
+    }
+}
+
+fn run_install_scripts(
+    plan: &InstallPlan,
+    build_dir: &str,
+    destdir: &str,
+    tags: &[String],
+    quiet: bool,
+) -> Result<(), String> {
+    let prefix = installed_path(&plan.prefix, &plan.prefix);
+    let destdir_prefix = destdir_path(destdir, &plan.prefix, &plan.prefix);
+    for script in &plan.scripts {
+        if !tags.is_empty()
+            && !script
+                .install_tag
+                .as_deref()
+                .is_some_and(|tag| tags.iter().any(|selected| selected == tag))
+        {
+            continue;
+        }
+        if !destdir.is_empty() && script.skip_if_destdir {
+            continue;
+        }
+        let name = script_name(&script.command);
+        let program = script
+            .command
+            .first()
+            .ok_or("Install script has an empty command")?;
+        let mut command = Command::new(program);
+        command.args(&script.command[1..]).current_dir(build_dir);
+        for (key, value) in script_environment(&plan.source_root, build_dir) {
+            command.env(key, value);
+        }
+        command.env("MESON_INSTALL_PREFIX", &prefix);
+        command.env("MESON_INSTALL_DESTDIR_PREFIX", &destdir_prefix);
+        if quiet {
+            command.env("MESON_INSTALL_QUIET", "1");
+        }
+        if !destdir.is_empty() {
+            command.env("DESTDIR", destdir);
+        }
+        let status = command
+            .status()
+            .map_err(|e| format!("Install script '{}' could not be run: {}", name, e))?;
+        if !status.success() {
+            return Err(script_failure("Install", &name, &status));
+        }
+    }
+    Ok(())
+}
+
+pub fn run_postconf_scripts(
+    scripts: &[Vec<String>],
+    source_root: &str,
+    build_root: &str,
+) -> Result<(), String> {
+    for script in scripts {
+        let name = script_name(script);
+        let program = script
+            .first()
+            .ok_or("Postconf script has an empty command")?;
+        let mut command = Command::new(program);
+        command.args(&script[1..]);
+        for (key, value) in script_environment(source_root, build_root) {
+            command.env(key, value);
+        }
+        let status = command
+            .status()
+            .map_err(|e| format!("Postconf script '{}' could not be run: {}", name, e))?;
+        if !status.success() {
+            return Err(script_failure("Postconf", &name, &status));
+        }
+    }
     Ok(())
 }
 

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Vendored from laputa-systems/gluon at bc8002f; make changes upstream, not here.
+Vendored from laputa-systems/gluon at 95bdcf5; make changes upstream, not here.
 
 gluon is a Rust workspace implementing Meson- and Ninja-compatible build
 tools (`meson`, `ninja`, `gluon-build` in `bins/`). Library crates live in

@@ -357,15 +357,15 @@ pub fn register(vm: &mut VM) {
     );
     vm.method_registry.insert(
         ("meson".to_string(), "add_install_script".to_string()),
-        meson_noop,
+        meson_add_install_script,
     );
     vm.method_registry.insert(
         ("meson".to_string(), "add_postconf_script".to_string()),
-        meson_noop,
+        meson_add_postconf_script,
     );
     vm.method_registry.insert(
         ("meson".to_string(), "add_dist_script".to_string()),
-        meson_noop,
+        meson_add_dist_script,
     );
     vm.method_registry.insert(
         ("meson".to_string(), "add_devenv".to_string()),
@@ -1990,6 +1990,160 @@ fn meson_can_run_host_binaries(
     _args: &[CallArg],
 ) -> Result<Object, String> {
     Ok(Object::Bool(true))
+}
+
+fn flatten_script_arg(value: &Object, out: &mut Vec<Object>) {
+    match value {
+        Object::Array(items) => {
+            for item in items {
+                flatten_script_arg(item, out);
+            }
+        }
+        other => out.push(other.clone()),
+    }
+}
+
+fn script_target_output(vm: &VM, subdir: &str, output: &str) -> String {
+    if subdir.is_empty() {
+        format!("{}/{}", vm.build_root, output)
+    } else {
+        format!("{}/{}/{}", vm.build_root, subdir, output)
+    }
+}
+
+fn script_target_argument(subdir: &str, output: &str) -> String {
+    if subdir.is_empty() {
+        output.to_string()
+    } else {
+        format!("{}/{}", subdir, output)
+    }
+}
+
+fn script_program_command(vm: &VM, program: &Object) -> Result<Vec<String>, String> {
+    match program {
+        Object::String(name) => {
+            if let Some(overridden) = vm.build_data.find_program_overrides.get(name) {
+                return script_program_command(vm, overridden);
+            }
+            match crate::builtins::functions::resolve_program_path(vm, name) {
+                Some(path) => crate::builtins::functions::script_command_from_path(&path),
+                None => Err(format!("Program '{}' not found or not executable", name)),
+            }
+        }
+        Object::ExternalProgram(program) => {
+            if !program.found {
+                return Err(format!(
+                    "Program '{}' not found or not executable",
+                    program.name
+                ));
+            }
+            crate::builtins::functions::script_command_from_path(&program.path)
+        }
+        Object::File(file) => {
+            let path = crate::builtins::functions::resolved_file_path(vm, file);
+            crate::builtins::functions::script_command_from_path(&path)
+        }
+        Object::BuildTarget(target) => {
+            if target.target_type != "executable" {
+                return Err("meson script requires an executable build target".to_string());
+            }
+            let output = target
+                .outputs
+                .first()
+                .ok_or("meson script executable target has no output")?;
+            Ok(vec![script_target_output(vm, &target.subdir, output)])
+        }
+        other => Err(format!(
+            "Meson script program must be a string, file, external program or executable, not {}",
+            other.type_name()
+        )),
+    }
+}
+
+fn append_script_arguments(vm: &VM, value: &Object, out: &mut Vec<String>) -> Result<(), String> {
+    match value {
+        Object::Array(items) => {
+            for item in items {
+                append_script_arguments(vm, item, out)?;
+            }
+        }
+        Object::String(string) => out.push(string.clone()),
+        Object::File(file) => {
+            if file.is_built {
+                out.push(script_target_argument(&file.subdir, &file.path));
+            } else {
+                out.push(crate::builtins::functions::resolved_file_path(vm, file));
+            }
+        }
+        Object::BuildTarget(target) => {
+            for output in &target.outputs {
+                out.push(script_target_argument(&target.subdir, output));
+            }
+        }
+        Object::CustomTarget(target) => {
+            for output in &target.outputs {
+                out.push(script_target_argument(&target.subdir, output));
+            }
+        }
+        Object::CustomTargetIndex(target, index) => {
+            if let Some(output) = target.outputs.get(*index) {
+                out.push(script_target_argument(&target.subdir, output));
+            }
+        }
+        Object::ExternalProgram(program) => {
+            let mut command = vec![program.path.clone()];
+            crate::builtins::functions::wrap_script_command(&mut command);
+            out.extend(command);
+        }
+        other => {
+            return Err(format!(
+                "Meson script argument has unsupported type {}",
+                other.type_name()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn script_command(vm: &VM, args: &[CallArg], method: &str) -> Result<Vec<String>, String> {
+    let mut positional = Vec::new();
+    for argument in VM::get_positional_args(args) {
+        flatten_script_arg(argument, &mut positional);
+    }
+    let program = positional
+        .first()
+        .ok_or_else(|| format!("{}() requires at least one argument", method))?;
+    let mut command = script_program_command(vm, program)?;
+    for argument in positional.iter().skip(1) {
+        append_script_arguments(vm, argument, &mut command)?;
+    }
+    Ok(command)
+}
+
+fn meson_add_install_script(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, String> {
+    let command = script_command(vm, args, "meson.add_install_script")?;
+    vm.build_data.install_scripts.push(InstallScriptData {
+        command,
+        skip_if_destdir: VM::get_arg_bool(args, "skip_if_destdir", false),
+        install_tag: VM::get_arg_str(args, "install_tag", usize::MAX).map(String::from),
+    });
+    Ok(Object::None)
+}
+
+fn meson_add_postconf_script(
+    vm: &mut VM,
+    _obj: &Object,
+    args: &[CallArg],
+) -> Result<Object, String> {
+    let command = script_command(vm, args, "meson.add_postconf_script")?;
+    vm.build_data.postconf_scripts.push(command);
+    Ok(Object::None)
+}
+
+fn meson_add_dist_script(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Object, String> {
+    let command = script_command(vm, args, "meson.add_dist_script")?;
+    vm.build_data.dist_scripts.push(command);
+    Ok(Object::None)
 }
 
 fn meson_noop(_vm: &mut VM, _obj: &Object, _args: &[CallArg]) -> Result<Object, String> {

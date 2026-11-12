@@ -4419,7 +4419,7 @@ pub(crate) fn resolved_file_path(vm: &VM, f: &FileData) -> String {
     }
 }
 
-fn resolve_program_path(vm: &VM, name: &str) -> Option<String> {
+pub(crate) fn resolve_program_path(vm: &VM, name: &str) -> Option<String> {
     if name.starts_with('/') {
         return Path::new(name).is_file().then(|| name.to_string());
     }
@@ -4503,6 +4503,26 @@ pub(crate) fn wrap_script_command(command: &mut Vec<String>) {
             command.splice(0..1, wrapped);
         }
     }
+}
+
+pub(crate) fn script_command_from_path(path: &str) -> Result<Vec<String>, String> {
+    let metadata = std::fs::metadata(path)
+        .map_err(|_| format!("Program '{}' not found or not executable", path))?;
+    if !metadata.is_file() {
+        return Err(format!("Program '{}' not found or not executable", path));
+    }
+    if let Some(mut interpreter) = script_interpreter(path) {
+        interpreter.push(path.to_string());
+        return Ok(interpreter);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o111 == 0 {
+            return Err(format!("Program '{}' not found or not executable", path));
+        }
+    }
+    Ok(vec![path.to_string()])
 }
 
 fn target_output_path(root: &str, subdir: &str, output: &str) -> String {
