@@ -1,11 +1,10 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `e42a4911b`, with XSH `d520fbcc5`, recorded with the other inputs in
+The checked-in kernel pin is `d59567c40`, with XSH `ef057ef33`, recorded with the other inputs in
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
-identical transcripts. That run passed on this pin, including three recovery
-rounds, and A0 accounting kept every original pass. The Linux
+identical transcripts. Final qualification of this pair is in progress. The Linux
 reference can still fail the clock `pause` case on a loaded host, because its
 QEMU peer then holds the guest for 12 to 13.5 s against a 5 s margin.
 The [roadmap](ROADMAP.md) owns the successor kernel
@@ -47,10 +46,10 @@ obligations.
   mount, so an unchecked volume stays unchecked until an offline checker
   repairs it. `fsync` of file data and its directory survives a VMM kill, and
   a full volume reports `ENOSPC` without leaving the image inconsistent.
-- Native suite: not a full pass. The original 1,281 A0 passes are preserved
-  (`infra/asterinas/a0-baseline.json`) and most of the 15,585 cases the
-  pinned XSH discovers remain unexecuted; a failure that Linux also shows is environment
-  debt, not an Asterinas defect.
+- Native suite: not a full pass. Final accounting for this pair must preserve
+  the original 1,281 A0 passes (`infra/asterinas/a0-baseline.json`). Most cases
+  discovered by the pinned XSH remain unexecuted. A failure that Linux also
+  shows is environment debt, not an Asterinas defect.
 
 Known limits that no capability claims: a change to a link's name, hardware
 address, MTU, queue length or link mode, or to any link flag other than
@@ -83,6 +82,16 @@ the sibling XSH working tree do not affect this pinned build.
 The Asterinas Cargo configuration uses the mycrates archive and native
 registry. Its cached dependency set is bound to that configuration as well as
 the kernel and toolchain lockfiles.
+
+The XSH snapshot's source hash selects a Cargo target cache under
+`.out/asterinas-firecracker/xsh-targets/`. `prepare-xsh.sh` points the shared
+`.out/xsh-target` link at that cache, so host tools and the seed use the same
+compiled inputs. A change of snapshot selects a different cache even when
+Git archive timestamps precede the old build. An existing directory is
+preserved under `xsh-targets/legacy.*`. Run
+`bash infra/asterinas/test-xsh-target.sh` to verify that a source switch with
+preserved timestamps changes the compiled program and that switching back
+reuses the original binary.
 
 The kernel, verified bundles, runtime disk copies, Firecracker configuration,
 and logs live under `.out/asterinas-firecracker/`; fetched Asterinas and XSH
@@ -172,8 +181,30 @@ changes link state with `SIOCSIFFLAGS` and `netlink-link` with the packaged
 anycast and multicast routes through `lo`, compares each route's type, scope,
 protocol, table, flags and attribute order with Linux's, and compares the errno
 of a scope that is too wide, a missing device, an unknown device and an unknown
-type. `events` also compares the
-route-netlink notifications. `ioctl-config` configures the address and netmask with
+type. Its gateway matrix compares those four types at global, link, host and
+nowhere scope, with an explicit, inferred or missing interface. Local routes
+refuse gateways. Broadcast and anycast routes accept gateways at link scope,
+and multicast routes accept them at global and link scope.
+
+`route_lookup` compares IPv4 output queries without a dump, including source,
+output interface, mark, uid, and `RTM_F_FIB_MATCH`. The witness checks each
+route type, rejection errno, attribute order, explicit-interface direct paths,
+and missing or down devices. Broadcast sources fail with `ENETUNREACH`.
+`RTM_F_FIB_MATCH` requires a stored route even when an explicit interface
+permits a direct output path. Cache length, error and expiration are compared.
+Cache use counts and ages are per-query state and are omitted from the
+transcript. Nonzero `RTA_IIF` input-route queries remain unsupported.
+
+`addr_config` compares finite preferred and valid IPv4 lifetimes. Deprecation
+emits `RTM_NEWADDR`, and expiration emits `RTM_DELADDR`, removes derived routes
+and prevents a new bind. Removing an address cancels its old expiry, and a
+netmask change preserves its remaining lifetime and deprecated state.
+Interface address labels such as `lo:expiry` resolve to their base device for
+ifreq ioctls. As on Linux, infinite validity makes an address permanent and
+reports both lifetimes as forever. A zero preferred lifetime still sets the
+deprecated flag. Invalid lifetime pairs fail with `EINVAL`.
+
+`events` also compares the route-netlink notifications. `ioctl-config` configures the address and netmask with
 `SIOCSIFADDR` and `SIOCSIFNETMASK` through XSH's guarded `linux.ioctl`, and adds and
 removes the gateway and network routes with `SIOCADDRT` and `SIOCDELRT` through the
 case's `ioctl-route-probe` C helper (the guard's catalogue admits only ifreq-shaped
@@ -292,7 +323,7 @@ It fetches the kernel commit and the XSH commit named in `infra/asterinas/inputs
 repositories into fresh bare caches under `.work/tmp`, requires each fetch to return exactly the locked
 commit, and compares the kernel commit with the `asterinas` gitlink and the kernel's dev image version
 with the lock's. A repository that answers but does not hold the commit fails, so a kernel commit that
-exists only locally is red until the fork's `main` is published. The caches are removed on exit.
+exists only locally is red until the fork publishes it. The caches are removed on exit.
 
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
