@@ -6,6 +6,20 @@ use pm.policy
 use pm.store
 use pm.types
 
+proc manual_fixture_entries(contents: Path) [fs, error] -> Result[List[Record], Error] {
+  var entries: List[Record] = []
+  for entry in fs.walk(contents, hidden: true, gitignore: false) |> sort-by .path {
+    let relative = entry.path.strip_prefix(contents)?.display()
+    continue when relative == "."
+    if entry.kind == "dir" {
+      entry.path.chmod(0o755)
+    }
+    let metadata = entry.path.metadata()?
+    entries += [{path: relative, kind: if entry.kind == "dir" { "tree" } else { entry.kind }, mode: metadata.mode % 4096, sha256: if entry.kind == "file" { hash.sha256(entry.path)?.hex() } else { "" }, target: if entry.kind == "symlink" { entry.path.readlink()?.display() } else { "" }}]
+  }
+  entries
+}
+
 test test_manual_index_queries_composed_pages_and_preserves_prior_generation_on_failure [fs, process, env, error] { |ctx|
   let tools = env.path("LAPUTA_MANUAL_INDEX_TOOL_ROOT")?
   let arch = system.uname()?.machine
@@ -45,16 +59,7 @@ export proc build(dest: Path) [fs, process, env, error] {}
   let page = fp"{contents}/usr/share/man/man1/laputa-island.1"
   page.parent.mkdir()
   page.write(".TH LAPUTA-ISLAND 1\n.SH NAME\nlaputa-island \\- original description\n")
-  var entries: List[Record] = []
-  for entry in fs.walk(contents, hidden: true, gitignore: false) |> sort-by .path {
-    let relative = entry.path.strip_prefix(contents)?.display()
-    continue when relative == "."
-    if entry.kind == "dir" {
-      entry.path.chmod(0o755)
-    }
-    let metadata = entry.path.metadata()?
-    entries += [{path: relative, kind: if entry.kind == "dir" { "tree" } else { entry.kind }, mode: metadata.mode % 4096, sha256: if entry.kind == "file" { hash.sha256(entry.path)?.hex() } else { "" }, target: if entry.kind == "symlink" { entry.path.readlink()?.display() } else { "" }}]
-  }
+  let entries = manual_fixture_entries(contents)?
   let payload = fp"{stage}/payload.tar.gz"
   archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)
   let metadata = fp"{stage}/metadata.json"
@@ -88,6 +93,52 @@ export proc build(dest: Path) [fs, process, env, error] {}
   let generated = root_receipt.get("generated_entries")?.require(List[Record])?
   assert generated.len() == 1
   assert generated[0].get("sha256")?.require(Str)? == original.sha256().hex()
+
+  let gate = fp"{stage}/gated-loader"
+  let evil = fp"{stage}/outside-program"
+  let cc = process.which("clang")?
+  run $cc "-static" "tests/fixtures/gated_loader.c" "-o" $gate
+  run $cc "-DATTACK_BODY" "tests/fixtures/gated_loader.c" "-o" $evil
+  let selected_loader = fp"{contents}/usr/lib/ld-musl-{arch}.so.1"
+  selected_loader.resolve()?.copy(to: fp"{contents}/usr/lib/retained-loader")
+  fp"{contents}/usr/lib/retained-loader".chmod(0o755)
+  selected_loader.remove()
+  gate.copy(to: selected_loader)
+  selected_loader.chmod(0o755)
+  let race_repo = fp"{test.temp_dir(ctx, name: "manual-index-race-repository")?}/repo"
+  let _ = fs.copy_tree(repo, race_repo, parents: true)?
+  let race_recipe = fp"{race_repo}/packages/mandoc/PKGBUILD.xsh"
+  race_recipe.write(race_recipe.read_text()?.replace("ver = \"1\"", with: "ver = \"2\""))
+  let race_build = plan.resolve(catalog.load(race_repo)?, {target, index_sha256: "", packages: []}, build_policy, ["mandoc"], false)?
+  let race_node = race_build.nodes[0]
+  let race_payload = fp"{stage}/gated-payload.tar.gz"
+  archive.create(race_payload, contents, [p"."], .Tar, compression: .Gzip)
+  let race_metadata = fp"{stage}/gated-metadata.json"
+  json.write(race_metadata, {name: "mandoc", ver: race_node.ver, rel: race_node.rel, package_kind: "payload", files: manual_fixture_entries(contents)?})
+  let _ = store.commit(target, store_root, race_node, {payload: race_payload, payload_sha256: hash.sha256(race_payload)?.hex(), metadata: race_metadata, proof, executor_sha256: bytes.from_text("gated manual index fixture").sha256().hex()})?
+  let race_value = generation.plan(race_build, ["mandoc"], generation.overlay_digest(overlay)?)?
+  let saved_plan = fp"{stage}/gated-plan.json"
+  generation.write_generation_plan(saved_plan, race_value)
+  let driver = path.absolute(p"tests/fixtures/index_race.xsh")?
+  for kind in ["program", "library", "manuals", "ancestor"] {
+    let race = test.temp_dir(ctx, name: f"manual-index-race-{kind}")?
+    let publication = fp"{race}/publication"
+    publication.mkdir()
+    let outside = fp"{race}/outside"
+    fp"{outside}/manuals/man1".mkdir(parents: true)
+    fp"{outside}/manuals/man1/outside.1".write("OUTSIDE_MANUAL_DATA\n.TH OUTSIDE 1\n.SH NAME\noutside \\- outside page\n")
+    fp"{outside}/manuals/mandoc.db".write("outside database unchanged\n")
+    fp"{outside}/sentinel".write("outside unchanged\n")
+    fp"{outside}/library".write("OUTSIDE_LIBRARY_DATA\n")
+    let result = test.run_xsh(ctx, driver.read_text()?, [], [
+      ctx.xsh_bin.display(), driver.display(), saved_plan.display(), store_root.display(), publication.display(),
+      overlay.display(), outside.display(), evil.display(), kind, fp"{race}/index.log".display(),
+    ], {}, name: f"index-race-{kind}.xsh")?
+    assert result.success, result.stderr
+    assert result.stdout == f"{kind} confined\n", result.stdout
+    assert database.read_bytes()? == original
+    generation.verify_generation(first, receipt)
+  }
   database.write("corrupt index")
   match generation.verify_generation(first, receipt) {
     Ok(_) => test.fail("changed manual index was accepted")

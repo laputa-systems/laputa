@@ -52,8 +52,8 @@ qualification remains open; manual cross-build evidence is bounded in
   - Atomic visibility: kill tests observed both the staged and the published outcome, never a partial visible tree, and a retry succeeds.
   - Durability: `strace` shows every staged file and directory fsynced before the `RENAME_NOREPLACE` publish and the parent fsynced after it. Power loss is untested.
   - Against the pre-change code, the suite found no escape from hostile entries, conflicts, kills or full disks. It had no retained-root composition to test against ancestor replacement.
+- **Manual indexing:** The existing `linux.run_confined` profile now accepts retained `FsRoot` authorities. The loader's child may open files beneath the selected root and write beneath its retained manual directory. Native and host boundary checks cover authority lifetime and ancestor replacement during policy setup. The real mandoc proof rejects program, library, manpath and ancestor swaps, preserves outside sentinels and refuses generation publication while retaining the prior generation. The preceding unconfined implementation executes the swapped outside program. Indexing requires Landlock ABI 6 and has no weaker fallback; the pinned Asterinas kernel lacks that capability, so a composition requesting an index fails closed there.
 - **Remaining:**
-  - `c1b407a` starts the musl loader beneath the staging root with `FsRoot.command` (`execveat`). The loader still opens `makewhatis`, its libraries and the manpath by host path, so a swap of those paths between the rooted precondition checks and the loader's opens is not excluded.
   - One fsync per staged entry is unmeasured on large generations; owner timing gates are deferred (perf gate deferred: host busy).
 - **Coordination:** Roadmap R4/R5; XSH-37 owns reusable host operations, not package policy.
 - **Fix with:** isolate-effects

@@ -934,7 +934,8 @@ proc root_require_index_tool_closure(output: FsRoot, arch: Str) {
 
 ## Generates a manual index in an unpublished staging root and records its generated contents.
 ## Every read and mutation goes through `output`; the index tool is its `makewhatis` opened
-## beneath `output`, while the tool's manpath, libraries and ELF interpreter are host paths.
+## beneath `output`. Kernel confinement restricts child filesystem opens to that retained root
+## and writes to its retained manual directory, including the loader's host-path opens.
 export proc root_index_manual_pages(output: FsRoot, receipt: types.RootReceipt) [fs, process, error] -> Result[types.RootReceipt, Error] {
   root_validate_receipt(receipt)
   if root_read_receipt_in(output)? != receipt {
@@ -951,6 +952,7 @@ export proc root_index_manual_pages(output: FsRoot, receipt: types.RootReceipt) 
   let loader = fp"{host}/usr/lib/ld-musl-{arch}.so.1"
   let program = fp"{host}/usr/bin/makewhatis"
   let library_path = fp"{host}/usr/lib"
+  let manuals = output.open_root(confined.rel(manual_directory)?)?
   let database: RelPath = p"usr/share/man/mandoc.db"
   if output.exists(database) {
     if receipt.generated_entries.is_empty() {
@@ -959,7 +961,7 @@ export proc root_index_manual_pages(output: FsRoot, receipt: types.RootReceipt) 
     output.remove(database)
   }
   let command = output.command(confined.rel(f"usr/lib/ld-musl-{arch}.so.1")?, [loader, "--library-path", library_path, program, manpath], env: {LD_PRELOAD: "", LD_LIBRARY_PATH: "", LC_ALL: "C"})?
-  let status = process.run(command)?
+  let status = linux.run_confined(command, read: [output], write: [manuals])?
   if ! status.ok {
     return Err(types.PmError.PackageContract("selected-root makewhatis failed; generation was not published"))
   }
