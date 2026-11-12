@@ -227,8 +227,19 @@ affinity case: a later query observes mask `3` after setting mask `1`.
 Kernel `81e2541ce` fixes this defect by copying the caller's affinity into cloned
 user tasks. Its new regression fails fork and thread inheritance on `d59567c40`
 while exec passes. The patched developer kernel passes all three paths and all
-eleven native cases. Full native qualification and replay of the maintained
-cohorts against the new published pin remain open.
+eleven native cases. The clean standard build of the published pin also passes
+those fourteen probes. Its kernel ELF SHA-256 is
+`dd5db1b9405497fd36905d69f75f13849fc9f20cee24ed9f7837adb9dbc826ee`.
+The synthetic C witness IDs are separate from the 15,649 native IDs.
+
+Full native execution is running from
+`.work/tmp/native-full-81e2541ce-9ba05675c/`, whose `run.json` fixes the kernel,
+fixture and product identities. The private VM has two CPUs, 4 GiB RAM and the
+unprivileged test principal above. Its `all` selection retains each test's
+original deadline. A partial accounting result is progress, not qualification.
+Keep its writable image while the VMM runs. Later XSH test and dd repairs need
+separate coverage because this fixture remains frozen at `9ba05675c`.
+Full native completion and maintained-cohort replay on the new pin remain open.
 
 To run a kernel regression witness against the built bundle and against the
 Linux reference with the same memory, run
