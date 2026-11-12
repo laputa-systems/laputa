@@ -198,8 +198,8 @@ process owns the namespace, so both veth endpoints and every address and route i
 creates disappear with it, and no host or guest network state is touched. It
 requires unprivileged user namespaces; the test skips when the kernel or the
 container refuses them, and the fixture itself refuses to run outside its
-`disposable-namespace` scope. The profile-integration half remains the KVM
-`qemu-self-hosting` guest below.
+`disposable-namespace` scope. The live IPv4 guest qualification below executes
+this same witness inside a disposable `qemu-self-hosting` KVM guest.
 
 The Docker command expects `bin/xsh` and `core/` under the supplied tool root
 and the existing `xsh-test` image. The container runs as the caller's UID and
@@ -274,11 +274,10 @@ re-observation error twice, checks retained partial state, and rejects implicit
 ownership of the observed address. The new guest run qualifies the bounded replay
 with the acknowledged-request transport; it does not establish convergence.
 
-The fixture establishes ownership through two fresh link indices and reciprocal
-peer links. The supplied `lib.nettools_fixture.link_add_veth` encodes nested
-`VETH_INFO_PEER` as 2, while the pinned Linux header defines 1. Linux consequently
-auto-names that peer. The fixture brings up the observed peer name. The XSH helper
-bug remains outside this Laputa change.
+The earlier bounded-replay fixture establishes ownership through two fresh link
+indices and reciprocal peer links. Its original core encoded `VETH_INFO_PEER`
+as 2 instead of 1, so Linux auto-named the peer. The fixture uses the observed
+peer name. The matching core used by the live qualification encodes 1.
 
 The guest fixture imports the existing `lib.nettools_fixture` from the matching
 frozen core. Checking that fixture requires both explicit module roots:
@@ -297,21 +296,67 @@ XSH_MODULE_PATH=/mnt/self-hosting/inputs/laputa:/usr/lib/xsh/core \
   disposable-vm
 ```
 
-This slice adds no dependencies and changes no installed payload. It does not
-persist ownership or supervise networking. IPv4 reconciliation through one
-managed virtual-Ethernet link is enabled and qualified in a disposable user and
-network namespace: `tests/system/network_policy_applier.xsh` converges an owned
-address and default route, leaves a foreign address, a peer address, and
-operator and Tailscale-like routes untouched, plans nothing on reapplication,
-refuses a zero-metric or unmodeled-attribute route change before any effect, and
-reports a conflict rather than a rollback for an injected concurrent change and
-for a real ENOBUFS overrun. The KVM `qemu-self-hosting` guest run still covers
-only the bounded failure replay; the live applier has not been re-run there.
-IPv6 is unsupported and reported separately: `NetworkAddress`, `NetworkIntent`,
-`NetworkSnapshot`, and `NetworkOwnership` are IPv4-only, `valid_address` rejects
-a non-IPv4 literal, and `network_project_state` returns only `Family.Inet`
-addresses and routes, so IPv6 addresses are outside this cohort rather than
-silently dropped. Cross-dump atomicity still needs a shared route-netlink
-generation from `linux.network_dump`. XSH-38 and XSH-45 shared-boundary
-qualification, a genuinely concurrent writer in another process, IPv6, Linux
-aarch64, and Asterinas remain unverified.
+## Live IPv4 guest qualification
+
+`tests/system/network_policy_live_vm.sh` runs the live witness in a private user
+and network namespace inside an actual Linux x86_64 KVM guest:
+
+```sh
+bash tests/system/network_policy_live_vm.sh \
+  /absolute/path/to/clean/x86_64-seed \
+  /absolute/path/to/canonical-self-hosting/current
+```
+
+The host driver requires KVM access, QEMU, `mkfs.ext4`, Bash, Git, `jaq`, `rg`,
+`sha256sum`, and tar with xz support. The supplied bundle must be canonical A,
+generation `906009468ffe783b2078aacfe5f1002e7294a15ac57712e50a2d09766229a8a5`,
+with Linux 7.2.9. The driver owns fresh disk copies and a 2-CPU, 4-GiB guest.
+It validates the clean seed's manifest against the copied runners and core
+archive. The private root receives the matching `xsh`, `xsht`, and complete
+core tree before the witness runs. This is an explicit tool overlay on A.
+The base generation receipt does not attest the overlaid tools.
+
+The driver prints its evidence directory under `.work/tmp/network-live.*` and
+retains it after completion. `vm/console.log` records the actual transcript,
+writer identities, installed runner hashes and guest markers. The directory
+also holds source and staged-input hashes, the seed manifest, and source-root
+hashes checked after the run. QEMU is canceled and reaped on success or failure.
+Completion requires complete marker lines from the raw serial console and an
+anchored writer-identity line. Embedded markers and QEMU diagnostics cannot
+complete the proof.
+The original root bundle remains unchanged. A skipped network test fails the
+guest qualification.
+
+On 2026-11-12, clean XSH `5cce5ddfd174e64cae5b3104071b7b604399b892` passed this
+KVM witness: five cases passed with no skips. Its installed `xsh` SHA-256 was
+`47658de9489d695c598c6c96edc8a8c2efcb092ff329b9110533ed8c94ec51e1`, and
+`xsht` was `2242b9622ec703fd55db8f4793bfc8035aebf3c8b55b5e2ad059bd4520041d10`.
+The native network-policy suite passed 48 cases with no skips. This evidence
+qualifies that seed. A replacement shared seed requires its own final rerun.
+
+The witness converges an owned IPv4 address and default route, then plans
+nothing on reapplication. Foreign and peer addresses, an operator default on
+the peer, and a Tailscale-like `100.64.0.0/10` route survive. A separate XSH
+process changes the kernel address state after planning. Its distinct PID,
+parent PID and shared network namespace are checked. Interprocess barriers
+release the controller only after the writer's acknowledged mutation is
+observed. The stale pass reports `NetworkReobserve` before operation 0 and
+attempts no changes. A fresh observation then converges two route operations,
+and reapplication again plans and attempts nothing. The writer is joined and
+its added foreign address survives recovery.
+
+The same witness retains zero-metric and unmodeled-attribute refusal before
+effects, partial-state reporting after a refused route request, and full
+re-observation after a real ENOBUFS notification overrun. No production network
+code, dependency or installed payload changes were needed for this qualification.
+
+This is deterministic second-process concurrency between planning and applying.
+It does not establish atomicity between a per-operation check and its request,
+or a shared generation across the four dumps in `linux.network_dump`. The
+controller reports observed divergence and loss. It does not provide a kernel
+transaction, persist ownership, supervise networking or prove packet delivery.
+
+IPv6 remains unsupported by this controller: `NetworkAddress`, `NetworkIntent`,
+`NetworkSnapshot` and `NetworkOwnership` are IPv4-only. `valid_address` refuses
+non-IPv4 input, and projection selects `Family.Inet` explicitly. Linux aarch64,
+Asterinas, physical networking and cross-dump atomicity remain unqualified.

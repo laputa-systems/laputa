@@ -18,11 +18,21 @@ operator-route true
 settled converged plans=0 attempts=0 owned=198.18.1.2/24|198.18.1.1:100
 settled-total-addresses 3
 settled-total-routes 16
-== an injected concurrent change stops the pass before any mutation
+== a second process changes kernel state between planning and application
+writer-distinct true
 conflict reobserve plans=4 attempts=0 reason=observation changed before operation 0
+writer-completed true
 conflict-kept-old true
 conflict-untouched-new true
 conflict-concurrent true
+== a fresh observation converges after the separate writer and then plans nothing
+recovered converged plans=2 attempts=2 owned=198.18.1.2/24|198.18.1.1:200
+recovered-settled converged plans=0 attempts=0 owned=198.18.1.2/24|198.18.1.1:200
+recovered-concurrent true
+recovered-foreign-address true
+recovered-peer-address true
+recovered-foreign-route true
+recovered-operator-route true
 == a zero-metric route change is refused in both directions and mutates nothing
 zero-add-operation true
 zero-add-plan-refused a zero-metric default route is never created because the kernel treats priority 0 as unset on removal, so it could not be removed exactly
@@ -44,7 +54,7 @@ customized-added-nothing true
 NETWORK_APPLIER_OK
 """
 
-test test_live_applier_converges_and_reports_conflicts_in_a_disposable_namespace [fs, process, env, error] { |ctx|
+test test_live_applier_converges_and_reports_conflicts_in_a_disposable_namespace [fs, process, env, io, error] { |ctx|
   guard system.uname()?.sysname == "Linux" else {
     test.skip("route netlink is Linux-only")
     return
@@ -66,9 +76,25 @@ test test_live_applier_converges_and_reports_conflicts_in_a_disposable_namespace
       let output = stdout.read_text()?
       assert status.shell_code()? == 0, f"{output}{stderr.read_text()?}"
       assert output == expected_transcript, output
+      assert "NETWORK_WRITER_IDENTITIES controller=" in stderr.read_text()?
+      io.write_stdout(output)
+      io.write_stderr(stderr.read_text()?)
     }
     Err(failure) => test.skip(f"the kernel refuses a private user and network namespace: {failure.message}")
   }
+}
+
+test test_separate_writer_refuses_to_run_outside_its_disposable_namespace [fs, process, error] { |ctx|
+  let scratch = test.temp_dir(ctx, name: "network-writer-scope")?
+  let stdout = fp"{scratch}/stdout"
+  let stderr = fp"{scratch}/stderr"
+  let namespace = p"unused"
+  let argv = [ctx.xsh_bin.display(), p"tests/system/fixtures/network-policy-writer.xsh".display(), "host", scratch.display(), "0", "0", namespace.display()]
+  let command = process.command_argv(ctx.xsh_bin, argv, p".", {}, b"", stdout, stderr, timeout: 10s)
+  let status = process.run(command)?
+  assert !status.ok
+  assert "writer requires the disposable namespace fixture" in stderr.read_text()?
+  assert !fp"{scratch}/ready".exists()?
 }
 
 test test_applier_refuses_to_run_outside_its_disposable_namespace [fs, process, env, error] { |ctx|
