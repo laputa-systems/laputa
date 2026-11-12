@@ -9,7 +9,7 @@ def outcome:
 | (split("\n")
    | map(select(contains(" ... ")) | split(" ... ") | select(.[0] | test("(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+$")) | {id: (.[0] | capture("(?<id>(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+)$").id), outcome: (.[1] | outcome)})
    | reduce .[] as $row ({}; .[$row.id] = $row.outcome)) as $observed
-| ($observed | to_entries | map(select((.key | split("::")[0]) as $module | ($interrupted_modules | index($module)) == null))) as $accepted
+| ($observed | to_entries | map(select(.key as $id | ($id | split("::")[0]) as $module | ($interrupted_modules | index($module)) == null and ($interrupted_modules | index($id)) == null))) as $accepted
 | ($observed | keys) as $observed_ids
 | {
     discovered: ($discovered | length),

@@ -356,14 +356,20 @@ exists only locally is red until the fork publishes it. The caches are removed o
 
 To account for many modules, run
 `bash infra/asterinas/native-batches.sh asterinas MODULES BATCH_SIZE BUDGET_SECONDS DIR`
-(or `linux`) on a list of test modules, then
+(or `linux`) on a list of test modules or exact test IDs, then
 `bash infra/asterinas/account-native.sh DISCOVERED_IDS.json DIR [--baseline ACCOUNTING.json]`.
 Each batch boots one guest from the built bundle. A guest that dies mid-batch
 returns its in-flight module to the pending list once and records it as
 interrupted if it dies alone. Modules left when the budget ends are written to
 `unstarted.txt`; the accounting counts their cases and those of interrupted
-modules as unexecuted. The accounting exits nonzero when it finds no results, a
+modules as unexecuted. An interrupted exact selection excludes only that ID;
+other completed IDs in the same module retain their results. The accounting exits nonzero when it finds no results, a
 result for an undiscovered case, or a baseline case that no longer passes.
+Its successful exit establishes accounting and pass preservation. Full native
+qualification additionally requires no failed, unexecuted, unknown or
+interrupted cases, with every skip assigned to its fixture or platform owner.
+Run the accounting regression checks independently with
+`bash tests/system/asterinas_native_accounting.sh`; the host checks also run them.
 To compare against the original A0 pass set, use
 `bash infra/asterinas/account-native.sh DISCOVERED_IDS.json DIR --baseline infra/asterinas/a0-baseline.json`.
 Discover the identities from the corpus the bundle carries: extract
