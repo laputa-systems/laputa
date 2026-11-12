@@ -1855,28 +1855,32 @@ proc reconcile_child_exits(units: List[ServiceUnit], children: List[ChildExit], 
   out
 }
 
-proc kill_unit(unit: ServiceUnit) {
-  return when unit.pid <= 0 and unit.state not in ["running", "starting"]
+proc kill_unit(unit: ServiceUnit) -> Result[List[ChildExit]] {
+  return [] when unit.pid <= 0 and unit.state not in ["running", "starting"]
+
+  var children: List[ChildExit] = []
 
   if unit.notify_fd > 0 {
     unix.notify_close(unit.notify_fd)
   }
 
   if run_stop_proc(unit.service) {} else if unit.pid > 0 {
-    unix.kill_process_group(unit.pid, "TERM")
-    time.sleep(time.millis(unit.service.stop_timeout_ms))
+    let cleanup = unix.shutdown_process_groups(
+      [unit.pid], time.millis(unit.service.stop_timeout_ms), kill_timeout: 100ms,
+    )?
 
-    match unix.kill_process_group(unit.pid, "KILL") {
-      Ok(_) | Err(_) => {}
+    guard cleanup.remaining.is_empty() else {
+      return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"service {unit.service.name} retained process group {unit.pid}"))
     }
+
+    children = cleanup.reaped
   }
 
   run_finish(unit)
+  children
 }
 
-proc stop_unit(unit: ServiceUnit) -> Result[ServiceUnit] {
-  kill_unit(unit)
-
+proc mark_unit_stopped(unit: ServiceUnit) -> Result[ServiceUnit] {
   let stopped: ServiceUnit = ServiceUnit(
     service: unit.service,
     desired: "down",
@@ -1896,8 +1900,13 @@ proc stop_unit(unit: ServiceUnit) -> Result[ServiceUnit] {
 }
 
 proc shutdown_all(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
-  let reversed = [stop_unit(unit)? for unit in reverse_units(units)]
-  reverse_units(reversed)
+  var reversed: List[ServiceUnit] = []
+  var children: List[ChildExit] = []
+  for unit in reverse_units(units) {
+    children += kill_unit(unit)?
+    reversed += [mark_unit_stopped(unit)?]
+  }
+  reconcile_child_exits(reverse_units(reversed), children, elapsed_now_ms()?)?
 }
 
 proc write_scanner_marker() {
@@ -1914,7 +1923,7 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
 
   if desired == "down" {
     if unit.pid > 0 or unit.state == "running" or unit.state == "starting" {
-      return stop_unit(unit)?
+      return mark_unit_stopped(unit)?
     }
 
     return {
@@ -1941,8 +1950,6 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
   }
 
   if desired == "restart" {
-    kill_unit(unit)
-
     let restarted: ServiceUnit = ServiceUnit(
       service: unit.service,
       desired: "up",
@@ -1979,7 +1986,14 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
 }
 
 proc apply_request(units: List[ServiceUnit], name: Str, desired: Str) -> Result[List[ServiceUnit]] {
-  [apply_one(unit, name, desired)? for unit in units]
+  var children: List[ChildExit] = []
+  for unit in units {
+    if unit.service.name == name and desired in ["down", "restart"] {
+      children += kill_unit(unit)?
+    }
+  }
+  let updated = [apply_one(unit, name, desired)? for unit in units]
+  reconcile_child_exits(updated, children, elapsed_now_ms()?)?
 }
 
 pure parse_control_verb(data: Bytes) -> Result[Str] {

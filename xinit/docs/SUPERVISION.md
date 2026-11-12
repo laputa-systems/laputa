@@ -32,6 +32,13 @@ each unit toward its desired state:
 - On `SIGTERM` or `SIGINT` the scanner stops its units in reverse dependency
   order, reaps the owned groups, and exits.
 
+The stop timeout is a maximum TERM grace period. A service that exits promptly
+is reaped before `finish()` without waiting for the whole allowance. Group
+cleanup returns other child exits it consumed. A control request reconciles
+those exits against sibling units before starting replacements. Whole-scanner
+shutdown marks every unit stopped before that reconciliation, so shutdown
+cannot schedule a replacement.
+
 Every unit reconciles against one start-of-pass snapshot, so gating reads
 consistent dependency states regardless of iteration order. The scanner is
 the only writer of the status JSON for the units it owns.
