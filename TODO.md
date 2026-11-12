@@ -178,11 +178,3 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** L (weeks)
 
-### LAP-56 · P2 · Wake xinit's scanner for a non-root control request
-
-- **Area:** xinit supervision
-- **Where:** `xinit/xinit.xsh` (`request_desired`, `wake_scanner`, `scan_units`), `xinit/docs/SUPERVISION.md`
-- **Problem:** The scanner drains its control inbox only when it wakes, and when every unit is steady it sleeps for up to an hour. A queued request now wakes it with `SIGHUP`, sent only when the scanner marker's pid and start time match. An `xinit-admin` member cannot signal the root scanner, though, so its requests can wait until the scanner next wakes on its own.
-- **Recommendation:** Give the scanner a wake channel the group can write to, such as a FIFO or socket in `/run/xinit` owned by `root:xinit-admin`, mode 0660. Include it in the scanner's wait, so a non-root request is applied within the same bound as a root one. Prove it with a guest case in which the operator restarts a steady service and observes the transition within a few seconds.
-- **Fix with:** lifecycle-concurrency
-- **Effort:** S

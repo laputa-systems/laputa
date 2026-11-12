@@ -169,6 +169,28 @@ proc scanner_marker_path() -> Result[Path] {
   fp"{run_dir()?.display()}/scanner.json"
 }
 
+proc scanner_wake_path() -> Result[Path] {
+  fp"{run_dir()?.display()}/wake"
+}
+
+proc prepare_scanner_wake() -> Result[Int] {
+  let path_value = scanner_wake_path()?
+  path_value.remove()
+  fs.mkfifo(path_value, mode: 0o600)
+  fs.set_owner(path_value, gid: control_group_gid()?)
+  path_value.chmod(0o660)
+  unix.open_fd(path_value, write: true, nonblock: true, flags: ["nofollow"])?
+}
+
+proc drain_scanner_wake(fd: Int) {
+  match unix.read_fd(fd, 4096) {
+    Ok(_) => {}
+    Err(failure) => {
+      return Err(failure) unless failure.errno == 11 or failure.errno == 35
+    }
+  }
+}
+
 pure control_permitted(uid: Int, primary_gid: Int, member_gids: List[Int], group_gid: Int) -> Bool {
   uid == 0 or primary_gid == group_gid or group_gid in member_gids
 }
@@ -1387,9 +1409,13 @@ proc wake_scanner() {
 
   return unless pid > 0 and start_time_ms > 0 and pid_start_time(pid)? == start_time_ms
 
-  match process.kill(pid, "HUP") {
+  let fd = unix.open_fd(scanner_wake_path()?, write: true, nonblock: true, flags: ["nofollow"])?
+  defer unix.close_fd(fd)
+  match unix.write_fd(fd, b"w") {
     Ok(_) => {}
-    Err(_) => {}
+    Err(failure) => {
+      return Err(failure) unless failure.errno == 11 or failure.errno == 35
+    }
   }
 }
 
@@ -1482,7 +1508,7 @@ proc restart_service(name: Str) {
   print status_line(status)
 }
 
-proc reload_service(name: Str) [fs, process, env, time, error] {
+proc reload_service(name: Str) [fs, process, env, time, error, net] {
   if scanner_active() {
     request_desired(name, "reload")
     return
@@ -2089,10 +2115,15 @@ proc scan_units(names: List[Str]) {
   var remaining = if test_mode() { env_int("XINIT_TEST_MAX_EVENTS", -1)? } else { -1 }
   var shutting_down = false
   prepare_control_inbox()
+  let wake_path = scanner_wake_path()?
+  defer wake_path.remove()
+  let wake_fd = prepare_scanner_wake()?
+  defer unix.close_fd(wake_fd)
   write_scanner_marker()
 
   while true {
     if ! shutting_down {
+      drain_scanner_wake(wake_fd)
       units = drain_inbox(units)?
     }
 
@@ -2103,7 +2134,7 @@ proc scan_units(names: List[Str]) {
 
     return when remaining == 0
 
-    let event = unix.wait_pid1_event(timeout: time.millis(next_wait_ms(units, elapsed_now_ms()?)))?
+    let event = unix.wait_pid1_event(timeout: time.millis(next_wait_ms(units, elapsed_now_ms()?)), wake_fd: wake_fd)?
 
     if remaining > 0 {
       remaining -= 1
@@ -2220,7 +2251,7 @@ proc control(verb: Str, name: Str) {
   }
 }
 
-proc main(...argv: List[Str]) [fs, process, env, time, error, io] {
+proc main(...argv: List[Str]) [fs, process, env, time, error, io, net] {
   let init_options = {
     respawn_delay_ms: {kind: "UInt", default: 1000},
     launch_limit: {kind: "UInt", default: 0},

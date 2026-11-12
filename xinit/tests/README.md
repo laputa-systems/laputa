@@ -140,6 +140,25 @@ These Linux x86_64 proofs do not qualify scanner SIGKILL, disk power loss,
 Asterinas, or architecture parity. The Python oracle uses the standard library
 already in `xsh-test`; installed packages gain no Python dependency.
 
+## Qualify nonroot control wakeups
+
+Run the root scanner and an `xinit-admin` member in a disposable Linux container
+with matching XSH tools and `core/` in one seed directory:
+
+```bash
+python3 xinit/tests/fixtures/control_wakeup.py --tools .out/seed/x86_64
+```
+
+Both root and member requests must restart a steady longrun within four seconds;
+a nonmember must fail to queue. A member's queued restart must also succeed
+when the paused scanner's FIFO is full. Member stop/start, scanner TERM cleanup, and a
+second scanner generation using the retained run directory must also pass.
+The fixture checks FIFO ownership and cleanup, and checks the accepted request's
+kernel uid. Gated test flags remain inert without the test opt-in. The container
+has no network, a read-only root, and only the CHOWN, SETUID, and SETGID
+capabilities needed for its disposable account fixtures. `--scanner PATH` runs
+the same oracle against an explicit candidate for negative qualification.
+
 ## Qualify the DHCP client in a disposable VM
 
 `xinit/tests/fixtures/dhcp_vm_host.xsh` boots a KVM guest from a staged
