@@ -1,11 +1,11 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `2167b6eb3`, with XSH `d520fbcc5`, recorded with the other inputs in
+The checked-in kernel pin is `e42a4911b`, with XSH `d520fbcc5`, recorded with the other inputs in
 `infra/asterinas/inputs.lock`; both are published. It is qualified by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
 below on Asterinas/Firecracker and on the Linux reference and requires
-identical transcripts. That run passed on this pin, including ten recovery
-rounds, and quiet-host A0 accounting kept every original pass. The Linux
+identical transcripts. That run passed on this pin, including three recovery
+rounds, and A0 accounting kept every original pass. The Linux
 reference can still fail the clock `pause` case on a loaded host, because its
 QEMU peer then holds the guest for 12 to 13.5 s against a 5 s margin.
 The [roadmap](ROADMAP.md) owns the successor kernel
@@ -31,7 +31,9 @@ obligations.
   Unresolved neighbors queue packets as Linux does. Links report their
   carrier, its transition counts and their frame counters, which `ifconfig`
   shows. Blackhole, unreachable, prohibit and throw routes install, survive
-  link loss, and refuse lookups with Linux's errno. `ip link set` brings a
+  link loss, and refuse lookups with Linux's errno. Local, broadcast, anycast
+  and multicast routes install through a device with their type, scope and
+  attributes, and the dump reports them as Linux does. `ip link set` brings a
   link up or down with `RTM_NEWLINK`, which matches Linux's lookup, errno
   and resulting state.
 - Logging: the packaged `syslogd` receives local datagrams with their sender
@@ -46,17 +48,16 @@ obligations.
   repairs it. `fsync` of file data and its directory survives a VMM kill, and
   a full volume reports `ENOSPC` without leaving the image inconsistent.
 - Native suite: not a full pass. The original 1,281 A0 passes are preserved
-  (`infra/asterinas/a0-baseline.json`) and most of the 15,255 discovered
-  cases remain unexecuted; a failure that Linux also shows is environment
+  (`infra/asterinas/a0-baseline.json`) and most of the 15,585 cases the
+  pinned XSH discovers remain unexecuted; a failure that Linux also shows is environment
   debt, not an Asterinas defect.
 
-Known limits that no capability claims: local, broadcast, anycast and multicast routes through a device fail with
-`EOPNOTSUPP`, as does an `RTM_NEWLINK` that renames a link or changes its
-hardware address, MTU, queue length or link mode, or any link flag other than
-`IFF_UP`; traffic to the host's own non-loopback address does not pass
-through `lo` or its counters; `MAP_POPULATE` is ignored, which Linux
-permits; pipe ring buffers and large kernel heap allocations still need
-contiguous frames; anonymous page faults cost about three times the Linux
+Known limits that no capability claims: a change to a link's name, hardware
+address, MTU, queue length or link mode, or to any link flag other than
+`IFF_UP`, fails with `EOPNOTSUPP`; traffic to the host's own non-loopback
+address does not pass through `lo` or its counters; `MAP_POPULATE` is ignored,
+which Linux permits; pipe ring buffers and large kernel heap allocations still
+need contiguous frames; anonymous page faults cost about three times the Linux
 reference.
 
 The Asterinas backend uses the exact kernel, toolchain, Firecracker, and XSH
@@ -167,7 +168,11 @@ the `guest/asterinas/network-state` case in each mode (`loopback`, `link`,
 `netlink-link`, `address`, `route`, `events`, `packet` and `ioctl-config`) against a
 TAP-backed `eth0` and requires the two `NET_` transcripts to be identical. `link`
 changes link state with `SIOCSIFFLAGS` and `netlink-link` with the packaged
-`ip link set`, which sends `RTM_NEWLINK`. `events` also compares the
+`ip link set`, which sends `RTM_NEWLINK`. `route_types` installs local, broadcast,
+anycast and multicast routes through `lo`, compares each route's type, scope,
+protocol, table, flags and attribute order with Linux's, and compares the errno
+of a scope that is too wide, a missing device, an unknown device and an unknown
+type. `events` also compares the
 route-netlink notifications. `ioctl-config` configures the address and netmask with
 `SIOCSIFADDR` and `SIOCSIFNETMASK` through XSH's guarded `linux.ioctl`, and adds and
 removes the gateway and network routes with `SIOCADDRT` and `SIOCDELRT` through the
@@ -301,6 +306,11 @@ modules as unexecuted. The accounting exits nonzero when it finds no results, a
 result for an undiscovered case, or a baseline case that no longer passes.
 To compare against the original A0 pass set, use
 `bash infra/asterinas/account-native.sh DISCOVERED_IDS.json DIR --baseline infra/asterinas/a0-baseline.json`.
+Discover the identities from the corpus the bundle carries: extract
+`git archive HEAD` of the XSH snapshot under
+`.out/asterinas-firecracker/xsh-snapshots/` and run `xsht test --list-json`
+there. A list discovered from an older XSH lacks the pin's newer cases, so the
+accounting reports them as unknown and fails.
 
 Native cases carry fixed timeouts that the guest must meet on a shared host. The
 `test-bb-awk` cases need about 1.9 s on Asterinas and 1.5 s on the Linux reference

@@ -39,7 +39,7 @@ case "$cohort" in
         tap_modes=(pause jump)
         ;;
     network-state)
-        witnesses=(network/rtnl_route_dump network/link_state network/addr_config network/route_config network/rtnl_ack network/rtnl_notify network/packet_bind network/packet_receive network/packet_send network/packet_options)
+        witnesses=(network/rtnl_route_dump network/link_state network/addr_config network/route_config network/route_types network/rtnl_ack network/rtnl_notify network/packet_bind network/packet_receive network/packet_send network/packet_options)
         case_dir=network-state
         modes=(loopback link netlink-link address route events packet ioctl-config)
         tap_modes=("${modes[@]}")
