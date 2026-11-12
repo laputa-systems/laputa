@@ -1,4 +1,5 @@
 ##! XSH module `tinyland` package and build operations.
+use packages.upstream_pins as upstream_pins
 use pm.target as pm_target
 use pm.rust as pm_rust
 use pm.types
@@ -16,12 +17,9 @@ export const package_kind = "payload"
 export const ver = "0.1.0"
 
 ## Package recipe export.
-export const rel = "2"
+export const rel = "3"
 
-## Package recipe export.
-## musl and the shared client libraries tinyland links: the seatd-rs daemon
-## package ships the libseat client for the seatd-only broker session.
-## Keyboard maps are pure-Rust KBVM with XKB data lookups; no libxkbcommon link.
+## Runtime broker and C runtime.
 export const deps = ["musl", "seatd-rs"]
 
 ## XKB data is a runtime lookup, not a link input.
@@ -30,40 +28,8 @@ export const runtime_only_deps = ["xkeyboard-config"]
 ## Package recipe export.
 export const mkdeps_host = ["cargo", "llvm-toolchain"]
 
-## Package recipe export.
-## The compositor lives in this monorepo as a top-level tree; the recipe
-## addresses it as a `repository/` source, which the PM resolves against
-## the checkout root and hashes into the plan fingerprint, so no URL pin
-## is needed. The cargo-vendor entry vendors every locked crates.io crate
-## beside the tree; the PM verifies each crate against Cargo.lock.
-export const upstream_sources = [
-  {
-    source: p"repository/tinyland",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "SKIP",
-      },
-    ],
-  },
-  {
-    source: p"repository/tinyland/Cargo.lock => vendor",
-    kind: "cargo-vendor",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "SKIP",
-      },
-    ],
-  },
-]
+## Pinned independent compositor workspace.
+export let upstream_sources = upstream_pins.tinyland_workspace_sources
 
 ## Package recipe export.
 export const filetree = [{path: p"usr/bin/tinyland", kind: "binary"}]
@@ -147,7 +113,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: x86_64_rustflags,
   }) {
     run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" \
-      "source.vendored-sources.directory=\"vendor\"" "--release" "--target" $triple "--bin" "tinyland"
+      "source.vendored-sources.directory=\"vendor\"" "--config" "git-kbvm/.cargo-source.toml" "--release" "--target" $triple "--package" "tinyland" "--bin" "tinyland"
   }
 
   fs.install(fp"target/{triple}/release/tinyland", fp"{dest}/usr/bin/tinyland", 0o755, parents: true, overwrite: true)

@@ -1,5 +1,5 @@
 ##! XSH module `seatd-rs` package and build operations.
-use pm.env as pm_env
+use packages.upstream_pins as upstream_pins
 use pm.target as pm_target
 use pm.rust as pm_rust
 use pm.types
@@ -13,132 +13,35 @@ export const name = "seatd-rs"
 ## Explicit payload or metapackage classification.
 export const package_kind = "payload"
 
-## Package recipe export.
-## Daemon and client library versions move together: the Rust daemon reports
-## the upstream seatd release it reimplements, and the client library is cut
-## from that same C release.
+## Upstream daemon protocol version.
 export const ver = "0.9.3"
 
 ## Package recipe export.
-export const rel = "2"
+export const rel = "3"
 
 ## Package recipe export.
-## The client library and the daemon link libc only (no libseat dependency).
+## The daemon links libc only.
 export const deps = ["musl"]
 
 ## Package recipe export.
-export const mkdeps_host = ["cargo", "llvm-toolchain", "linux-headers", "gluon", "pkgconf"]
+export const mkdeps_host = ["cargo", "llvm-toolchain"]
 
 ## The build installs an xinit service module; xinit runs it at runtime.
 export const runtime_only_deps = ["xinit"]
 
-## Package recipe export.
-## The Rust daemon lives in this monorepo as a top-level tree; the recipe
-## addresses it as a `repository/` source, which the PM resolves against
-## the checkout root and hashes into the plan fingerprint, so no URL pin
-## is needed. The Cargo.lock pin vendors every locked crates.io crate
-## beside the tree; the PM verifies each crate against it.
-## The C release tarball builds only the libseat client library the
-## tinyland compositor links; the daemon binary always comes from Rust.
-export const upstream_sources = [
-  {
-    source: p"repository/seatd-rs",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "SKIP",
-      },
-    ],
-  },
-  {
-    source: p"repository/seatd-rs/Cargo.lock => vendor",
-    kind: "cargo-vendor",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "SKIP",
-      },
-    ],
-  },
-  {
-    source: p"https://github.com/kennylevinsen/seatd/archive/refs/tags/VERSION.tar.gz => c-seatd",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "302564d54d8e28191fadfd734f2675ecb0c9e0615a58011b89ef15dfa4dbaa96",
-      },
-    ],
-  },
-  {
-    source: p"service.xsh",
-    kind: "auto",
-    architectures: [
-      "all",
-    ],
-    checksums: [
-      {
-        arch: "all",
-        sha256: "SKIP",
-      },
-    ],
-  },
-]
+## Pinned daemon workspace plus the distribution service module.
+export let upstream_sources = upstream_pins.tinyland_workspace_sources.push({
+  source: p"service.xsh",
+  kind: "auto",
+  architectures: ["all"],
+  checksums: [{arch: "all", sha256: "SKIP"}],
+})
 
-## Package recipe export.
-## Same installed filetree as the C `seatd` package, so the tinyland profile
-## swaps one package name: the daemon binary is Rust, the client library C.
+## Installed Rust daemon and supervisor integration.
 export const filetree = [
-  {
-    path: p"usr/bin/seatd",
-    kind: "binary",
-  },
-  {
-    path: p"usr/include/libseat.h",
-    kind: "file",
-  },
-  {
-    path: p"usr/lib/libseat.so",
-    kind: "symlink",
-  },
-  {
-    path: p"usr/lib/libseat.so.1",
-    kind: "binary",
-  },
-  {
-    path: p"usr/lib/pkgconfig/libseat.pc",
-    kind: "file",
-  },
-  {
-    path: p"usr/lib/xinit/services/seatd.xsh",
-    kind: "file",
-  },
+  {path: p"usr/bin/seatd", kind: "binary"},
+  {path: p"usr/lib/xinit/services/seatd.xsh", kind: "file"},
 ]
-
-proc patch_realtime_dependency(root: Path) {
-  let meson = fp"{root}/meson.build"
-  let text = meson.read_text()?
-
-  meson.write(
-    text.replace(
-  """# needed for cross-compilation
-realtime = meson.get_compiler('c').find_library('rt')
-private_deps += realtime""",
-  with: """# musl provides realtime interfaces in libc; avoid recording the build-env librt.
-realtime = declare_dependency()""",
-),
-  )
-}
 
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
@@ -217,38 +120,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: x86_64_rustflags,
   }) {
     run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" \
-      "source.vendored-sources.directory=\"vendor\"" "--release" "--target" $triple "--bin" "seatd"
+      "source.vendored-sources.directory=\"vendor\"" "--config" "git-kbvm/.cargo-source.toml" "--release" "--target" $triple "--package" "seatd" "--bin" "seatd"
   }
 
   fs.install(fp"target/{triple}/release/seatd", fp"{dest}/usr/bin/seatd", 0o755, parents: true, overwrite: true)
-
-  # The C release builds only the libseat client library. The daemon stays
-  # Rust: -Dserver=disabled drops seatd and seatd-launch from install.
-  patch_realtime_dependency(p"c-seatd")
-
-  let meson = process.which("meson")?
-  let ninja = process.which("ninja")?
-  let jobs_flag = f"-j{cpu.count()}"
-  let pc = pm_env.pkg_config_context()?
-
-  env ({
-    LD_LIBRARY_PATH: pc.ld_library_path,
-    PKG_CONFIG: pc.pkg_config,
-    PKG_CONFIG_LIBDIR: pc.pkg_config_libdir,
-    PKG_CONFIG_PATH: pc.pkg_config_path,
-    PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot,
-  }) {
-    run $meson "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() "-Ddefault_library=shared" "-Dwerror=false" \
-      "-Dlibseat-logind=disabled" "-Dlibseat-seatd=enabled" "-Dlibseat-builtin=disabled" "-Dserver=disabled" \
-      "-Dexamples=disabled" "-Dman-pages=disabled" "c-seatd/build" "c-seatd"
-    run $ninja "-C" "c-seatd/build" $jobs_flag
-
-    env ({
-      DESTDIR: dest,
-    }) {
-      run $meson "install" "-C" "c-seatd/build"
-    }
-  }
 
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/seatd.xsh", 0o644, parents: true, overwrite: true)
 }

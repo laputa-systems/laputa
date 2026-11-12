@@ -4,8 +4,7 @@ Make Laputa a small, reproducible, XSH-managed operating system that can remain
 useful unattended: a VM should survive service crashes, network loss, interrupted
 updates, and virtual-disk damage, with an inspectable recovery path.
 
-After the in-tree tinyland, mdevd-rs, seatd-rs, doas-rs, and ntpd-rs integration is
-qualified, the next step change is the [remotely maintainable VM](#g2-the-remotely-maintainable-vm):
+After the native userland package integration is qualified, the next step change is the [remotely maintainable VM](#g2-the-remotely-maintainable-vm):
 install, administer, update, recover, and eventually rebuild Laputa through XSH.
 SSH is the control path connecting those workflows, not an isolated additional
 command. Installed-generation activation is the centerpiece that turns composed
@@ -49,12 +48,13 @@ durability; formal semantics are not native-adapter conformance. Require the
 corresponding host/guest evidence and state its limits. Keep the language core
 and substrate increasingly predictable while userspace grows above them.
 
-Keep the four native userland components in-tree beside their recipes and
-qualification. Preserve independent binaries and narrow responsibilities, but
-make a source change, package rebuild, and exact-image test one development
-loop. Do not restore four release-and-repin cycles or require a shared runtime
-framework merely because the code now shares a repository. XSH remains the
-separate substrate/toolchain boundary.
+Maintain shared native components in their independent upstream repositories.
+Tinyland owns the compositor, separate seat daemon, and shared wire protocol;
+mdevd-rs and doas-rs retain separate upstreams. Land shared changes upstream,
+then update checksum-pinned recipe inputs and qualify the installed artifacts.
+Keep distribution policy, package proofs, and guest integration here. Do not
+restore vendored implementation trees or consumer-only patches. XSH remains
+the separate substrate and toolchain boundary.
 
 The most direct feedback loop is to build XSH inside Laputa, use it to produce a
 successor system, and reduce discovered failures to ordinary regression tests.
@@ -112,7 +112,7 @@ owners, not a new message bus or resident fleet-management service.
 
 | Area | Existing foundation | Remaining boundary |
 |---|---|---|
-| Native userland | In-tree tinyland, mdevd-rs, seatd-rs, doas-rs, and ntpd-rs have package inputs and retained tests | Qualify the exact packaged chain, normal boot ownership, and regression coverage; consolidation alone is not a security or release claim. See [tinyland](TINYLAND.md). |
+| Native userland | Tinyland, seatd, mdevd, and doas have pinned upstream package inputs; ntpd-rs remains in-tree | Qualify the exact packaged chain, normal boot ownership, and regression coverage; consolidation alone is not a security or release claim. See [tinyland](TINYLAND.md). |
 | Packages and images | Typed plans, immutable artifacts, runtime-only generations, atomic publication of host-side system bundles | Installed-system activation, boot success, rollback, and state ownership are not the same as composing a generation. See [PM](PM.md) and [core infrastructure](CORE-INFRASTRUCTURE.md). |
 | Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Keep normal boot, tested recovery, and supervisor ownership aligned. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
 | Remote administration | Packaged Dropbear and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
@@ -930,7 +930,7 @@ tools for a C/Rust/XSH cohort and successor bundle, boot B, verify its actual
 receipt/runner hashes, and boot the unchanged A again. Preserve and reuse it;
 do not launch a second self-hosting campaign as though no foundation exists.
 
-The next step is to make that loop routine: change XSH or an in-tree component
+The next step is to make that loop routine: change XSH or an upstream component
 inside Laputa, rebuild the affected package with declared inputs, stage the
 successor through R4/R5, and reboot with the same confirmation/fallback contract
 used for remotely supplied updates. Keep the compiler in Rust; this is
@@ -1006,7 +1006,7 @@ Linux applications cannot be assumed to cooperate the way macOS applications
 do.
 
 **Acceptance:** on the reference laptop, the installed system boots to the
-in-tree compositor, joins Wi-Fi, suspends and resumes repeatedly without losing
+upstream compositor, joins Wi-Fi, suspends and resumes repeatedly without losing
 the session, reports battery and controls backlight, plays audio, runs a
 browser with working portals, and rolls back a bad update through R5.
 
@@ -1033,7 +1033,7 @@ direction launches no new pilot and changes no current acceptance gate.
 
 | Gate | Required result |
 |---|---|
-| G0: Qualified baseline | Record exact source/seed/kernel/profile inputs and runnable existing proofs. Preserve the in-tree userland regressions and recheck historical TODO gaps against current topic evidence. Linux aarch64 qualification remains separately reported; missing proof is not a pass. |
+| G0: Qualified baseline | Record exact source/seed/kernel/profile inputs and runnable existing proofs. Preserve the upstream component regressions and recheck historical TODO gaps against current topic evidence. Linux aarch64 qualification remains separately reported; missing proof is not a pass. |
 | G1: Reliable VM | R1-R3 work together with controlled network/time failure, daemon recovery, dirty-disk handling, independent rescue, and enough persistent diagnostics to explain failures. |
 | G2: Remotely maintainable VM | Pass the integrated provision/SSH/inspect/stage/fail-B/recover-A/confirm/blank-disk-restore scenario above using R4-R7 and the G1 foundation. |
 | G3: Optional expansion | R8/R9 are admitted only with a concrete workload, bounded runtime cost, and their own proof; they do not hold G1/G2 hostage. |

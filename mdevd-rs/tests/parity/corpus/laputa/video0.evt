@@ -1,6 +1,0 @@
-ACTION=add
-DEVPATH=/devices/x
-SUBSYSTEM=video4linux
-DEVNAME=video0
-MAJOR=81
-MINOR=0

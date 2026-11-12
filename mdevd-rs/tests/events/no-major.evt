@@ -1,3 +1,0 @@
-ACTION=add
-DEVPATH=/devices/x
-SUBSYSTEM=test

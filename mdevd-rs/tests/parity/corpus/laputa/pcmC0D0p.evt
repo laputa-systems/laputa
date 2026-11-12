@@ -1,6 +1,0 @@
-ACTION=add
-DEVPATH=/devices/x
-SUBSYSTEM=sound
-DEVNAME=pcmC0D0p
-MAJOR=116
-MINOR=16

@@ -1,3 +1,0 @@
-dry run: mknod ttyACM0 c 166 0
-dry run: chmod 660 ttyACM0
-dry run: chown 0:20 ttyACM0

@@ -49,8 +49,6 @@ XSHT ?= $(XSH_BIN_DIR)/xsht
 XSH_HOST ?= $(XSH)
 CARGO ?= cargo
 CARGO_JOBS ?= 4
-TINYLAND_XKB_ROOT ?= /usr/share/X11/xkb
-TINYLAND_XKB_LIB_DIR ?= /usr/lib
 
 HOST_XSH_ENV = PATH="$(XSH_BIN_DIR):$$PATH" XSH_HOST="$(XSH_HOST)" XSH_ROOT="$(XSH_ROOT_ABS)" XSH_MODULE_PATH="$(CURDIR):$(XSH_ROOT_ABS)/core"
 LAPUTA_PROFILE_ENV = XSH_MODULE_PATH="$(CURDIR):$(XSH_ROOT_ABS)/core" XSH_ROOT="$(XSH_ROOT_ABS)"
@@ -90,7 +88,7 @@ endif
 PNPM_VERSION ?= 12.18.0
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-components test-components-privileged test-components-integration test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
+.PHONY: check lint test test-components-integration test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
 	need-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
 	asterinas-setup asterinas-preflight asterinas-fetch asterinas-build \
@@ -112,40 +110,10 @@ check: need-xsh
 lint: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) lint pm.xsh pm system installer xinit
 
-test: test-components test-pm test-system test-xinit test-linux
-
-test-components: export RUST_TEST_THREADS := 1
-test-components:
-	@test "$(HOST_OS)" = Linux || { echo "test-components: Linux is required" >&2; exit 1; }
-	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
-	cd mdevd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets
-	/bin/sh mdevd-rs/tools/test-check-combined.sh
-	/bin/sh mdevd-rs/tools/test-build-qemu-guest.sh
-	/bin/sh mdevd-rs/tools/test-check-udev-consumer.sh
-	/bin/sh mdevd-rs/tools/test-check-privileged.sh
-	/bin/sh mdevd-rs/tools/test-check-deps.sh
-	cd mdevd-rs && /bin/sh tools/check-deps.sh
-	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --offline --locked
-	cd seatd-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --offline --locked --all-targets -- -D warnings
-	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
-	cd doas-rs && RUSTC_WRAPPER=kache $(CARGO) clippy -j $(CARGO_JOBS) --locked --all-targets -- -D warnings
-	@test -f "$(TINYLAND_XKB_ROOT)/rules/evdev" || { echo "test-components: XKB rules missing at $(TINYLAND_XKB_ROOT); set TINYLAND_XKB_ROOT" >&2; exit 1; }
-	@test -f "$(TINYLAND_XKB_LIB_DIR)/libxkbcommon.so" || { echo "test-components: libxkbcommon development library missing at $(TINYLAND_XKB_LIB_DIR); set TINYLAND_XKB_LIB_DIR" >&2; exit 1; }
-	@cd tinyland && host="$$(rustc -vV)" && flags="$${RUSTFLAGS:-} -Lnative=$(abspath $(TINYLAND_XKB_LIB_DIR))"; \
-	    case "$$host" in *"host: "*"linux-musl"*) flags="$$flags -Ctarget-feature=-crt-static -Clink-arg=-fuse-ld=mold" ;; esac; \
-	    TINYLAND_XKB_ROOT="$(abspath $(TINYLAND_XKB_ROOT))" LD_LIBRARY_PATH="$(abspath $(TINYLAND_XKB_LIB_DIR))$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
-	    RUSTFLAGS="$$flags" RUSTC_WRAPPER=kache $(CARGO) test -j $(CARGO_JOBS) --locked
-	mkdir -p tinyland/.work/tmp
-	cd tinyland && python3 -B harness/test-qmp.py
-	cd tinyland && python3 -B harness/test-guest-lock.py
-
-test-components-privileged:
-	@test "$(HOST_OS)/$(HOST_ARCH)" = Linux/x86_64 || { echo "privileged component coverage unavailable on $(HOST_OS)/$(HOST_ARCH)" >&2; exit 1; }
-	RUSTC_WRAPPER=kache RUSTFLAGS="-Clinker=mold -Clinker-flavor=ld" /bin/sh mdevd-rs/tools/check-privileged.sh
+test: test-pm test-system test-xinit test-linux
 
 test-components-integration:
 	$(MAKE) test
-	$(MAKE) test-components-privileged
 	$(MAKE) profile-test
 
 test-pm: need-xsh

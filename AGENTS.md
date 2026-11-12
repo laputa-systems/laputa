@@ -68,3 +68,14 @@ Host-tool setup, the full target reference, and cleanup are in
 
 Read both xinit docs before changing its inittab engine, scanner, readiness,
 or status handling. Fixtures under `tests/*/fixtures/` are inputs, not tests.
+
+## Shared native components
+
+Tinyland, seatd, and seatd-protocol are maintained in the independent
+`laputa-systems/tinyland` workspace. mdevd-rs and doas-rs retain separate
+upstreams. Recipes consume checksum-pinned upstream commits and lockfiles.
+Submit shared fixes, adjustments, and features upstream first, verify them
+there, then update recipe pins and qualify the installed artifacts here.
+Do not vendor these implementations or retain consumer-only patches.
+Component Cargo suites belong upstream; package and guest integration tests
+belong in this repository.

@@ -1,6 +1,0 @@
-ACTION=add
-DEVPATH=/devices/x
-SUBSYSTEM=mem
-DEVNAME=null
-MAJOR=1
-MINOR=3

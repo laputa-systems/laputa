@@ -73,28 +73,9 @@ test test_rust_distribution_sources_keep_the_loaded_records_and_target_urls [fs,
     },
     expected_cargo_rust_std,
   ]
-  let expected_doas_sources = [
-    {
-      source: "repository/doas-rs",
-      kind: "auto",
-      architectures: ["all"],
-      checksums: [
-        {arch: "all", sha256: "SKIP"},
-      ],
-    },
-    {
-      source: "repository/doas-rs/Cargo.lock => vendor",
-      kind: "cargo-vendor",
-      architectures: ["all"],
-      checksums: [
-        {arch: "all", sha256: "SKIP"},
-      ],
-    },
-    expected_doas_rust_std,
-  ]
 
   assert serialized_sources(cargo_aarch64)? == json.encode(expected_cargo_sources)?
-  assert serialized_sources(doas_aarch64)? == json.encode(expected_doas_sources)?
+  assert json.encode(serialized_source(doas_aarch64.upstream_sources[2]))? == json.encode(expected_doas_rust_std)?
   assert expanded_sources(cargo_aarch64, "aarch64") == [
     "https://static.rust-lang.org/dist/2026-10-01/cargo-1.99.0-aarch64-unknown-linux-musl.tar.xz => cargo",
     "https://static.rust-lang.org/dist/2026-10-01/rustc-1.99.0-aarch64-unknown-linux-musl.tar.xz => rustc",

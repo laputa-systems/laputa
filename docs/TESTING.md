@@ -12,8 +12,7 @@ make test-system   # tests/system, then tests/integration
 make test-xinit
 make test-linux    # the kernel recipe's Kbuild tests and linux-headers' headers_install tests
 make test          # all four
-make test-components # Rust component suites, lint, and local harness tests
-make test-components-integration # components, PM, and all three guest profiles
+make test-components-integration # distribution suites and the canonical guest profile
 ```
 
 Kbuild planner tests cover object-list replacement, nested `patsubst` and
@@ -45,27 +44,16 @@ $XSHT check tests/integration/cross_consumer.xsh
 $XSHT test --jobs 1 tests/integration/cross_consumer.xsh
 ```
 
-`make test-components` runs the retained host tests for mdevd, seatd, doas,
-and tinyland, the documented Rust lints for the first three, mdevd's dependency
-gate, and tinyland's QMP and package-lock harness tests. Seatd's golden
-transcript is part of its Cargo suite. Outer Rust test cases run serially to
-isolate descriptors from subprocess creation in other cases. Tests that create
-concurrent clients or startup races retain their own concurrency.
-Tinyland needs the native libxkbcommon development library and XKB rules;
-set `TINYLAND_XKB_LIB_DIR` and `TINYLAND_XKB_ROOT` if those
-are not under `/usr/lib` and `/usr/share/X11/xkb`. A prepared guest root can
-also supply them. Linux musl host tests link libxkbcommon dynamically with mold.
-This target does not build packages or boot guests.
+Component Cargo suites, Rust lints, protocol goldens, and component-only VM
+harnesses belong in their upstream repositories. This repository verifies
+checksum-pinned package sources, artifact constraints, supervisor policy,
+and installed guest behavior. Land shared component changes upstream before
+updating recipe pins.
 
-`make test` includes component tests alongside the PM, system, xinit, and Linux
-suites. The package-lock test uses isolated fixture inputs without a cached guest.
-`make test-components-privileged` runs the retained mdevd adversarial cases in
-disposable Docker containers on Linux x86_64. Other hosts fail with an explicit
-coverage-unavailable message. The ordinary Cargo run reports these cases as ignored.
-`make test-components-integration` runs `make test`, the privileged component
-cases, then the canonical Ghostty profile. The profile needs the infrastructure
-described in [QEMU](QEMU.md) and [Tinyland](TINYLAND.md). This explicit integration gate is separate from
-`make verify`.
+`make test-components-integration` runs `make test` and the canonical Ghostty
+profile. The profile needs the infrastructure described in [QEMU](QEMU.md)
+and [Tinyland](TINYLAND.md). This distribution integration gate is separate
+from `make verify`.
 
 Use `cargo -j 4` for Rust checks. `make mirror-test` checks the mirror and its
 POSIX deployment scripts; on Linux it runs Cargo offline in `xsh-test`.

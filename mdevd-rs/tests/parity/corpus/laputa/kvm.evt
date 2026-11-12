@@ -1,6 +1,0 @@
-ACTION=add
-DEVPATH=/devices/x
-SUBSYSTEM=misc
-DEVNAME=kvm
-MAJOR=10
-MINOR=232

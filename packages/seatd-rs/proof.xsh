@@ -6,7 +6,6 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
   proof.package_metadata(root, "seatd-rs")
   let seatd = fp"{root}/usr/bin/seatd"
   proof.target_elf(root, p"usr/bin/seatd", "seatd-rs")
-  proof.target_elf(root, p"usr/lib/libseat.so.1", "seatd-rs")
   proof.ensure(fp"{root}/usr/lib/xinit/services/seatd.xsh".exists()?, "proof-seatd-rs", "missing seatd service module")
 
   let readelf = proof.readelf_tool()?

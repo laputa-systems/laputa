@@ -7,6 +7,11 @@ accounts for both for the Tinyland and Ghostty profile
 [LAP-51](rfc/LAP-51-c-free-userspace.md). FFmpeg, codecs, musl, Linux, Mesa
 drivers, crabc, and allocators are retained and are counted, not replaced.
 
+The measurements below describe the recorded artifacts before the independent
+Tinyland workspace migration. Current recipes use its native Rust seat client
+and no longer install the C libseat client from the Rust daemon package. Rerun
+the census on the newly built root before claiming updated sizes or closure.
+
 ## Run it
 
 Build and compose the profile's runtime roots with the existing commands, then

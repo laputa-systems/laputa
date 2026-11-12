@@ -1,6 +1,0 @@
-ACTION=add
-DEVPATH=/devices/x
-SUBSYSTEM=block
-DEVNAME=loop0
-MAJOR=7
-MINOR=0

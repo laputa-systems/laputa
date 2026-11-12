@@ -7,24 +7,23 @@ node (`docs/QEMU.md`).
 
 ## Source and artifact contract
 
-The authoritative implementations live in `tinyland/`, `mdevd-rs/`,
-`seatd-rs/`, and `doas-rs/`. Their recipes consume `repository/` inputs.
-Source edits change PM build identities without an intermediate release.
-Cargo `target` output and ignored harness scratch are excluded from inputs.
-XSH remains a separate substrate checkout.
+Tinyland and its separate seatd daemon come from the independent
+[upstream workspace](https://github.com/laputa-systems/tinyland), pinned once
+in `packages/upstream_pins.xsh`. mdevd-rs and doas-rs retain separate upstream
+repositories. Recipes fetch checksum-pinned archives and lockfiles. Shared
+fixes, adjustments, and features land upstream before recipe pins change.
+No component implementation is vendored here.
 
-`pm/rust.xsh` owns standard-library staging shared by the four recipes.
-Each recipe retains its explicit linker, dependency, and patch policy.
-No Rust dependencies or toolchain pins changed in this hardening pass.
+`pm/rust.xsh` owns standard-library staging for package builds. Recipes retain
+their distribution linker and dependency policy. The seatd package installs
+its daemon and xinit service; it no longer ships the unused C libseat client.
+Tinyland's native Rust client uses the shared upstream protocol crate.
 
-Keep separate binaries and component interfaces. No shared Cargo workspace,
-D-Bus, logind, PAM, polkit, or desktop stack is required.
-
-PM package proofs validate the distribution artifacts. Guest qualification
-must use those artifacts and their installed paths. Standalone static builds
-are component evidence and cannot qualify the dynamically linked Laputa
-`doas` or `tinyland`. The libseat backend is explicitly `seatd`; broker loss
-must never select direct device access.
+Keep the privileged seat daemon and unprivileged compositor in separate
+processes. Supervision and distribution session policy remain here. Component
+Cargo tests belong upstream; PM package proofs and installed guest qualification
+belong here. Standalone static builds cannot qualify the dynamically linked
+distribution artifacts. Broker loss must never select direct device access.
 
 ## Session security contract
 
@@ -64,8 +63,7 @@ The proof counts broker instances and binds reader readiness to each session.
 
 ## Verification entry points
 
-`make test-components` runs the retained host component checks. Native
-libxkbcommon and XKB rules are prerequisites. See [testing](TESTING.md) for
+Run component checks in their upstream repositories. See [testing](TESTING.md) for
 those inputs and the explicit integration target.
 
 `make profile-test` composes PM artifacts and boots the disposable
@@ -102,10 +100,11 @@ treating these graphical results as production qualification.
 
 ## Ghostty stack decisions
 
-- Tinyland's keyboard engine is KBVM. The `tinyland` binary links only
-  `libseat.so.1`, `libgcc_s.so`, and `libc.so`. The `xkbcommon` crate is an
-  optional test oracle behind the `oracle` feature, so production test
-  commands stay free of C XKB.
+- Tinyland's keyboard engine is KBVM. Its native Rust seat client replaces
+  libseat, and the package proof rejects either libseat or libxkbcommon as a
+  runtime dependency. The optional `oracle` feature uses libxkbcommon only
+  for component tests. Historical binary and closure measurements below
+  predate the upstream migration and require fresh installed-artifact checks.
 - `ghostty-custom` is a prebuilt musl release of the `joshuarli/ghostty` fork,
   pinned per architecture with SHA-256 in `packages/ghostty-custom/`. Its
   declared `DT_NEEDED` set is `libEGL.so.1`, `libwayland-client.so.0`,
@@ -147,7 +146,8 @@ Measured on the canonical profile at `ghostty-custom-1.4.1-2` (Linux x86_64/KVM)
 Before the hardening run, the profiles recorded successful mediated rendering
 and keyboard input using Laputa foot 1.28.0. Earlier external source pins
 included tinyland `e40d653`, seatd-rs `e32d931`, and mdevd-rs `4334f17`.
-These pins describe historical runs; recipes now use the in-tree sources.
+These pins describe historical runs; recipes now consume the independent
+upstream commits named by their source records.
 
 The unbound proof recorded compositor-crash recovery, broker-loss session
 termination, and removal of one keyboard while input continued on another.

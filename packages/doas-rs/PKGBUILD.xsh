@@ -17,7 +17,7 @@ export const package_kind = "payload"
 export const ver = "0.1.0"
 
 ## Package recipe export.
-export const rel = "2"
+export const rel = "3"
 
 ## Package recipe export.
 ## The binary links libc only (the password check calls the system libcrypt
@@ -28,14 +28,10 @@ export const deps = ["musl"]
 export const mkdeps_host = ["cargo", "llvm-toolchain"]
 
 ## Package recipe export.
-## The Rust port lives in this monorepo as a top-level tree; the recipe
-## addresses it as a `repository/` source, which the PM resolves against
-## the checkout root and hashes into the plan fingerprint, so no URL pin
-## is needed. The Cargo.lock pin vendors every locked crates.io crate
-## beside the tree; the PM verifies each crate against Cargo.lock.
+## The independent upstream commit and its locked crate set.
 export let upstream_sources = [
   {
-    source: p"repository/doas-rs",
+    source: p"https://github.com/laputa-systems/doas-rs/archive/cb97bed0ab617c73f272f7a6794e442ac54cc9a9.tar.gz",
     kind: "auto",
     architectures: [
       "all",
@@ -43,12 +39,12 @@ export let upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "SKIP",
+        sha256: "336958769d80404b9189925ed9cb472e84fcbba15bbc3a47da7c4e8f025ebb68",
       },
     ],
   },
   {
-    source: p"repository/doas-rs/Cargo.lock => vendor",
+    source: p"https://raw.githubusercontent.com/laputa-systems/doas-rs/cb97bed0ab617c73f272f7a6794e442ac54cc9a9/Cargo.lock => vendor",
     kind: "cargo-vendor",
     architectures: [
       "all",
@@ -56,7 +52,7 @@ export let upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "SKIP",
+        sha256: "728ff804fca047c283ec9bb2f56712d05361e2c3fed212545f0312f56c8908d0",
       },
     ],
   },

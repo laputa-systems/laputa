@@ -1,6 +1,0 @@
-ACTION=add
-DEVPATH=/devices/x
-SUBSYSTEM=input
-DEVNAME=event0
-MAJOR=13
-MINOR=64

@@ -16,7 +16,7 @@ export const package_kind = "payload"
 export const ver = "0.1.0"
 
 ## Package recipe export.
-export const rel = "2"
+export const rel = "3"
 
 ## Package recipe export.
 ## Both daemons link libc only.
@@ -29,14 +29,10 @@ export const mkdeps_host = ["cargo", "llvm-toolchain"]
 export const runtime_only_deps = ["xinit"]
 
 ## Package recipe export.
-## The Rust port lives in this monorepo as a top-level tree; the recipe
-## addresses it as a `repository/` source, which the PM resolves against
-## the checkout root and hashes into the plan fingerprint, so no URL pin
-## is needed. The Cargo.lock pin vendors every locked crates.io crate
-## beside the tree; the PM verifies each crate against Cargo.lock.
+## The independent upstream commit and its locked crate set.
 export const upstream_sources = [
   {
-    source: p"repository/mdevd-rs",
+    source: p"https://github.com/laputa-systems/mdevd-rs/archive/2c1543db81d1bc27b9ffb9c654f62bdf2f8f8eb5.tar.gz",
     kind: "auto",
     architectures: [
       "all",
@@ -44,12 +40,12 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "SKIP",
+        sha256: "23637f98efcf10e6fe4376b56d0fb774994af43d64bff751b1ee6db953ae5c8c",
       },
     ],
   },
   {
-    source: p"repository/mdevd-rs/Cargo.lock => vendor",
+    source: p"https://raw.githubusercontent.com/laputa-systems/mdevd-rs/2c1543db81d1bc27b9ffb9c654f62bdf2f8f8eb5/Cargo.lock => vendor",
     kind: "cargo-vendor",
     architectures: [
       "all",
