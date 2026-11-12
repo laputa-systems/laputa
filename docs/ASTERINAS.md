@@ -219,6 +219,9 @@ The native protocol reports `XSH_NATIVE_CONTEXT`, `XSH_NATIVE_START` and
 `XSH_NATIVE_RESULT`. Preserve those consoles, the requested selections and
 `fixture.json` alongside the result. A passing bounded probe does not establish
 full-corpus qualification or preserve an earlier bundle's pass set by itself.
+If XSHT reports that its native process requires shutdown after failed
+cancellation, the runner fails and reaps the VMM immediately. Record the
+interrupted ID before accounting. The fatal report is not a completed test.
 
 On 2026-11-12, XSH `9ba05675c` with the pinned test image and kernel
 `d59567c40` runs the eleven formerly shared minimal-guest failures in this

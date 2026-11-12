@@ -58,6 +58,9 @@ fail() {
 }
 
 check_guest_failure() {
+    if [[ "$proof" == native-xsh ]] && grep -Eq '^xsht: native test thread remains running after .* of cancellation; process shutdown is required[[:space:]]*$' "$console_log"; then
+        fail 'native test process requires shutdown after failed cancellation'
+    fi
     if grep -Fq "$failure_marker" "$console_log" || grep -Fq LAPUTA_ASTERINAS_TEST_FAILED "$console_log"; then
         fail 'guest reported a failed Laputa proof'
     fi

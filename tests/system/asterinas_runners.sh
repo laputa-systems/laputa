@@ -223,6 +223,7 @@ jaq -n --arg root "$scratch/runtime-root.ext2" '{"machine-config": {mem_size_mib
 cat > "$runner_root/.out/asterinas-firecracker/bin/firecracker" <<'FIRECRACKER'
 #!/usr/bin/env bash
 [[ -z "${FAKE_FIRECRACKER_EXITS:-}" ]] || exit 0
+[[ -z "${FAKE_FIRECRACKER_PID_FILE:-}" ]] || printf '%s\n' "$$" > "$FAKE_FIRECRACKER_PID_FILE"
 cat "$FAKE_CONSOLE"
 [[ -z "${FAKE_FIRECRACKER_STALLS:-}" ]] || exec sleep 30
 exit "${FAKE_FIRECRACKER_STATUS:-0}"
@@ -297,6 +298,16 @@ sed 's/uid=1000 gid=1000/uid=0 gid=0/' "$scratch/native.pass" > "$scratch/native
 run_native_contract native-xsh 1 "$scratch/native.root"
 { printf 'XSH_NATIVE_RESULT fail status=1\n'; cat "$scratch/native.pass"; } > "$scratch/native.failed"
 run_native_contract native-xsh 1 "$scratch/native.failed"
+printf '%s\n' \
+    'XSH_NATIVE_CONTEXT uid=1000 gid=1000 jobs=1' \
+    'XSH_NATIVE_START core/tests/native.xsh::case' \
+    'xsht: native test thread remains running after 6s of cancellation; process shutdown is required' \
+    > "$scratch/native.aborted"
+FAKE_FIRECRACKER_STALLS=1 FAKE_FIRECRACKER_PID_FILE="$scratch/native-aborted.pid" \
+    run_native_contract native-xsh 1 "$scratch/native.aborted"
+rg -q 'native test process requires shutdown after failed cancellation' "$scratch/native.command" \
+    || fail 'the native runner waited for completion after fatal cancellation'
+expect_gone "$(cat "$scratch/native-aborted.pid")" 'the VMM after fatal native cancellation'
 run_native_contract unsupported 2 "$scratch/native.pass"
 
 rm -f "$docker_state"/* "$scratch/client.pid"
