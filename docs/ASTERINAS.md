@@ -232,14 +232,35 @@ those fourteen probes. Its kernel ELF SHA-256 is
 `dd5db1b9405497fd36905d69f75f13849fc9f20cee24ed9f7837adb9dbc826ee`.
 The synthetic C witness IDs are separate from the 15,649 native IDs.
 
-Full native execution is running from
+Full native execution stopped in
 `.work/tmp/native-full-81e2541ce-9ba05675c/`, whose `run.json` fixes the kernel,
 fixture and product identities. The private VM has two CPUs, 4 GiB RAM and the
-unprivileged test principal above. Its `all` selection retains each test's
-original deadline. A partial accounting result is progress, not qualification.
-Keep its writable image while the VMM runs. Later XSH test and dd repairs need
-separate coverage because this fixture remains frozen at `9ba05675c`.
-Full native completion and maintained-cohort replay on the new pin remain open.
+unprivileged test principal above. It completed 1,034 passes, six failures and
+five skips; 14,604 IDs remain unexecuted, with no unknown IDs. The btop headless
+syscall-trace case exceeded its original 120-second deadline and failed bounded
+cancellation after six more seconds. XSHT required process shutdown; the VMM
+was then stopped and reaped. The interrupted case remains an open tracing bug.
+
+All six completed failures reproduce independently. Four arise from tmpfs
+ignoring root mode and ownership options, leaving `mode=1777` scratch mounts
+root-owned and 0755. Published kernel `8a4449950` fixes those attributes and keeps
+the internal ramfs, devtmpfs and memfd roots unchanged. Its new C regression
+fails on `81e2541ce` and passes on Linux and the patched developer kernel. That
+kernel passes the four affected native IDs and two independent native tmpfs
+permission probes. Two du failures instead assume file allocation equals its
+logical length. XSH `0b919a035` corrects those expectations and passes both IDs
+in the patched guest. Developer evidence is in
+`.work/tmp/tmpfs-root-options-after/`. The clean standard build passes the mount
+regression, existing memfd and devtmpfs regressions, all six du cases, the four
+permission failures and both synthetic permission probes. Evidence is in
+`.work/tmp/tmpfs-clean-pin-proof/`. Its kernel ELF SHA-256 is
+`b1e91aa376f23149d1aea6b9de9f5c095dcab31c0bc3d2d2b9eec1b05d0e6a79`.
+Synthetic probe IDs remain separate from the 15,649-ID corpus.
+
+Later XSH test and dd repairs need separate coverage because the full-run
+fixture remains frozen at `9ba05675c`. Full native completion and maintained
+cohort replay on the new pin remain open. Always copy a read-only base into a
+fresh writable disk for each probe; a failed guest may not have synced its disk.
 
 To run a kernel regression witness against the built bundle and against the
 Linux reference with the same memory, run
