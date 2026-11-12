@@ -239,7 +239,7 @@ unprivileged test principal above. It completed 1,034 passes, six failures and
 five skips; 14,604 IDs remain unexecuted, with no unknown IDs. The btop headless
 syscall-trace case exceeded its original 120-second deadline and failed bounded
 cancellation after six more seconds. XSHT required process shutdown; the VMM
-was then stopped and reaped. The interrupted case remains an open tracing bug.
+was then stopped and reaped.
 
 All six completed failures reproduce independently. Four arise from tmpfs
 ignoring root mode and ownership options, leaving `mode=1777` scratch mounts
@@ -261,6 +261,22 @@ Later XSH test and dd repairs need separate coverage because the full-run
 fixture remains frozen at `9ba05675c`. Full native completion and maintained
 cohort replay on the new pin remain open. Always copy a read-only base into a
 fresh writable disk for each probe; a failed guest may not have synced its disk.
+
+Published kernel `ba0383234` fixes the tracing deadlock. `PTRACE_TRACEME` held
+the child parent lock while Yama's unprivileged ancestry check reacquired it.
+The fix retains the parent thread reference and drops the lock before the
+unchanged permission checks. The new unprivileged fork, exec and syscall-trace
+regression fails on `8a4449950` and passes on Linux and the patched kernel.
+The clean standard build passes that regression and both btop syscall-trace
+cases at `.work/tmp/ptrace-clean-pin-proof/`. Its kernel ELF SHA-256 is
+`d82a2bd4a409a383b251ac2dda2793a16d35c8384d0212a6f96d88878c918e43`.
+
+A new full run is active at `.work/tmp/native-full-ba0383234-3f4687802/`, using
+that clean kernel and a freshly assembled XSH `3f4687802` fixture. Its `run.json`
+binds the base disk, initramfs and product identities. It keeps the same
+UID/GID 1000, cleared groups, one worker, two CPUs, 4 GiB RAM and original test
+deadlines. Partial accounting does not establish full qualification. Keep the
+private writable disk while its VMM runs.
 
 To run a kernel regression witness against the built bundle and against the
 Linux reference with the same memory, run
