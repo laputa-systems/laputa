@@ -244,12 +244,16 @@ export pure qemu_command_argv(
   ]
 }
 
-## Attach the declared read-only inputs and writable output disk to a self-hosting guest.
-export pure qemu_self_hosting_disks_argv(target: QemuTarget, inputs: Path, output: Path) -> List[Str] {
+## Whether the self-hosting guest builds into its output disk or inspects completed outputs.
+export enum QemuSelfHostingOutput { BuildOutput, InspectOutput }
+
+## Attach declared inputs and an output disk with explicit build or inspection authority.
+export pure qemu_self_hosting_disks_argv(target: QemuTarget, inputs: Path, output: Path, output_access: QemuSelfHostingOutput = BuildOutput) -> List[Str] {
+  let access = if output_access == InspectOutput { ",readonly=on" } else { "" }
   [
     "-drive", f"if=none,id=inputs,format=raw,file={inputs},readonly=on",
     "-device", f"{target.block_device},drive=inputs",
-    "-drive", f"if=none,id=output,format=raw,file={output}",
+    "-drive", f"if=none,id=output,format=raw,file={output}{access}",
     "-device", f"{target.block_device},drive=output",
   ]
 }

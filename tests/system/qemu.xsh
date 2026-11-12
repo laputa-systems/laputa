@@ -464,3 +464,14 @@ test test_qmp_socket_fits_a_unix_socket_path_from_any_checkout_depth [error] {
   assert socket.byte_len() < 108, socket
   assert build.outputs(deep).qmp_socket != build.outputs(p"/other/target/laputa/qemu-fixture").qmp_socket
 }
+
+test test_self_hosting_runtime_output_is_readonly_at_the_block_device [error] {
+  let config = fixture_qemu("Linux", "x86_64")?
+  let writable = qemu.qemu_self_hosting_disks_argv(config.target, p"/inputs", p"/output")
+  let readonly = qemu.qemu_self_hosting_disks_argv(config.target, p"/inputs", p"/output", qemu.InspectOutput)
+  assert "if=none,id=inputs,format=raw,file=/inputs,readonly=on" in writable
+  assert "if=none,id=inputs,format=raw,file=/inputs,readonly=on" in readonly
+  assert "if=none,id=output,format=raw,file=/output" in writable
+  assert "if=none,id=output,format=raw,file=/output,readonly=on" in readonly
+  assert !("if=none,id=output,format=raw,file=/output" in readonly)
+}

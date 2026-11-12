@@ -4,7 +4,7 @@ if test "$(uname -s)" != Linux || test "$(uname -m)" != x86_64; then
   printf 'self-hosting qualification requires Linux x86_64\n' >&2
   exit 2
 fi
-phase=${1:?usage: self_hosting.sh compile|qualify|replay|compose|boot-successor|preserve-previous|network|debug REPOSITORY INPUT_ROOT OUTPUT_ROOT TOOLS_IMAGE XSH}
+phase=${1:?usage: self_hosting.sh compile|qualify|replay|compose|compose-package|boot-successor|boot-package-successor|fail-successor|preserve-previous|preserve-package-previous|network|debug REPOSITORY INPUT_ROOT OUTPUT_ROOT TOOLS_IMAGE XSH}
 repository=$(realpath "${2:?repository}")
 input_root=$(realpath "${3:?input root}")
 output_root=$(realpath "${4:?output root}")
@@ -17,8 +17,12 @@ case "$phase" in
   qualify) entry=self-hosting-qualify.xsh; marker=LAPUTA_SELF_HOSTING_QUALIFIED ;;
   preserve-previous) entry=self-hosting-preserved-proof.xsh; marker=LAPUTA_SELF_HOSTING_PREVIOUS_BOOTED ;;
   boot-successor) entry=self-hosting-successor-proof.xsh; marker=LAPUTA_SELF_HOSTING_SUCCESSOR_BOOTED ;;
+  fail-successor) entry=self-hosting-failed-proof.xsh; marker=LAPUTA_SELF_HOSTING_SUCCESSOR_BOOTED ;;
   replay) entry=self-hosting-replay.xsh; marker=LAPUTA_SELF_HOSTING_REPLAYED ;;
   compose) entry=self-hosting-compose.xsh; marker=LAPUTA_SELF_HOSTING_SUCCESSOR_COMPOSED ;;
+  compose-package) entry=self-hosting-package-compose.xsh; marker=LAPUTA_SELF_HOSTING_SUCCESSOR_COMPOSED ;;
+  boot-package-successor) entry=self-hosting-package-successor.xsh; marker=LAPUTA_SELF_HOSTING_SUCCESSOR_BOOTED ;;
+  preserve-package-previous) entry=self-hosting-package-previous.xsh; marker=LAPUTA_SELF_HOSTING_PREVIOUS_BOOTED ;;
   *) exit 2 ;;
 esac
 case "$input_root" in "$repository"/.work/*) ;; *) exit 2 ;; esac
@@ -28,8 +32,10 @@ self_hosting_lock "$input_root.lock" LAPUTA_SELF_HOSTING_INPUT_LOCK_FD
 self_hosting_lock "${output_root}.lock" LAPUTA_SELF_HOSTING_OUTPUT_LOCK_FD
 self_hosting_disk_lock "$repository" "$output_root"
 test -f "$output_root/current/generation.json"
-test -f "$input_root/inputs/xsh/Cargo.lock"
-test -d "$input_root/inputs/vendor"
+if test "$phase" = compile || test "$phase" = qualify || test "$phase" = debug; then
+  test -f "$input_root/inputs/xsh/Cargo.lock"
+  test -d "$input_root/inputs/vendor"
+fi
 test -f "$input_root/inputs/laputa/guest/$entry"
 mkdir -p "$repository/.work/tmp"
 export TMPDIR="$repository/.work/tmp"
@@ -52,12 +58,12 @@ docker run --rm --network none --memory 1g \
   --mount "type=bind,src=$repository,dst=/repo,readonly" \
   --mount "type=bind,src=$xsh,dst=/bin/xsh,readonly" \
   "$tools_image" /bin/xsh /repo/tests/docker/fixtures/self-hosting/permission-probe.xsh
-truncate -s 5G "$output_root/inputs.ext4"
+truncate -s 12G "$output_root/inputs.ext4"
 docker run --rm --network none --memory 2g \
   --mount "type=bind,src=$input_root,dst=/inputs,readonly" \
   --mount "type=bind,src=$output_root,dst=/output" \
   "$tools_image" /sbin/mkfs.ext4 -q -F -d /inputs /output/inputs.ext4
-if test "$phase" = compile; then
+if test "$phase" = compile || test "$phase" = compose-package; then
   test ! -e "$output_root/output.ext4"
   truncate -s 24G "$output_root/output.ext4"
   docker run --rm --network none --memory 1g \
@@ -66,7 +72,7 @@ if test "$phase" = compile; then
 else
   test -f "$output_root/output.ext4"
 fi
-if test "$phase" = boot-successor; then
+if test "$phase" = boot-successor && test ! -f "$output_root/generations/activation.json"; then
   expected_generation=$(jaq -r '.generation_sha256' "$input_root/inputs/generation-B.json")
   XSH_MODULE_PATH="$repository" "$xsh" "$repository/seed/self_hosting_verify.xsh" -- \
     "$output_root/current" "$expected_generation" "$output_root/selected-kernel" "$tools_image"
