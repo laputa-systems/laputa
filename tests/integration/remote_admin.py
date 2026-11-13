@@ -50,7 +50,7 @@ def provision(args, scratch):
             continue
         subprocess.run(["cp", "-a", str(entry), str(staging / "etc" / entry.name)], check=True)
     shutil.copy(root / "profiles/qemu-maintained/etc/inittab", staging / "etc/inittab")
-    shutil.copy(root / "packages/nftables/nftables.conf", staging / "etc/nftables.conf")
+    shutil.copy(root / "packages/crabtables/nftables.conf", staging / "etc/nftables.conf")
     (staging / "etc/network").mkdir(parents=True, exist_ok=True)
     shutil.copy(root / "packages/laputa-net/interfaces", staging / "etc/network/interfaces")
     (staging / "var/lib/dhcpc").mkdir(parents=True)

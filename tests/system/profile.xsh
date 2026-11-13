@@ -175,7 +175,7 @@ test test_qemu_maintained_profile_is_not_a_development_image [fs, error] {
   let value = profile.load_system_profile("qemu-maintained", profiles_root())?
   assert ! value.development
   assert "oxish" in value.package_roots
-  assert "nftables" in value.package_roots
+  assert "crabtables" in value.package_roots
   assert "laputa-net" in value.package_roots
   assert "laputa-syslog" in value.package_roots
   assert "xinfra" in value.package_roots

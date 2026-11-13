@@ -158,11 +158,12 @@ A pass on one kernel does not qualify another.
 
 ### Keep lower-confidence projects bounded
 
-Crabtables is a later, bounded experiment against Laputa's actual firewall
-requirements. It must preserve atomic failure, packet verdicts, permissions,
-recovery, and host-firewall isolation in disposable namespaces. Project-provided
-benchmarks do not establish operational maturity. It does not outrank existing
-desktop interfaces.
+Crabtables is adopted as the firewall: the `crabtables` package ships `nfcrt` and
+replaces the C nftables, libnftnl and libmnl packages. Qualification must keep
+preserving atomic failure, packet verdicts, permissions, recovery, and
+host-firewall isolation in disposable namespaces (the maintained-guest firewall
+drills). Project-provided benchmarks do not establish operational maturity.
+Fixes land in laputa-systems/crabtables first, and the recipe pins the commit.
 
 Do not put e2fsprogs replacement on the production roadmap. rust-fs-ext4's
 partial checker can inform disposable-image access, limited formatting, or

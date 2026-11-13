@@ -208,7 +208,7 @@ logs name the failed generation with its service history and no secrets,
 with a marker count of three and the activation record resting on the
 fallback with pending cleared and the failed generation named.
 `maintained_guest.py --firewall` boots fresh
-state disks whose `/etc/nftables.conf` is absent or not valid nftables syntax:
+state disks whose `/etc/nftables.conf` is absent or not valid nft syntax (`nfcrt` rejects it):
 the firewall oneshot must fail without becoming `running`, `oxish` must have no
 process and no ready listener, and the guest must not reach the identity proof. The guest then powers itself
 off through PID 1 (`SIGUSR2`) and QEMU must exit without a host kill, which
@@ -226,8 +226,8 @@ are covered by the XSH namespace suites that qualified the client.
 The launcher requires a separate, owner-private `{output}/state.ext4` containing
 `etc`, `home`, `var`, and a `format` file with `laputa-maintained-state-1` followed
 by a newline. Initialize those directories from the selected image (including the
-image's static `/etc` files, the maintained inittab, the packaged nftables
-ruleset, the ca-certificates trust store that `ntpd-rs` needs for NTS, and the loopback-only interfaces file), create the service-owned
+image's static `/etc` files, the maintained inittab, the packaged firewall
+ruleset (`/etc/nftables.conf` from the `crabtables` package), the ca-certificates trust store that `ntpd-rs` needs for NTS, and the loopback-only interfaces file), create the service-owned
 `/var/lib/dhcpc` (mode 0700) and `/var/log` staging directories the image never
 contains, apply the first-boot document with `system.first_boot.apply`, and
 format the state tree with `system/maintained_state_image.xsh`. Pass the staged
@@ -633,7 +633,7 @@ On 2026-10-29, Linux x86_64/KVM proofs established:
 - two actual unbootable-B kernel panics followed by launcher selection of healthy A;
 - rejection of changed kernel/disk bytes, mismatched receipts, incomplete publication,
   missing state, and public state permissions before consuming a boot attempt;
-- fresh guests with missing or rejected nftables rules keeping the SSH server down
+- fresh guests with missing or rejected firewall rules keeping the SSH server down
   (proved before SSHB-7 with the previous SSH server; the `oxish` service has not rerun it, see LAP-57).
 
 All owned QEMU PIDs were reaped. The initial writable-generation reboot proof was

@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 58
+Next: 59
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -121,7 +121,7 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Where:** `pm/elfdeps.xsh`, `docs/FONT-STACK.md`, `profiles/qemu-tinyland-ghostty.xsh`, `packages/wayland-libs-client/PKGBUILD.xsh`, `../play/scripts/audit-linux.sh`
 - **Problem:** The ELF provider closure identifies libraries but does not account for statically incorporated C/C++ or establish that a Rust replacement preserves consumer contracts. The graphical profile and Play need a common, measured starting point before replacing libraries.
 - **Recommendation:** After the active campaign, Play's SRT/Core Text migrations, and LAP-52, extend existing PM and application audits into a per-profile census. Count unique installed files, static native code, runtime-loaded providers, and build-only inputs separately. Prioritize the seatd client, remaining keyboard/Wayland consumers, distribution zlib, and later HarfRust/Swash qualification. XSH already uses Rust zlib and bzip2 backends. Preserve the shared font contract throughout.
-- **Scope:** Retain `ffmpeg-build`, Mesa, musl, and Linux. FFmpeg/codec replacement, crabc evaluation or adoption, allocator work, and GPU-driver rewrites are explicitly excluded. Firewall and filesystem experiments are lower-confidence research; physical hardware stays deferred.
+- **Scope:** Retain `ffmpeg-build`, Mesa, musl, and Linux. FFmpeg/codec replacement, crabc evaluation or adoption, allocator work, and GPU-driver rewrites are explicitly excluded. The firewall is now `crabtables` (`nfcrt`); filesystem experiments are lower-confidence research; physical hardware stays deferred.
 - **Acceptance:** Reproduce the census for the Tinyland/Ghostty profile and a separately identified Play build. Explain each native dependency and every unknown attribution. Establish differential correctness, failure, closure, and performance gates for each proposed replacement without changing production defaults.
 - **Fix with:** architect, reference-parity, benchmark-checklist
 - **Effort:** M (days)
@@ -162,6 +162,15 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Where:** `packages/oxish/PKGBUILD.xsh`, `docs/REMOTE-ADMIN.md`, `docs/QEMU.md`
 - **Problem:** Laputa has no Dropbear; the maintained profile's SSH server is `oxish-server --mode login` from the `oxish` package. The recipe pins ssh-build `release-686ec0d03f9c4c2737289641c4e3432fcb3a44ba` (all four executables, SHA-256 per architecture from its `SHA256SUMS`). The VM drills that boot the guest (`remote_admin.py`, `ssh_network_recovery.py`, `g2_lifecycle.py`, `maintained_guest.py`, `backup_schedule.py`, `diagnostics_reboot.py`, `dhcp_lifecycle.py`, `installer-qemu-test.xsh`) are migrated but have not run against the real archive. No Asterinas run exists for the login server.
 - **Recommendation:** Run `make fetch`, `make build PKGS=oxish`, the package proof, then each drill above, and record the outcomes in [Remote administration](docs/REMOTE-ADMIN.md) and [QEMU](docs/QEMU.md). Confirm that `xsh-login` sessions, the 96 MiB staging transfer and the pinned-fingerprint client behave against `oxish-server` as they did against Dropbear.
+- **Fix with:** reference-parity
+- **Effort:** S (hours)
+
+### LAP-58 · P2 · Qualify the crabtables firewall in the guest
+
+- **Area:** Networking
+- **Where:** `packages/crabtables/PKGBUILD.xsh`, `packages/crabtables/service.xsh`, `docs/QEMU.md`, `docs/TESTING.md`
+- **Problem:** The `crabtables` package (`nfcrt`, pinned laputa-systems/crabtables `289be0df06e17afb582d9694a4ff1409277c9dbd`) replaced the C nftables, libnftnl and libmnl packages. `make build PKGS=crabtables` builds it against the Laputa musl/Rust toolchain and its proof compiles the shipped ruleset without `CAP_NET_ADMIN`; container evidence shows that ruleset loads to the same kernel ruleset as `nft` 1.1.6. The guest drills (`maintained_guest.py --firewall`, `maintained_ntp_offline.py`, and the other drills that stage `/etc/nftables.conf`) have not run. The Asterinas guest has no `NETLINK_NETFILTER` socket, so the firewall service cannot run there.
+- **Recommendation:** Run each drill above and record the outcomes in [QEMU](docs/QEMU.md); fix defects they find upstream in crabtables and move the recipe pin and Cargo.lock checksum together. Keep Asterinas out of the firewall profile until its kernel implements `NETLINK_NETFILTER` and nf_tables, fixed in the pinned fork.
 - **Fix with:** reference-parity
 - **Effort:** S (hours)
 

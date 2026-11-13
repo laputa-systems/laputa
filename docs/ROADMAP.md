@@ -117,7 +117,7 @@ owners, not a new message bus or resident fleet-management service.
 | Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Keep normal boot, tested recovery, and supervisor ownership aligned. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
 | Remote administration | Packaged OxiSH login server (ssh-build `oxish` archive) and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
 | Storage | Native image/installer filesystem tools | Installer `mkfs.ext4` is journal-less and `fsck.ext4` does not repair. See [installer](INSTALLER.md). |
-| Networking and logging | XSH records supervised DHCPv4 and syslog (XSH-53/54) as implemented; Laputa has network policy, xinit, OxiSH, Tailscale, and nftables foundations | Adopt matching XSH products, roll out the services, and qualify leases/resolver ownership, time, and persistent logs in the installed image. See [XSH roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md). |
+| Networking and logging | XSH records supervised DHCPv4 and syslog (XSH-53/54) as implemented; Laputa has network policy, xinit, OxiSH, Tailscale, and firewall (`crabtables`/`nfcrt`) foundations | Adopt matching XSH products, roll out the services, and qualify leases/resolver ownership, time, and persistent logs in the installed image. See [XSH roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md). |
 | Trust | Signed repository snapshots with mandatory durable acceptance, guest HTTP/reboot proof, signed certificate releases and intermediate distrust in XSH and Tailscale | Provision production repository keys through image/first boot; upstream prebuilt uv lacks intermediate distrust. See [PM](PM.md#snapshot-authentication) and [certificate trust](CERTIFICATE-TRUST.md). |
 | Self-hosting | Bounded in-guest XSH rebuild and A-to-B successor workflow | Turn the existing development proof into the normal installed build/stage/boot path without overstating bootstrap closure or production admission. See [self-hosting](SELF-HOSTING.md). |
 | Verification | Package tests, installer/SSH and graphical QEMU proofs, pinned Asterinas guest tests | Existing smoke proofs do not establish long-lived operation, recovery, or platform parity. See [testing](TESTING.md), [QEMU](QEMU.md), and [Asterinas](ASTERINAS.md). |
@@ -489,7 +489,7 @@ and `nts.time.nl` (three independent operators; two must agree). The owner asked
 PTB as the third operator, but a guest saw its NTS-KE succeed and every NTS poll go
 unanswered, so NLnet Labs' `nts.time.nl` took its place. The cold-boot policy is
 unchanged: a trustworthy RTC or operator-set time is still required, and the daemon
-does not weaken TLS verification. The nftables output chain drops TCP 4460 and UDP 123
+does not weaken TLS verification. The firewall output chain drops TCP 4460 and UDP 123
 from every user except UID 123; it does not restrict the daemon's own egress, because
 an NTS-KE server may name another NTP port.
 Persisted guest state alone cannot prevent a hostile hypervisor from rolling
@@ -714,7 +714,7 @@ first network answer. Define rotation, failed/partial first boot, and the
 identity distinction between restore and clone. Preserve an independent local
 rescue route when provisioning or remote access fails.
 
-nftables and the OxiSH login server already exist; the gap is policy and lifecycle
+The `crabtables` firewall package (pure-Rust `nfcrt`, loading `/etc/nftables.conf`) and the OxiSH login server already exist; the gap is policy and lifecycle
 integration, not another firewall or login-server implementation. Apply a tested profile-owned
 firewall before exposing listeners, handle failed ruleset updates atomically,
 and define Tailscale coexistence without accidentally removing recovery access.
@@ -792,7 +792,8 @@ login. The development profile remains convenient and visibly distinct.
 
 `qemu-maintained` sets `development` false; the other profiles set it true and
 keep their roots. First boot is validated before any write, OxiSH keeps one
-ed25519 host key, and the nftables package installs the filter ruleset whose
+ed25519 host key, and the `crabtables` package (the pure-Rust `nfcrt`, replacing the C nftables,
+libnftnl and libmnl packages) installs the filter ruleset whose
 oneshot fails closed when the file is absent. Linux x86_64/KVM guests boot and
 reboot with stable operator files and host identity; missing or rejected
 firewall rules keep the SSH server down. New operators use `/usr/bin/xsh-login`.

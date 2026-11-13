@@ -223,7 +223,7 @@ def stage_state(staging):
         check=True,
     )
     subprocess.run(
-        ["cp", str(root / "packages/nftables/nftables.conf"), str(staging / "etc/nftables.conf")],
+        ["cp", str(root / "packages/crabtables/nftables.conf"), str(staging / "etc/nftables.conf")],
         check=True,
     )
     (staging / "etc/network").mkdir(parents=True, exist_ok=True)

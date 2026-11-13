@@ -11,7 +11,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "laputa-pm",
     "xinit",
     "oxish",
-    "nftables",
+    "crabtables",
     "laputa-net",
     "ntpd-rs",
     "laputa-syslog",

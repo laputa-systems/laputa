@@ -131,7 +131,7 @@ state disk is seeded with the ca-certificates trust store (the image's `/etc` an
 live on the state disk, so NTS has no roots without it). Boot one (`LAPUTA_NTP_DRILL=sync`)
 checks that readiness reports stratum 16, that all three NTS operators answer with no
 missed polls, that a SIGKILLed daemon restarts and resynchronizes, then reboots through PID 1.
-Boot two (`offline`) resynchronizes after the reboot, inserts an nftables rule that drops
+Boot two (`offline`) resynchronizes after the reboot, inserts a rule with `nfcrt` that drops
 UDP 123 and TCP 4460, and requires the daemon to stay alive and the wall clock minus the
 monotonic clock to move less than 20 ms in 120 seconds with no logged jump. On 2026-11-01
 the sync boot reached stratum 2 and the offline boot saw a one-millisecond change. The

@@ -90,7 +90,7 @@ def ensure_state_image(ruleset="packaged", apply_args=(), trust_store=False):
             subprocess.run(["cp", "-a", str(entry), str(staging / "etc")], check=True)
     subprocess.run(["cp", str(root / "profiles/qemu-maintained/etc/inittab"), str(staging / "etc/inittab")], check=True)
     if ruleset == "packaged":
-        subprocess.run(["cp", str(root / "packages/nftables/nftables.conf"), str(staging / "etc/nftables.conf")], check=True)
+        subprocess.run(["cp", str(root / "packages/crabtables/nftables.conf"), str(staging / "etc/nftables.conf")], check=True)
     elif ruleset == "invalid":
         (staging / "etc/nftables.conf").write_text(INVALID_RULESET)
     else:

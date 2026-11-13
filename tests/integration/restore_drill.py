@@ -86,7 +86,7 @@ def stage_base(staging, drill_hook=True):
     if drill_hook:
         with open(staging / "etc/inittab", "a") as handle:
             handle.write("::once:/usr/bin/xsh /etc/laputa/drill/drill.xsh\n")
-    subprocess.run(["cp", str(root / "packages/nftables/nftables.conf"),
+    subprocess.run(["cp", str(root / "packages/crabtables/nftables.conf"),
                     str(staging / "etc/nftables.conf")], check=True)
     (staging / "etc/network").mkdir(parents=True, exist_ok=True)
     subprocess.run(["cp", str(root / "packages/laputa-net/interfaces"),

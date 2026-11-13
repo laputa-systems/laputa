@@ -421,7 +421,7 @@ def provision(args, work):
             continue
         subprocess.run(["cp", "-a", str(entry), str(staging / "etc" / entry.name)], check=True)
     shutil.copy(ROOT / "profiles/qemu-maintained/etc/inittab", staging / "etc/inittab")
-    shutil.copy(ROOT / "packages/nftables/nftables.conf", staging / "etc/nftables.conf")
+    shutil.copy(ROOT / "packages/crabtables/nftables.conf", staging / "etc/nftables.conf")
     (staging / "etc/network").mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / "packages/laputa-net/interfaces", staging / "etc/network/interfaces")
     for directory, mode in (("var/lib/dhcpc", 0o700), ("var/lib/laputa", 0o755), ("var/log", 0o755)):

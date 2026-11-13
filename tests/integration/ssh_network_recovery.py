@@ -160,7 +160,7 @@ def provision_state(args, scratch):
         else:
             shutil.copy(entry, staging / "etc" / entry.name, follow_symlinks=False)
     shutil.copy(ROOT / "profiles/qemu-maintained/etc/inittab", staging / "etc/inittab")
-    shutil.copy(ROOT / "packages/nftables/nftables.conf", staging / "etc/nftables.conf")
+    shutil.copy(ROOT / "packages/crabtables/nftables.conf", staging / "etc/nftables.conf")
     (staging / "etc/network").mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / "packages/laputa-net/interfaces", staging / "etc/network/interfaces")
     (staging / "var/lib/dhcpc").mkdir(parents=True)

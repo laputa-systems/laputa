@@ -1,5 +1,5 @@
 ##! Behavior coverage for first-boot identity, the OxiSH accounts file, and the firewall plan.
-use packages.nftables.service as firewall_service
+use packages.crabtables.service as firewall_service
 use packages.oxish.hostkey as oxish_hostkey
 use packages.oxish.service as oxish_service
 use pm.repo_snapshot
@@ -408,15 +408,15 @@ test test_firewall_fails_closed_without_a_ruleset [fs, error] {
   }
 
   let plan = firewall_service.firewall_plan(true)?
-  assert plan == ["/usr/bin/nft", "-f", "/etc/nftables.conf"]
+  assert plan == ["/usr/bin/nfcrt", "-f", "/etc/nftables.conf"]
   firewall_service.firewall_result(0)
   match firewall_service.firewall_result(1) {
     Ok(_) => assert false
     Err(_) => {}
   }
 
-  let ruleset = p"packages/nftables/nftables.conf".read_text()?
-  let recipe = p"packages/nftables/PKGBUILD.xsh".read_text()?
+  let ruleset = p"packages/crabtables/nftables.conf".read_text()?
+  let recipe = p"packages/crabtables/PKGBUILD.xsh".read_text()?
   assert "flush ruleset" in ruleset
   assert "policy drop;" in ruleset
   assert "tcp dport 22 accept" in ruleset
