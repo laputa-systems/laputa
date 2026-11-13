@@ -958,7 +958,8 @@ export proc root_index_manual_pages(output: FsRoot, receipt: types.RootReceipt) 
     }
     output.remove(database)
   }
-  let status = process.run(process.command_argv(loader, [loader, "--library-path", library_path, program, manpath], env: {LD_PRELOAD: "", LD_LIBRARY_PATH: "", LC_ALL: "C"}))?
+  let command = output.command(confined.rel(f"usr/lib/ld-musl-{arch}.so.1")?, [loader, "--library-path", library_path, program, manpath], env: {LD_PRELOAD: "", LD_LIBRARY_PATH: "", LC_ALL: "C"})?
+  let status = process.run(command)?
   if ! status.ok {
     return Err(types.PmError.PackageContract("selected-root makewhatis failed; generation was not published"))
   }
