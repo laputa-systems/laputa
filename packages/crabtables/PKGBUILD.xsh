@@ -34,7 +34,7 @@ export const runtime_only_deps = ["xinit"]
 ## together.
 export const upstream_sources = [
   {
-    source: p"https://github.com/laputa-systems/crabtables/archive/289be0df06e17afb582d9694a4ff1409277c9dbd.tar.gz",
+    source: p"https://github.com/laputa-systems/crabtables/archive/a8fc9c1b84c0609e58a6ac83e313853958cfbde7.tar.gz",
     kind: "auto",
     architectures: [
       "all",
@@ -42,12 +42,12 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "a552fed8b77035f51f857ae413cb17364a821ff29f9ca788bbb9cda9e6328ddd",
+        sha256: "7b6c8dc6974214ad6288c0b45075734924413b2e58cf6f66fb39f3698d3bdf8c",
       },
     ],
   },
   {
-    source: p"https://raw.githubusercontent.com/laputa-systems/crabtables/289be0df06e17afb582d9694a4ff1409277c9dbd/Cargo.lock => vendor",
+    source: p"https://raw.githubusercontent.com/laputa-systems/crabtables/a8fc9c1b84c0609e58a6ac83e313853958cfbde7/Cargo.lock => vendor",
     kind: "cargo-vendor",
     architectures: [
       "all",
