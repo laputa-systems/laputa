@@ -349,6 +349,16 @@ its kernel ELF SHA-256 is
 `7843e1289d3bce0e0c6797cd06d02c3a3423cd4fe3b283898d30b57a5e10431f`.
 Pending-mask fields and wait-channel reporting are separate open interfaces.
 
+Published successor `6da5de581` honors `MSG_DONTWAIT` on UDP receives without
+changing the shared descriptor flags. Empty recv, recvfrom and recvmsg calls
+return `EAGAIN`; queued data, peek and truncation retain their behavior.
+The Linux control passes and the old-kernel control blocks until interrupted.
+The original native case now completes normally. The clean main build passes
+twelve syscall regression programs and 149 native cases, with four expected
+skips. Published-input checks pass. Evidence is at
+`.work/tmp/udp-dontwait-main-proof/`; its kernel ELF SHA-256 is
+`b49a33aa0d235ce2907c2169f55ddef7accac3a3bca043c598309b7c1f4106e5`.
+
 Native accounting retains a case as failed when its timeout exhausts bounded
 cancellation without a normal result line. Later results for the same ID retain
 their chronological order; a terminated runner leaves later IDs unexecuted.
@@ -356,12 +366,15 @@ their chronological order; a terminated runner leaves later IDs unexecuted.
 The earlier remaining-ID run ends with a kernel heap panic. A fresh isolated
 sparse-copy test times out. Combined accounting retains 709 passes, 22 failures,
 32 skips and 13,496 unexecuted IDs. Those outcomes remain failures of that pin.
-Failure discovery continues at the main checkout's
-`.work/tmp/native-remaining-5303dc23a-7b8809107/` on the earlier clean kernel and
-an OpenSSL-enabled fixture. It selects every remaining ID with unchanged
-credentials, resources and deadlines. Keep its private writable disk while its
-VMM runs. Full native qualification, ACL support and other discovered failures
-remain open.
+The subsequent OpenSSL-enabled run at
+`.work/tmp/native-remaining-5303dc23a-7b8809107/` stops after the UDP timeout
+exhausts cancellation. It records 11,619 passes, 247 failures, 237 skips and
+1,393 unexecuted IDs. Those failures retain their original kernel identity.
+Discovery resumes at `.work/tmp/native-remaining-dontwait-7b8809107/` on
+`6da5de581`, selecting the unexecuted IDs and the repaired timeout case with
+unchanged credentials, resources and deadlines. Keep its private writable disk
+while its VMM runs. Full native qualification, ACL support and other discovered
+failures remain open.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
