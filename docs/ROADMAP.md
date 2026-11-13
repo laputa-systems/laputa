@@ -749,9 +749,8 @@ archive: the `oxish` package pins that archive by checksum and installs
 `/etc/oxish/accounts`, which first boot derives from the operator and
 `authorized-key` fields of its one document, and gives each the account's own
 login shell. It provides no SFTP, scp, forwarding, agent, X11 or password login;
-those stay out of scope until a consumer needs them. The release pin is a
-placeholder until ssh-build publishes a release carrying all four executables
-(LAP-57), and the guest drills that need it are migrated but unrun.
+those stay out of scope until a consumer needs them. The package pins ssh-build
+`release-686ec0d`; the guest drills that need it are migrated but unrun (LAP-57).
 
 [xsh-infra](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-56-xsh-infra.md)
 is a separate pyinfra-inspired tool over the same client, for hosts without a

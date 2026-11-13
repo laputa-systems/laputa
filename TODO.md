@@ -156,12 +156,12 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 
-### LAP-57 · P2 · Pin the ssh-build `oxish` release and qualify OxiSH in the guest
+### LAP-57 · P2 · Qualify the ssh-build `oxish` release in the guest
 
 - **Area:** Remote administration
 - **Where:** `packages/oxish/PKGBUILD.xsh`, `docs/REMOTE-ADMIN.md`, `docs/QEMU.md`
-- **Problem:** Laputa has no Dropbear; the maintained profile's SSH server is `oxish-server --mode login` from the `oxish` package. The recipe pins a placeholder ssh-build release (tag `release-000…0`, all-zero SHA-256 per architecture), so `make fetch` fails until ssh-build publishes a release that carries `oxish`, `oxish-server`, `oxish-session` and `oxish-keygen`. The VM drills that boot the guest (`remote_admin.py`, `ssh_network_recovery.py`, `g2_lifecycle.py`, `maintained_guest.py`, `backup_schedule.py`, `diagnostics_reboot.py`, `dhcp_lifecycle.py`, `installer-qemu-test.xsh`) are migrated but have not run against the real archive. No Asterinas run exists for the login server.
-- **Recommendation:** Fill the one pin block in the recipe from that release's `SHA256SUMS`, run `make fetch`, `make build PKGS=oxish`, the package proof, then each drill above, and record the outcomes in [Remote administration](docs/REMOTE-ADMIN.md) and [QEMU](docs/QEMU.md). Confirm that `xsh-login` sessions, the 96 MiB staging transfer and the pinned-fingerprint client behave against `oxish-server` as they did against Dropbear.
+- **Problem:** Laputa has no Dropbear; the maintained profile's SSH server is `oxish-server --mode login` from the `oxish` package. The recipe pins ssh-build `release-686ec0d03f9c4c2737289641c4e3432fcb3a44ba` (all four executables, SHA-256 per architecture from its `SHA256SUMS`). The VM drills that boot the guest (`remote_admin.py`, `ssh_network_recovery.py`, `g2_lifecycle.py`, `maintained_guest.py`, `backup_schedule.py`, `diagnostics_reboot.py`, `dhcp_lifecycle.py`, `installer-qemu-test.xsh`) are migrated but have not run against the real archive. No Asterinas run exists for the login server.
+- **Recommendation:** Run `make fetch`, `make build PKGS=oxish`, the package proof, then each drill above, and record the outcomes in [Remote administration](docs/REMOTE-ADMIN.md) and [QEMU](docs/QEMU.md). Confirm that `xsh-login` sessions, the 96 MiB staging transfer and the pinned-fingerprint client behave against `oxish-server` as they did against Dropbear.
 - **Fix with:** reference-parity
 - **Effort:** S (hours)
 

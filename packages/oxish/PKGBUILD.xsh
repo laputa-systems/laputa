@@ -26,16 +26,9 @@ export const runtime_only_deps = ["xinit", "xsh"]
 ## Preserve the released binaries without stripping; the archive provenance names their digests.
 export const nostrip = true
 
-# PLACEHOLDER RELEASE PIN. ssh-build has published no oxish release that carries `oxish`,
-# `oxish-server`, `oxish-session` and `oxish-keygen` (SSHB-7). This is the one place to
-# fill in once it does: set `release_tag` to the `release-<commit>` tag of
-# https://github.com/laputa-systems/ssh-build/releases and each digest to the matching
-# `oxish-<ver>-<arch>-unknown-linux-musl.tar.xz` line of that release's SHA256SUMS
-# (set `ver` to the archive's version if it differs). `make fetch` fails on this
-# placeholder rather than installing anything.
-const release_tag = "release-0000000000000000000000000000000000000000"
-const release_sha256_x86_64 = "0000000000000000000000000000000000000000000000000000000000000000"
-const release_sha256_aarch64 = "0000000000000000000000000000000000000000000000000000000000000000"
+const release_tag = "release-686ec0d03f9c4c2737289641c4e3432fcb3a44ba"
+const release_sha256_x86_64 = "2cb3fa86bdcd1752e170ac0525edddef0c98e0d2a44b638ed5b5196777774720"
+const release_sha256_aarch64 = "7278123eeca2c07929ff31bdcaf3e11ac4a4d3c65692b6659fa0636e94d7bc32"
 
 ## Upstream release archives and checksums. The archive has no top-level directory:
 ## `bin/`, the licenses and `provenance.json`.
