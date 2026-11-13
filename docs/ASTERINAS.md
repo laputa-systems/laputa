@@ -440,8 +440,30 @@ case, with no skips. Standard evidence is at
 Main evidence is at `.work/tmp/ioprio-permissions-main-proof/`, with ELF SHA-256
 `9fd792ddd8be9161765bd70d0d9eb1cece7f9b06fe3ba52bd9bb324b7bba440c`.
 Published-input checks pass. Group/user I/O-priority selectors, inheritance and
-physical I/O scheduling are outside this repair. Full native and maintained
-replay remain open.
+physical I/O scheduling are outside this repair.
+
+Published successor `eac3a0b19` adds group and user I/O-priority selections across
+all selected threads. Aggregate reads use the best effective priority, including
+CPU-policy defaults; single-thread reads retain the raw stored value. Every bulk
+write checks its target's real UID or capability authority. Linux 7.2's user-zero
+read/write distinction is preserved. CPU nice now has one authoritative thread
+scheduling value; `getpriority`, scheduler attributes, procfs and fork consume it.
+CPU-priority writes authenticate ownership and enforce the nice limit or
+`CAP_SYS_NICE` before changing that state.
+
+The extended Linux C control passes. Before controls reject missing selectors,
+stale nice after a scheduler change, and an unprivileged foreign-target update.
+The finite concurrent-setter control passes; it is not a proof of every schedule.
+Independent review finds the permission and duplicated-state findings resolved.
+Both clean standard and main artifacts pass both I/O C regressions and all eleven
+native scheduling cases, without skips. Standard evidence is at
+`.work/tmp/ioprio-selectors-standard-proof/`, with ELF SHA-256
+`f5a7bae573200498a2f5bd9859581fa58c1893c151888ca03fe570ee92c0be99`.
+Main evidence is at `.work/tmp/ioprio-selectors-main-proof/`, with ELF SHA-256
+`dcc0071b0418d8dd3d7d839b47b5f3a3e391c712e376fdfb839d2b238640251b`.
+Published-input checks pass. Existing CPU-priority selector limitations, I/O
+priority inheritance and physical I/O scheduling remain outside this repair.
+Full native and maintained replay remain open.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
