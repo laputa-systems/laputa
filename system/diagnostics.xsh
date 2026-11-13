@@ -415,10 +415,14 @@ export proc diagnostics_collect(
   let lease_path = fp"{store}/{LEASE_NAME}"
 
   var existing_lines = []
+  var events_read_failed = false
   if events_path.exists() {
     match events_path.read_lines() {
       Ok(lines) => { existing_lines = lines }
-      Err(problem) => { degraded += [f"events:read:{problem.errno ?? -1}"] }
+      Err(problem) => {
+        events_read_failed = true
+        degraded += [f"events:read:{problem.errno ?? -1}"]
+      }
     }
   }
   var existing_keys = []
@@ -537,11 +541,13 @@ export proc diagnostics_collect(
   let bounded = diagnostics_trim(all_lines + appended_lines, MAX_EVENT_LINES, MAX_EVENT_BYTES)
   var stored = 0
   var byte_total = 0
-  if ! (added.is_empty() and existing_lines.is_empty()) {
+  var total = existing_lines.len()
+  if ! events_read_failed and ! (added.is_empty() and existing_lines.is_empty()) {
     let body = bounded.join("\n") + (if bounded.is_empty() { "" } else { "\n" })
     match diagnostics_replace(events_path, body) {
       Ok(_) => {
         stored = added.len()
+        total = bounded.len()
         byte_total = body.byte_len()
       }
       Err(problem) => { degraded += [f"events:write:{problem.errno ?? -1}"] }
@@ -553,7 +559,7 @@ export proc diagnostics_collect(
     Ok(_) => {}
     Err(problem) => { degraded += [f"history:write:{problem.errno ?? -1}"] }
   }
-  if sources.lease_status.exists() {
+  if ! events_read_failed and sources.lease_status.exists() {
     let lease_body = json.encode(lease)? + "\n"
     if lease_body.byte_len() <= MAX_LEASE_BYTES {
       match diagnostics_replace(lease_path, lease_body) {
@@ -568,7 +574,7 @@ export proc diagnostics_collect(
   Ok({
     existing: existing_lines.len(),
     appended: stored,
-    total: bounded.len(),
+    total,
     bytes: byte_total,
     degraded,
     history: history.entries,
@@ -654,6 +660,10 @@ export proc diagnostics_bundle(
   }
 
   for name in [EVENTS_NAME, BOOT_HISTORY_NAME, LEASE_NAME] {
+    if name == EVENTS_NAME and !(collected.degraded |> where .starts_with("events:read:") |> collect).is_empty() {
+      omitted += [name]
+      continue
+    }
     let source = fp"{store}/{name}"
     continue unless source.exists()
     match source.copy(to: fp"{staging}/{name}", overwrite: true) {

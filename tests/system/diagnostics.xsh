@@ -175,18 +175,75 @@ test test_event_retention_stays_within_the_declared_caps [fs, process, net, erro
   assert "activation|a|2|b" in fp"{store}/{diagnostics.EVENTS_NAME}".read_text()?
 }
 
+test test_unreadable_event_bytes_are_preserved [fs, process, net, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "diagnostics-invalid-events")?
+  seed_sources(root)
+  let store = fp"{root}/store"
+  store.mkdir()
+  let events = fp"{store}/{diagnostics.EVENTS_NAME}"
+  let original = bytes.concat([b"{\"key\":\"old\"}\n", b"\xff"])
+  events.write(original)
+  let result = diagnostics.diagnostics_collect(store, sources(root), clock("boot-invalid"), [])?
+  assert events.read_bytes()? == original
+  assert (result.degraded |> where .starts_with("events:read:") |> collect).len() == 1
+  assert result.existing == 0
+  assert result.appended == 0
+  assert result.total == 0
+  assert ! fp"{store}/{diagnostics.LEASE_NAME}".exists()?
+  assert fp"{store}/{diagnostics.BOOT_HISTORY_NAME}".exists()?
+  let bundle = diagnostics.diagnostics_bundle(store, ["/bin/false", "false"], [], clock("boot-invalid"), result, SENTINEL)?
+  assert diagnostics.EVENTS_NAME in bundle.omitted
+  assert diagnostics.EVENTS_NAME not in bundle.files
+  assert events.read_bytes()? == original
+}
+
+test test_event_read_io_failure_preserves_the_existing_path [fs, process, net, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "diagnostics-read-failure")?
+  seed_sources(root)
+  let store = fp"{root}/store"
+  store.mkdir()
+  let events = fp"{store}/{diagnostics.EVENTS_NAME}"
+  events.mkdir()
+  fp"{events}/kept".write("prior state\n")
+  let result = diagnostics.diagnostics_collect(store, sources(root), clock("boot-read-failure"), [])?
+  assert events.is_dir()?
+  assert fp"{events}/kept".read_text()? == "prior state\n"
+  assert (result.degraded |> where .starts_with("events:read:") |> collect).len() == 1
+  assert result.existing == 0
+  assert result.appended == 0
+  assert result.total == 0
+  assert ! fp"{store}/{diagnostics.LEASE_NAME}".exists()?
+}
+
+test test_absent_events_create_fresh_history [fs, process, net, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "diagnostics-absent-events")?
+  seed_sources(root)
+  let store = fp"{root}/store"
+  let result = diagnostics.diagnostics_collect(store, sources(root), clock("boot-fresh"), [])?
+  let events = fp"{store}/{diagnostics.EVENTS_NAME}".read_lines()?
+  assert result.existing == 0
+  assert result.appended > 0
+  assert result.total == events.len()
+  assert "boot|boot-fresh" in events.join("\n")
+  assert (result.degraded |> where .starts_with("events:read:") |> collect).is_empty()
+}
+
 test test_failed_event_write_preserves_the_existing_path [fs, process, net, error] { |ctx|
   let root = test.temp_dir(ctx, name: "diagnostics-write-failure")?
   seed_sources(root)
   let store = fp"{root}/store"
-  store.mkdir()
-  let blocked = fp"{store}/{diagnostics.EVENTS_NAME}"
-  blocked.mkdir()
-  fp"{blocked}/kept".write("prior state\n")
+  let seeded = diagnostics.diagnostics_collect(store, sources(root), clock("boot-2"), [])?
+  assert seeded.appended > 0
+  let events = fp"{store}/{diagnostics.EVENTS_NAME}"
+  let before = events.read_bytes()?
+  store.chmod(0o555)
+  defer store.chmod(0o755)
   let result = diagnostics.diagnostics_collect(store, sources(root), clock("boot-3"), [])?
-  assert ! result.degraded.is_empty()
-  assert blocked.is_dir()?
-  assert fp"{blocked}/kept".read_text()? == "prior state\n"
+  store.chmod(0o755)
+  assert (result.degraded |> where .starts_with("events:write:") |> collect).len() == 1
+  assert (result.degraded |> where .starts_with("events:read:") |> collect).is_empty()
+  assert result.appended == 0
+  assert events.read_bytes()? == before
 }
 
 test test_bundle_is_bounded_and_omits_unavailable_reports [fs, process, net, time, error] { |ctx|
