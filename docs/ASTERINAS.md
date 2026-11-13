@@ -519,6 +519,32 @@ Published-input checks pass. A separate replay of the earlier fourteen failures
 now passes six and fails eight. That diagnostic retains its failed status at
 `.work/tmp/native-fourteen-replay-6c752b269/`; it is not a full-suite result.
 
+Published successor `3bd79cfbf` adds `/proc/PID/task/TID/children`. Each child
+relation retains its parent thread in the existing process-wide child map.
+Thread exit transfers those relations to a surviving sibling; final process
+exit transfers them to the reaper. Waiting remains process-wide. Thread identity
+survives nonleader exec. The process-level `/proc/PID/children` alias remains
+absent, matching Linux. The existing process-level parent-death-signal limitation
+is unchanged.
+
+The static C regression passes as root and UID 1000 on pinned Linux. It checks
+thread-specific ownership, zombie retention, reap, thread exit, `CLONE_PARENT`,
+subreaper transfer and nonleader exec. The old kernel fails both controls and
+the original native logger-reaping case. Independent review finds no supported
+defect. Both clean standard and main artifacts pass both new C controls, the six
+retained C control executions and all 98 selected native cases, without skips.
+These probes use the established-session launcher and XSH `d9487ffc5`'s `within`
+test overlay. Standard evidence is at
+`.work/tmp/proc-task-children-standard-proof/`, with ELF SHA-256
+`febfc33b98bc0cdc54e31ac6f1cd67c6f1676e6a3a31547b437c338df477a027`.
+Main evidence is at `.work/tmp/proc-task-children-main-proof/`, with ELF SHA-256
+`84d9e01c4805f3b9ffd72861042c5a5298c605df09242777dd673bb86f57052a`.
+Published-input checks pass. The updated fourteen-case diagnostic at
+`.work/tmp/native-fourteen-replay-d9487ffc5-3bd79cfbf/` passes ten and fails four.
+Both netlink cases and both procfs-sampling cases remain unresolved. Its failed
+status is retained. Full native qualification and final-pin maintained replay
+remain open.
+
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
 maintained replay remains open.
