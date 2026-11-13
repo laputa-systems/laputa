@@ -388,7 +388,13 @@ The clean standard build passes thirteen syscall regression programs and 186
 native cases, with four existing skips. Fresh published-input checks pass.
 Evidence is at `.work/tmp/setgid-permission-standard-proof/`. Its kernel ELF
 SHA-256 is `c32118aaf9b01e666db41e44b236e5334835b112053dce34fde1bee9d36dc43c`.
-This group does not establish full native qualification or final-pin maintained replay.
+The main checkout produces a different ELF, which is qualified separately at
+`.work/tmp/setgid-permission-main-proof/`. Thirteen syscall regression programs
+and 220 native cases pass, with no failures and four existing skips. That run
+adds the 34 dev target tests through a separately identified two-file overlay
+from XSH `6d7df355b`. Both source files match their disk readbacks. The main ELF
+SHA-256 is `21fd72dc0b1dd57ea4a83ca6d78eb7727d4b2933df3c2ebc606b097f0a350426`.
+These groups do not establish full native qualification or final-pin maintained replay.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
