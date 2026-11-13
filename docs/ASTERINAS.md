@@ -310,6 +310,22 @@ the original terabyte sparse-copy test with its unchanged ten-second deadline.
 Evidence is at the main checkout's `.work/tmp/tty-sparse-clean-proof/`. The kernel
 ELF SHA-256 is `7f6f1b2f076d3c2bbe8869fd532042feba263e5ca0d62ad5bf17a26f2cd42b43`.
 
+Published successors `2d11b04b2`, `3c0a59719` and `73e357850` repair anonymous-pipe
+ownership, ptrace syscall-register edits and exec from an untraced worker.
+Pipe and pipe2 now assign filesystem credentials, so an unprivileged caller can
+reopen its own pipe through procfs. Syscall tracing uses the retained syscall
+number and honors replacement, skipping and return edits. Thread exec removes
+the replaced leader's stale tracing attachment while preserving any attachment
+on the executing thread. Linux controls pass and old-kernel controls fail.
+All six affected install, mktemp, mv and btop native cases pass unchanged.
+
+The clean standard build at `73e357850` passes all nine syscall regression
+programs and 105 native cases, with four expected skips. Published-input and
+host checks pass. Evidence is at the main checkout's
+`.work/tmp/pipe-ptrace-exec-clean-proof/`. Its kernel ELF SHA-256 is
+`189b76a16d3e601c101312c465e80ff9db53e85a4d412621b4bc05c190fccf2a`.
+This qualification preserves the full-suite failures and final-pin replay gate.
+
 The earlier remaining-ID run ends with a kernel heap panic. A fresh isolated
 sparse-copy test times out. Combined accounting retains 709 passes, 22 failures,
 32 skips and 13,496 unexecuted IDs. Those outcomes remain failures of that pin.
