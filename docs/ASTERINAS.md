@@ -301,13 +301,28 @@ The kernel ELF SHA-256 is
 The wider cp module still fails its POSIX ACL xattr fixture. These focused
 results do not establish full native or maintained-cohort qualification.
 
+Published successors `c90062aad`, `0eab8a612` and `025f4ae4f` repair regular-file
+size limits, devpts ownership and terminal speeds, and ext2 data and hole seeks.
+Their Linux syscall controls pass and their before-repair Asterinas controls
+fail. The grouped clean standard build at `025f4ae4f` passes all six syscall
+regression programs and 99 native cases, with four expected skips. This includes
+the original terabyte sparse-copy test with its unchanged ten-second deadline.
+Evidence is at the main checkout's `.work/tmp/tty-sparse-clean-proof/`. The kernel
+ELF SHA-256 is `7f6f1b2f076d3c2bbe8869fd532042feba263e5ca0d62ad5bf17a26f2cd42b43`.
+
+The earlier remaining-ID run ends with a kernel heap panic. A fresh isolated
+sparse-copy test times out. Combined accounting retains 709 passes, 22 failures,
+32 skips and 13,496 unexecuted IDs. Those outcomes remain failures of that pin.
 Failure discovery continues at the main checkout's
-`.work/tmp/native-remaining-5303dc23a-3f4687802/` with the unchanged XSH
-`3f4687802` fixture. Its 14,259 selected IDs include every unexecuted ID,
-the three failed IDs and the cp cleanup case. It preserves UID/GID 1000,
-cleared groups, one worker, two CPUs, 4 GiB RAM and original test deadlines.
-Keep its private writable disk while the VMM runs. A final full qualification
-at the candidate pin remains open.
+`.work/tmp/native-remaining-5303dc23a-7b8809107/` on the earlier clean kernel and
+an OpenSSL-enabled fixture. It selects every remaining ID with unchanged
+credentials, resources and deadlines. Keep its private writable disk while its
+VMM runs. Full native qualification, ACL support and other discovered failures
+remain open.
+
+The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
+It retains its own XSH pin and does not qualify this successor kernel. Final-pin
+maintained replay remains open.
 
 To run a kernel regression witness against the built bundle and against the
 Linux reference with the same memory, run
