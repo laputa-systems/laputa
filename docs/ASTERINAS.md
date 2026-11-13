@@ -5,8 +5,16 @@ the other inputs in `infra/asterinas/inputs.lock`; both are published.
 It includes the permission, process, procfs, generic-netlink and TCP diagnostic
 repairs below. Both standard and main builds pass twenty-four C control
 executions and all 110 selected native tests without skips. The earlier
-fourteen-failure diagnostic now passes all fourteen cases. Full current-pin
-native qualification and maintained replay remain open.
+fourteen-failure diagnostic now passes all fourteen cases. Maintained replay at
+clean Laputa `829d9b3c` passes both backends and all ten recovery rounds at this
+pin. Full current-pin native qualification remains open.
+
+The current replay uses XSH seed `d7b4c9c85` and exits zero. Evidence is at
+`.work/tmp/tcp-sock-diag-maintained-legacy/`. Its Linux input is the retained
+legacy-ACPI reference kernel, supplied through `LAPUTA_LINUX_KERNEL_PACKAGE`.
+The mirror's reduced-hardware-only ACPI kernel cannot qualify this QEMU profile.
+The stopped runs with missing or incompatible reference inputs remain
+unsuccessful. No cohort assertion, deadline or poweroff requirement changed.
 
 The maintained cohorts below were qualified at kernel `d59567c40` by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
@@ -959,4 +967,5 @@ Main evidence is `.work/tmp/tcp-sock-diag-main-proof/`, with ELF SHA-256
 Both published-input checks pass. The earlier fourteen-case diagnostic at
 `.work/tmp/native-fourteen-replay-6c0dc4e3f-9ebef8747/` passes all fourteen cases
 and the twenty-four C executions, without skips. These focused results do not
-qualify the full native suite or final-pin maintained replay.
+qualify the full native suite. The separate current-pin maintained replay passes
+both backends and all ten recovery rounds, as recorded above.
