@@ -42,6 +42,7 @@ hostname xsh-qualification
 
 mkdir -p /run/xsh-native /work/.work/tmp/native/home /work/.work/tmp/native/tmp
 chown -R 1000:1000 /work/.work/tmp/native
+chown 1000:1000 /work/.work /work/.work/tmp
 chmod 700 /work/.work/tmp/native /work/.work/tmp/native/home /work/.work/tmp/native/tmp
 touch /work/.work/tmp/native/xsht-config.ini
 chown 1000:1000 /work/.work/tmp/native/xsht-config.ini
