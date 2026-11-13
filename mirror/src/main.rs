@@ -115,18 +115,16 @@ fn run_local(args: LocalArgs) -> Result<(), String> {
         source_cache: args.source_cache.clone(),
     });
 
-    let server = tiny_http::Server::http(args.listen)
+    let server = std::net::TcpListener::bind(args.listen)
         .map_err(|e| format!("bind {}: {e}", args.listen))?;
     let addr = server
-        .server_addr()
-        .to_ip()
-        .ok_or("listener has no IP address")?;
+        .local_addr().map_err(|e| e.to_string())?;
     println!("http://{addr} (local mode, no auth)");
     println!("  data:    {}", data_dir.display());
     if let Some(dir) = &args.source_cache {
         println!("  sources: {}/sha256/<hash>", dir.display());
     }
-    laputa_mirror::serve(server, state);
+    laputa_mirror::serve(server, state).expect("server failed");
     Ok(())
 }
 
@@ -193,12 +191,12 @@ fn run_production() {
         source_cache: None,
     });
 
-    let server = tiny_http::Server::http(&listen_addr).expect("failed to bind");
+    let server = std::net::TcpListener::bind(&listen_addr).expect("failed to bind");
     println!("http://{listen_addr}");
     println!("  packages: http://{listen_addr}/");
     println!("  auth:     http://{listen_addr}/auth");
 
-    laputa_mirror::serve(server, state);
+    laputa_mirror::serve(server, state).expect("server failed");
 }
 
 fn env_required(key: &str) -> String {

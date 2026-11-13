@@ -7,7 +7,7 @@ pub mod s3;
 pub mod webauthn_handlers;
 
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -44,65 +44,139 @@ pub struct AuthState {
     pub secure_cookies: bool,
 }
 
-/// Serves requests forever, one thread per request.
-pub fn serve(server: tiny_http::Server, state: Arc<AppState>) {
-    for mut request in server.incoming_requests() {
+const WORKERS: usize = 8;
+const QUEUE: usize = 8;
+const BODY_LIMIT: usize = 64 * 1024;
+const INDEX_LIMIT: usize = 10 * 1024 * 1024;
+const UPLOAD_LIMIT: usize = 128 * 1024 * 1024;
+const HEADER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+const BODY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+pub fn serve(listener: std::net::TcpListener, state: Arc<AppState>) -> std::io::Result<()> {
+    let worker_name = format!("mirror-{}", listener.local_addr()?.port());
+    let (sender, receiver) = std::sync::mpsc::sync_channel::<std::net::TcpStream>(QUEUE);
+    let receiver = Arc::new(Mutex::new(receiver));
+    let mut workers = Vec::new();
+    for _ in 0..WORKERS {
+        let receiver = receiver.clone();
         let state = state.clone();
-        std::thread::spawn(move || {
-            let method = request.method().as_str().to_string();
-            let url = request.url().to_string();
-            let headers: HashMap<String, String> = request
-                .headers()
-                .iter()
-                .map(|h| {
-                    (
-                        h.field.as_str().as_str().to_lowercase(),
-                        h.value.as_str().to_string(),
-                    )
-                })
-                .collect();
-
-            let mut body = Vec::new();
-            let _ = request.as_reader().read_to_end(&mut body);
-
-            let resp = packages::route(&method, &url, &headers, &body, &state);
-
-            let mut response_headers = vec![
-                tiny_http::Header::from_bytes(&b"Content-Type"[..], resp.content_type.as_bytes())
-                    .unwrap(),
-            ];
-            for (name, value) in &resp.extra_headers {
-                if let Ok(h) = tiny_http::Header::from_bytes(name.as_bytes(), value.as_bytes()) {
-                    response_headers.push(h);
-                }
-            }
-
-            let status = tiny_http::StatusCode(resp.status);
-            let response = match resp.body {
-                packages::Body::Bytes(bytes) => {
-                    let length = bytes.len();
-                    tiny_http::Response::new(
-                        status,
-                        response_headers,
-                        Box::new(Cursor::new(bytes)) as Box<dyn Read + Send>,
-                        Some(length),
-                        None,
-                    )
-                }
-                // Files are streamed, never buffered. tiny_http switches to chunked
-                // encoding (dropping Content-Length) above 32 KiB unless told otherwise;
-                // clients use the length to size and check downloads, so always send it.
-                packages::Body::File { file, length } => tiny_http::Response::new(
-                    status,
-                    response_headers,
-                    Box::new(file) as Box<dyn Read + Send>,
-                    Some(length as usize),
-                    None,
-                )
-                .with_chunked_threshold(usize::MAX),
+        workers.push(std::thread::Builder::new().name(worker_name.clone()).spawn(move || loop {
+            let stream = match receiver.lock().unwrap().recv() {
+                Ok(stream) => stream,
+                Err(_) => break,
             };
+            if let Err(error) = serve_connection(stream, state.clone()) {
+                tracing::warn!("connection: {error}");
+            }
+        }).expect("spawn mirror worker"));
+    }
+    let result = loop {
+        match listener.accept() {
+            Ok((mut stream, _)) => match sender.try_send(stream) {
+                Ok(()) => {},
+                Err(std::sync::mpsc::TrySendError::Full(returned)) => {
+                    stream = returned;
+                    let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(100)));
+                    let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+                }
+                Err(std::sync::mpsc::TrySendError::Disconnected(_)) => break Err(std::io::Error::other("mirror workers stopped")),
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => break Err(error),
+        }
+    };
+    drop(sender);
+    for worker in workers {
+        if worker.join().is_err() {
+            tracing::error!("mirror worker panicked");
+        }
+    }
+    result
+}
 
-            let _ = request.respond(response);
-        });
+fn serve_connection(stream: std::net::TcpStream, state: Arc<AppState>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let stream = async_io::Async::new(stream)?;
+    let router = h12tiny::web::Router::<()>::new().fallback(move |request: h12tiny::web::Request| {
+        let state = state.clone();
+        async move { handle(request, state).await }
+    });
+    let mut builder = h12tiny::server::conn::auto::Builder::new(()).http1_only();
+    builder.http1().timer(h12tiny::runtime::AsyncIoTimer).header_read_timeout(HEADER_TIMEOUT).keep_alive(false);
+    futures_lite::future::block_on(builder.serve_connection(h12tiny::io::FuturesIo::new(stream), router))?;
+    Ok(())
+}
+
+async fn handle(request: h12tiny::web::Request, state: Arc<AppState>) -> ::http::Response<h12tiny::util::BoxBody> {
+    use h12tiny::util::BodyExt;
+    use http_body::Body as _;
+    let method = request.method().as_str().to_string();
+    let path = request.uri().path_and_query().map(|p| p.as_str()).unwrap_or("/").to_string();
+    let headers: HashMap<String, String> = request.headers().iter().filter_map(|(name, value)| {
+        value.to_str().ok().map(|value| (name.as_str().to_string(), value.to_string()))
+    }).collect();
+    let auth_route = path == "/auth" || path.starts_with("/auth?") || path.starts_with("/auth/");
+    if !auth_route && (method == "PUT" || (method == "POST" && path.starts_with("/_uploads/") && path.ends_with("/complete"))) && !packages::may_write(&headers, &state) {
+        return response(packages::Response::unauthorized());
+    }
+    let limit = if method == "PUT" && (path.starts_with("/packages/") || path.starts_with("/sources/") || path.starts_with("/_uploads/")) {
+        UPLOAD_LIMIT
+    } else if method == "PUT" && (path == "/index.json" || path.starts_with("/indexes/")) {
+        INDEX_LIMIT
+    } else { BODY_LIMIT };
+    if request.body().size_hint().upper().is_some_and(|n| n > limit as u64) {
+        return response(packages::Response::json(413, r#"{"error":"body too large"}"#));
+    }
+    let read = async {
+        let mut body = request.into_body();
+        let mut bytes = Vec::new();
+        while let Some(frame) = body.frame().await {
+            let frame = frame.map_err(|error| error.to_string())?;
+            if let Ok(data) = frame.into_data() {
+                if data.len() > limit - bytes.len() {
+                    return Ok(None);
+                }
+                bytes.extend_from_slice(&data);
+            }
+        }
+        Ok::<_, String>(Some(bytes))
+    };
+    let result = futures_lite::future::race(async { Some(read.await) }, async {
+        async_io::Timer::after(BODY_TIMEOUT).await;
+        None
+    }).await;
+    match result {
+        None => response(packages::Response::json(408, r#"{"error":"body read timeout"}"#)),
+        Some(Ok(None)) => response(packages::Response::json(413, r#"{"error":"body too large"}"#)),
+        Some(Ok(Some(body))) => response(packages::route(&method, &path, &headers, &body, &state)),
+        Some(Err(error)) => {
+            tracing::warn!("body read: {error}");
+            response(packages::Response::bad_request("body read failed"))
+        }
+    }
+}
+
+fn response(result: packages::Response) -> ::http::Response<h12tiny::util::BoxBody> {
+    use h12tiny::util::{boxed_body, bytes_body, reader_body};
+    let mut builder = ::http::Response::builder().status(result.status).header(::http::header::CONTENT_TYPE, result.content_type);
+    for (name, value) in result.extra_headers {
+        if let Ok(value) = ::http::HeaderValue::from_str(&value) {
+            builder = builder.header(name, value);
+        }
+    }
+    let body = match result.body {
+        packages::Body::Bytes(bytes) => boxed_body(bytes_body(bytes)),
+        packages::Body::File { file, length } => {
+            builder = builder.header(::http::header::CONTENT_LENGTH, length);
+            boxed_body(reader_body(FileReader(file)))
+        }
+    };
+    builder.body(body).unwrap()
+}
+
+struct FileReader(std::fs::File);
+
+impl futures_lite::io::AsyncRead for FileReader {
+    fn poll_read(mut self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>, buf: &mut [u8]) -> std::task::Poll<std::io::Result<usize>> {
+        std::task::Poll::Ready(std::io::Read::read(&mut self.0, buf))
     }
 }

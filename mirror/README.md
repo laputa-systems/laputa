@@ -28,6 +28,17 @@ writes accept only content-addressed names. Source mirrors are
 target-architecture-specific and their paths are derived from the package
 index entry.
 
+## HTTP admission limits
+
+The server admits eight active connections and queues eight more. Additional
+connections receive 503 and close. Request headers have 10 seconds to arrive;
+the entire request body has 30 seconds. Bodies are limited to 128 MiB for
+package, source, and upload-chunk PUTs; 10 MiB for index PUTs; and 64 KiB for
+all other requests, including authentication and upload completion. Limits
+apply to both Content-Length and streamed HTTP chunked bodies. Rejected bodies
+receive 413, and body read timeouts receive 408. Protected writes are checked
+before their body is read.
+
 ## Local mode
 
 For local development and offline bootstraps, run the mirror against a

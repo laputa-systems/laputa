@@ -775,17 +775,16 @@ fn http_get(addr: std::net::SocketAddr, path: &str) -> (String, Vec<u8>) {
 #[test]
 fn local_mode_streams_large_files_with_content_length() {
     let mirror = make_local_state();
-    // Above tiny_http's 32 KiB default chunking threshold.
     let package: Vec<u8> = (0..100_000u32).map(|i| i as u8).collect();
     mirror.storage.put(PACKAGE, package.clone(), "").unwrap();
     let hash = db::sha256_hex(&package);
     std::fs::write(mirror.tmp.path().join("sources/sha256").join(&hash), &package).unwrap();
 
-    let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
-    let addr = server.server_addr().to_ip().unwrap();
+    let server = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = server.local_addr().unwrap();
     let TestMirror { state, tmp: _tmp } = mirror;
     // The serving thread runs until the test process exits.
-    std::thread::spawn(move || laputa_mirror::serve(server, Arc::new(state)));
+    std::thread::spawn(move || laputa_mirror::serve(server, Arc::new(state)).unwrap());
 
     for path in [format!("/{PACKAGE}"), format!("/sources/sha256/{hash}")] {
         let (head, body) = http_get(addr, &path);
@@ -1157,4 +1156,114 @@ fn stale_session_cannot_mint_tokens() {
     let conn = rusqlite::Connection::open(state.tmp.path().join("mirror.db")).unwrap();
     conn.execute("UPDATE browser_sessions SET authenticated_at = '2020-01-01'", []).unwrap();
     assert_eq!(enrollment_post(&state, "/auth/tokens", serde_json::json!({"name":"stale"}), Some(&cookie)).status, 401);
+}
+
+fn start_http(mirror: TestMirror) -> (std::net::SocketAddr, Arc<AppState>, TempDir) {
+    let server = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = server.local_addr().unwrap();
+    let TestMirror { state, tmp } = mirror;
+    let state = Arc::new(state);
+    let serving = state.clone();
+    std::thread::spawn(move || laputa_mirror::serve(server, serving).unwrap());
+    (addr, state, tmp)
+}
+
+fn raw_connection(addr: std::net::SocketAddr, request: &[u8]) -> std::net::TcpStream {
+    let mut stream = std::net::TcpStream::connect(addr).unwrap();
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(35))).unwrap();
+    stream.write_all(request).unwrap();
+    stream
+}
+
+fn response_text(mut stream: std::net::TcpStream) -> String {
+    let mut response = Vec::new();
+    let _ = stream.read_to_end(&mut response);
+    String::from_utf8_lossy(&response).into_owned()
+}
+
+#[test]
+fn http_rejects_unauthorized_and_oversized_before_body() {
+    let (addr, _, _tmp) = start_http(make_state());
+    let response = response_text(raw_connection(addr, b"PUT /index.json HTTP/1.1\r\nHost: x\r\nContent-Length: 200000000\r\n\r\n"));
+    assert!(response.starts_with("HTTP/1.1 401"), "{response}");
+    let (addr, _, _tmp) = start_http(make_local_state());
+    let response = response_text(raw_connection(addr, b"PUT /index.json HTTP/1.1\r\nHost: x\r\nContent-Length: 10485761\r\n\r\n"));
+    assert!(response.starts_with("HTTP/1.1 413"), "{response}");
+}
+
+#[test]
+fn http_limits_chunked_body_and_rejects_partial_upload() {
+    let (addr, state, _tmp) = start_http(make_local_state());
+    let mut stream = raw_connection(addr, b"POST /_uploads/test/complete HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n10001\r\n");
+    let _ = stream.write_all(&vec![b'x'; 65537]);
+    let response = response_text(stream);
+    assert!(response.starts_with("HTTP/1.1 413"), "{response}");
+    let mut stream = raw_connection(addr, b"PUT /_uploads/partial/0 HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\nshort");
+    stream.shutdown(std::net::Shutdown::Write).unwrap();
+    let mut response = String::new();
+    let _ = stream.read_to_string(&mut response);
+    assert!(response.starts_with("HTTP/1.1 400"), "{response}");
+    assert!(!state.upload_dir.join("partial/00000000").exists());
+}
+
+#[test]
+fn http_get_and_large_upload_succeed() {
+    let (addr, state, _tmp) = start_http(make_local_state());
+    let (head, _) = http_get(addr, "/health");
+    assert!(head.starts_with("http/1.1 200"));
+    let data = vec![b'x'; 2 * 1024 * 1024];
+    let mut stream = raw_connection(addr, format!("PUT /_uploads/large/0 HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n", data.len()).as_bytes());
+    stream.write_all(&data).unwrap();
+    stream.write_all(b"\r\n0\r\n\r\n").unwrap();
+    let response = response_text(stream);
+    assert!(response.starts_with("HTTP/1.1 201"), "{response}");
+    assert_eq!(std::fs::read(state.upload_dir.join("large/00000000")).unwrap(), data);
+}
+
+#[test]
+fn http_slow_body_times_out_and_frees_worker() {
+    let (addr, _, _tmp) = start_http(make_local_state());
+    let stream = raw_connection(addr, b"PUT /index.json HTTP/1.1\r\nHost: x\r\nContent-Length: 10\r\n\r\n[");
+    let response = response_text(stream);
+    assert!(response.starts_with("HTTP/1.1 408"), "{response}");
+    let (head, _) = http_get(addr, "/health");
+    assert!(head.starts_with("http/1.1 200"));
+}
+
+#[test]
+fn http_saturation_rejects_excess_connections() {
+    let (addr, _, _tmp) = start_http(make_local_state());
+    let mut active = Vec::new();
+    for _ in 0..8 {
+        let mut stream = raw_connection(addr, b"PUT /index.json HTTP/1.1\r\nHost: x\r\nContent-Length: 10\r\nExpect: 100-continue\r\n\r\n");
+        let mut ready = [0u8; 25];
+        stream.read_exact(&mut ready).unwrap();
+        assert_eq!(&ready, b"HTTP/1.1 100 Continue\r\n\r\n");
+        active.push(stream);
+    }
+    #[cfg(target_os = "linux")]
+    let workers_before = mirror_worker_count(addr.port());
+    #[cfg(target_os = "linux")]
+    assert_eq!(workers_before, 8);
+    let queued: Vec<_> = (0..8).map(|_| raw_connection(addr, b"GET /health HTTP/1.1\r\nHost: x\r\n")).collect();
+    let start = std::time::Instant::now();
+    let response = response_text(raw_connection(addr, b"GET /health HTTP/1.1\r\nHost: x\r\n\r\n"));
+    assert!(response.starts_with("HTTP/1.1 503"), "{response}");
+    assert!(start.elapsed() < std::time::Duration::from_secs(2));
+    for stream in &queued {
+        stream.set_nonblocking(true).unwrap();
+        let mut byte = [0];
+        assert_eq!(stream.peek(&mut byte).unwrap_err().kind(), std::io::ErrorKind::WouldBlock);
+    }
+    #[cfg(target_os = "linux")]
+    assert_eq!(mirror_worker_count(addr.port()), workers_before);
+    drop((active, queued));
+}
+
+#[cfg(target_os = "linux")]
+fn mirror_worker_count(port: u16) -> usize {
+    let name = format!("mirror-{port}");
+    std::fs::read_dir("/proc/self/task").unwrap().filter_map(Result::ok).filter(|entry| {
+        std::fs::read_to_string(entry.path().join("comm")).is_ok_and(|value| value.trim_end() == name)
+    }).count()
 }

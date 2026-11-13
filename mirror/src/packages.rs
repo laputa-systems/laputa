@@ -201,7 +201,7 @@ fn auth_route(
 }
 
 /// Whether this request may write objects, the index, or upload chunks.
-fn may_write(headers: &HashMap<String, String>, state: &AppState) -> bool {
+pub(crate) fn may_write(headers: &HashMap<String, String>, state: &AppState) -> bool {
     match &state.access {
         Access::Authenticated(auth) => auth::authenticated(headers, auth),
         Access::Open => true,

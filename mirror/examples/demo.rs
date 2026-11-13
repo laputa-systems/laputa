@@ -32,7 +32,7 @@ fn main() {
         source_cache: None,
     });
 
-    let server = tiny_http::Server::http(("127.0.0.1", PORT)).expect("failed to bind");
+    let server = std::net::TcpListener::bind(("127.0.0.1", PORT)).expect("failed to bind");
     println!("Laputa mirror demo (in-memory; everything is lost on exit)\n");
     println!("1. Open {origin}/auth");
     println!("2. Register as `{USER}` with authorization `{authorization}`, then sign in");
@@ -40,5 +40,5 @@ fn main() {
     println!("   TOKEN=<paste>");
     println!("   curl -i -X PUT {origin}/index.json -d '[]'                                  # 401: no token");
     println!("   curl -i -X PUT {origin}/index.json -d '[]' -H \"Authorization: Bearer $TOKEN\"  # 201");
-    laputa_mirror::serve(server, state);
+    laputa_mirror::serve(server, state).expect("server failed");
 }
