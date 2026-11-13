@@ -485,6 +485,25 @@ Published-input checks pass. These samples do not establish atomic accounting
 under arbitrary concurrent mapping changes. Full native qualification remains
 open.
 
+Published successor `6c752b269` rejects parent `setpgid` calls after a child's
+successful exec with `EACCES`, including idempotent changes. Different-session
+`EPERM` retains precedence. Failed exec, pre-exec parent changes and self changes
+remain allowed. Exec history starts fresh on fork and is published under the
+process-table lock before vfork wakeup or close-on-exec pipe completion.
+
+The new static C regression passes as root and UID 1000 on pinned Linux.
+The old kernel fails both controls and the original native process-group case.
+Independent review finds no supported defect. Both clean standard and main
+artifacts pass those controls, both earlier I/O controls, both memory controls
+and all 48 selected native process and scheduling cases, with no skips.
+Standard evidence is at `.work/tmp/setpgid-exec-standard-proof/`, with ELF
+SHA-256 `ca13afcb0c1da9253827d382437384724a7d154586e44b97bfb227a60fb6cbb3`.
+Main evidence is at `.work/tmp/setpgid-exec-main-proof/`, with ELF SHA-256
+`f921f7f2b3e8bd50c5a3ffbd9cfbe8933aa42e782bd332874bb9afc5324d338b`.
+Published-input checks pass. A separate replay of the earlier fourteen failures
+now passes six and fails eight. That diagnostic retains its failed status at
+`.work/tmp/native-fourteen-replay-6c752b269/`; it is not a full-suite result.
+
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
 maintained replay remains open.
