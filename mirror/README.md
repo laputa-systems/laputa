@@ -56,10 +56,34 @@ For host setup, credentials, deployment, inspection, and rollback, use the
 
 ## Create the first publisher token
 
-Open `https://laputa.17166969.xyz/auth` and register a passkey using a username
-from `MIRROR_ALLOWED_USERS`. Then open
-`https://laputa.17166969.xyz/auth/settings`, create a named token, and store it
-when it is shown. Tokens are displayed only at creation time.
+On the mirror host, using the same `DB_PATH` and `ALLOWED_USERS` as the
+service, run the local operator tool from the mirror source directory:
+
+```sh
+cargo run --example enrollment -- list
+cargo run --example enrollment -- issue USER
+```
+
+Review the listed credential and token IDs before reopening enrollment. The
+issue command prints a secret once; deliver it privately to the named user. It
+expires after 10 minutes, is valid for one first passkey, and is invalidated by
+issuing another or running `cargo run --example enrollment -- revoke USER`.
+The user enters it on `/auth` with the allowlisted username. Do not put it in a
+URL or log. Existing credentials and tokens are retained.
+
+For another passkey, enter the account username and sign in with an existing key, then register for the same
+username within 10 minutes. Token creation also requires a WebAuthn sign-in in
+the last 10 minutes; ordinary browser sessions last 30 days. Registration alone
+is not a WebAuthn sign-in, so sign in before creating a named token. The first
+registration may issue the initial CLI token, shown once.
+
+If all keys are lost, an operator must review and explicitly remove the affected
+credentials from the SQLite database before issuing a new authorization. Stop
+the service, back up the database, and use SQLite with a bound username to
+delete only rows in `credentials` for that user ID. Review and explicitly
+revoke uncertain tokens separately; recovery does not revoke them automatically.
+Restart the service and issue a new authorization. Protect database access as
+publisher authority.
 
 ## Publish packages
 
@@ -96,6 +120,6 @@ host requirement, refresh behavior, and the exact TLS dependency closure.
 assets used by the mirror.
 `make mirror-demo` builds those assets and runs the in-memory demo server at
 `http://localhost:3000`. It requires a host Rust toolchain. Register a passkey as
-`demo`, create a token, then use the printed `curl` commands to try an
+`demo` using the printed authorization, sign in, create a token, then use the printed `curl` commands to try an
 unauthenticated request and an authorized publish. Demo data disappears when
 the process exits.
