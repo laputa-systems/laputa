@@ -1,7 +1,7 @@
 use pm.generation
 use pm.util
 
-proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
+proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", development_os_release: Path? = null) [fs, process, env, time, error] -> Result[Unit, Error] {
   assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let output = p"/run/self-hosting-output"
@@ -16,12 +16,15 @@ proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
   linux.mount(b"successor", work, fstype: "tmpfs", options: ["size=1G", "nosuid", "nodev"])?
   let repository = fp"{work}/repository"
   let _ = fs.copy_tree(fp"{root}/inputs/laputa", repository, parents: true)?
+  if development_os_release != null {
+    fs.install(development_os_release, fp"{repository}/packages/baselayout/files/rootfs/etc/os-release", 0o644, overwrite: true)?
+  }
   let seed = fp"{repository}/.out/seed/x86_64"
   let _ = fs.copy_tree(fp"{root}/inputs/seed-A", seed, parents: true)?
   let runners = fp"{work}/runners"
   runners.mkdir()?
   for name in ["xsh", "xsht"] {
-    let source = fp"{output}/target/x86_64-unknown-linux-musl/verification/{name}"
+    let source = fp"{toolchain}/{name}"
     fs.install(source, fp"{runners}/{name}", 0o755)?
     fs.install(source, fp"{seed}/{name}", 0o755, overwrite: true)?
   }
@@ -69,6 +72,12 @@ proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
   fs.sync()?
   fail "in-guest successor composition failed" unless status.ok
   print "LAPUTA_SELF_HOSTING_SUCCESSOR_COMPOSED"
+}
+
+proc main(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, time, error] -> Result[Unit, Error] {
+  guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
+  let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
+  compose(root, toolchain, release_input)?
 }
 
 main(@args)?
