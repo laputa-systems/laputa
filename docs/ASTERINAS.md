@@ -412,6 +412,16 @@ Evidence is at `.work/tmp/proc-affinity-main-proof/`, with the same verified
 single-file test overlay. Its ELF SHA-256 is
 `2ebb506a1f58f893da10a9f118122341beab8e14f162048b88bd30e1ebdc446d`.
 
+Published successor `e6ab1b621` returns `ENXIO` when `/dev/tty` has no
+controlling terminal. Other terminal ioctl errors retain their meanings.
+The new C regression verifies absent, attached and detached terminal states.
+The pinned Linux control and normal PTY regression Makefile route pass.
+The old kernel fails that control and the original native errno check.
+The clean standard artifact passes both terminal C regressions and the native
+case, with no skips. Evidence is at `.work/tmp/tty-open-standard-proof/`.
+Its ELF SHA-256 is `3be52c97babef7c19492c731ff3ec99dc563decbf74543657e942e471279db28`.
+Fresh published-input checks pass. Full native and maintained replay remain open.
+
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
 maintained replay remains open.
