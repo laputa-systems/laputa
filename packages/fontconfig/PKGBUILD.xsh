@@ -10,7 +10,7 @@ export const package_kind = "payload"
 ## Upstream version.
 export const ver = "2.18.3"
 ## Package revision.
-export const rel = "2"
+export const rel = "3"
 ## Runtime dependencies.
 export const deps = ["musl", "freetype", "expat"]
 ## Build dependencies.
@@ -117,10 +117,12 @@ export proc build(dest: Path) [fs, process, env, error] {
   let ninja = process.which("ninja")?
   let jobs = make.jobs()?
   let pc = pm_env.pkg_config_context()?
+  let source = p".".resolve()?
   env ({LD_LIBRARY_PATH: pc.ld_library_path, PKG_CONFIG: pc.pkg_config, PKG_CONFIG_LIBDIR: pc.pkg_config_libdir, PKG_CONFIG_PATH: pc.pkg_config_path, PKG_CONFIG_SYSROOT_DIR: pc.pkg_config_sysroot}) {
     run $meson "setup" pm_env.meson_prefix_arg() pm_env.meson_libdir_arg() pm_env.meson_sysconfdir_arg() pm_env.meson_localstatedir_arg() \
       "-Ddefault_library=shared" "-Dxml-backend=expat" "-Dtools=disabled" "-Ddoc=disabled" \
       "-Dnls=disabled" "-Dtests=disabled" "-Dtests-external-fonts=disabled" "-Dcache-build=disabled" \
+      f"-Dc_args=-ffile-prefix-map={source}=." \
       "-Ddefault-fonts-dirs=/usr/share/fonts" "-Dadditional-fonts-dirs=" "build"
     stage_generated()
     run $ninja "-C" "build" f"-j{jobs}" "libfontconfig.so.1.17.0"
