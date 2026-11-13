@@ -282,7 +282,7 @@ def fallback_mode():
         text = console.read_text(errors="replace")
         assert HEALTH in text, "health report missing on the fallback boot"
         marker = validate_marker(console, "a", record["serial"], "b")
-        assert {service["name"] for service in marker["services"]} >= {"logger", "dropbear", "dhcp-eth0"}
+        assert {service["name"] for service in marker["services"]} >= {"logger", "oxish", "dhcp-eth0"}
         assert f"{MARKER_COUNT} 3" in text, "boot marker log did not accumulate the failed boots"
         print(f"PASS fallback: logs name failed generation b with service history: {marker['services']}")
     finally:
@@ -312,7 +312,7 @@ def firewall_mode():
             text = console.read_text(errors="replace")
             assert OK not in text and READY not in text, "a guest without a loadable ruleset reached the identity proof"
             wait_exit(guest, 120)
-            print(f"PASS firewall: {ruleset} ruleset left the firewall failed and dropbear down, then the guest powered itself off")
+            print(f"PASS firewall: {ruleset} ruleset left the firewall failed and oxish down, then the guest powered itself off")
         finally:
             err.close()
             if guest.poll() is None:

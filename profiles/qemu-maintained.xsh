@@ -1,7 +1,7 @@
 ##! Headless maintained QEMU profile without a development graphical session.
 use system.types
 
-## Direct package roots for an operator login over Dropbear. Dependencies are resolved by PM.
+## Direct package roots for an operator login over OxiSH. Dependencies are resolved by PM.
 export let profile: types.SystemProfile = types.SystemProfile(
   name: "qemu-maintained",
   package_roots: [
@@ -10,7 +10,7 @@ export let profile: types.SystemProfile = types.SystemProfile(
     "xsh",
     "laputa-pm",
     "xinit",
-    "dropbear",
+    "oxish",
     "nftables",
     "laputa-net",
     "ntpd-rs",

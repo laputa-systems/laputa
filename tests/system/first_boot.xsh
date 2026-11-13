@@ -1,10 +1,12 @@
-##! Behavior coverage for first-boot identity, Dropbear argv, and the firewall plan.
-use packages.dropbear.service as dropbear_service
+##! Behavior coverage for first-boot identity, the OxiSH accounts file, and the firewall plan.
 use packages.nftables.service as firewall_service
+use packages.oxish.hostkey as oxish_hostkey
+use packages.oxish.service as oxish_service
 use pm.repo_snapshot
 use system.first_boot
 
 const ed25519 = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+const other_ed25519 = "AAAAC3NzaC1lZDI1NTE5AAAAIP5dX9+bfK4gA/ycbra29S+WJPifGPkYzWvgR4ZNU783"
 
 proc snapshot(root: Path) -> Result[List[Str]] {
   let lines = collect {
@@ -48,7 +50,7 @@ pure base(identity: Str) -> Str {
 hostname laputa-host
 operator pazu
 authorized-key ssh-ed25519 {ed25519} pazu@laputa
-authorized-key ssh-ed25519 {ed25519} other
+authorized-key ssh-ed25519 {other_ed25519} other
 network dhcp
 tailscale no
 identity {identity}
@@ -65,14 +67,15 @@ test test_dhcp_apply_is_idempotent [fs, error] { |ctx|
   assert users.len() == 1
   assert users[0] == "pazu:x:1000:1000::/home/pazu:/usr/bin/xsh-login"
   assert passwd.starts_with("root:x:0:0:root:/root:/bin/xshi\n")
-  let keys = fp"{root}/home/pazu/.ssh/authorized_keys".read_text()?
-  assert keys.lines().len() == 2
+  let accounts = fp"{root}/etc/oxish/accounts".read_text()?
+  assert accounts == f"# account  key\npazu ssh-ed25519 {ed25519} pazu@laputa\npazu ssh-ed25519 {other_ed25519} other\n"
+  assert fp"{root}/etc/oxish/accounts".metadata()?.mode % 4096 == 0o644
+  assert fp"{root}/etc/oxish".metadata()?.mode % 4096 == 0o755
+  assert ! fp"{root}/home/pazu/.ssh".exists()?
   assert fp"{root}/etc/hostname".read_text()? == "laputa-host\n"
   assert fp"{root}/etc/laputa/first-boot/network".read_text()? == "dhcp\n"
   assert fp"{root}/etc/laputa/first-boot/tailscale".read_text()? == "no\n"
   assert ! fp"{root}/etc/laputa/trust-update-key".exists()?
-  assert fp"{root}/home/pazu/.ssh".metadata()?.mode % 4096 == 0o700
-  assert fp"{root}/home/pazu/.ssh/authorized_keys".metadata()?.mode % 4096 == 0o600
   let applied = fp"{root}/etc/laputa/first-boot/applied".read_text()?
   assert "hostname laputa-host" in applied
   assert "identity new" in applied
@@ -161,7 +164,7 @@ identity new
 }
 
 proc host_key(root: Path) -> Path {
-  fp"{root}/etc/dropbear/dropbear_ed25519_host_key"
+  fp"{root}/etc/oxish/host_ed25519_key"
 }
 
 test test_restore_requires_an_unchanged_host_key [fs, error] { |ctx|
@@ -326,16 +329,27 @@ identity new
   }
 }
 
-test test_dropbear_argv_uses_the_persistent_host_key [error] {
-  let persistent = "/etc/dropbear/dropbear_ed25519_host_key"
-  let argv = dropbear_service.dropbear_argv()
-  assert "-r" in argv
-  assert persistent in argv
-  assert ! ("-R" in argv)
-  let ephemeral = dropbear_service.dropbear_argv("0.0.0.0", 22, p"/etc/dropbear/dropbear_ed25519_host_key", true)
-  assert "-R" in ephemeral
-  assert ! ("-r" in ephemeral)
-  assert ! (persistent in ephemeral)
+test test_first_boot_and_the_oxish_service_agree_on_the_state_disk_paths [error] {
+  assert fp"/{first_boot.host_key_path}" == oxish_service.host_key_path
+  assert fp"/{first_boot.host_key_path}" == oxish_hostkey.host_key_path
+  assert fp"/{first_boot.accounts_path}" == oxish_service.accounts_path
+  assert "--host-key-file" in oxish_service.oxish_argv()
+  assert f"{oxish_service.host_key_path}" in oxish_service.oxish_argv()
+  assert f"{oxish_service.accounts_path}" in oxish_service.oxish_argv()
+}
+
+test test_accounts_follow_the_applied_document_on_reapplication [fs, error] { |ctx|
+  let root = prepare(ctx, name: "accounts-rotate")?
+  first_boot.apply(root, base("new"))?
+  let rotated = base("new").replace(f"authorized-key ssh-ed25519 {other_ed25519} other\n", with: "")
+  first_boot.apply(root, rotated)?
+  assert fp"{root}/etc/oxish/accounts".read_text()? == f"# account  key\npazu ssh-ed25519 {ed25519} pazu@laputa\n"
+}
+
+test test_documents_oxish_would_refuse_never_reach_the_state_tree [fs, error] { |ctx|
+  reject(ctx, "duplicate-key", base("new").replace(other_ed25519, with: ed25519))
+  reject(ctx, "short-blob", base("new").replace(other_ed25519, with: "AAAAC3NzaC1lZDI1NTE5AAAAIOMq"))
+  reject(ctx, "wrong-blob-type", base("new").replace(other_ed25519, with: "AAAAB3NzaC1yc2EAAAADAQABAAABgQC7"))
 }
 
 test test_new_operator_skips_used_account_ids [fs, error] { |ctx|
@@ -445,13 +459,9 @@ test test_state_image_ownership_uses_allocated_operator_identity [fs, error] { |
   first_boot.apply(root, base("new"))?
   fp"{root}/format".write("laputa-maintained-state-1\n")?
   let owners = first_boot.state_ownership(root)?
-  assert owners == [
-    {path: "home/pazu", uid: 1001, gid: 1001},
-    {path: "home/pazu/.ssh", uid: 1001, gid: 1001},
-    {path: "home/pazu/.ssh/authorized_keys", uid: 1001, gid: 1001},
-  ]
-  fp"{root}/home/pazu/.ssh/authorized_keys".remove()?
-  fp"{root}/home/pazu/.ssh/authorized_keys".symlink(to: p"/etc/passwd")?
+  assert owners == [{path: "home/pazu", uid: 1001, gid: 1001}]
+  fp"{root}/etc/oxish/accounts".remove()?
+  fp"{root}/etc/oxish/accounts".symlink(to: p"/etc/passwd")?
   assert first_boot.state_ownership(root) is Err(_)
 }
 
@@ -484,29 +494,25 @@ test test_state_image_publication_preserves_old_output_on_invalid_state [fs, pro
   assert image.read_text()? == "previous"
 }
 
-test test_apply_tightens_preexisting_operator_paths_to_dropbear_modes [fs, error] { |ctx|
-  let root = prepare(ctx, name: "dropbear-modes")?
-  fp"{root}/etc".mkdir()?
-  fp"{root}/home/pazu/.ssh".mkdir(parents: true)?
+test test_apply_tightens_preexisting_operator_paths_and_replaces_a_stale_accounts_file [fs, error] { |ctx|
+  let root = prepare(ctx, name: "oxish-modes")?
+  fp"{root}/etc/oxish".mkdir(parents: true)?
+  fp"{root}/home/pazu".mkdir(parents: true)?
   fp"{root}/home/pazu".chmod(0o777)?
-  fp"{root}/home/pazu/.ssh".chmod(0o755)?
-  fp"{root}/home/pazu/.ssh/authorized_keys".write("stale\n")?
-  fp"{root}/home/pazu/.ssh/authorized_keys".chmod(0o666)?
+  fp"{root}/etc/oxish/accounts".write("stale\n")?
+  fp"{root}/etc/oxish/accounts".chmod(0o666)?
   first_boot.apply(root, base("new"))?
   assert fp"{root}/home/pazu".metadata()?.mode % 4096 == 0o755
-  assert fp"{root}/home/pazu/.ssh".metadata()?.mode % 4096 == 0o700
-  assert fp"{root}/home/pazu/.ssh/authorized_keys".metadata()?.mode % 4096 == 0o600
+  assert fp"{root}/etc/oxish/accounts".metadata()?.mode % 4096 == 0o644
+  assert "stale" not in fp"{root}/etc/oxish/accounts".read_text()?
 }
 
-test test_state_image_ownership_accepts_authorized_keys_as_operator [fs, error] { |ctx|
+test test_state_image_ownership_accepts_a_key_file_name_as_operator [fs, error] { |ctx|
   let root = prepare(ctx, name: "state-operator-authorized-keys")?
   let document = base("new").replace("operator pazu", with: "operator authorized_keys")
   first_boot.apply(root, document)?
   fp"{root}/format".write("laputa-maintained-state-1\n")?
   let owners = first_boot.state_ownership(root)?
-  assert owners == [
-    {path: "home/authorized_keys", uid: 1000, gid: 1000},
-    {path: "home/authorized_keys/.ssh", uid: 1000, gid: 1000},
-    {path: "home/authorized_keys/.ssh/authorized_keys", uid: 1000, gid: 1000},
-  ]
+  assert owners == [{path: "home/authorized_keys", uid: 1000, gid: 1000}]
+  assert "\nauthorized_keys ssh-ed25519 " in fp"{root}/etc/oxish/accounts".read_text()?
 }

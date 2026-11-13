@@ -69,22 +69,22 @@ def fail(message):
     raise AssertionError(message)
 
 
-def find_dropbearkey(store):
+def find_oxish_keygen(store):
     if store.exists():
         for entry in sorted(store.iterdir()):
             metadata = entry / "artifact.json"
             payload = entry / "payload.tar.gz"
             if not metadata.exists() or not payload.exists():
                 continue
-            if json.loads(metadata.read_text()).get("package_name") != "dropbear":
+            if json.loads(metadata.read_text()).get("package_name") != "oxish":
                 continue
             tools = SCRATCH_ROOT / "ssh-recovery-tools"
             tools.mkdir(parents=True, exist_ok=True)
             subprocess.run(
-                ["tar", "xzf", str(payload), "-C", str(tools), "usr/bin/dropbearkey"],
+                ["tar", "xzf", str(payload), "-C", str(tools), "usr/bin/oxish-keygen"],
                 check=True, capture_output=True,
             )
-            binary = tools / "usr/bin/dropbearkey"
+            binary = tools / "usr/bin/oxish-keygen"
             binary.chmod(0o755)
             return binary
     return None
@@ -111,8 +111,8 @@ def require_prerequisites(args):
             missing.append(f"{label}: {path}")
     if os.uname().machine != "x86_64":
         missing.append(f"host architecture {os.uname().machine} is not x86_64")
-    if args.dropbearkey is None or not args.dropbearkey.exists():
-        missing.append("dropbearkey (pass --dropbearkey or populate the artifact store)")
+    if args.oxish_keygen is None or not args.oxish_keygen.exists():
+        missing.append("oxish-keygen (pass --oxish-keygen or populate the artifact store)")
     if missing:
         print("SKIP: missing prerequisites:\n  " + "\n  ".join(missing), file=sys.stderr)
         sys.exit(77)
@@ -169,10 +169,10 @@ def provision_state(args, scratch):
     (staging / "var/log").mkdir(parents=True, exist_ok=True)
     (staging / "format").write_text("laputa-maintained-state-1\n")
 
-    host_key = staging / "etc/dropbear/dropbear_ed25519_host_key"
+    host_key = staging / "etc/oxish/host_ed25519_key"
     host_key.parent.mkdir(parents=True)
-    generated = run_command([str(args.dropbearkey), "-t", "ed25519", "-f", str(host_key)], lifecycle.xsh_env(args.core), timeout=60)
-    fingerprint = next(line.split()[-1] for line in (generated.stdout + generated.stderr).splitlines() if line.startswith("Fingerprint:"))
+    run_command([str(args.oxish_keygen), "-f", str(host_key), "-C", "laputa-host"], lifecycle.xsh_env(args.core), timeout=60)
+    fingerprint = run_command([str(args.oxish_keygen), "-l", "-f", str(host_key)], lifecycle.xsh_env(args.core), timeout=60).stdout.split()[1]
     public = client_key.with_suffix(".pub").read_text().strip()
 
     provision_script = work / "provision.xsh"
@@ -427,15 +427,15 @@ def main():
     parser.add_argument("--core", type=pathlib.Path, default=DEFAULT_CORE)
     parser.add_argument("--bundle", type=pathlib.Path, default=DEFAULT_BUNDLE)
     parser.add_argument("--artifact-store", type=pathlib.Path, default=DEFAULT_ARTIFACT_STORE)
-    parser.add_argument("--dropbearkey", type=pathlib.Path, default=None)
+    parser.add_argument("--oxish-keygen", type=pathlib.Path, default=None)
     parser.add_argument("--ip-tool", type=pathlib.Path, help="the XSH ip applet matching --core")
     parser.add_argument("--keep", action="store_true")
     args = parser.parse_args()
     if args.ip_tool is None:
         candidate = args.core / "ip"
         args.ip_tool = candidate if candidate.exists() else args.core / "ip.xsh"
-    if args.dropbearkey is None:
-        args.dropbearkey = find_dropbearkey(args.artifact_store)
+    if args.oxish_keygen is None:
+        args.oxish_keygen = find_oxish_keygen(args.artifact_store)
     args.probe_pin = ""
     reexec_in_user_net_namespace()
     try:

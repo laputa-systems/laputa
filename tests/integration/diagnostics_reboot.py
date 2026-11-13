@@ -396,7 +396,7 @@ def validate_fallback(console):
     assert final["serial"] == "2", final
     assert final["failed"] == "b", final
     assert int(final["boottime_ns"]) > 0 and int(final["wall_ns"]) > 0, final
-    for service in ("logger=running", "dhcp-eth0=running", "dropbear=running"):
+    for service in ("logger=running", "dhcp-eth0=running", "oxish=running"):
         assert service in final["services"], final
     assert final["markers"] == "3", final
 

@@ -17,7 +17,13 @@ It never runs `ssh`.
   JSON line and exits zero whenever it produced an answer, so a nonzero exit or a
   missing completion is a transport fault, never a refusal.
 - **Operator authority.** The program runs as the first-boot operator and uses
-  only that account's access. Reads work without elevated authority; a log the
+  only that account's access. The guest's SSH server is `oxish-server --mode login`
+  (from [ssh-build](https://github.com/laputa-systems/ssh-build)): it authenticates
+  as root, then `oxish-session` drops to the operator's uid, groups and login shell
+  before the shell runs, so the exec command still reaches `xsh-login` as that
+  operator. The operator's login keys are the `authorized-key` lines of the
+  first-boot document, rendered into the root-owned `/etc/oxish/accounts`; the
+  server never reads `~/.ssh`. Reads work without elevated authority; a log the
   operator cannot read is reported as `readable: false`.
 
 ## Operations
@@ -49,16 +55,31 @@ never retries and never reconnects. After a `submitted` failure, open a fresh
 session and reconcile (`remote_staged`, `remote_inspect`) before deciding. Closing
 a connection does not prove a remote process stopped.
 
+## Host key trust
+
+`RemoteTarget.host_key` is the `SHA256:` fingerprint of the guest's ed25519 host
+key, checked before authentication. It comes from `oxish-keygen -l -f
+/etc/oxish/host_ed25519_key` (a `.pub` file works too; the second word of its
+output is the pin). For an `identity restore` guest the harness makes the key with
+`oxish-keygen`, reads that fingerprint, and places the key on the state disk
+before first boot, so the pin is known out of band. For `identity new` the guest's
+`oxish-hostkey` oneshot makes the key at first boot, and the pin must be read from
+a trusted channel such as the console. The oneshot never replaces an existing key.
+
 ## Qualification
+
+The drills below are written for `oxish-server --mode login`. They were migrated from
+the previous SSH server and have not been run against a published `oxish` release
+(LAP-57); their earlier passing runs do not carry over.
 
 `tests/system/remote_guest.xsh` runs the guest program as a script and covers
 refusals, bounded input and the staging contract. `tests/integration/remote_admin.py`
 boots the maintained x86_64 image headless under KVM, provisions an operator, an
-authorized key and a pinned Dropbear host key on the state disk, and runs
+authorized key and a pinned OxiSH host key on the state disk, and runs
 `tests/integration/fixtures/remote-admin-drill.xsh` over a forwarded port:
 
 ```sh
-python3 tests/integration/remote_admin.py --xsh PATH/TO/xsh --dropbearkey PATH/TO/dropbearkey \
+python3 tests/integration/remote_admin.py --xsh PATH/TO/xsh --oxish-keygen PATH/TO/oxish-keygen \
   [--bundle target/laputa/qemu-maintained/current]
 ```
 
@@ -80,7 +101,7 @@ activation of the staged candidate.
 network under test rather than a forwarded port. A scripted DHCPv4 server
 declares one address on a tap owned by an unprivileged user+network namespace,
 and the client connects to that address inside the namespace with the pinned
-Dropbear host key. After link loss, lease expiry and re-acquisition, a supervised
+OxiSH host key. After link loss, lease expiry and re-acquisition, a supervised
 `dhcp-eth0` restart, and NIC reappearance on a new ifindex, it requires a fresh
 verified connection to recover on the declared address and reads the guest's own
 `xinit status dhcp-eth0` there. The same run proves the profile's IPv6 policy:
@@ -99,4 +120,4 @@ aarch64 clients.
 
 The harness formats the state disk with `system/maintained_state_image.xsh`, so the
 operator keeps the id `first_boot.apply` allocates (1001 beside baselayout's `laputa`)
-and owns `home/admin`, `.ssh` and `authorized_keys` in the image.
+and owns `home/admin` in the image; `etc/oxish/accounts` stays root-owned.

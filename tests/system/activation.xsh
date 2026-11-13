@@ -61,16 +61,16 @@ test test_guest_health_requires_current_boot_identity_and_critical_services [fs,
   install(state, generation("a"))
   stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
-  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear", "firewall"], "running"))
-  let policy = activation.HealthPolicy(profile: "qemu-maintained", critical_services: ["firewall", "dropbear"])
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["oxish", "firewall"], "running"))
+  let policy = activation.HealthPolicy(profile: "qemu-maintained", critical_services: ["firewall", "oxish"])
   let before = record_text(state)?
   let invalid: List[activation.GuestHealthReport] = [
     {...report, root_digest: sha256_text("tampered")},
     {...report, generation_id: "a"},
     {...report, boot_serial: 0},
-    {...report, services: health_services(["dropbear"], "running")},
-    {...report, services: health_services(["dropbear", "firewall"], "dead")},
-    {...report, services: health_services(["dropbear", "firewall", "dropbear"], "running")},
+    {...report, services: health_services(["oxish"], "running")},
+    {...report, services: health_services(["oxish", "firewall"], "dead")},
+    {...report, services: health_services(["oxish", "firewall", "oxish"], "running")},
   ]
   for candidate in invalid {
     assert activation.activation_confirm_guest_health(state, candidate, policy) is Err(_)
@@ -90,9 +90,9 @@ test test_a_later_boot_rejects_a_delayed_health_report [fs, time, error] { |ctx|
   stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
   let _ = activation.activation_begin_boot(state)?
-  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["oxish"], "running"))
   let before = record_text(state)?
-  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["oxish"]}) is Err(_)
   assert record_text(state)? == before
 }
 
@@ -101,10 +101,10 @@ test test_a_failed_attempt_cannot_confirm_a_delayed_health_report [fs, time, err
   install(state, generation("a"))
   stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
-  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["oxish"], "running"))
   activation.activation_boot_failed(state)
   let before = record_text(state)?
-  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["oxish"]}) is Err(_)
   assert record_text(state)? == before
 }
 
@@ -497,8 +497,8 @@ test test_revoked_fallback_requires_rescue_and_rejects_delayed_health [fs, time,
   assert activation.activation_boot_failed(state) is Err(_)
   assert activation.activation_status(state)?.last_operation == "boot-failed"
   assert activation.activation_select_image(state) is Err(_)
-  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
-  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["oxish"], "running"))
+  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["oxish"]}) is Err(_)
 }
 
 test test_policy_pins_bytes_and_rejects_incompatible_state [fs, time, error] { |ctx|
@@ -562,8 +562,8 @@ test test_blocked_fallback_selection_closes_the_last_health_window [fs, time, er
     }
     assert activation.activation_status(state)?.last_operation == "boot-failed"
     assert activation.activation_confirm_health(state, "b") is Err(_)
-    let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
-    assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+    let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["oxish"], "running"))
+    assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["oxish"]}) is Err(_)
   }
 }
 
@@ -595,8 +595,8 @@ test test_failed_terminal_write_cannot_reopen_health_confirmation [fs, time, err
   state.chmod(0o755)
   assert activation.activation_status(state)?.last_operation == "pending-boot"
   let before = record_text(state)?
-  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["dropbear"], "running"))
-  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["dropbear"]}) is Err(_)
+  let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 2, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["oxish"], "running"))
+  assert activation.activation_confirm_guest_health(state, report, {profile: "qemu-maintained", critical_services: ["oxish"]}) is Err(_)
   assert activation.activation_confirm_health(state, "b") is Err(_)
   assert record_text(state)? == before
 }

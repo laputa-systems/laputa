@@ -5,7 +5,7 @@ use pm.plan
 use pm.policy
 use pm.types
 
-const seed_independent = ["dropbear", "laputa-fs", "laputa-net", "laputa-pm", "tailscale", "xinit"]
+const seed_independent = ["laputa-fs", "laputa-net", "laputa-pm", "oxish", "tailscale", "xinit"]
 
 proc repository_with_seeds(ctx: TestContext, name: Str) -> Result[Path] {
   let checkout = fs.cwd()?
@@ -79,12 +79,12 @@ test test_seed_rebuild_changes_only_its_own_target_key [fs, env, error] { |ctx|
 test test_build_dependency_cascades_and_runtime_only_dependency_does_not [fs, env, error] { |ctx|
   let root = repository_with_seeds(ctx, "repository-keys-cascade")?
   let value = catalog.load_for_target(root, types.target_aarch64())?
-  let roots = ["dropbear", "laputa-net", "tailscale"]
+  let roots = ["libpng", "oxish", "laputa-net", "tailscale"]
   let before = plan_for(value, types.target_aarch64(), roots)?
 
   let zlib = plan_for(with_release(value, "zlib", "999")?, types.target_aarch64(), roots)?
   assert "zlib" in changed_key_names(before, zlib)?
-  assert "dropbear" in changed_key_names(before, zlib)?
+  assert "libpng" in changed_key_names(before, zlib)?
 
   let xinit = plan_for(with_release(value, "xinit", "999")?, types.target_aarch64(), roots)?
   assert changed_key_names(before, xinit)? == ["xinit"]
@@ -95,12 +95,15 @@ test test_runtime_roots_compose_runtime_only_dependencies [fs, env, error] { |ct
   let value = plan_for(
     catalog.load_for_target(root, types.target_aarch64())?,
     types.target_aarch64(),
-    ["tinyland", "laputa-net", "tailscale"],
+    ["tinyland", "laputa-net", "oxish", "tailscale"],
   )?
   let overlay = generation.overlay_digest(test.temp_dir(ctx, name: "repository-keys-overlay")?)?
 
   let tailscale = generation_names(generation.plan(value, ["tailscale"], overlay)?)
   assert tailscale == ["ca-certificates", "iptables", "musl", "tailscale", "xinit", "xsh"]
+
+  let login = generation_names(generation.plan(value, ["oxish"], overlay)?)
+  assert login == ["oxish", "xinit", "xsh"]
 
   let network = generation_names(generation.plan(value, ["laputa-net"], overlay)?)
   for name in ["wpa_supplicant", "xinit", "xsh"] {

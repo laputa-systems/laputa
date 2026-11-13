@@ -74,11 +74,11 @@ proc console(text: Str) {
 }
 proc main() {
   var waited = 0
-  while ! p"/etc/dropbear/dropbear_ed25519_host_key".exists()? and waited < 30000 {
+  while ! p"/etc/oxish/host_ed25519_key".exists()? and waited < 30000 {
     time.sleep(100ms)?
     waited += 100
   }
-  guard p"/etc/dropbear/dropbear_ed25519_host_key".exists()? else { fail "no host key before backup" }
+  guard p"/etc/oxish/host_ed25519_key".exists()? else { fail "no host key before backup" }
   waited = 0
   while ! p"/var/lib/backup-proof/writer.pid".exists()? and waited < 30000 {
     time.sleep(100ms)?
@@ -96,8 +96,8 @@ proc main() {
   let lines = p"/var/lib/backup-proof/writer.log".read_text()?.lines() |> where .trim() != "" |> collect
   guard ! lines.is_empty() else { fail "the proof writer wrote no state" }
   let identity = [
-    p"/etc/dropbear/dropbear_ed25519_host_key",
-    p"/home/probe/.ssh/authorized_keys",
+    p"/etc/oxish/host_ed25519_key",
+    p"/etc/oxish/accounts",
     p"/etc/passwd",
     p"/etc/group",
     p"/etc/shadow",

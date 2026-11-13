@@ -1041,7 +1041,7 @@ def run(args):
         if health.get("format") != "laputa-guest-health-1":
             fail(f"the health report is malformed: {offline_wait.get('health')}")
         service_states = {item["name"]: item["state"] for item in health.get("services", [])}
-        for required in ("logger", "dropbear", "dhcp-eth0"):
+        for required in ("logger", "oxish", "dhcp-eth0"):
             if service_states.get(required) != "running":
                 fail(f"offline service {required} is {service_states.get(required)}: {service_states}")
         panic_guard(offline_console)

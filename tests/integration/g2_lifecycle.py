@@ -51,7 +51,7 @@ SCRATCH_ROOT = ROOT / ".work/tmp"
 DEFAULT_XSH = ROOT / ".out/seed/x86_64/xsh"
 DEFAULT_BUNDLE = ROOT / "target/laputa/qemu-maintained/current"
 DEFAULT_ARTIFACT_STORE = ROOT / ".out/artifacts/x86_64/v2/sha256"
-CRITICAL_SERVICES = ["dhcp-eth0", "dropbear", "logger"]
+CRITICAL_SERVICES = ["dhcp-eth0", "logger", "oxish"]
 OPERATOR = "probe"
 PROFILE = "qemu-maintained"
 
@@ -263,8 +263,8 @@ def require_prerequisites(args, work):
             missing.append(f"{label}: {path}")
     if os.uname().machine != "x86_64":
         missing.append(f"host architecture {os.uname().machine} is not x86_64")
-    if not args.dropbearkey.exists():
-        missing.append(f"dropbearkey: {args.dropbearkey} (pass --dropbearkey or set LAPUTA_ARTIFACT_STORE)")
+    if not args.oxish_keygen.exists():
+        missing.append(f"oxish-keygen: {args.oxish_keygen} (pass --oxish-keygen or set LAPUTA_ARTIFACT_STORE)")
     available = set()
     if args.artifact_store.exists():
         for entry in args.artifact_store.iterdir():
@@ -340,9 +340,9 @@ def free_port():
         return probe.getsockname()[1]
 
 
-def find_dropbearkey(args, work):
-    if args.dropbearkey.exists():
-        return args.dropbearkey
+def find_oxish_keygen(args, work):
+    if args.oxish_keygen.exists():
+        return args.oxish_keygen
     store = args.artifact_store
     if store.exists():
         for entry in sorted(store.iterdir()):
@@ -351,16 +351,16 @@ def find_dropbearkey(args, work):
             if not metadata.exists() or not payload.exists():
                 continue
             record = json.loads(metadata.read_text())
-            if record.get("package_name") != "dropbear":
+            if record.get("package_name") != "oxish":
                 continue
             tools = work / "tools"
             tools.mkdir(parents=True, exist_ok=True)
             with tarfile.open(payload) as archive:
-                archive.extract("usr/bin/dropbearkey", path=tools, filter="tar")
-            binary = tools / "usr/bin/dropbearkey"
+                archive.extract("usr/bin/oxish-keygen", path=tools, filter="tar")
+            binary = tools / "usr/bin/oxish-keygen"
             binary.chmod(0o755)
             return binary
-    return args.dropbearkey
+    return args.oxish_keygen
 
 
 def seed_trust_store(staging):
@@ -431,11 +431,12 @@ def provision(args, work):
     (staging / "format").write_text("laputa-maintained-state-1\n")
     seed_trust_store(staging)
 
-    host_key = staging / "etc/dropbear/dropbear_ed25519_host_key"
+    host_key = staging / "etc/oxish/host_ed25519_key"
     host_key.parent.mkdir(parents=True)
-    generated = run([str(args.dropbearkey), "-t", "ed25519", "-f", str(host_key)], xsh_env(work), timeout=60)
+    run([str(args.oxish_keygen), "-f", str(host_key), "-C", "laputa-host"], xsh_env(work), timeout=60)
     assert host_key.stat().st_mode & 0o077 == 0, "the host key is not private"
-    fingerprint = next(line.split()[-1] for line in (generated.stdout + generated.stderr).splitlines() if line.startswith("Fingerprint:"))
+    fingerprint = run([str(args.oxish_keygen), "-l", "-f", str(host_key)], xsh_env(work), timeout=60).stdout.split()[1]
+    assert fingerprint.startswith("SHA256:"), fingerprint
     public = client_key.with_suffix(".pub").read_text().strip()
 
     hostname = f"laputa-g2-{os.urandom(3).hex()}"
@@ -458,8 +459,8 @@ def provision(args, work):
     xinit_admin = [line for line in groups if line.startswith("xinit-admin:")]
     assert len(xinit_admin) == 1, "the image has no single xinit-admin group"
     assert OPERATOR in xinit_admin[0].split(":")[3].split(","), "the operator is not an xinit-admin member"
-    authorized = staging / f"home/{OPERATOR}/.ssh/authorized_keys"
-    assert authorized.read_text().strip().endswith(public.split()[-1]) or public in authorized.read_text(), "authorized key differs"
+    accounts = staging / "etc/oxish/accounts"
+    assert f"{OPERATOR} {public}" in accounts.read_text().splitlines(), "the accounts file does not carry the authorized key"
 
     state_image = work / "outputs/state.ext4"
     state_image.parent.mkdir(parents=True, exist_ok=True)
@@ -660,7 +661,7 @@ def restic_search(args):
 def restore_identity(args, work, port, key, pin):
     files = {}
     for path in ("/etc/passwd", "/etc/group", "/etc/hostname",
-                 "/etc/laputa/first-boot/applied", f"/home/{OPERATOR}/.ssh/authorized_keys"):
+                 "/etc/laputa/first-boot/applied", "/etc/oxish/accounts"):
         result = remote(args, work, port, key, pin, "read", path)
         assert result["exit_code"] == 0, (path, result)
         files[path] = result["stdout"]
@@ -1116,12 +1117,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run the roadmap G2 integrated lifecycle scenario.")
     parser.add_argument("--xsh", type=pathlib.Path, default=DEFAULT_XSH)
     parser.add_argument("--bundle", type=pathlib.Path, default=DEFAULT_BUNDLE)
-    parser.add_argument("--dropbearkey", type=pathlib.Path, default=pathlib.Path(""))
+    parser.add_argument("--oxish-keygen", type=pathlib.Path, default=pathlib.Path(""))
     parser.add_argument("--artifact-store", type=pathlib.Path, default=DEFAULT_ARTIFACT_STORE)
     parser.add_argument("--keep", action="store_true")
     args = parser.parse_args()
-    if args.dropbearkey == pathlib.Path(""):
-        args.dropbearkey = pathlib.Path("/nonexistent")
+    if args.oxish_keygen == pathlib.Path(""):
+        args.oxish_keygen = pathlib.Path("/nonexistent")
     return args
 
 
@@ -1131,7 +1132,7 @@ def main():
     work = pathlib.Path(tempfile.mkdtemp(prefix="g2-lifecycle.", dir=SCRATCH_ROOT))
     (work / "tmp").mkdir()
     try:
-        args.dropbearkey = find_dropbearkey(args, work)
+        args.oxish_keygen = find_oxish_keygen(args, work)
         require_prerequisites(args, work)
         (work / "host-driver.xsh").write_text(HOST_DRIVER)
         (work / "provision.xsh").write_text(PROVISION_DRIVER)

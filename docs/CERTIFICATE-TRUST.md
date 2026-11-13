@@ -199,7 +199,7 @@ Known TLS consumers and their cutover:
 | `uv` | Upstream binary caches TLS roots; no Laputa SPKI policy | Start a new process |
 | `cargo` | Upstream binary (libcurl with OpenSSL); no Laputa SPKI policy | Start a new process |
 | `ntpd-rs` (xinit-supervised) | Rustls with the platform verifier for NTS key exchange; no Laputa SPKI policy | `xinit restart ntpd-rs` |
-| `dropbear` (SSH daemon, xinit-supervised) | Host keys only; no TLS roots | None needed |
+| `oxish-server` (SSH daemon, xinit-supervised) | Host keys only; Graviola, no TLS roots | None needed |
 | `laputa-net` (`ifup`, oneshot) | No long-lived client | None needed |
 | `mdevd`, `seatd`, `wpa_supplicant` | No TLS | None needed |
 | Long-lived XSH network clients | Pool pins its trust snapshot; changes fail closed until the pool is recreated | Close and recreate the pool (`net.close_pool`, then `net.pool`); the service keeps the rest of its state |
@@ -278,7 +278,7 @@ retained `cross-r1` root as an extra root, calling `verify_server_cert`
 directly; it is not a full NTS-KE handshake. The `cargo` row was observed
 with the host `cargo` 1.99.0-nightly and `CARGO_HTTP_CAINFO`; the packaged
 binary is the same upstream OpenSSL-based build but has not been run
-through the fixture. Other packages have no TLS client (`dropbear`,
+through the fixture. Other packages have no TLS client (`oxish`,
 `wpa_supplicant`, `mdevd-rs`, `seatd-rs`, `laputa-net`) or build `rustic`
 with `--no-default-features`; the `rustic` network feature set was not
 inspected.

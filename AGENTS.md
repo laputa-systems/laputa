@@ -84,3 +84,8 @@ there, then update recipe pins and qualify the installed artifacts here.
 Do not vendor these implementations or retain consumer-only patches.
 Component Cargo suites belong upstream; package and guest integration tests
 belong in this repository.
+
+The SSH server, session helper, client and key generator are built in
+`laputa-systems/ssh-build`; the `oxish` package only pins its release archive
+(`packages/oxish/PKGBUILD.xsh` holds the one release pin) and installs the xinit
+service modules. Do not add an SSH implementation here.

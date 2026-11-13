@@ -206,12 +206,12 @@ proc assert_ssh_smoke(
   wait_for_ssh(pid, kill, tail, ssh_client, ssh_key, port, known_hosts, target_log, timeout_seconds, cwd)
 
   # xinit status uses signal-0 liveness which gets EPERM across UIDs
-  # (SSH user is pazu, dropbear runs as root). Use doas.
-  let status = ssh_guest(ssh_client, ssh_key, port, known_hosts, "run /usr/bin/doas /usr/bin/xinit status dropbear ?")?
+  # (SSH user is pazu, oxish-server runs as root). Use doas.
+  let status = ssh_guest(ssh_client, ssh_key, port, known_hosts, "run /usr/bin/doas /usr/bin/xinit status oxish ?")?
 
-  if ! ("dropbear running" in status) {
+  if ! ("oxish running" in status) {
     print $status
-    return Err(InstallerQemuTestError.Failed(kind: "ssh-dropbear", message: "dropbear status assertion failed"))
+    return Err(InstallerQemuTestError.Failed(kind: "ssh-oxish", message: "oxish status assertion failed"))
   }
 
   let result = ssh_guest(ssh_client, ssh_key, port, known_hosts, "run /bin/xsh --help ?")?

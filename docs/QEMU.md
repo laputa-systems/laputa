@@ -193,8 +193,8 @@ interface is resolved and its loop is armed, before it acquires a lease. The
 syslog receiver writes its readiness byte directly and keeps notify. The
 third service is `laputa-timers`, the supervised scheduler described under
 [persistent timers](#persistent-timers). None of them blocks boot, rescue,
-or login: dependents use `after` at most, and Dropbear's `need` set stays
-`firewall`, `dropbear-keygen`, and `net`. The loopback-only `net` oneshot is
+or login: dependents use `after` at most, and the `oxish` service's `need` set stays
+`firewall`, `oxish-hostkey`, and `net`. The loopback-only `net` oneshot is
 unchanged and the interfaces file carries no `eth0` or `inet6` stanza, so no
 second client contends for the lease. IPv6 stays unsupported on this profile:
 no DHCPv6 or router-advertisement handling is configured or tested. Service
@@ -209,7 +209,7 @@ with a marker count of three and the activation record resting on the
 fallback with pending cleared and the failed generation named.
 `maintained_guest.py --firewall` boots fresh
 state disks whose `/etc/nftables.conf` is absent or not valid nftables syntax:
-the firewall oneshot must fail without becoming `running`, Dropbear must have no
+the firewall oneshot must fail without becoming `running`, `oxish` must have no
 process and no ready listener, and the guest must not reach the identity proof. The guest then powers itself
 off through PID 1 (`SIGUSR2`) and QEMU must exit without a host kill, which
 needs an ACPI PM1 power-off path in the x86_64 kernel.
@@ -238,9 +238,9 @@ XSH_MODULE_PATH="$PWD" xsh system/maintained_state_image.xsh -- \
   STATE_ROOT state.ext4 268435456 packages/laputa-fs/files/mkfs.ext4.xsh /path/to/xsh
 ```
 
-The entry validates the applied document, account IDs, and private SSH paths, then
-assigns the operator's UID and GID to the home, `.ssh`, and `authorized_keys`
-inodes. Other image entries use root ownership. Staging itself does not change
+The entry validates the applied document, account IDs, the operator home, and the
+root-owned `etc/oxish/accounts`, then assigns the operator's UID and GID to the
+home inode. Other image entries, including `etc/oxish`, use root ownership. Staging itself does not change
 host ownership. The output image is private and atomically published.
 First boot assigns new operators `/usr/bin/xsh-login`, which accepts remote `-c`
 commands as XSH source. The standard seed does not provide an interactive login
@@ -257,7 +257,7 @@ data schemas; a matching string alone cannot prove semantic compatibility.
 
 Before binding persistent `/var`, the boot hook captures the immutable generation
 receipt in `/run/laputa-running-generation.json`. The guest health reporter writes
-`/run/laputa-health.json` after Dropbear reaches running state and emits the same
+`/run/laputa-health.json` after `oxish` reaches running state and emits the same
 JSON with `LAPUTA_ACTIVATION_HEALTH` on serial. The report contains the selected
 id, pending-boot sequence, full PM `generation_sha256`, profile, and named xinit
 service states. The full generation identity includes the profile overlay.
@@ -401,11 +401,11 @@ x86_64/KVM VM:
 ```sh
 python3 tests/integration/g2_lifecycle.py --xsh PATH/TO/xsh \
   --bundle target/laputa/qemu-maintained/current \
-  [--dropbearkey PATH/TO/dropbearkey] [--keep]
+  [--oxish-keygen PATH/TO/oxish-keygen] [--keep]
 ```
 
-Without `--dropbearkey` the test extracts `usr/bin/dropbearkey` from the
-Dropbear package artifact under `LAPUTA_ARTIFACT_STORE` (default
+Without `--oxish-keygen` the test extracts `usr/bin/oxish-keygen` from the
+`oxish` package artifact under `LAPUTA_ARTIFACT_STORE` (default
 `.out/artifacts/x86_64/v2/sha256`). The host needs KVM, `strace`, `unshare`,
 `mount`, `ssh-keygen`, and the bundle's `vmlinuz`, `disk.img`, and
 `generation.json`. The artifact store must hold `baselayout`, `musl`, `xsh`,
@@ -419,9 +419,11 @@ a skip. `--keep` retains consoles, the state image, generation bundles, the
 restore media and backup repository, and the host activation record. Fetched
 restic is cached under `.cache/restore-tools`.
 
-The test provisions a fresh state disk with a unique Dropbear host key and a
+The test provisions a fresh state disk with a unique OxiSH host key (made by
+`oxish-keygen`, mode `0600`, pinned by its `SHA256:` fingerprint) and a
 locked-password `probe` account whose first-boot record adds it to the reserved
-`xinit-admin` group, and checks that the immutable generation disk contains
+`xinit-admin` group and whose `authorized-key` becomes its line in
+`/etc/oxish/accounts`, and checks that the immutable generation disk contains
 neither the operator's authorized public key nor the operator's private key
 body. It installs generation A from the bundle under policy revision 1, runs the
 existing `rescue_guest.py` for an independently composed rescue root
@@ -446,7 +448,7 @@ record's `failure` naming B's receipt and two consumed attempts. The next stage
 clears that `failure` record; the persistent host key and a staged home sentinel
 survive, and the boot marker history names the A boots and failed B. The
 repaired C is staged from the bundle under policy revision 3, booted, checked
-for a matching running receipt and live `dropbear`, `logger`, and `dhcp-eth0`,
+for a matching running receipt and live `oxish`, `logger`, and `dhcp-eth0`,
 and only then confirmed through `activation_confirm_guest_health`. A further C
 reboot shows the committed record and the retained four-entry history.
 
@@ -631,7 +633,8 @@ On 2026-10-29, Linux x86_64/KVM proofs established:
 - two actual unbootable-B kernel panics followed by launcher selection of healthy A;
 - rejection of changed kernel/disk bytes, mismatched receipts, incomplete publication,
   missing state, and public state permissions before consuming a boot attempt;
-- fresh guests with missing or rejected nftables rules keeping Dropbear down.
+- fresh guests with missing or rejected nftables rules keeping the SSH server down
+  (proved before SSHB-7 with the previous SSH server; the `oxish` service has not rerun it, see LAP-57).
 
 All owned QEMU PIDs were reaped. The initial writable-generation reboot proof was
 superseded by the separate-state proof. The firewall fixtures and initial fallback
@@ -663,9 +666,11 @@ A KVM regression fixture with persistent `vm.swappiness=17` failed before this
 ordering change and passed afterward. `LAPUTA_BOOT_POLICY_PROOF=1` enables that
 assertion in the guest proof.
 
-Dropbear readiness requires a listening TCP socket owned by the supervised
-Dropbear child of the scanner at the configured address and port. Merely spawning
-the process does not satisfy readiness. The native Linux regression command is
-`python3 tests/integration/dropbear_readiness.py PATH_TO_PACKAGED_DROPBEAR`.
+`oxish` readiness requires a listening TCP socket owned by the supervised
+`oxish-server` child of the scanner at the configured address and port. Merely
+spawning the process does not satisfy readiness. The native Linux regression command is
+`python3 tests/integration/oxish_readiness.py PATH_TO_OXISH_BIN_DIR`, a directory
+holding `oxish-server`, `oxish-session` and `oxish-keygen` (an unpacked release
+archive's `bin/`); it runs as an unprivileged account with `XSH_HOST` naming the host `xsh`.
 It verifies a real owned listener and a conflicting foreign listener, then stops
 and reaps every child it starts.

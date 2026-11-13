@@ -20,7 +20,9 @@ rather than inherited from the checkout:
 
 `/etc/passwd`, `/etc/group`, `/etc/shells`, and `/etc/doas.conf` stay `0644`:
 they carry password placeholders, group membership, or public privilege
-policy, not hashes or keys. The operator's `authorized_keys` is `0600`.
+policy, not hashes or keys. `/etc/oxish/accounts` (the operator's public login keys) is `0644` and root-owned,
+because `oxish-server` refuses an accounts file its user does not own; the host key
+`/etc/oxish/host_ed25519_key` is `0600`.
 `/etc/laputa/trust-update-key` and `/etc/laputa/repo-snapshot-keys` are `0444`
 because they are public verification keys.
 

@@ -22,7 +22,7 @@ def parse():
     parser = argparse.ArgumentParser(description="Administer one headless maintained VM over native SSH.")
     parser.add_argument("--xsh", required=True, help="an xsh with the native ssh module")
     parser.add_argument("--bundle", type=pathlib.Path, default=root / "target/laputa/qemu-maintained/current")
-    parser.add_argument("--dropbearkey", required=True, help="the dropbearkey of the dropbear package")
+    parser.add_argument("--oxish-keygen", required=True, help="the oxish-keygen of the oxish package")
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--hold", type=int, default=0, help="seconds to keep the guest running before the drill")
     return parser.parse_args()
@@ -59,10 +59,10 @@ def provision(args, scratch):
     (staging / "var/log").mkdir(parents=True, exist_ok=True)
     (staging / "format").write_text("laputa-maintained-state-1\n")
 
-    host_key = staging / "etc/dropbear/dropbear_ed25519_host_key"
+    host_key = staging / "etc/oxish/host_ed25519_key"
     host_key.parent.mkdir(parents=True)
-    generated = run([args.dropbearkey, "-t", "ed25519", "-f", str(host_key)])
-    fingerprint = next(line.split()[-1] for line in (generated.stdout + generated.stderr).splitlines() if line.startswith("Fingerprint:"))
+    run([args.oxish_keygen, "-f", str(host_key), "-C", "laputa-host"])
+    fingerprint = run([args.oxish_keygen, "-l", "-f", str(host_key)]).stdout.split()[1]
     public = (client_key.with_suffix(".pub")).read_text().strip()
     env = dict(os.environ, XSH_MODULE_PATH=str(root), TMPDIR=str(scratch_root))
     run([args.xsh, str(state_fixture), "--", str(staging), OPERATOR, public], env=env, cwd=root)

@@ -11,10 +11,14 @@ manual drill.
 ## State ownership
 
 - **Restored from the backup:** `/etc`, `/home`, and `/var`, including the
-  Dropbear host key, operator accounts and authorized keys, the applied
+  OxiSH host key (`/etc/oxish/host_ed25519_key`), operator accounts and the
+  `/etc/oxish/accounts` login keys, the applied
   first-boot record, service state, and logs. Restoring these files restores
   the machine's identity; it is not a clone. A clone requires a distinct host
-  key and identity document.
+  key and identity document. A restored host key must keep owner root and mode
+  `0600`: `oxish-server` refuses a looser key, `oxish-hostkey` never replaces
+  an existing key, and the restore drill hashes both OxiSH files before and
+  after.
 - **Reconstructed from the generation:** the kernel and `/usr`, which remain
   immutable generation content. A restore therefore needs the matching
   trusted image generation plus the repository.

@@ -2,13 +2,17 @@
 const hostname_re = rx"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
 const operator_re = rx"^[a-z_][a-z0-9_-]{0,31}$"
 const digits_re = rx"^[0-9]+$"
-const host_key_path: RelPath = p"etc/dropbear/dropbear_ed25519_host_key"
+## The OxiSH host key `oxish-hostkey` creates at boot and `identity` policy governs.
+export const host_key_path: RelPath = p"etc/oxish/host_ed25519_key"
+## The OxiSH login-mode accounts file, derived from the document's operator and authorized keys.
+export const accounts_path: RelPath = p"etc/oxish/accounts"
+const ed25519_blob_prefix = "AAAAC3NzaC1lZDI1NTE5AAAAI"
 const operator_shell = "/usr/bin/xsh-login"
 const first_account_id = 1000
 const account_id_limit = 60000
 const repo_key_limit = 4
 
-## How the operator wants the Dropbear host key to be treated. Apply never generates one.
+## How the operator wants the OxiSH host key to be treated. Apply never generates one.
 export enum BootIdentity { New, Restore, Clone }
 
 ## dhcp, or a static address and gateway that are both required.
@@ -104,7 +108,9 @@ proc authorized_key(value: Str) -> Result[AuthorizedKey] {
   let material = tokens[1]
   let raw = material.base64_decode()?
 
-  guard ! raw.is_empty() else {
+  # oxish-server refuses to start on a key that is not one canonical ssh-ed25519
+  # blob (4 + 11 + 4 + 32 bytes), so refuse it here, before any state is written.
+  guard raw.len() == 51 and material.starts_with(ed25519_blob_prefix) and raw.base64() == material else {
     fail "malformed authorized-key"
   }
 
@@ -211,6 +217,16 @@ export proc parse(document: Str) [error] -> Result[FirstBoot, Error] {
 
   let keys = [authorized_key(value)? for value in key_lines]
 
+  var seen_keys = []
+
+  for key in keys {
+    guard key.material not in seen_keys else {
+      fail "duplicate authorized-key"
+    }
+
+    seen_keys += [key.material]
+  }
+
   guard seen.get("hostname") ?? false else {
     fail "missing hostname"
   }
@@ -298,6 +314,12 @@ pure installed_key(key: AuthorizedKey) -> Str {
   } else {
     f"ssh-ed25519 {key.material} {key.comment}"
   }
+}
+
+# The OxiSH accounts file: one `name key` line per authorized key of the operator.
+pure accounts_text(config: FirstBoot) -> Str {
+  let lines = [f"{config.operator} {installed_key(key)}" for key in config.keys]
+  ["# account  key", @lines].join("\n") + "\n"
 }
 
 pure identity_text(identity: BootIdentity) -> Str {
@@ -528,12 +550,12 @@ proc identity_ok(key_present: Bool, identity: BootIdentity) {
     New => {}
     Restore => {
       guard key_present else {
-        fail "restore requires the dropbear host key"
+        fail "restore requires the oxish host key"
       }
     }
     Clone => {
       guard ! key_present else {
-        fail "clone refuses an existing dropbear host key"
+        fail "clone refuses an existing oxish host key"
       }
     }
   }
@@ -541,22 +563,18 @@ proc identity_ok(key_present: Bool, identity: BootIdentity) {
 
 proc write_tree(rootfs: FsRoot, config: FirstBoot) {
   let home: RelPath = fp"home/{config.operator}".require()?
-  let ssh_dir: RelPath = fp"home/{config.operator}/.ssh".require()?
-  let authorized: RelPath = fp"home/{config.operator}/.ssh/authorized_keys".require()?
   ensure_dir(rootfs, p"etc", 0o755)
+  ensure_dir(rootfs, p"etc/oxish", 0o755)
   ensure_dir(rootfs, p"etc/laputa", 0o755)
   ensure_dir(rootfs, p"etc/laputa/first-boot", 0o755)
   ensure_dir(rootfs, p"home", 0o755)
   ensure_dir(rootfs, home, 0o755)
   withhold_group_and_world_write(rootfs, home)
-  ensure_dir(rootfs, ssh_dir, 0o700)
-  rootfs.chmod(ssh_dir, 0o700)
   write_text(rootfs, p"etc/hostname", f"{config.hostname}\n", 0o644)
   write_text(rootfs, p"etc/laputa/first-boot/network", network_text(config.network), 0o644)
   let tailscale = if config.tailscale { "yes" } else { "no" }
   write_text(rootfs, p"etc/laputa/first-boot/tailscale", f"{tailscale}\n", 0o644)
-  let key_text = [installed_key(key) for key in config.keys].join("\n") + "\n"
-  write_text(rootfs, authorized, key_text, 0o600)
+  write_text(rootfs, accounts_path, accounts_text(config), 0o644)
   ensure_account(rootfs, config.operator)
 
   if config.trust_key != null {
@@ -628,20 +646,16 @@ export proc state_ownership(root: Path) [fs, error] -> Result[List[StateInodeOwn
     }
     guard fields[5] == f"/home/{config.operator}" else { fail "operator home does not match the applied document" }
     let home = f"home/{config.operator}"
-    let ssh_dir = f"{home}/.ssh"
-    let authorized = f"{ssh_dir}/authorized_keys"
-    for entry in ["home", home, ssh_dir, authorized] {
+    for entry in ["home", home] {
       let info = tree.stat(fp"{entry}".require(RelPath)?, follow_symlinks: false)?
-      let expected = if entry == authorized { "file" } else { "dir" }
-      guard info.kind == expected else { fail f"operator state path is not a {expected}: {entry}" }
+      guard info.kind == "dir" else { fail f"operator state path is not a dir: {entry}" }
       if entry == home { guard info.mode.bit_and(0o022) == 0 else { fail "operator home must not be group or world writable" } }
-      if entry == ssh_dir { guard info.mode.bit_and(0o7777) == 0o700 else { fail "operator SSH directory mode must be 0700" } }
-      if entry == authorized { guard info.mode.bit_and(0o7777) == 0o600 else { fail "operator authorized keys mode must be 0600" } }
     }
-    [
-      {path: home, uid, gid},
-      {path: f"{home}/.ssh", uid, gid},
-      {path: f"{home}/.ssh/authorized_keys", uid, gid},
-    ]
+    # The accounts file stays root-owned: oxish-server refuses one that is not,
+    # so it is validated here but never handed to the operator.
+    let oxish_accounts = tree.stat(accounts_path, follow_symlinks: false)?
+    guard oxish_accounts.kind == "file" else { fail "oxish accounts is not a file" }
+    guard oxish_accounts.mode.bit_and(0o022) == 0 else { fail "oxish accounts must not be group or world writable" }
+    [{path: home, uid, gid}]
   }
 }

@@ -45,8 +45,8 @@ manual harness is aarch64-only and receives `MIRROR_URL` as
   matching kernel for direct boot.
 - `make installer-qemu-test` boots the ISO with a blank virtio disk sized from
   the target root, waits for `LAPUTA_INSTALLER_CI_OK`, then boots the installed
-  disk with a QEMU-only Dropbear and key overlay. The host SSHes as `pazu`
-  through user-mode port forwarding, checks `xinit status dropbear`, and runs
+  disk with a QEMU-only OxiSH and key overlay (`/etc/oxish/accounts`). The host SSHes as `pazu`
+  through user-mode port forwarding, checks `xinit status oxish`, and runs
   `xsh --help`. The `xsh` package supplies `/usr/bin/xsh-login`, which
   runs `-c SOURCE` with `xsh`; the default seed's `xshi` is the documented
   stub, so there is no interactive login shell. x86_64 runs under KVM. Logs:
@@ -87,7 +87,7 @@ and composes target, installer, and image-tools roots from that one plan.
 Composition is file extraction on the host; no container writes into the work
 tree. The target root adds the kernel, `doas-rs`, and `ca-certificates` (the
 trust seeds the installer bootstraps from), the installer and tools
-roots add `laputa-fs`, and the QEMU test adds Dropbear to the target. Installer
+roots add `laputa-fs`, and the QEMU test adds `oxish` to the target. Installer
 files are overlaid after composition, so image roots carry no PM generation
 receipts. `LAPUTA_INSTALLER_JOBS` sets import concurrency (default 4).
 

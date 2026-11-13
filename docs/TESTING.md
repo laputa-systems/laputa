@@ -102,14 +102,14 @@ NIC reappearance, and pause/resume, then boots offline.
 ### Run the SSH network-recovery proof
 
 `python3 tests/integration/ssh_network_recovery.py` needs the same built image and
-KVM, a seed `xsh` with the native SSH client, and `dropbearkey` (pass
-`--dropbearkey`, or let it extract one from `--artifact-store`). It owns one
+KVM, a seed `xsh` with the native SSH client, and `oxish-keygen` (pass
+`--oxish-keygen`, or let it extract one from `--artifact-store`). It owns one
 unprivileged user and network namespace, one tap, and a scripted DHCPv4 server
 that declares `192.0.2.100/24` on the tap address `192.0.2.1`; the virtio-serial
 control agent is installed only on the disposable state disk. Unlike the DHCP
 lifecycle proof, administration travels over the network under test: XSH's
 native SSH client connects to the declared address inside the namespace with
-the Dropbear host key provisioned on the state disk. After link loss, lease
+the OxiSH host key provisioned on the state disk. After link loss, lease
 expiry and re-acquisition, a supervised `dhcp-eth0` restart, and NIC
 reappearance on a new ifindex, the test requires a fresh verified connection to
 recover on the declared address and reads `xinit status dhcp-eth0` over it.

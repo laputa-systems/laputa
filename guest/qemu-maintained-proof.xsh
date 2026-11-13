@@ -1,7 +1,7 @@
 #!/bin/xsh
 
 proc listener_ready() -> Result[Bool] {
-  let status = p"/run/xinit/dropbear.json"
+  let status = p"/run/xinit/oxish.json"
   return false unless status.exists()?
   json.get(json.read(status)?, ["state"], "down").require(Str)? == "running"
 }
@@ -105,11 +105,11 @@ proc run_proof() {
         fail "invalid firewall unexpectedly started"
       }
     }
-    guard ! listener_ready()? else { fail "dropbear started after firewall failure" }
-    let listener = p"/run/xinit/dropbear.json"
+    guard ! listener_ready()? else { fail "oxish started after firewall failure" }
+    let listener = p"/run/xinit/oxish.json"
     if listener.exists()? {
       guard json.get(json.read(listener)?, ["pid"], 0).require(Int)? == 0 else {
-        fail "dropbear process started after firewall failure"
+        fail "oxish process started after firewall failure"
       }
     }
     p"/dev/console".write("LAPUTA_FIREWALL_FAILURE_PROOF_OK listener stayed down\n")
@@ -121,9 +121,9 @@ proc run_proof() {
   let operator = applied.lines() |> where .starts_with("operator ") |> collect
   guard operator.len() == 1 else { fail "one provisioned operator required" }
   let name = operator[0].split(" ")[1]
-  let keys = fp"/home/{name}/.ssh/authorized_keys"
-  guard keys.read_text()?.trim() != "" else { fail "operator authorized keys required" }
-  let host_key = p"/etc/dropbear/dropbear_ed25519_host_key"
+  let keys = p"/etc/oxish/accounts"
+  guard f"{name} ssh-ed25519 " in keys.read_text()? else { fail "operator account keys required" }
+  let host_key = p"/etc/oxish/host_ed25519_key"
   wait until host_key.exists()? within 30s every 100ms
   guard host_key.read_bytes()?.len() > 0 else { fail "persistent host key required" }
   wait until listener_ready()? within 30s every 100ms

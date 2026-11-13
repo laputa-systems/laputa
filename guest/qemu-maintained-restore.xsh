@@ -128,10 +128,9 @@ proc identity_files() -> Result[List[Path]] {
   let applied = p"/etc/laputa/first-boot/applied".read_text()?
   let operator = applied.lines() |> where .starts_with("operator ") |> collect
   guard operator.len() == 1 else { fail "one provisioned operator required" }
-  let name = operator[0].split(" ")[1]
   [
-    p"/etc/dropbear/dropbear_ed25519_host_key",
-    fp"/home/{name}/.ssh/authorized_keys",
+    p"/etc/oxish/host_ed25519_key",
+    p"/etc/oxish/accounts",
     p"/etc/passwd",
     p"/etc/group",
     p"/etc/shadow",
@@ -145,8 +144,8 @@ proc hash_manifest(files: List[Path]) -> Result[Str] {
 }
 
 proc steady_state() {
-  wait until p"/run/xinit/dropbear.json".exists()? within 30s every 100ms
-  wait until json.get(json.read(p"/run/xinit/dropbear.json")?, ["state"], "").require(Str)? == "running" within 30s every 100ms
+  wait until p"/run/xinit/oxish.json".exists()? within 30s every 100ms
+  wait until json.get(json.read(p"/run/xinit/oxish.json")?, ["state"], "").require(Str)? == "running" within 30s every 100ms
   wait until p"/run/dhcpc/eth0.status".exists()? within 30s every 100ms
   var leased = ""
   var waited = 0

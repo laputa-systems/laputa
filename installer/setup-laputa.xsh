@@ -145,24 +145,20 @@ proc configure_qemu_smoke_ssh(root: Path) -> Result[Bool] {
 
   return false when public_key == ""
 
-  let ssh_dir = fp"{root}/home/pazu/.ssh"
-  let authorized_keys = fp"{ssh_dir}/authorized_keys"
-  fp"{root}/etc/dropbear".mkdir()
-  ssh_dir.mkdir()
+  let accounts = fp"{root}/etc/oxish/accounts"
+  accounts.parent.mkdir()
+  accounts.parent.chmod(0o755)
 
-  authorized_keys.write(
-    f"""{public_key}
+  # oxish-server reads this root-owned file, never ~/.ssh; the pazu account is in /etc/passwd.
+  accounts.write(
+    f"""# account  key
+pazu {public_key}
 """,
+    mode: 0o644,
   )
 
   fs.chown(fp"{root}/home/pazu", user.by_uid(1000)?)
   fs.chgrp(fp"{root}/home/pazu", group.by_gid(1000)?)
-  fs.chown(ssh_dir, user.by_uid(1000)?)
-  fs.chgrp(ssh_dir, group.by_gid(1000)?)
-  fs.chown(authorized_keys, user.by_uid(1000)?)
-  fs.chgrp(authorized_keys, group.by_gid(1000)?)
-  ssh_dir.chmod(0o700)
-  authorized_keys.chmod(0o600)
   true
 }
 

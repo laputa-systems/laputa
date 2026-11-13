@@ -1,7 +1,7 @@
 #!/bin/xsh
 
 proc ready() -> Result[Bool] {
-  let status = p"/run/xinit/dropbear.json"
+  let status = p"/run/xinit/oxish.json"
   return false unless status.exists()?
   json.get(json.read(status)?, ["state"], "").require(Str)? == "running"
 }

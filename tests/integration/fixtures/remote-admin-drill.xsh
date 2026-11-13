@@ -32,10 +32,10 @@ proc main(...argv: List[Str]) [fs, process, net, env, time, error, io] {
     let inspection = remote.remote_inspect(session, program)?
     check("running generation reported", json.get(inspection.generation, ["profile"], "").require(Str)? == "qemu-maintained")?
     check("guest identifies itself", inspection.hostname == "laputa-admin")?
-    let dropbear = inspection.services |> where .name == "dropbear" |> collect
-    check("xinit services listed with dropbear running", dropbear.len() == 1 and dropbear[0].state == "running")?
+    let oxish = inspection.services |> where .name == "oxish" |> collect
+    check("xinit services listed with oxish running", oxish.len() == 1 and oxish[0].state == "running")?
 
-    let hostname = remote.remote_run(session, program, ["/usr/bin/xinit", "status", "dropbear"])?
+    let hostname = remote.remote_run(session, program, ["/usr/bin/xinit", "status", "oxish"])?
     check("explicit argv ran with exact status", hostname.exit_code == 0 and ! hostname.signaled)?
     let failing = remote.remote_run(session, program, ["/usr/bin/xinit", "check", "/nonexistent/service.xsh"])?
     check("a failing command reports its status and stderr as data", failing.exit_code != 0 and ! failing.stderr.is_empty())?

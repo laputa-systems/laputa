@@ -37,7 +37,7 @@ The current sources already establish several foundations:
 
 | Area | Existing implementation | Remaining boundary |
 |---|---|---|
-| SSH | XSH vendors OxiSH with Graviola, and xinfra consumes its native client. | The current server is Git-only. Retain Dropbear for general login, PTY, and SFTP until a separate server qualifies. |
+| SSH | XSH vendors OxiSH with Graviola, and xinfra consumes its native client. | Laputa consumes the ssh-build `oxish` archive: its login-mode server replaces Dropbear for login and PTY. SFTP and scp are not provided. |
 | Keyboard | Tinyland uses KBVM. xkbcommon belongs to the optional oracle feature. | Audit remaining consumers and preserve keymaps, compose, modifiers, and text input. |
 | Seat management | The Rust seatd daemon is packaged with a C libseat client. | Qualify a seatd-only Rust client for Tinyland before removing the C provider. |
 | Device management | mdevd-rs calls libc POSIX regex functions for matching and captures. | Preserve capture byte offsets, syntax, locale behavior, and errors in a separate compatibility effort. |

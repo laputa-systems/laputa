@@ -115,9 +115,9 @@ owners, not a new message bus or resident fleet-management service.
 | Native userland | Tinyland, seatd, mdevd, and doas have pinned upstream package inputs; ntpd-rs remains in-tree | Qualify the exact packaged chain, normal boot ownership, and regression coverage; consolidation alone is not a security or release claim. See [tinyland](TINYLAND.md). |
 | Packages and images | Typed plans, immutable artifacts, runtime-only generations, atomic publication of host-side system bundles | Installed-system activation, boot success, rollback, and state ownership are not the same as composing a generation. See [PM](PM.md) and [core infrastructure](CORE-INFRASTRUCTURE.md). |
 | Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Keep normal boot, tested recovery, and supervisor ownership aligned. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
-| Remote administration | Packaged Dropbear and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
+| Remote administration | Packaged OxiSH login server (ssh-build `oxish` archive) and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
 | Storage | Native image/installer filesystem tools | Installer `mkfs.ext4` is journal-less and `fsck.ext4` does not repair. See [installer](INSTALLER.md). |
-| Networking and logging | XSH records supervised DHCPv4 and syslog (XSH-53/54) as implemented; Laputa has network policy, xinit, Dropbear, Tailscale, and nftables foundations | Adopt matching XSH products, roll out the services, and qualify leases/resolver ownership, time, and persistent logs in the installed image. See [XSH roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md). |
+| Networking and logging | XSH records supervised DHCPv4 and syslog (XSH-53/54) as implemented; Laputa has network policy, xinit, OxiSH, Tailscale, and nftables foundations | Adopt matching XSH products, roll out the services, and qualify leases/resolver ownership, time, and persistent logs in the installed image. See [XSH roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md). |
 | Trust | Signed repository snapshots with mandatory durable acceptance, guest HTTP/reboot proof, signed certificate releases and intermediate distrust in XSH and Tailscale | Provision production repository keys through image/first boot; upstream prebuilt uv lacks intermediate distrust. See [PM](PM.md#snapshot-authentication) and [certificate trust](CERTIFICATE-TRUST.md). |
 | Self-hosting | Bounded in-guest XSH rebuild and A-to-B successor workflow | Turn the existing development proof into the normal installed build/stage/boot path without overstating bootstrap closure or production admission. See [self-hosting](SELF-HOSTING.md). |
 | Verification | Package tests, installer/SSH and graphical QEMU proofs, pinned Asterinas guest tests | Existing smoke proofs do not establish long-lived operation, recovery, or platform parity. See [testing](TESTING.md), [QEMU](QEMU.md), and [Asterinas](ASTERINAS.md). |
@@ -342,7 +342,7 @@ status for a malformed module and a readiness timeout, and a pre-shutdown hook
 that sees no owned workers while the root is still writable. The proof found
 `rc.shutdown` running a command named `hook` instead of each hook. The baselayout
 and installer inittabs each start one `xinit scan boot`, which starts mdevd,
-dropbear and networking from their boot-target modules; `mdev.supervise` is
+the SSH server and networking from their boot-target modules; `mdev.supervise` is
 gone, and the guest proof reads the scanner line from baselayout. Open: SIGKILL
 of the scanner is unqualified, the installer QEMU smoke image was not rebuilt
 to exercise the CI scanner, and the graphical reference was not rerun.
@@ -406,7 +406,7 @@ negative wait after a slow re-acquisition and a re-created NIC left down.
 
 `tests/integration/ssh_network_recovery.py` reaches the same guest over XSH's
 native SSH client on the address the scripted server declares (`192.0.2.100/24`
-on the tap), not over the control channel, with a pinned Dropbear host key. It
+on the tap), not over the control channel, with a pinned OxiSH host key. It
 proves a verified session, then a fresh verified connection after each
 disruption: link loss, lease expiry and re-acquisition, a supervised DHCP client
 restart that keeps the saved address, and NIC reappearance on a new ifindex. The
@@ -714,8 +714,8 @@ first network answer. Define rotation, failed/partial first boot, and the
 identity distinction between restore and clone. Preserve an independent local
 rescue route when provisioning or remote access fails.
 
-nftables and Dropbear already exist; the gap is policy and lifecycle integration,
-not another firewall or login-server implementation. Apply a tested profile-owned
+nftables and the OxiSH login server already exist; the gap is policy and lifecycle
+integration, not another firewall or login-server implementation. Apply a tested profile-owned
 firewall before exposing listeners, handle failed ruleset updates atomically,
 and define Tailscale coexistence without accidentally removing recovery access.
 Use least-privilege service execution and explicit doas delegation where needed.
@@ -736,9 +736,22 @@ which never invokes an external `ssh`. The OpenSSL-less client in
 [ssh-build](https://github.com/laputa-systems/ssh-build) is its test oracle, not
 a production fallback. The client has landed in XSH (experimental) and
 [remote administration](REMOTE-ADMIN.md) uses it for one headless VM. The
-current OxiSH server is Git-only, not a general
-login/PTY/SFTP server. Keep Dropbear until a separately qualified server has a
-concrete benefit; a server rewrite is not a dependency of G2.
+guest's login server is
+the same OxiSH, built in [ssh-build](https://github.com/laputa-systems/ssh-build).
+
+**Decision (SSHB-7): Laputa removes Dropbear and keeps no SSH implementation of its
+own.** ssh-build is the SSH implementation, and Laputa consumes only its release
+archive: the `oxish` package pins that archive by checksum and installs
+`oxish-server` (run as `oxish-server --mode login`, supervised by xinit as the
+`oxish` service), its `oxish-session` helper, the `oxish` client and
+`oxish-keygen`. First boot's `oxish-hostkey` oneshot makes the host key with
+`oxish-keygen`. Login mode serves public-key logins for accounts listed in
+`/etc/oxish/accounts`, which first boot derives from the operator and
+`authorized-key` fields of its one document, and gives each the account's own
+login shell. It provides no SFTP, scp, forwarding, agent, X11 or password login;
+those stay out of scope until a consumer needs them. The release pin is a
+placeholder until ssh-build publishes a release carrying all four executables
+(LAP-57), and the guest drills that need it are migrated but unrun.
 
 [xsh-infra](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-56-xsh-infra.md)
 is a separate pyinfra-inspired tool over the same client, for hosts without a
@@ -779,11 +792,11 @@ verbs (`start`, `stop`, `restart`, `reload`) and does not require doas or a root
 login. The development profile remains convenient and visibly distinct.
 
 `qemu-maintained` sets `development` false; the other profiles set it true and
-keep their roots. First boot is validated before any write, Dropbear keeps one
+keep their roots. First boot is validated before any write, OxiSH keeps one
 ed25519 host key, and the nftables package installs the filter ruleset whose
 oneshot fails closed when the file is absent. Linux x86_64/KVM guests boot and
 reboot with stable operator files and host identity; missing or rejected
-firewall rules keep Dropbear down. New operators use `/usr/bin/xsh-login`.
+firewall rules keep the SSH server down. New operators use `/usr/bin/xsh-login`.
 Native SSH also passes the interrupted activation-stage recovery drill described
 in [maintained VM activation](QEMU.md#maintained-vm-activation). These checks do
 not qualify macOS or aarch64 clients. XSH-55 owns the SSH client's wider matrix.

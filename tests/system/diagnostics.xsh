@@ -43,7 +43,7 @@ proc seed_sources(root: Path) {
   fp"{root}/markers".write_lines([
     marker("b", 1, "", ["logger", "dhcp-eth0"]),
     marker("b", 2, "", ["logger", "dhcp-eth0"]),
-    marker("a", 2, "b", ["logger", "dhcp-eth0", "dropbear"]),
+    marker("a", 2, "b", ["logger", "dhcp-eth0", "oxish"]),
     "not a marker",
   ])
   fp"{root}/logger".write_lines([
@@ -76,15 +76,15 @@ test test_trim_keeps_newest_lines_within_both_bounds [error] {
 test test_boot_history_extracts_identity_and_service_states [error] {
   let history = diagnostics.diagnostics_boot_history([
     marker("b", 1, "", ["logger", "dhcp-eth0"]),
-    marker("a", 2, "b", ["dropbear", "logger"]),
+    marker("a", 2, "b", ["oxish", "logger"]),
     "not a marker",
   ], 20)
   assert history.invalid == 1
   assert history.entries.len() == 2
   assert history.entries[0].generation_id == "b"
   assert history.entries[1].failed_generation == "b"
-  assert history.entries[1].services[0].name == "dropbear"
-  assert history.entries[1].services[1].name == "logger"
+  assert history.entries[1].services[0].name == "logger"
+  assert history.entries[1].services[1].name == "oxish"
 }
 
 test test_boot_history_keeps_only_the_newest_limit [error] {
