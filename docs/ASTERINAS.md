@@ -183,8 +183,10 @@ first.
 from an immutable `Dockerfile.test` image, a clean XSH checkout and matching
 verification products. It preserves the test image's Bash, Perl, compiler and
 helper environment. The fixture runs tests as UID and GID 1000, with cleared
-supplementary groups and one test worker. Root-only cases need their own cohort.
-The fixture is not a PM generation or a maintained Laputa boot proof.
+supplementary groups and one test worker. Each test command enters a new session
+through `setsid --wait`, which preserves its exit status. Root-only cases need
+their own cohort. The fixture is not a PM generation or a maintained Laputa boot
+proof.
 
 Prepare the verification products in the pinned Linux container, then run:
 
@@ -214,6 +216,19 @@ Linux reference kernel, initramfs, private disk, console path, QEMU log path and
 timeout in seconds. It uses the existing QEMU supervisor with the explicit
 `NativeXsh` proof contract. The default contract remains the maintained Laputa
 proof. Each contract rejects the other contract's completion marker.
+
+A matched Linux 7.2.9 and Asterinas `6c752b269` control shows why the launcher
+must establish a session. The initramfs handoff leaves both guests' children in
+process group and session zero. Both kernels then fail the same process-identity
+and terminal-group assertions. The controls at
+`.work/tmp/native-session-context-{linux,asterinas}/` retain those failures.
+After the launcher change, both guests report positive process-group and session
+IDs for unprivileged commands. All 97 selected process, scheduling, terminal and
+`within` cases pass on both kernels, with no skips. Both I/O C controls and the
+root and unprivileged memory and exec controls also pass. Evidence is at
+`.work/tmp/native-session-established-{linux,asterinas}/`. Those probes use the
+unchanged XSH products with `d9487ffc5`'s `within` test overlay. Their results do
+not qualify the complete corpus.
 
 The native protocol reports `XSH_NATIVE_CONTEXT`, `XSH_NATIVE_START` and
 `XSH_NATIVE_RESULT`. Preserve those consoles, the requested selections and

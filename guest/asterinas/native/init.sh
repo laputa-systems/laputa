@@ -46,7 +46,7 @@ chmod 700 /work/.work/tmp/native /work/.work/tmp/native/home /work/.work/tmp/nat
 touch /work/.work/tmp/native/xsht-config.ini
 chown 1000:1000 /work/.work/tmp/native/xsht-config.ini
 
-native_user=(setpriv --reuid=1000 --regid=1000 --clear-groups env
+native_user=(setsid --wait setpriv --reuid=1000 --regid=1000 --clear-groups env
     HOME=/work/.work/tmp/native/home
     TMPDIR=/work/.work/tmp/native/tmp
     XDG_CACHE_HOME=/work/.work/tmp/native/home/.cache
