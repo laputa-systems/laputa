@@ -47,15 +47,20 @@ Host-tool setup, the full target reference, and cleanup are in
 | Recipes, source inputs, plans, store, roots, publication | [Package manager](docs/PM.md) |
 | Typed Makefile-style build graphs | [Make task graphs](docs/MAKE.md) |
 | Vision, scope, priorities, acceptance milestones | [Roadmap](docs/ROADMAP.md) |
-| Open work | [TODO](TODO.md) |
+| Open work | [Laputa TODO](TODO.md), [joint-review TODOs in XSH](https://github.com/laputa-systems/xsh/blob/master/TODO.md) |
 | Focused tests and wider verification | [Testing](docs/TESTING.md) |
 | Native Docker/QEMU profile and graphical proof | [QEMU](docs/QEMU.md) |
+| Guest compiler and self-hosting proof | [Self-hosting](docs/SELF-HOSTING.md) |
 | Static and shared native code in the graphical profile and Play | [Native census](docs/NATIVE-CENSUS.md) |
+| Shared font libraries, discovery, shaping, and guest proof | [Font stack](docs/FONT-STACK.md) |
 | Remote administration over XSH's native SSH client | [Remote administration](docs/REMOTE-ADMIN.md) |
 | Tinyland kiosk profile, evidence, and remaining roadmap | [Tinyland](docs/TINYLAND.md) |
 | Installer images, install policy, QEMU harness | [Installer](docs/INSTALLER.md) |
 | Pinned Asterinas/Firecracker build, test, serial shell | [Asterinas](docs/ASTERINAS.md) |
 | Root bundle, trust policy, signed releases | [Certificate trust](docs/CERTIFICATE-TRUST.md) |
+| Credential file ownership and modes | [Security](docs/SECURITY.md) |
+| Persistent jobs, retries, cancellation, and scheduler recovery | [Timers](docs/TIMERS.md) |
+| Backup quiescence, retention, keys, and restore binding | [Backups](docs/BACKUP.md) |
 | Mirror host/Cloudflare operations and rollback | [Mirror deployment](docs/MIRROR-DEPLOYMENT.md) |
 | Mirror invocation, publishing, client settings | [Mirror usage](mirror/README.md) |
 | xinfra Alpine host configuration management (vendored from laputa-systems/xsh-infra) | [xinfra](xinfra/AGENTS.md) |

@@ -28,7 +28,7 @@ PM (`pm.xsh`, `pm/`, `packages/`) owns recipes, the typed `PackageCatalog`,
 graph resolution, the `BuildPlan`, artifact storage, root composition, and
 publication; [PM](PM.md) is its contract. `seed/` owns the local XSH seed, the
 two Docker images, and the package world behind `make plan/build/publish/root`.
-`system/` and `laputa.xsh` own the typed `SystemProfile` for `qemu-tinyland-ghostty`;
+`system/` and `laputa.xsh` load typed `SystemProfile` definitions from `profiles/`;
 `system/qemu.xsh` picks the QEMU target for the host. The installer composes its
 roots from the local mirror; see [installer](INSTALLER.md).
 
@@ -60,9 +60,10 @@ verifies the kernel, ext4 root filesystem, and GPT disk inside Linux, then
 publishes all of them as one immutable `builds/<system-key>/` directory.
 `current` switches atomically to a complete bundle. `laputa test` and
 `laputa boot` first ensure that bundle, so QEMU always uses the kernel and
-disk from the same current system. The acceptance proof boots QEMU with
-hardware acceleration, drives the real dwl and foot session through QMP, and
-requires the guest success marker plus a screenshot; see [QEMU proof](QEMU.md).
+disk from the same current system. The graphical proof drives Tinyland and
+Ghostty through QMP and requires a success marker plus a screenshot. Headless
+profiles have their own guest-marker contracts; see [QEMU proof](QEMU.md) and
+[self-hosting](SELF-HOSTING.md).
 
 ## Boot device policy
 

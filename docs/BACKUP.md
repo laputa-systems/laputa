@@ -44,9 +44,9 @@ The runner:
 6. writes a receipt and runs the release hook.
 
 A failed quiesce, backup, check, prune, receipt write, or release exits
-nonzero. Every step after a successful repository-open runs the release hook so
-a failure does not leave the configured services stopped; the release failure
-is itself reported.
+nonzero. Ordinary caught failures attempt the release hook. A killed or crashed
+runner can bypass that epilogue and leave services stopped; recovery ownership
+is open in [XSH-89](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-89-backup-quiescence-recovery.md).
 
 ## Target and keys
 
@@ -82,16 +82,14 @@ policy count before it writes a receipt.
 
 ## Quiescence
 
-`/usr/lib/laputa/backup-quiesce.xsh` stops or starts named xinit services and
-waits for the observed state. After each control request it sends `SIGHUP` to
-the scanner named by `/run/xinit/scanner.json`; `xinit scan` treats that signal
-as a wake-up and drains its control inbox, while an idle scanner otherwise
-sleeps until a child exit or its next deadline. Without a scanner marker the
-one-shot path has already applied the transition. The shipped configuration
-stops `logger` and `dhcp-eth0` through `xinit stop`, requires `desired=down`
-with a stopped, down, or dead state, and restarts them through `xinit start`
-until they report running. This bounds writes to `/var/log`, `/var/lib/dhcpc`, and
-`/etc/resolv.conf` during the snapshot.
+`/usr/lib/laputa/backup-quiesce.xsh` invokes xinit and waits for the observed
+state. xinit queues each desired-state request and wakes the live scanner
+through its control FIFO; without an active scanner, it applies the transition
+directly. The shipped hook stops `logger` and `dhcp-eth0`, waits for
+`desired=down` with a stopped, down, or dead state, and starts both on release
+until they report running. It does not retain their prior desired states.
+This bounds writes to `/var/log`, `/var/lib/dhcpc`, and `/etc/resolv.conf`
+during the snapshot.
 
 The timer scheduler is not stopped: it is the backup job's parent, and its
 durable state is replaced atomically. A quiesced snapshot can still contain
