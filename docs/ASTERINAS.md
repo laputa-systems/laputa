@@ -407,6 +407,10 @@ Evidence is at `.work/tmp/proc-affinity-standard-proof/`. Its ELF SHA-256 is
 That run overlays XSH `d85490822`'s corrected taskset test. Pinned util-linux
 2.42.4 prints `0,1` for two CPUs. The earlier expectation of `0-1` was wrong.
 The original before and first after aggregates retain their failed status.
+The main artifact also passes both C regressions and all seventeen native cases.
+Evidence is at `.work/tmp/proc-affinity-main-proof/`, with the same verified
+single-file test overlay. Its ELF SHA-256 is
+`2ebb506a1f58f893da10a9f118122341beab8e14f162048b88bd30e1ebdc446d`.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
