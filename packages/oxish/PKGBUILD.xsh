@@ -1,4 +1,4 @@
-##! The OxiSH SSH server, session helper, interactive client and key generator,
+##! The OxiSH SSH server, session helper, interactive and file-transfer clients and key generator,
 ##! installed from the checksum-pinned ssh-build release archive.
 ##! Laputa builds no SSH implementation; the archive is the only source.
 
@@ -26,9 +26,9 @@ export const runtime_only_deps = ["xinit", "xsh"]
 ## Preserve the released binaries without stripping; the archive provenance names their digests.
 export const nostrip = true
 
-const release_tag = "release-686ec0d03f9c4c2737289641c4e3432fcb3a44ba"
-const release_sha256_x86_64 = "2cb3fa86bdcd1752e170ac0525edddef0c98e0d2a44b638ed5b5196777774720"
-const release_sha256_aarch64 = "7278123eeca2c07929ff31bdcaf3e11ac4a4d3c65692b6659fa0636e94d7bc32"
+const release_tag = "release-ba4e5e269b1737b32cf7cdaa08e739ec06712cf5"
+const release_sha256_x86_64 = "6d20f301b1957cbf612630627730e0b219fd8a63c9c91879368751a84ed4202c"
+const release_sha256_aarch64 = "0822b5ddaf85ff0347d53ab21ab7b306e512227ca88c85ef7bad41cce7a94857"
 
 ## Upstream release archives and checksums. The archive has no top-level directory:
 ## `bin/`, the licenses and `provenance.json`.
@@ -89,11 +89,19 @@ export const filetree = [
     kind: "binary",
   },
   {
+    path: p"usr/bin/oxish-scp",
+    kind: "binary",
+  },
+  {
     path: p"usr/bin/oxish-server",
     kind: "binary",
   },
   {
     path: p"usr/bin/oxish-session",
+    kind: "binary",
+  },
+  {
+    path: p"usr/bin/oxish-sftp",
     kind: "binary",
   },
   {
@@ -122,7 +130,7 @@ export const filetree = [
   },
 ]
 
-const executables = ["oxish", "oxish-keygen", "oxish-server", "oxish-session"]
+const executables = ["oxish", "oxish-keygen", "oxish-scp", "oxish-server", "oxish-session", "oxish-sftp"]
 const documents = ["LICENSE-APACHE", "LICENSE-MIT", "THIRD-PARTY.md", "provenance.json"]
 
 ## Install an unpacked release archive (`release/bin/<executable>`, the licenses and

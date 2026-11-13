@@ -3,7 +3,7 @@
 use pm.proof
 use pm.util as pm_util
 
-const tools = ["oxish", "oxish-keygen", "oxish-server", "oxish-session"]
+const tools = ["oxish", "oxish-keygen", "oxish-scp", "oxish-server", "oxish-session", "oxish-sftp"]
 
 proc fingerprint(keygen: Path, key: Path) [fs, process, env, error] -> Result[Str] {
   let line = run.text $keygen "-l" "-f" $key
@@ -97,6 +97,12 @@ proc main(rootfs = p"/rootfs") [fs, process, env, time, error] {
     }
   }
 
+  let scp = fp"{rootfs}/usr/bin/oxish-scp"
+  let upload = fp"{tmp}/upload"
+  upload.write("laputa-scp-ok\n", mode: 0o600)
+  let download = fp"{tmp}/download"
+  let put = run.status --timeout=10s $scp "-P" $port "-i" $client_key "--host-key" $host_fingerprint $upload f"{me.name}@127.0.0.1:copied" > /dev/null 2> /dev/null
+  let get = run.status --timeout=10s $scp "-P" $port "-i" $client_key "--host-key" $host_fingerprint f"{me.name}@127.0.0.1:copied" $download > /dev/null 2> /dev/null
   let stranger = ssh_echo(client, stranger_key, host_fingerprint, me.name, port)?
   let wrong_host = ssh_echo(client, client_key, "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", me.name, port)?
   process.kill(service.pid, "TERM")
@@ -105,5 +111,7 @@ proc main(rootfs = p"/rootfs") [fs, process, env, time, error] {
   proof.ensure(output == "laputa-ssh-ok", "proof-oxish", f"authorized client did not run its command: {output}; server log: {log}")
   proof.ensure(stranger == "", "proof-oxish", "oxish-server accepted a client key missing from the accounts file")
   proof.ensure(wrong_host == "", "proof-oxish", "the client accepted a host key that does not match the pin")
-  print "oxish ok: pinned host key, public-key login runs a command, unknown key refused"
+  proof.ensure(put.ok and get.ok, "proof-oxish", f"oxish-scp round trip failed; server log: {log}")
+  proof.ensure(fp"{tmp}/copied".read_text()? == "laputa-scp-ok\n" and download.read_text()? == "laputa-scp-ok\n", "proof-oxish", "oxish-scp copies differ from the source")
+  print "oxish ok: pinned host key, public-key login runs a command, unknown key refused, scp round trip"
 }

@@ -743,14 +743,15 @@ the same OxiSH, built in [ssh-build](https://github.com/laputa-systems/ssh-build
 own.** ssh-build is the SSH implementation, and Laputa consumes only its release
 archive: the `oxish` package pins that archive by checksum and installs
 `oxish-server` (run as `oxish-server --mode login`, supervised by xinit as the
-`oxish` service), its `oxish-session` helper, the `oxish` client and
-`oxish-keygen`. First boot's `oxish-hostkey` oneshot makes the host key with
+`oxish` service), its `oxish-session` helper, the `oxish`, `oxish-sftp` and
+`oxish-scp` clients and `oxish-keygen`. First boot's `oxish-hostkey` oneshot makes the host key with
 `oxish-keygen`. Login mode serves public-key logins for accounts listed in
 `/etc/oxish/accounts`, which first boot derives from the operator and
 `authorized-key` fields of its one document, and gives each the account's own
-login shell. It provides no SFTP, scp, forwarding, agent, X11 or password login;
-those stay out of scope until a consumer needs them. The package pins ssh-build
-`release-686ec0d`; the guest drills that need it are migrated but unrun (LAP-57).
+login shell, and serves the `sftp` subsystem as the account (OpenSSH `sftp` and
+`scp`, and `oxish-sftp`/`oxish-scp`). It provides no forwarding, agent, X11 or
+password login; those stay out of scope until a consumer needs them. The package
+pins ssh-build `release-ba4e5e2`; the guest drills that need it are migrated but unrun (LAP-57).
 
 [xsh-infra](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-56-xsh-infra.md)
 is a separate pyinfra-inspired tool over the same client, for hosts without a
