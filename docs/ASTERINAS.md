@@ -1,10 +1,10 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `81e2541ce`, with XSH `d7b4c9c85`, recorded with
+The checked-in kernel pin is `9160b9644`, with XSH `d7b4c9c85`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published.
-The kernel repair preserves CPU affinity across fork and thread creation.
-The focused developer build passes the fork, thread and exec regressions and
-the eleven native fixture cases. Full current-pin qualification remains open.
+It includes the permission, process, procfs and generic-netlink repairs below.
+Both standard and main builds pass ten C control executions and all 104 selected
+native tests without skips. Full current-pin qualification remains open.
 
 The maintained cohorts below were qualified at kernel `d59567c40` by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
@@ -544,6 +544,34 @@ Published-input checks pass. The updated fourteen-case diagnostic at
 Both netlink cases and both procfs-sampling cases remain unresolved. Its failed
 status is retained. Full native qualification and final-pin maintained replay
 remain open.
+
+Published successor `9160b9644` adds real `NETLINK_GENERIC` sockets through the
+existing netlink transport. Its registered `nlctrl` family answers lookup by
+name or ID and complete family dumps, including sequence numbers, ACKs and
+errors. The advertised operations match the implementation; dynamic families,
+multicast notifications and `GETPOLICY` remain unsupported.
+
+The static C regression passes as root and UID 1000 on pinned Linux. It covers
+both socket kinds, port isolation and reuse, multipart dumps, partial dump flags,
+large attributes, control ACKs and malformed requests. Independent review found
+an oversized family-name policy defect. Four exact requests fail on the earlier
+candidate and pass after the correction, matching Linux's `ERANGE` responses.
+The correction passes a second independent review. Both clean standard and main
+builds pass both generic controls, eight retained C executions and all 104 native
+cases without skips. Published-input checks pass for both builds.
+Standard evidence is at `.work/tmp/netlink-generic-standard-proof/`, with ELF
+SHA-256 `a0cda85bc8bdf6938faa5c89b5081ed287bf84c28c7fff3562ace9680e364569`.
+Main evidence is at `.work/tmp/netlink-generic-main-proof/`, with ELF SHA-256
+`1892db781fb02978a0e5c2f45dc12a9d0b3f2f05f0c5dd0a3952665f171e6221`.
+Socket diagnostics and procfs sampling still need repairs. Full native
+qualification and final-pin maintained replay remain open.
+
+The procfs cwd/root candidate is not pinned. Its original native descriptor
+test passes, but its C regression still fails nondumpable-target access and
+deleted-directory display. `PR_SET_DUMPABLE` currently acknowledges the request
+without storing the setting, and path display omits Linux's deleted suffix.
+These failures must be repaired before accepting the candidate; its failed
+evidence remains at `.work/tmp/proc-fs-links-{after,diagnostic}/`.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
