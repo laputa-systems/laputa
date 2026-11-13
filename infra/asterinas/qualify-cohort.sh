@@ -39,7 +39,7 @@ case "$cohort" in
         tap_modes=(pause jump)
         ;;
     network-state)
-        witnesses=(network/rtnl_route_dump network/link_state network/addr_config network/route_config network/route_types network/rtnl_ack network/rtnl_notify network/packet_bind network/packet_receive network/packet_send network/packet_options)
+        witnesses=(network/rtnl_route_dump network/link_state network/addr_config network/route_config network/route_types network/route_lookup network/rtnl_ack network/rtnl_notify network/packet_bind network/packet_receive network/packet_send network/packet_options)
         case_dir=network-state
         modes=(loopback link netlink-link address route events packet ioctl-config)
         tap_modes=("${modes[@]}")
@@ -121,6 +121,16 @@ for path in "${witnesses[@]}"; do
     name="${path##*/}"
     [[ -z "$selected" || "$selected" == "$name" ]] || continue
     if run_backends "witness-$name" witness_argv "$path"; then
+        if [[ ( "$path" == network/route_types || "$path" == network/route_lookup || "$path" == network/addr_config ) && "$backend" == both ]]; then
+            transcript "$work/witness-$name-linux" > "$work/witness-$name-linux.transcript"
+            transcript "$work/witness-$name-asterinas" > "$work/witness-$name-asterinas.transcript"
+            if [[ ! -s "$work/witness-$name-linux.transcript" ]] ||
+                ! diff -u "$work/witness-$name-linux.transcript" "$work/witness-$name-asterinas.transcript" >&2; then
+                printf 'qualification: %s differs between Linux and Asterinas\n' "$name" >&2
+                failed=1
+                continue
+            fi
+        fi
         passed_cases=$((passed_cases + 1))
         printf 'qualification: %s witness %s passed for %s\n' "$cohort" "$name" "$backend"
     fi

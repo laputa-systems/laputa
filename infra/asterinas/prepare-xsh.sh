@@ -52,4 +52,5 @@ else
     chmod -R a-w "$stage"
     mv "$stage" "$snapshot"
 fi
+bash "$repo_root/infra/asterinas/select-xsh-target.sh" "$repo_root" "$xsh_build_inputs_hash"
 printf '%s\n%s\n' "$snapshot" "$xsh_build_inputs_hash"
