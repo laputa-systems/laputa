@@ -423,7 +423,25 @@ Its ELF SHA-256 is `3be52c97babef7c19492c731ff3ec99dc563decbf74543657e942e471279
 Fresh published-input checks pass. The main artifact also passes both C
 regressions and the native case at `.work/tmp/tty-open-main-proof/`.
 Its ELF SHA-256 is `63ccdd995e3afa76f78c1571c7fe77320e42433b51e6333d30fe399f281770c4`.
-Full native and maintained replay remain open.
+Published successor `5a88ea44f` validates I/O-priority classes before target
+lookup and stores the Linux unsigned-short representation, retaining hint bits.
+Realtime selection requires effective `CAP_SYS_ADMIN` or `CAP_SYS_NICE`.
+Changing a target whose real UID matches neither caller UID requires
+`CAP_SYS_NICE`; `CAP_SYS_ADMIN` alone does not grant that authority.
+The C control checks caller real/effective UID combinations, foreign target
+ownership, isolated capabilities, priority round-trips and unchanged values on
+rejection. It passes on pinned Linux. The old kernel fails the C control and
+the original native unprivileged realtime case.
+
+The clean standard and main artifacts each pass that C control and the native
+case, with no skips. Standard evidence is at
+`.work/tmp/ioprio-permissions-standard-proof/`, with ELF SHA-256
+`83a615bf60191ddac3fb642c7f6c9e43911edbede961e49288383a45639035dd`.
+Main evidence is at `.work/tmp/ioprio-permissions-main-proof/`, with ELF SHA-256
+`9fd792ddd8be9161765bd70d0d9eb1cece7f9b06fe3ba52bd9bb324b7bba440c`.
+Published-input checks pass. Group/user I/O-priority selectors, inheritance and
+physical I/O scheduling are outside this repair. Full native and maintained
+replay remain open.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
