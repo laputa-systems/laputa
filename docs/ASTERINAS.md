@@ -465,6 +465,26 @@ Published-input checks pass. Existing CPU-priority selector limitations, I/O
 priority inheritance and physical I/O scheduling remain outside this repair.
 Full native and maintained replay remain open.
 
+Published successor `915cb64e6` exposes `/proc/PID/statm` and its task alias
+from actual mapped-byte and anonymous/file resident-page counters. All seven
+fields use pages, including executable extent and private writable mappings;
+the Linux legacy fields remain zero. `stat`, `status` and `statm` share the
+constant-cost memory readout. Only `statm` scans mappings for layout fields.
+`status` now reports virtual size in kB. RSS remains a concurrent sample.
+
+The static C control passes as root and UID 1000 on pinned Linux. The old kernel
+fails its absent-file check and the native process-statistics assertion.
+Both clean standard and main artifacts pass the root and unprivileged control,
+both prior I/O regressions and all 36 native process cases, without skips.
+Independent review finds no supported defect. Standard evidence is at
+`.work/tmp/proc-statm-standard-proof/`, with ELF SHA-256
+`a062dfae8724e25cde3030a2c40622c7748d85e55cc6b7abc07b824732c436de`.
+Main evidence is at `.work/tmp/proc-statm-main-proof/`, with ELF SHA-256
+`4fc5f4140827c611d950ecb83c34d328e7caae9f2e02f980c8294629428a42a1`.
+Published-input checks pass. These samples do not establish atomic accounting
+under arbitrary concurrent mapping changes. Full native qualification remains
+open.
+
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
 maintained replay remains open.
