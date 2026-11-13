@@ -1,9 +1,9 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `9160b9644`, with XSH `d7b4c9c85`, recorded with
+The checked-in kernel pin is `85ca4bf3c`, with XSH `d7b4c9c85`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published.
 It includes the permission, process, procfs and generic-netlink repairs below.
-Both standard and main builds pass ten C control executions and all 104 selected
+Both standard and main builds pass fourteen C control executions and all 104 selected
 native tests without skips. Full current-pin qualification remains open.
 
 The maintained cohorts below were qualified at kernel `d59567c40` by
@@ -566,12 +566,38 @@ Main evidence is at `.work/tmp/netlink-generic-main-proof/`, with ELF SHA-256
 Socket diagnostics and procfs sampling still need repairs. Full native
 qualification and final-pin maintained replay remain open.
 
-The procfs cwd/root candidate is not pinned. Its original native descriptor
-test passes, but its C regression still fails nondumpable-target access and
-deleted-directory display. `PR_SET_DUMPABLE` currently acknowledges the request
-without storing the setting, and path display omits Linux's deleted suffix.
-These failures must be repaired before accepting the candidate; its failed
-evidence remains at `.work/tmp/proc-fs-links-{after,diagnostic}/`.
+Published successor `85ca4bf3c` records successful removal on each retained
+dentry, so readlink displays the deleted suffix even when the inode still has
+another hard link. Recreating the name leaves the old descriptor deleted.
+Rename replacement marks the overwritten name and preserves the moving source;
+exchange leaves both participants linked. It also releases the replaced tmpfs
+inode's links, including both links of an empty directory.
+
+The static C regression passes pinned Linux root and UID 1000 controls. It checks
+raw filenames, surviving hard links, recreated names, same- and cross-directory
+replacement, failed no-replace operations, removed directories and inode identity.
+The guest runs the common profile on ext2 and the full exchange profile on tmpfs,
+both as root and UID 1000. Ext2's existing `RENAME_EXCHANGE` rejection remains;
+the successful-exchange control runs on the filesystem that implements it.
+The old kernel fails all four deleted-path controls. The first candidate fixes
+names but fails tmpfs link counts; the corrected candidate passes the complete
+matrix. Independent review finds no supported defect. Both clean standard and
+main builds pass all fourteen C executions and all 104 native cases without
+skips. Published-input checks pass. Standard evidence is at
+`.work/tmp/deleted-paths-standard-proof/`, with ELF SHA-256
+`efd13ebbb5fce1e0255d7b4f169f47cbd0ce2e2e56af44261b113ff7722c1179`.
+Main evidence is at `.work/tmp/deleted-paths-main-proof/`, with ELF SHA-256
+`cfa6896db7e0c4a274cbee31f31a6960e0c9afe4e29e57f14e22ba981ff3f6e1`.
+Anonymous temporary-file display and full Linux path-display conformance remain
+outside this focused proof.
+
+The procfs cwd/root candidate is not pinned. With the shared deleted-path repair,
+its unprivileged C witness and all 105 selected native tests pass. Its root C
+witness still fails at nondumpable-target access: `PR_SET_DUMPABLE` acknowledges
+the request without storing the setting. Later root-only cases remain unexecuted
+after that failed prerequisite. The candidate remains rejected at
+`.work/tmp/proc-fs-links-deleted-base-after/`; preserve the earlier failed evidence
+at `.work/tmp/proc-fs-links-{after,diagnostic}/` as well.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
