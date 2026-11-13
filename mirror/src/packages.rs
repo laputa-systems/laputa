@@ -188,9 +188,9 @@ fn auth_route(
         "GET" if path == "/auth/logout" => wh::logout(headers, auth),
         "GET" if path == "/auth/settings" => wh::settings_page(headers, auth),
         "POST" => match path {
-            "/auth/register/options" => wh::register_options(body, auth),
+            "/auth/register/options" => wh::register_options(body, headers, auth),
             "/auth/register/verify" => wh::register_verify(body, auth),
-            "/auth/authenticate/options" => wh::authenticate_options(auth),
+            "/auth/authenticate/options" => wh::authenticate_options(body, auth),
             "/auth/authenticate/verify" => wh::authenticate_verify(body, auth),
             "/auth/tokens" => wh::create_token_api(body, headers, auth),
             "/auth/tokens/delete" => wh::delete_token_api(body, headers, auth),

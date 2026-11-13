@@ -14,10 +14,12 @@ const USER: &str = "demo";
 
 fn main() {
     let origin = format!("http://localhost:{PORT}");
+    let db = Db::open(":memory:").expect("in-memory auth db");
+    let authorization = db.issue_enrollment(USER).expect("enrollment authorization");
     let state = Arc::new(AppState {
         storage: Storage::memory(),
         access: Access::Authenticated(AuthState {
-            db: Mutex::new(Db::open(":memory:").expect("in-memory auth db")),
+            db: Mutex::new(db),
             webauthn: webauthn_minimal::RelyingParty::new("localhost", &origin, "Laputa Mirror Demo"),
             jwks: None,
             allowed_users: vec![USER.to_string()],
@@ -33,7 +35,7 @@ fn main() {
     let server = tiny_http::Server::http(("127.0.0.1", PORT)).expect("failed to bind");
     println!("Laputa mirror demo (in-memory; everything is lost on exit)\n");
     println!("1. Open {origin}/auth");
-    println!("2. Register a passkey as user `{USER}`, then sign in with it");
+    println!("2. Register as `{USER}` with authorization `{authorization}`, then sign in");
     println!("3. Copy the token it shows, then prove it works:\n");
     println!("   TOKEN=<paste>");
     println!("   curl -i -X PUT {origin}/index.json -d '[]'                                  # 401: no token");

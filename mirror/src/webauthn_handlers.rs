@@ -23,10 +23,11 @@ fn session_user(headers: &HashMap<String, String>, state: &AuthState) -> Option<
 
 /// POST /auth/register/options
 /// Body: {"username":"josh"}
-pub fn register_options(body: &[u8], state: &AuthState) -> Response {
+pub fn register_options(body: &[u8], headers: &HashMap<String, String>, state: &AuthState) -> Response {
     #[derive(serde::Deserialize)]
     struct Req {
         username: String,
+        authorization: Option<String>,
     }
 
     let req: Req = match serde_json::from_slice(body) {
@@ -38,18 +39,11 @@ pub fn register_options(body: &[u8], state: &AuthState) -> Response {
         return Response::json(403, r#"{"error":"username not allowed"}"#);
     }
 
-    // Get or create the user record.
     let user_id = {
         let db = state.db.lock().unwrap();
         match db.get_user_by_name(&req.username) {
             Ok(Some(id)) => id,
-            Ok(None) => {
-                let id = uuid::Uuid::new_v4().to_string();
-                if let Err(e) = db.create_user(&id, &req.username) {
-                    return Response::error(&format!("db: {e}"));
-                }
-                id
-            }
+            Ok(None) => return Response::json(403, r#"{"error":"enrollment authority required"}"#),
             Err(e) => return Response::error(&format!("db: {e}")),
         }
     };
@@ -62,8 +56,9 @@ pub fn register_options(body: &[u8], state: &AuthState) -> Response {
     let challenge_json = serde_json::to_string(&reg_state).unwrap();
     let session_id = {
         let db = state.db.lock().unwrap();
-        match db.create_session(Some(&user_id), &challenge_json) {
-            Ok(id) => id,
+        match db.create_registration(&user_id, &challenge_json, req.authorization.as_deref(), session_cookie(headers).as_deref()) {
+            Ok(Some(id)) => id,
+            Ok(None) => return Response::json(403, r#"{"error":"enrollment authority required"}"#),
             Err(e) => return Response::error(&format!("db: {e}")),
         }
     };
@@ -128,26 +123,11 @@ pub fn register_verify(body: &[u8], state: &AuthState) -> Response {
 
     let (new_token, browser_session) = {
         let db = state.db.lock().unwrap();
-        if let Err(e) = db.save_credential(&cred_id, &user_id, &passkey_json) {
-            return Response::error(&format!("db: {e}"));
-        }
-        // Only create an API token on first registration.
-        let token = if !db.has_any_token(&user_id).unwrap_or(false) {
-            match db.create_token(&user_id, "cli", None) {
-                Ok(t) => {
-                    let _ = db.complete_session(&req.session_id, &t);
-                    Some(t)
-                }
-                Err(e) => return Response::error(&format!("db: {e}")),
-            }
-        } else {
-            None
-        };
-        let session = match db.create_browser_session(&user_id) {
-            Ok(s) => s,
+        match db.finish_registration(&req.session_id, &user_id, &cred_id, &passkey_json) {
+            Ok(Some(result)) => result,
+            Ok(None) => return Response::json(403, r#"{"error":"enrollment authority expired or consumed"}"#),
             Err(e) => return Response::error(&format!("db: {e}")),
-        };
-        (token, session)
+        }
     };
 
     let token_json = match &new_token {
@@ -159,16 +139,20 @@ pub fn register_verify(body: &[u8], state: &AuthState) -> Response {
 }
 
 /// POST /auth/authenticate/options
-pub fn authenticate_options(state: &AuthState) -> Response {
+pub fn authenticate_options(body: &[u8], state: &AuthState) -> Response {
+    #[derive(serde::Deserialize)]
+    struct Req { username: String }
+    let req: Req = match serde_json::from_slice(body) {
+        Ok(req) => req,
+        Err(_) => return Response::bad_request("invalid json"),
+    };
+    if !state.allowed_users.contains(&req.username) {
+        return Response::json(403, r#"{"error":"username not allowed"}"#);
+    }
     let (user_id, creds) = {
         let db = state.db.lock().unwrap();
 
-        let username = match state.allowed_users.first() {
-            Some(u) => u.clone(),
-            None => return Response::error("no allowed users configured"),
-        };
-
-        let user_id = match db.get_user_by_name(&username) {
+        let user_id = match db.get_user_by_name(&req.username) {
             Ok(Some(id)) => id,
             Ok(None) => return Response::json(404, r#"{"error":"no user registered"}"#),
             Err(e) => return Response::error(&format!("db: {e}")),
@@ -289,6 +273,12 @@ pub fn authenticate_verify(body: &[u8], state: &AuthState) -> Response {
     let (new_token, browser_session) = {
         let db = state.db.lock().unwrap();
 
+        match db.claim_authentication(&req.session_id, &user_id) {
+            Ok(true) => {},
+            Ok(false) => return Response::json(400, r#"{"error":"invalid or expired session"}"#),
+            Err(e) => return Response::error(&format!("db: {e}")),
+        }
+
         // Persist updated sign counter.
         let updated_json = serde_json::to_string(&updated_cred).unwrap();
         let cred_id_hex = crate::db::hex_encode(&updated_cred.cred_id);
@@ -306,7 +296,7 @@ pub fn authenticate_verify(body: &[u8], state: &AuthState) -> Response {
         } else {
             None
         };
-        let session = match db.create_browser_session(&user_id) {
+        let session = match db.create_authenticated_session(&user_id) {
             Ok(s) => s,
             Err(e) => return Response::error(&format!("db: {e}")),
         };
@@ -489,9 +479,15 @@ pub fn create_token_api(
         expires_days: Option<u64>,
     }
 
-    let (_, user_id) = match session_user(headers, state) {
-        Some(u) => u,
-        None => return Response::json(401, r#"{"error":"not authenticated"}"#),
+    let cookie = match session_cookie(headers) {
+        Some(cookie) => cookie,
+        None => return Response::json(401, r#"{"error":"recent authentication required"}"#),
+    };
+    let db = state.db.lock().unwrap();
+    let user_id = match db.recent_user(&cookie) {
+        Ok(Some(user_id)) => user_id,
+        Ok(None) => return Response::json(401, r#"{"error":"recent authentication required"}"#),
+        Err(e) => return Response::error(&format!("db: {e}")),
     };
 
     let req: Req = match serde_json::from_slice(body) {
@@ -503,11 +499,7 @@ pub fn create_token_api(
         return Response::bad_request("name must be 1-64 characters");
     }
 
-    let token = match state
-        .db
-        .lock()
-        .unwrap()
-        .create_token(&user_id, &req.name, req.expires_days)
+    let token = match db.create_token(&user_id, &req.name, req.expires_days)
     {
         Ok(t) => t,
         Err(e) => return Response::error(&format!("db: {e}")),

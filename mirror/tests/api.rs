@@ -58,13 +58,13 @@ impl DerefMut for TestMirror {
 
 /// Production configuration: in-memory storage and token auth.
 fn make_state() -> TestMirror {
-    let db = laputa_mirror::db::Db::open(":memory:").expect("db");
+    let tmp = TempDir::new();
+    let db = laputa_mirror::db::Db::open(tmp.path().join("mirror.db").to_str().unwrap()).expect("db");
     db.create_user("test-user-id", TEST_USER)
         .expect("create user");
     db.seed_token("test-user-id", "test", TEST_TOKEN)
         .expect("seed token");
 
-    let tmp = TempDir::new();
     let state = AppState {
         storage: s3::Storage::memory(),
         access: Access::Authenticated(AuthState {
@@ -117,7 +117,7 @@ fn make_browser_session(state: &AppState) -> String {
         .db
         .lock()
         .unwrap()
-        .create_browser_session("test-user-id")
+        .create_authenticated_session("test-user-id")
         .expect("browser session");
     format!("laputa_mirror_session={session}")
 }
@@ -1049,4 +1049,112 @@ fn signed_index_copies_are_immutable_and_never_assembled_from_chunks() {
         packages::route("POST", "/_uploads/idx/complete", &auth_headers(), &complete, &state).status,
         400
     );
+}
+
+fn enrollment_post(state: &AppState, path: &str, body: serde_json::Value, cookie: Option<&str>) -> packages::Response {
+    let mut h = headers(&[]);
+    if let Some(cookie) = cookie { h.insert("cookie".into(), cookie.into()); }
+    packages::route("POST", path, &h, &serde_json::to_vec(&body).unwrap(), state)
+}
+
+fn enrollment_options(state: &AppState, username: &str, secret: Option<&str>, cookie: Option<&str>) -> packages::Response {
+    enrollment_post(state, "/auth/register/options", serde_json::json!({"username": username, "authorization": secret}), cookie)
+}
+
+fn enrollment_credential(options: &serde_json::Value, key: u8) -> serde_json::Value {
+    use base64ct::{Base64UrlUnpadded, Encoding};
+    use graviola::hashing::{Hash, Sha256};
+    let hash = Sha256::hash(b"test.example.com");
+    let mut auth = hash.as_ref().to_vec();
+    auth.extend_from_slice(&[0x41, 0, 0, 0, 0]);
+    auth.extend_from_slice(&[0; 16]);
+    auth.extend_from_slice(&[0, 1, key]);
+    auth.extend_from_slice(&[0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20]);
+    auth.extend_from_slice(&[0x6b,0x17,0xd1,0xf2,0xe1,0x2c,0x42,0x47,0xf8,0xbc,0xe6,0xe5,0x63,0xa4,0x40,0xf2,0x77,0x03,0x7d,0x81,0x2d,0xeb,0x33,0xa0,0xf4,0xa1,0x39,0x45,0xd8,0x98,0xc2,0x96]);
+    auth.extend_from_slice(&[0x22, 0x58, 0x20]);
+    auth.extend_from_slice(&[0x4f,0xe3,0x42,0xe2,0xfe,0x1a,0x7f,0x9b,0x8e,0xe7,0xeb,0x4a,0x7c,0x0f,0x9e,0x16,0x2b,0xce,0x33,0x57,0x6b,0x31,0x5e,0xce,0xcb,0xb6,0x40,0x68,0x37,0xbf,0x51,0xf5]);
+    let mut attestation = b"\xa3\x63fmt\x64none\x67attStmt\xa0\x68authData\x58".to_vec();
+    attestation.push(auth.len() as u8);
+    attestation.extend_from_slice(&auth);
+    let client = serde_json::json!({"type":"webauthn.create", "challenge":options["options"]["challenge"], "origin":"https://test.example.com"});
+    let id = Base64UrlUnpadded::encode_string(&[key]);
+    serde_json::json!({"id": id, "rawId": id, "type":"public-key", "response": {"clientDataJSON":Base64UrlUnpadded::encode_string(&serde_json::to_vec(&client).unwrap()), "attestationObject":Base64UrlUnpadded::encode_string(&attestation)}})
+}
+
+fn enrollment_verify(state: &AppState, options: &serde_json::Value, key: u8) -> packages::Response {
+    enrollment_post(state, "/auth/register/verify", serde_json::json!({"session_id":options["session_id"], "credential":enrollment_credential(options, key)}), None)
+}
+
+#[test]
+fn enrollment_route_authority_and_replay() {
+    let mut state = make_state();
+    if let Access::Authenticated(auth) = &mut state.state.access { auth.allowed_users.push("other".into()); }
+    let secret = auth_state(&state).db.lock().unwrap().issue_enrollment(TEST_USER).unwrap();
+    let other_secret = auth_state(&state).db.lock().unwrap().issue_enrollment("other").unwrap();
+    assert_eq!(enrollment_options(&state, "other", Some(&secret), None).status, 403);
+    let other = body_json(&enrollment_options(&state, "other", Some(&other_secret), None));
+    assert_eq!(enrollment_verify(&state, &other, 3).status, 200);
+    let other_login = enrollment_post(&state, "/auth/authenticate/options", serde_json::json!({"username":"other"}), None);
+    assert_eq!(other_login.status, 200);
+    assert_eq!(body_json(&other_login)["options"]["allowCredentials"].as_array().unwrap().len(), 1);
+    assert_eq!(enrollment_options(&state, TEST_USER, None, None).status, 403);
+    let first = body_json(&enrollment_options(&state, TEST_USER, Some(&secret), None));
+    let second = body_json(&enrollment_options(&state, TEST_USER, Some(&secret), None));
+    assert_eq!(enrollment_verify(&state, &first, 1).status, 200);
+    assert_ne!(enrollment_verify(&state, &first, 2).status, 200);
+    assert_ne!(enrollment_verify(&state, &second, 2).status, 200);
+    assert_eq!(enrollment_options(&state, TEST_USER, Some(&secret), None).status, 403);
+    assert_eq!(enrollment_options(&state, TEST_USER, None, None).status, 403);
+    let cookie = make_browser_session(&state);
+    assert_eq!(enrollment_options(&state, "other", None, Some(&cookie)).status, 403);
+    let additional = body_json(&enrollment_options(&state, TEST_USER, None, Some(&cookie)));
+    assert_eq!(enrollment_verify(&state, &additional, 2).status, 200);
+    let auth = enrollment_post(&state, "/auth/authenticate/options", serde_json::json!({"username":TEST_USER}), None);
+    assert_eq!(auth.status, 200);
+    assert_eq!(body_json(&auth)["options"]["allowCredentials"].as_array().unwrap().len(), 2);
+}
+
+#[test]
+fn enrollment_route_expiry_revocation_and_stale_session() {
+    let state = make_state();
+    let secret = auth_state(&state).db.lock().unwrap().issue_enrollment(TEST_USER).unwrap();
+    let pending = body_json(&enrollment_options(&state, TEST_USER, Some(&secret), None));
+    let conn = rusqlite::Connection::open(state.tmp.path().join("mirror.db")).unwrap();
+    conn.execute("UPDATE enrollment_authorizations SET expires_at = '2020-01-01'", []).unwrap();
+    assert_eq!(enrollment_options(&state, TEST_USER, Some(&secret), None).status, 403);
+    assert_ne!(enrollment_verify(&state, &pending, 1).status, 200);
+    let secret = auth_state(&state).db.lock().unwrap().issue_enrollment(TEST_USER).unwrap();
+    let pending = body_json(&enrollment_options(&state, TEST_USER, Some(&secret), None));
+    auth_state(&state).db.lock().unwrap().revoke_enrollment(TEST_USER).unwrap();
+    assert_ne!(enrollment_verify(&state, &pending, 1).status, 200);
+    let secret = auth_state(&state).db.lock().unwrap().issue_enrollment(TEST_USER).unwrap();
+    let pending = body_json(&enrollment_options(&state, TEST_USER, Some(&secret), None));
+    assert_eq!(enrollment_verify(&state, &pending, 1).status, 200);
+    let cookie = make_browser_session(&state);
+    let additional = body_json(&enrollment_options(&state, TEST_USER, None, Some(&cookie)));
+    conn.execute("UPDATE browser_sessions SET authenticated_at = '2020-01-01' WHERE authenticated_at IS NOT NULL", []).unwrap();
+    assert_eq!(enrollment_options(&state, TEST_USER, None, Some(&cookie)).status, 403);
+    assert_ne!(enrollment_verify(&state, &additional, 2).status, 200);
+}
+
+#[test]
+fn enrollment_route_concurrent_verification_has_one_winner() {
+    let state = make_state();
+    let secret = auth_state(&state).db.lock().unwrap().issue_enrollment(TEST_USER).unwrap();
+    let first = body_json(&enrollment_options(&state, TEST_USER, Some(&secret), None));
+    let second = body_json(&enrollment_options(&state, TEST_USER, Some(&secret), None));
+    std::thread::scope(|scope| {
+        let a = scope.spawn(|| enrollment_verify(&state, &first, 1).status);
+        let b = scope.spawn(|| enrollment_verify(&state, &second, 2).status);
+        assert_eq!([a.join().unwrap(), b.join().unwrap()].iter().filter(|&&s| s == 200).count(), 1);
+    });
+}
+
+#[test]
+fn stale_session_cannot_mint_tokens() {
+    let state = make_state();
+    let cookie = make_browser_session(&state);
+    let conn = rusqlite::Connection::open(state.tmp.path().join("mirror.db")).unwrap();
+    conn.execute("UPDATE browser_sessions SET authenticated_at = '2020-01-01'", []).unwrap();
+    assert_eq!(enrollment_post(&state, "/auth/tokens", serde_json::json!({"name":"stale"}), Some(&cookie)).status, 401);
 }

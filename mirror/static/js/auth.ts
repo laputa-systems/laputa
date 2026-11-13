@@ -96,8 +96,9 @@ async function runCeremony<O>(
             session_id: opts.data.session_id,
             credential: encodeCredential(cred),
         });
-        if (!verified.ok || !verified.data.token) throw new Error(verified.data.error || failure);
-        showToken(verified.data.token);
+        if (!verified.ok) throw new Error(verified.data.error || failure);
+        if (verified.data.token) showToken(verified.data.token);
+        else window.location.href = "/auth/settings";
     } catch (e) {
         setMsg(msgId, e instanceof Error ? e.message : String(e), true);
         submit.disabled = false;
@@ -106,13 +107,16 @@ async function runCeremony<O>(
 }
 
 el("signin-btn").addEventListener("click", async () => {
+    const username = input("signin-username").value.trim();
+    if (!username) return setMsg("signin-msg", "Enter username", true);
     const failed = await runCeremony<RequestOptionsJson>(
-        "authenticate", "signin-msg", "signin-btn", {},
+        "authenticate", "signin-msg", "signin-btn", { username },
         (o) => navigator.credentials.get({ publicKey: decodeRequest(o) }),
         "Verification failed",
     );
     // 404 means no passkey is registered yet: offer registration instead.
     if (failed?.status === 404) {
+        input("username-input").value = username;
         showSection("section-register");
     }
 });
@@ -121,7 +125,7 @@ el("register-btn").addEventListener("click", async () => {
     const username = input("username-input").value.trim();
     if (!username) return setMsg("register-msg", "Enter username", true);
     await runCeremony<CreationOptionsJson>(
-        "register", "register-msg", "register-btn", { username },
+        "register", "register-msg", "register-btn", { username, authorization: input("authorization-input").value },
         (o) => navigator.credentials.create({ publicKey: decodeCreation(o) }),
         "Registration failed",
     );
