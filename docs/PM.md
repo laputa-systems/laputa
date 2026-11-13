@@ -558,8 +558,16 @@ symlink metadata stays `0o777`.
 Generation composition builds `usr/share/man/mandoc.db` after package extraction
 and profile overlays, before atomic publication, when the selected runtime
 closure contains `mandoc` and manual pages. It runs the selected root's
-`makewhatis` with that root's musl loader and libraries. A missing required tool
-or library, or an indexing failure, aborts publication. Package artifacts may
+`makewhatis` with that root's musl loader and libraries. Linux Landlock ABI 6
+or newer confines the child to retained directory capabilities. The child may
+read and execute beneath the selected root, and may write only beneath its
+retained `usr/share/man` directory. Replacing paths or ancestors cannot retarget
+these authorities. Symlinks into outside trees cannot grant access. A missing
+required tool or library, unavailable confinement, or an indexing failure aborts
+publication. There is no unconfined fallback. The pinned Asterinas kernel does not implement the
+required Landlock syscalls, so compositions that request a manual index fail
+there. Compositions without selected mandoc or manual pages do not enter this
+boundary. Package artifacts may
 not own this generated path. Dependency build and proof roots do not generate
 the database.
 
@@ -648,10 +656,10 @@ publication and cleanup.
 The remaining limits are these:
 
 - `fs.lock` is path-based.
-- The selected-root `makewhatis` process starts from `output.host_path()`,
-  because a process cannot start from a directory handle. The reads that
-  decide whether it runs, and the ELF dependency walk, go through the staging
-  `FsRoot`; the walk inspects private copies of the files it read.
+- The manual-index child uses the existing Landlock profile. Standard streams
+  remain usable, and file metadata and path resolution are outside that profile.
+  The reads that decide whether indexing runs and the ELF dependency walk use
+  the staging `FsRoot`; the walk inspects private copies of the files it read.
 - Overlay sources are read through a root opened after the overlay was
   digested, and are not re-hashed.
 
