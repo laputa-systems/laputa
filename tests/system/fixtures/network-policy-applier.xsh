@@ -92,7 +92,7 @@ pure address_kept(state: net_state.State, ifindex: Int, local: Str) -> Bool {
   [address for address in net_state.addresses_of(state, ifindex) if address.local == local and address.family == .Inet].len() == 1
 }
 
-proc main(scope: Str) [fs, process, env, net, io, error] {
+proc main(scope: Str) [fs, process, env, net, io, time, error] {
   if scope != "disposable-namespace" {
     return Err(NetworkApplierError.Failed("run only inside the disposable namespace fixture"))
   }
@@ -134,19 +134,59 @@ proc main(scope: Str) [fs, process, env, net, io, error] {
   print f"settled-total-addresses {net_state.addresses_of(after_settled, ifindex).len()}"
   print f"settled-total-routes {after_settled.routes.len()}"
 
-  print "== an injected concurrent change stops the pass before any mutation"
+  print "== a second process changes kernel state between planning and application"
   let before_injection = kernel.network_observe(desired, 30)?
   let replacing = intent(ifindex, replacement_address, reachable_gateway, 200)
   let stale_plan = policy.network_plan(replacing, settled, before_injection)?
-  net_state.apply(net_state.AddAddress({ifindex, family: .Inet, local: concurrent_address, prefix: 24, peer: null, broadcast: null, scope: 0, flags: 0}))?
   let notifications = net_state.subscribe()?
   defer unix.close_fd(notifications)
-  let conflicted = kernel.network_apply_plan(stale_plan, notifications, 31)?
-  verdict("conflict", conflicted)
+  tempdir barrier {
+    let xsh = process.which("xsh")?
+    let writer_source = path.absolute(p"tests/system/fixtures/network-policy-writer.xsh")?
+    let controller = process.current_pid()?
+    let namespace = p"/proc/self/ns/net".readlink()?
+    let writer = spawn process.command_argv(xsh, [xsh.display(), writer_source.display(), scope, barrier.display(), f"{ifindex}", f"{controller}", namespace.display()], timeout: 15s)?
+    defer writer.cancel(signal: "TERM", kill_after: 1s)
+    wait until fp"{barrier}/ready".exists()? within 5s every 10ms
+    assert fp"{barrier}/ready".read_text()?.parse_int()? == writer.pid
+    assert writer.pid != controller
+    fp"{barrier}/mutate".write_atomic("ready")
+    wait until fp"{barrier}/changed".exists()? within 5s every 10ms
+    assert fp"{barrier}/changed".read_text()?.parse_int()? == writer.pid
+    assert address_kept(net_state.observe()?, ifindex, concurrent_address)
+    eprint f"NETWORK_WRITER_IDENTITIES controller={controller} writer={writer.pid} namespace={namespace}"
+    print f"writer-distinct {writer.pid != controller}"
+    let conflicted = kernel.network_apply_plan(stale_plan, notifications, 31)?
+    verdict("conflict", conflicted)
+    assert conflicted.attempts == 0
+    assert conflicted.result == policy.NetworkReobserve("observation changed before operation 0")
+    fp"{barrier}/release".write_atomic("ready")
+    let status = wait writer ?
+    assert status.exited_with(0), "separate kernel writer failed"
+    print f"writer-completed {status.exited_with(0)}"
+  }
   let after_conflict = net_state.observe()?
   print f"conflict-kept-old {address_kept(after_conflict, ifindex, managed_address)}"
   print f"conflict-untouched-new {!address_kept(after_conflict, ifindex, replacement_address)}"
   print f"conflict-concurrent {address_kept(after_conflict, ifindex, concurrent_address)}"
+
+  print "== a fresh observation converges after the separate writer and then plans nothing"
+  let recovery_intent = intent(ifindex, managed_address, reachable_gateway, 200)
+  let recovered = kernel.network_reconcile(recovery_intent, settled, 32)?
+  verdict("recovered", recovered)
+  let recovery_owned = ownership(ifindex, owned_addresses, [{gateway: reachable_gateway, metric: 200}])
+  assert recovered.result == policy.NetworkConverged(recovery_owned)
+  let recovery_settled = kernel.network_reconcile(recovery_intent, recovery_owned, 33)?
+  verdict("recovered-settled", recovery_settled)
+  assert recovery_settled.attempts == 0 and recovery_settled.plan.operations.is_empty()
+  let restored = kernel.network_reconcile(desired, recovery_owned, 34)?
+  assert restored.result == policy.NetworkConverged(settled)
+  let after_recovery = net_state.observe()?
+  print f"recovered-concurrent {address_kept(after_recovery, ifindex, concurrent_address)}"
+  print f"recovered-foreign-address {address_kept(after_recovery, ifindex, foreign_address)}"
+  print f"recovered-peer-address {address_kept(after_recovery, peer_index, "198.19.0.2")}"
+  print f"recovered-foreign-route {foreign_route(peer_index) in after_recovery.routes}"
+  print f"recovered-operator-route {operator_route(peer_index) in after_recovery.routes}"
 
   print "== a zero-metric route change is refused in both directions and mutates nothing"
   let before_zero = kernel.network_observe(desired, 50)?
