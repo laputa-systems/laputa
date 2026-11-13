@@ -1,9 +1,9 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `1b74449a5`, with XSH `d7b4c9c85`, recorded with
+The checked-in kernel pin is `4a479c421`, with XSH `d7b4c9c85`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published.
 It includes the permission, process, procfs and generic-netlink repairs below.
-Both standard and main builds pass eighteen C control executions and all 105 selected
+Both standard and main builds pass twenty-two C control executions and all 108 selected
 native tests without skips. Full current-pin qualification remains open.
 
 The maintained cohorts below were qualified at kernel `d59567c40` by
@@ -630,6 +630,39 @@ diagnostic at `.work/tmp/native-fourteen-replay-d9487ffc5-1b74449a5/` has twelve
 passes and two failures: TCP socket diagnostics and host sampling. Its UID 1000
 observation finds `/proc/vmstat` and `/proc/diskstats` unavailable. Full native
 qualification and final-pin maintained replay remain open.
+
+Published `a30c08b31` and `23e5f4c70` implement `/proc/vmstat` and
+`/proc/diskstats` from actual block I/O. The former counts initial BIO submission
+once, then converts accumulated sectors to KiB. The latter tracks merged
+requests, partition attribution, completion, outstanding I/O and elapsed time.
+Rejected submissions still count globally, matching Linux's submission boundary.
+All eight block kernel tests pass, including exact read/write units, queue
+rejection, error completion, timing and cross-partition merges.
+
+Published `30b366286` and `4a479c421` add resident `Cached` and `Shmem` fields.
+Physical frame metadata owns the count. Aliases do not add pages, and truncation
+does not release a frame still held elsewhere. Tmpfs, memfd and shared anonymous
+mappings use shared accounting, including differently named tmpfs-backed mounts.
+`Buffers` and `SReclaimable` report zero because there is no retained block-device
+buffer cache or slab reclaim mechanism. The corrected final-frame ownership
+kernel test passes. Its initial eager-RCU-release assumption fails; an attempted
+RCU wait is aborted in the minimal test runner. Neither earlier result counts
+as qualification. Independent review finds no supported production defect.
+
+Both clean standard and main artifacts pass twenty-two C executions and all 108
+selected native cases without skips, including the original host-sampling case.
+Both published-input checks pass. Standard evidence is at
+`.work/tmp/meminfo-counters-standard-proof/`, with ELF SHA-256
+`c5f3c0c3d15889085a450c82601ba7be78b69dd1026cf5af36888112e1cf3bd9`.
+Main evidence is at `.work/tmp/meminfo-counters-main-proof/`, with ELF SHA-256
+`c69d54541c724426c44e91bdd42d0e00c5d818c1915926a0eeda996ae307671f`.
+Main pins this successor in `dc7afeb4`. These guest runs include XSH
+`6c0dc4e3f`'s deadline-test correction: cancellation can precede HTTP transmission,
+while both real connections remain mandatory. Its Linux controls pass twenty
+cases and reject the no-request mutation. The latest fourteen-case diagnostic at
+`.work/tmp/native-fourteen-replay-6c0dc4e3f-4a479c421/` passes thirteen and fails
+TCP socket diagnostics. Full native qualification and final-pin maintained
+replay remain open.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
