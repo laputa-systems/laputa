@@ -326,6 +326,17 @@ host checks pass. Evidence is at the main checkout's
 `189b76a16d3e601c101312c465e80ff9db53e85a4d412621b4bc05c190fccf2a`.
 This qualification preserves the full-suite failures and final-pin replay gate.
 
+Published successor `c7a1c3113` makes `getcwd` and directory reads reject a
+removed directory with `ENOENT`. Open directory descriptors remain valid;
+libc iteration reports an empty directory. The syscall regression passes on
+Linux and on both Asterinas tmpfs and ext2, while the old-kernel control fails.
+The clean standard build passes all ten syscall regression programs and
+109 native cases, with four expected skips. Evidence is at the main checkout's
+`.work/tmp/removed-dir-clean-proof/`; its kernel ELF SHA-256 is
+`28f1ede8a6b22d084c81bfb89c9385b3fc72257bc67beac0b1cac5c647796279`.
+The fresh published-input check passes. Host harness inputs are unchanged.
+The wider ls probe still fails two ACL cases; those failures remain open.
+
 The earlier remaining-ID run ends with a kernel heap panic. A fresh isolated
 sparse-copy test times out. Combined accounting retains 709 passes, 22 failures,
 32 skips and 13,496 unexecuted IDs. Those outcomes remain failures of that pin.
