@@ -2111,6 +2111,146 @@ assert fp"{current}.1".read_text()? == "before rotation\\n"
   assert result.success, result.stderr
 }
 
+test test_prompt_scanner_shutdown_reaps_before_the_outer_deadline [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "prompt-scanner-shutdown")?
+  let services = fp"{root}/services"
+  services.mkdir()
+  let marker = fp"{root}/daemon-ready"
+  let daemon = fp"{root}/daemon.xsh"
+  daemon.write("""unix.signal_setup(["TERM"])
+Path(args[0]).write(f"{process.current_pid()?}")
+while unix.take_signals()?.is_empty() {
+  time.sleep(10ms)
+}
+""")
+  let runner = process.which("xsh")?
+  fp"{services}/prompt.xsh".write(f"""##! A foreground daemon with a two-second maximum stop allowance.
+
+## The scanner owns the daemon process group.
+export let service = {{
+  name: "prompt",
+  command: process.command_argv(Path({json.encode(runner.display())?}), ["xsh", Path({json.encode(daemon.display())?}), Path({json.encode(marker.display())?})]),
+  stop_timeout_ms: 2000,
+  restart: {{mode: "always"}},
+  logging: "off",
+}}
+""")
+  let driver = """unix.pid1_setup([], subreaper: true, allow_non_pid1: true)
+let scanner = unix.spawn_process_group_log(process.command_argv(Path(args[0]), ["xsh", Path(args[1]), "--", "supervise", "prompt"], env: {
+  XINIT_SERVICE_DIR: args[2], XINIT_RUN_DIR: args[3], XINIT_LOG_ROOT: args[4],
+  XINIT_TEST_ALLOW_NON_PID1: "1",
+}), Path(args[5]))?
+var groups = [scanner.pid]
+defer {
+  let cleanup = unix.shutdown_process_groups(groups, 0ms, 1s)?
+  assert cleanup.remaining.is_empty()
+}
+let marker = Path(args[6])
+var tries = 0
+while ! marker.exists()? and tries < 300 {
+  time.sleep(10ms)
+  tries += 1
+}
+assert marker.exists()?, Path(args[5]).read_text()?
+let daemon = marker.read_text()?.parse_int()?
+groups += [daemon]
+let before = time.monotonic()?
+let cleanup = unix.shutdown_process_groups([scanner.pid], 2s, 100ms)?
+assert cleanup.remaining.is_empty()
+var scanner_finished = false
+for child in cleanup.reaped {
+  if child.pid == scanner.pid {
+    scanner_finished = child.status.exited_with(0)
+  }
+}
+assert scanner_finished, "scanner must reap its service and return before the outer KILL deadline"
+assert process.kill(daemon, signal: "0") is Err(_), "scanner left its service live or unreaped"
+assert marker.read_text()? == f"{daemon}", "shutdown started a replacement service"
+assert time.monotonic()? - before < 1000000000, "prompt shutdown consumed the service grace allowance"
+print "scanner-reaped"
+"""
+  let result = test.run_xsh(ctx, driver, [], [
+    runner.display(), path.absolute(xinit_script())?.display(), services.display(), fp"{root}/run".display(),
+    fp"{root}/logs".display(), fp"{root}/scanner.log".display(), marker.display(),
+  ], {}, name: "prompt-scanner-shutdown.xsh")?
+  assert result.success, result.stderr
+  assert result.stdout == "scanner-reaped\n"
+}
+
+test test_stopping_a_unit_reconciles_a_sibling_exit_reaped_during_cleanup [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "stop-sibling-reap")?
+  let services = fp"{root}/services"
+  services.mkdir()
+  let worker = fp"{root}/worker.xsh"
+  worker.write("""let root = Path(args[0])
+let name = args[1]
+unix.signal_setup(["TERM"])
+fp"{root}/{name}-ready".write(f"{process.current_pid()?}")
+if name == "first" {
+  while unix.take_signals()?.is_empty() { time.sleep(10ms) }
+  fp"{root}/stop-entered".write("ready")
+  let sibling = fp"{root}/sibling-ready".read_text()?.parse_int()?
+  while process.kill(sibling, signal: "0") is Ok(_) { time.sleep(10ms) }
+} else {
+  while ! fp"{root}/stop-entered".exists()? { time.sleep(10ms) }
+  exit 17
+}
+""")
+  let runner = process.which("xsh")?
+  for name in ["first", "sibling"] {
+    fp"{services}/{name}.xsh".write(f"""##! A foreground service for cross-unit child-status reconciliation.
+
+## The scanner owns the foreground group.
+export let service = {{
+  name: "{name}",
+  command: process.command_argv(Path({json.encode(runner.display())?}), ["xsh", Path({json.encode(worker.display())?}), Path({json.encode(root.display())?}), "{name}"]),
+  stop_timeout_ms: 2000,
+  restart: {{mode: "never"}},
+  logging: "off",
+}}
+
+## Finish records exactly one observed service exit.
+export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
+  let marker = Path({json.encode(fp"{root}/{name}-finished".display())?})
+  let previous = if marker.exists()? {{ marker.read_text()?.parse_int()? }} else {{ 0 }}
+  marker.write(f"{{previous + 1}}")?
+}}
+""")
+  }
+  let script = xinit_policy_source()? + """
+unix.pid1_setup([], subreaper: true, allow_non_pid1: true)
+let root = Path(args[0])
+var units = [unit_init(load_service(name)?) for name in ["first", "sibling"]]
+units = reconcile_all(units, elapsed_now_ms()?)?
+let groups = [unit.pid for unit in units]
+defer {
+  let cleanup = unix.shutdown_process_groups(groups, 0ms, 1s)?
+  assert cleanup.remaining.is_empty()
+}
+var tries = 0
+while (! fp"{root}/first-ready".exists()? or ! fp"{root}/sibling-ready".exists()?) and tries < 300 {
+  time.sleep(10ms)
+  tries += 1
+}
+assert fp"{root}/first-ready".exists()? and fp"{root}/sibling-ready".exists()?
+units = apply_request(units, "first", "down")?
+assert all_units_stopped(units), "the sibling exit consumed by group cleanup was lost"
+assert fp"{root}/first-finished".read_text()? == "1"
+assert fp"{root}/sibling-finished".read_text()? == "1"
+units = shutdown_all(units)?
+assert all_units_stopped(units)
+assert fp"{root}/first-finished".read_text()? == "1"
+assert fp"{root}/sibling-finished".read_text()? == "1"
+print "sibling-reconciled"
+"""
+  let result = test.run_xsh(ctx, script, [], [root.display()], {
+    XINIT_SERVICE_DIR: services.display(), XINIT_RUN_DIR: fp"{root}/run".display(),
+    XINIT_LOG_ROOT: fp"{root}/logs".display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+  }, name: "stop-sibling-reap.xsh")?
+  assert result.success, result.stderr
+  assert result.stdout == "sibling-reconciled\n"
+}
+
 test test_a_service_that_ignores_term_is_killed_after_the_stop_timeout [fs, process, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "stubborn")?
   let service_dir = fp"{root}/services"

@@ -161,7 +161,8 @@ dependencies. The scanner owns and reaps its children, writes their status
 JSON, and on `SIGTERM` or `SIGINT` stops them in reverse dependency order.
 When a service leader exits, the scanner stops and reaps its remaining process
 group before `finish()` and respawn. Scanner shutdown reaps owned groups before
-returning. Group cleanup allows `stop_timeout_ms` for TERM and 100 ms after KILL.
+returning. Group cleanup allows up to `stop_timeout_ms` for TERM and up to
+100 ms after KILL. It returns early after every owned group is reaped.
 A group surviving that bound produces an `xinit-cleanup` error.
 
 While a live `${XINIT_RUN_DIR}/scanner.json` marks a scanner,
