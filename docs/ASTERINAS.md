@@ -396,6 +396,18 @@ from XSH `6d7df355b`. Both source files match their disk readbacks. The main ELF
 SHA-256 is `21fd72dc0b1dd57ea4a83ca6d78eb7727d4b2933df3c2ebc606b097f0a350426`.
 These groups do not establish full native qualification or final-pin maintained replay.
 
+Published successor `a361c90fe` reports `Cpus_allowed` and `Cpus_allowed_list`
+from one task-affinity snapshot. The process status alias reports its leader.
+The Linux control passes. The old kernel fails the extended inheritance control
+and the original native affinity check because both fields are absent.
+The clean standard artifact passes that control, the signal-mask regression and
+seventeen native affinity and taskset cases, with no failures or skips.
+Evidence is at `.work/tmp/proc-affinity-standard-proof/`. Its ELF SHA-256 is
+`e5c7f6abf9956f1af10ddb143ad5db59a14900539c98007d4f2c400e2d85f980`.
+That run overlays XSH `d85490822`'s corrected taskset test. Pinned util-linux
+2.42.4 prints `0,1` for two CPUs. The earlier expectation of `0-1` was wrong.
+The original before and first after aggregates retain their failed status.
+
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
 maintained replay remains open.
