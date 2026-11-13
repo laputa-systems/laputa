@@ -1,10 +1,12 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `4a479c421`, with XSH `d7b4c9c85`, recorded with
+The checked-in kernel pin is `9ebef8747`, with XSH `d7b4c9c85`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published.
-It includes the permission, process, procfs and generic-netlink repairs below.
-Both standard and main builds pass twenty-two C control executions and all 108 selected
-native tests without skips. Full current-pin qualification remains open.
+It includes the permission, process, procfs, generic-netlink and TCP diagnostic
+repairs below. Both standard and main builds pass twenty-four C control
+executions and all 110 selected native tests without skips. The earlier
+fourteen-failure diagnostic now passes all fourteen cases. Full current-pin
+native qualification and maintained replay remain open.
 
 The maintained cohorts below were qualified at kernel `d59567c40` by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
@@ -920,3 +922,41 @@ The shell uses the pinned XSH commit. Type `laputa-exit` in the guest to stop
 Firecracker; Ctrl-C interrupts xshi. `asterinas-shell` and `asterinas-viability` are legacy aliases
 for `asterinas-boot` and `asterinas-test`.
 
+
+
+## TCP socket diagnostics
+
+Published `c3d0e614a` and `9ebef8747` implement the base TCP
+`NETLINK_SOCK_DIAG` interface for IPv4 and IPv6. Dumps and exact tuple/cookie
+queries expose actual transport state, endpoints, queues, file inode and owner.
+A connection retains its cookie after the file closes and remains visible in
+closing states and TIME_WAIT. Accepted sockets receive their real file identity;
+`fchown` updates the reported owner. Collection borrows the transport tables in
+the packet path's lock order; it retains no background socket references that
+could delay refused-connect notification.
+
+Dumps keep one bounded packet and a table cursor, refill after consumption, and
+leave the cursor unchanged on peek. Their queue reservation is released at
+completion. A structural table change marks the final response interrupted.
+Unknown protocols terminate a dump with `NLMSG_DONE(-ENOENT)`; malformed and
+unsupported requests report errors. Timer, retransmission and optional memory
+or TCP_INFO telemetry remain unavailable. This is a base diagnostic subset,
+not complete socket-diagnostic coverage.
+
+The regression checks Linux root and UID 1000, both address families, queued
+data, half-close, orphan and TIME_WAIT lifetime, ownership, cookies and protocol
+replies. Its 700-listener case reproduces `ENOBUFS` before pagination and passes
+afterward; peeking and eight completed empty dumps exercise cursor and capacity
+release. Independent review found the overflow; a second review of its repair
+found no demonstrated defect. The reviews did not rerun runtime tests.
+
+Both clean normal artifacts pass twenty-four C executions and 110 native cases,
+with no skips. Standard evidence is
+`.work/tmp/tcp-sock-diag-standard-proof/`, with ELF SHA-256
+`e496447eeca2b59589072eaa46bc13ea3caac5c03481a33d2a8023587de404c9`.
+Main evidence is `.work/tmp/tcp-sock-diag-main-proof/`, with ELF SHA-256
+`81b3152b3a9faff06c7d6c335581aa97435ca40eccf024f36337a8a3167570f2`.
+Both published-input checks pass. The earlier fourteen-case diagnostic at
+`.work/tmp/native-fourteen-replay-6c0dc4e3f-9ebef8747/` passes all fourteen cases
+and the twenty-four C executions, without skips. These focused results do not
+qualify the full native suite or final-pin maintained replay.
