@@ -370,11 +370,25 @@ The subsequent OpenSSL-enabled run at
 `.work/tmp/native-remaining-5303dc23a-7b8809107/` stops after the UDP timeout
 exhausts cancellation. It records 11,619 passes, 247 failures, 237 skips and
 1,393 unexecuted IDs. Those failures retain their original kernel identity.
-Discovery resumes at `.work/tmp/native-remaining-dontwait-7b8809107/` on
-`6da5de581`, selecting the unexecuted IDs and the repaired timeout case with
-unchanged credentials, resources and deadlines. Keep its private writable disk
-while its VMM runs. Full native qualification, ACL support and other discovered
-failures remain open.
+The continuation at `.work/tmp/native-remaining-dontwait-7b8809107/` on
+`6da5de581` finishes with 1,360 passes, fourteen failures, twenty skips and no
+unexecuted or unknown IDs among its 1,394 selections. The four discovery runs
+together observe all 15,649 IDs. Their different kernel revisions retain their
+own outcomes. Full native qualification, ACL support and other failures remain open.
+
+Published successor `5d129f207` initializes inherited groups and directory setgid
+bits before publishing children on ramfs and ext2. Executable setgid creation
+requires group membership or `CAP_FSETID`. Unix sockets honor the caller's umask.
+Chmod requires filesystem ownership or `CAP_FOWNER` and checks setgid eligibility.
+Supplementary membership selects group permissions even when other permissions
+would allow access. Linux controls pass. Old-kernel controls expose each repair.
+An independent read-only review finds no supported introduced or worsened defect.
+
+The clean standard build passes thirteen syscall regression programs and 186
+native cases, with four existing skips. Fresh published-input checks pass.
+Evidence is at `.work/tmp/setgid-permission-standard-proof/`. Its kernel ELF
+SHA-256 is `c32118aaf9b01e666db41e44b236e5334835b112053dce34fde1bee9d36dc43c`.
+This group does not establish full native qualification or final-pin maintained replay.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
