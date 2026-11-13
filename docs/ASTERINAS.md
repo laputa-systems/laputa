@@ -420,7 +420,10 @@ The old kernel fails that control and the original native errno check.
 The clean standard artifact passes both terminal C regressions and the native
 case, with no skips. Evidence is at `.work/tmp/tty-open-standard-proof/`.
 Its ELF SHA-256 is `3be52c97babef7c19492c731ff3ec99dc563decbf74543657e942e471279db28`.
-Fresh published-input checks pass. Full native and maintained replay remain open.
+Fresh published-input checks pass. The main artifact also passes both C
+regressions and the native case at `.work/tmp/tty-open-main-proof/`.
+Its ELF SHA-256 is `63ccdd995e3afa76f78c1571c7fe77320e42433b51e6333d30fe399f281770c4`.
+Full native and maintained replay remain open.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
