@@ -337,6 +337,18 @@ The clean standard build passes all ten syscall regression programs and
 The fresh published-input check passes. Host harness inputs are unchanged.
 The wider ls probe still fails two ACL cases; those failures remain open.
 
+Published successor `b7f403c92` adds `SigBlk`, `SigIgn` and `SigCgt` to process
+and task status. Blocked masks belong to the selected thread; ignored and caught
+dispositions are shared by the process. All 64 signal bits are represented.
+The Linux-matched regression covers distinct thread masks, realtime handlers
+and exec inheritance. The old kernel fails because `SigBlk` is missing.
+The clean main build passes eleven syscall regression programs and 148 native
+cases, with four expected skips, including all 39 env cases. The fresh
+published-input check passes. Evidence is at `.work/tmp/proc-signal-main-proof/`;
+its kernel ELF SHA-256 is
+`7843e1289d3bce0e0c6797cd06d02c3a3423cd4fe3b283898d30b57a5e10431f`.
+Pending-mask fields and wait-channel reporting are separate open interfaces.
+
 The earlier remaining-ID run ends with a kernel heap panic. A fresh isolated
 sparse-copy test times out. Combined accounting retains 709 passes, 22 failures,
 32 skips and 13,496 unexecuted IDs. Those outcomes remain failures of that pin.
