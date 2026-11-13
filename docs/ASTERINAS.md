@@ -274,12 +274,40 @@ The clean standard build passes that regression and both btop syscall-trace
 cases at `.work/tmp/ptrace-clean-pin-proof/`. Its kernel ELF SHA-256 is
 `d82a2bd4a409a383b251ac2dda2793a16d35c8384d0212a6f96d88878c918e43`.
 
-A new full run is active at `.work/tmp/native-full-ba0383234-3f4687802/`, using
-that clean kernel and a freshly assembled XSH `3f4687802` fixture. Its `run.json`
-binds the base disk, initramfs and product identities. It keeps the same
-UID/GID 1000, cleared groups, one worker, two CPUs, 4 GiB RAM and original test
-deadlines. Partial accounting does not establish full qualification. Keep the
-private writable disk while its VMM runs.
+The full run at `.work/tmp/native-full-ba0383234-3f4687802/` passes both btop
+tracing cases, then stops at a cp fixture cleanup failure. Its accounting has
+1,371 passes, three failures, twenty skips and 14,255 unexecuted IDs. Cat fails
+to reject copying onto its output. Chgrp and chown incorrectly allow changing
+ownership to root as an unprivileged user.
+
+Published successor `f296506e6` validates ownership changes against filesystem
+credentials and `CAP_CHOWN`, before either requested ID changes. A per-inode
+lock serializes ownership checks and mutations. Its 54-case regression covers
+six syscall routes and passes on Linux, fails on `ba0383234`, and passes on the
+repaired kernel on tmpfs and ext2. Both native ownership modules pass. The cp
+parent-metadata case also completes cleanup.
+
+Published kernel `5303dc23a` additionally returns `EINVAL` for non-symlink
+`readlink` requests. The old default `EISDIR` aborts musl canonicalization through
+procfs and prevents cat from identifying its output. Its syscall regression
+fails before the repair and passes afterward. All 22 cat, readlink and realpath
+native cases pass. The supporting commit message incorrectly says 25.
+
+The clean standard build passes both syscall regressions and 48 native cases,
+with three expected privilege skips. Published-input and host checks pass.
+Evidence is at the main checkout's `.work/tmp/ownership-readlink-clean-proof/`.
+The kernel ELF SHA-256 is
+`779f0e4f8e93b7d7dc00b965eeb3e24de37e88e10dc44e6a9eee2c9e07567d73`.
+The wider cp module still fails its POSIX ACL xattr fixture. These focused
+results do not establish full native or maintained-cohort qualification.
+
+Failure discovery continues at the main checkout's
+`.work/tmp/native-remaining-5303dc23a-3f4687802/` with the unchanged XSH
+`3f4687802` fixture. Its 14,259 selected IDs include every unexecuted ID,
+the three failed IDs and the cp cleanup case. It preserves UID/GID 1000,
+cleared groups, one worker, two CPUs, 4 GiB RAM and original test deadlines.
+Keep its private writable disk while the VMM runs. A final full qualification
+at the candidate pin remains open.
 
 To run a kernel regression witness against the built bundle and against the
 Linux reference with the same memory, run
