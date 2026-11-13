@@ -963,6 +963,36 @@ test test_control_client_queues_a_mode_0770_request [fs, process, error] { |ctx|
   assert info.uid == applet.current_euid()
 }
 
+test test_control_client_wakes_the_scanner_through_its_fifo [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-wake")?
+  let run_dir = fp"{root}/run"
+  let source = xinit_policy_source()? + """
+unix.pid1_setup(["HUP", "TERM", "INT"], subreaper: true, allow_non_pid1: true)
+prepare_control_inbox()
+let path_value = scanner_wake_path()?
+defer path_value.remove()
+let fd = prepare_scanner_wake()?
+defer unix.close_fd(fd)
+let info = path_value.metadata()?
+assert info.mode.bit_and(0o7777) == 0o660
+assert info.uid == applet.current_euid()
+assert info.gid == control_group_gid()?
+write_scanner_marker()
+request_desired("app", "down")
+assert unix.read_fd(fd, 4096)? == b"w"
+drain_scanner_wake(fd)
+assert unix.poll_fd(fd, ["readable"], 0)?.is_empty()
+assert fp"{inbox_dir()?}/app".read_text()? == "down"
+"""
+  let result = test.run_xsh(ctx, source, env: {
+    XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+  }, name: "control-wake.xsh")?
+
+  assert result.success, result.stderr
+  assert result.stdout == "app down queued\n"
+  assert ! fp"{run_dir}/wake".exists()?
+}
+
 test test_scan_refuses_a_planted_fifo_control_request [fs, process, error] { |ctx|
   let root = test.temp_dir(ctx, name: "control-fifo")?
   let service_dir = fp"{root}/services"

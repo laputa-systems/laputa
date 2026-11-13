@@ -167,7 +167,11 @@ A group surviving that bound produces an `xinit-cleanup` error.
 While a live `${XINIT_RUN_DIR}/scanner.json` marks a scanner,
 `start`/`stop`/`restart`/`reload SERVICE` post a request to
 `${XINIT_RUN_DIR}/inbox/SERVICE` instead of acting, and the scanner applies it
-on its next pass. Without a scanner, `start` and `stop` act directly.
+on its next pass. A root-owned `${XINIT_RUN_DIR}/wake` FIFO, mode `0660` and
+group `xinit-admin`, wakes that pass when the client queues a request. The
+scanner owns its nonblocking descriptor and removes the FIFO on exit. Wake
+bytes carry no authority; the opened request file supplies the credential.
+Without a scanner, `start` and `stop` act directly.
 
 The scanner creates and owns the control plane. `${XINIT_RUN_DIR}` is owned by
 root and is not group or world writable. `${XINIT_RUN_DIR}/inbox` is created at
@@ -186,10 +190,9 @@ error, logged, and removed; the scanner keeps running. Every accepted request is
 logged as `xinit-control accepted service=SERVICE uid=UID verb=VERB`; every
 refusal is logged as `xinit-control-refused ... uid=UID reason=...`. A planted
 symlink or FIFO is refused from its `lstat` as a non-regular entry and is not
-followed or opened. A swap between that observation and the read is not yet
-closed: XSH exposes no way to open without following symlinks and without
-blocking, then observe the opened object, so the observation and the read are
-not yet the same object. The
+followed or opened. The bounded request read and credential metadata come from
+the same opened file through `FsRoot.read_regular`, so replacing its name
+cannot substitute the authorized object. The
 scanner marker records its pid and kernel start time, so a non-root operator
 detects a live scanner from `/proc` rather than by signalling a root process.
 Status, list, logs, and inspect reads do not require control authority and are

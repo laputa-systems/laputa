@@ -56,8 +56,8 @@ pending -> starting -> running -> dead -> running ...
 ### Backoff without blocking
 
 Backoff is a per-unit `next_ms` gate checked on each pass, not a sleep. The
-scanner sleeps in `unix.wait_pid1_event(timeout:)` until the soonest gate and
-wakes early on a signal or child exit, so an idle tree does not spin and
+scanner sleeps in `unix.wait_pid1_event(timeout:, wake_fd:)` until the soonest gate and
+wakes early on a signal, child exit, or control FIFO byte, so an idle tree does not spin and
 backing one unit off never delays stopping or starting another. Units blocked
 on the dependency gate are left out of that deadline. Units in `starting` poll
 readiness every 100 ms, whether the signal is a notify byte or a `ready()` hook. The restart fields are in
@@ -108,6 +108,17 @@ names a requester. The client writes through a hidden temporary name with mode
 `0770`, group `xinit-admin`, then renames it, so a scanner pass never reads a
 partial request.
 
+The scanner creates a root-owned `wake` FIFO beside the inbox at mode `0600`,
+sets its group to `xinit-admin`, then widens it to `0660`. Its parent directory
+prevents group members from replacing it. Scanner and clients open it without
+following symlinks, nonblocking and read/write, which keeps an idle FIFO from
+reporting EOF. A client writes one byte after publishing its request; a full
+FIFO already carries a wakeup. Each scanner pass drains one bounded chunk
+before reading the inbox. The descriptor participates in the lifecycle wait,
+so a group member needs no permission to signal the root scanner. Wake bytes
+never select a service, verb, or identity. The scanner closes its descriptor
+and removes its FIFO on return or error.
+
 `chown` requires `CAP_CHOWN`, so a member cannot create a file owned by another
 uid, and an unprivileged process cannot make a request appear to come from
 root. Symlinks, directories, hard-linked files, oversized files, and unknown
@@ -130,6 +141,14 @@ unlink or replace another member's still-queued request, which is a denial or a
 replay within the same four-verb service-control authority; it cannot change
 which uid the scanner observes. Root's own requests, and requests from any
 current member, carry that member's kernel identity rather than a claimed one.
+
+The Linux x86_64 disposable control-wakeup fixture passes root and nonroot
+member restarts of a steady service, member stop/start, a full wake FIFO,
+nonmember refusal, and TERM cleanup across two scanner generations sharing a
+run directory. Its signal-only counterfactual accepts root's restart but
+leaves the nonroot member's restart queued beyond the four-second observation
+bound. The native regression checks the client's wake byte, empty-channel draining,
+FIFO permissions, and descriptor/path cleanup.
 
 ## The inittab engine
 
