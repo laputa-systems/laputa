@@ -54,7 +54,7 @@ export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: 
   net_put_file(util.repo_url_for(repo, rel)?, source, token)
 }
 
-## Publishes one immutable repository object. A file remote receives a temporary copy and rename;
+## Publishes one immutable repository object. A file remote receives a temporary copy and no-replace rename;
 ## an existing object is accepted only when its exact bytes already match the requested source.
 export proc upload_immutable_repo_file(
   repo: Str,
@@ -93,19 +93,21 @@ export proc upload_immutable_repo_file(
 
   let dest = util.repo_file_path(repo, rel)?
 
-  if dest.exists() {
-    return false when hash.sha256(dest)?.hex() == hash.sha256(source)?.hex()
-
-    return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
-  }
-
-  let temporary = fp"{dest.parent}/.{dest.name}.tmp"
   dest.parent.mkdir()
-  temporary.remove()
-  defer temporary.remove()
-  source.copy(to: temporary, overwrite: true)
-  temporary.rename(to: dest)
-  true
+  let parent = fs.open_root(dest.parent)?
+  let staging = parent.tempdir(prefix: ".publish-")?
+  let staging_path = staging.host_path()?
+  defer staging_path.remove()
+  let temporary = fp"{staging_path}/object"
+  source.copy(to: temporary)
+  match fs.rename_noreplace(temporary, dest) {
+    Ok(_) => true
+    Err(problem) => {
+      return Err(problem) unless dest.exists()?
+      return false when dest.read_bytes()? == temporary.read_bytes()?
+      return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
+    }
+  }
 }
 
 ## Exported PM declaration `load_remote_index_from`.
