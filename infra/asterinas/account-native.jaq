@@ -6,8 +6,19 @@ def outcome:
 
 ($ids[0]) as $discovered
 | ($interrupted | split("\n") | map(select(. != ""))) as $interrupted_modules
-| (split("\n")
-   | map(select(contains(" ... ")) | split(" ... ") | select(.[0] | test("(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+$")) | {id: (.[0] | capture("(?<id>(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+)$").id), outcome: (.[1] | outcome)})
+| (split("\n") as $lines
+   | [range(0; $lines | length) as $index
+      | $lines[$index]
+      | if contains(" ... ") then
+          split(" ... ")
+          | select(.[0] | test("(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+$"))
+          | {id: (.[0] | capture("(?<id>(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+)$").id), outcome: (.[1] | outcome)}
+        elif . == "test did not produce a result during bounded cancellation" and $index >= 2 then
+          select($lines[$index - 1] | startswith("TIMEOUT after "))
+          | $lines[$index - 2]
+          | capture("^---- (?<id>(core/tests|dev/tests|tests/xsh|showcase/tests)/\\S*\\.xsh::\\S+) ----$")
+          | {id, outcome: "failed"}
+        else empty end]
    | reduce .[] as $row ({}; .[$row.id] = $row.outcome)) as $observed
 | ($observed | to_entries | map(select(.key as $id | ($id | split("::")[0]) as $module | ($interrupted_modules | index($module)) == null and ($interrupted_modules | index($id)) == null))) as $accepted
 | ($observed | keys) as $observed_ids

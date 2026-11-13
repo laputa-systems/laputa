@@ -62,4 +62,33 @@ printf '%s\n' \
     'core/tests/b.xsh::t_late ... ok 1ms' > "$account_root/interrupted-exact/1.console.log"
 bash "$repo_root/infra/asterinas/account-native.sh" "$account_root/discovered.json" "$account_root/interrupted-exact" > /dev/null
 [[ "$(jaq -c '[.passed, .failed, (.unexecuted | length)]' "$account_root/interrupted-exact/accounting.json")" == '[["core/tests/a.xsh::t_stable","core/tests/b.xsh::t_late"],[],3]' ]]
+mkdir -p "$account_root/cancelled-timeout"
+: > "$account_root/cancelled-timeout/interrupted.txt"
+printf '%s\n' \
+    'core/tests/a.xsh::t_stable ... ok 1ms' \
+    '---- core/tests/b.xsh::t_in_flight ----' \
+    'TIMEOUT after 2m' \
+    'test did not produce a result during bounded cancellation' \
+    > "$account_root/cancelled-timeout/1.console.log"
+bash "$repo_root/infra/asterinas/account-native.sh" "$account_root/discovered.json" "$account_root/cancelled-timeout" > /dev/null
+[[ "$(jaq -c '[.failed, (.unexecuted | length)]' "$account_root/cancelled-timeout/accounting.json")" == '[["core/tests/b.xsh::t_in_flight"],3]' ]]
+printf 'core/tests/b.xsh::t_in_flight ... ok 1ms\n' >> "$account_root/cancelled-timeout/1.console.log"
+bash "$repo_root/infra/asterinas/account-native.sh" "$account_root/discovered.json" "$account_root/cancelled-timeout" > /dev/null
+[[ "$(jaq -c '[.passed, .failed, (.unexecuted | length)]' "$account_root/cancelled-timeout/accounting.json")" == '[["core/tests/a.xsh::t_stable","core/tests/b.xsh::t_in_flight"],[],3]' ]]
+printf '%s\n' \
+    '---- core/tests/b.xsh::t_in_flight ----' \
+    'TIMEOUT after 2m' \
+    'test did not produce a result during bounded cancellation' \
+    >> "$account_root/cancelled-timeout/1.console.log"
+bash "$repo_root/infra/asterinas/account-native.sh" "$account_root/discovered.json" "$account_root/cancelled-timeout" > /dev/null
+[[ "$(jaq -c '.failed' "$account_root/cancelled-timeout/accounting.json")" == '["core/tests/b.xsh::t_in_flight"]' ]]
+printf '%s\n' \
+    '---- core/tests/z.xsh::t_other ----' \
+    'TIMEOUT after 2m' \
+    'test did not produce a result during bounded cancellation' \
+    >> "$account_root/cancelled-timeout/1.console.log"
+if bash "$repo_root/infra/asterinas/account-native.sh" "$account_root/discovered.json" "$account_root/cancelled-timeout" > /dev/null 2>&1; then
+    printf 'accounting accepted a timed-out undiscovered case\n' >&2
+    exit 1
+fi
 printf 'Asterinas native accounting checks passed.\n'

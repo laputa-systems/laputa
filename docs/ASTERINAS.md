@@ -349,6 +349,10 @@ its kernel ELF SHA-256 is
 `7843e1289d3bce0e0c6797cd06d02c3a3423cd4fe3b283898d30b57a5e10431f`.
 Pending-mask fields and wait-channel reporting are separate open interfaces.
 
+Native accounting retains a case as failed when its timeout exhausts bounded
+cancellation without a normal result line. Later results for the same ID retain
+their chronological order; a terminated runner leaves later IDs unexecuted.
+
 The earlier remaining-ID run ends with a kernel heap panic. A fresh isolated
 sparse-copy test times out. Combined accounting retains 709 passes, 22 failures,
 32 skips and 13,496 unexecuted IDs. Those outcomes remain failures of that pin.
