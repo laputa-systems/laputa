@@ -1,9 +1,9 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `85ca4bf3c`, with XSH `d7b4c9c85`, recorded with
+The checked-in kernel pin is `1b74449a5`, with XSH `d7b4c9c85`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published.
 It includes the permission, process, procfs and generic-netlink repairs below.
-Both standard and main builds pass fourteen C control executions and all 104 selected
+Both standard and main builds pass eighteen C control executions and all 105 selected
 native tests without skips. Full current-pin qualification remains open.
 
 The maintained cohorts below were qualified at kernel `d59567c40` by
@@ -591,13 +591,45 @@ Main evidence is at `.work/tmp/deleted-paths-main-proof/`, with ELF SHA-256
 Anonymous temporary-file display and full Linux path-display conformance remain
 outside this focused proof.
 
-The procfs cwd/root candidate is not pinned. With the shared deleted-path repair,
-its unprivileged C witness and all 105 selected native tests pass. Its root C
-witness still fails at nondumpable-target access: `PR_SET_DUMPABLE` acknowledges
-the request without storing the setting. Later root-only cases remain unexecuted
-after that failed prerequisite. The candidate remains rejected at
-`.work/tmp/proc-fs-links-deleted-base-after/`; preserve the earlier failed evidence
-at `.work/tmp/proc-fs-links-{after,diagnostic}/` as well.
+Published `5fda05945` implements actual dumpability state. Fork copies it;
+`CLONE_VM` shares it. Valid `prctl` changes persist, while invalid requests,
+failed identity changes and no-op setters preserve it. Identity changes and
+privileged or unreadable exec reset it. Credential updates are prepared privately
+so the shared reset precedes publication; matching writer and reader fences
+preserve that order across peers with separate process mutexes. Exec also
+preserves the required keep-capabilities reset.
+
+Foreign inspection uses dumpability and capability policy. Filesystem-credential
+checks use the caller's effective capabilities; real-credential checks use its
+permitted capabilities. The target's permitted set must be covered unless the
+caller has `SYS_PTRACE`. The static C regression passes pinned Linux root and
+UID 1000 controls, including state inheritance, exec, identity changes, access
+denial, capability-subset rejection and privileged bypass. The earlier candidate
+fails the capability-subset counterexample. Independent review of the complete
+change and the publication-order correction finds no supported defect. This
+does not establish universal race freedom or core-file generation.
+
+Published successor `1b74449a5` exposes `/proc/PID/{cwd,root}` and task aliases
+through that policy. It retains actual target paths, including raw filenames,
+renamed and removed directories, and chroot roots. Lookup runs before the write
+guard in chdir, chroot and pivot_root; pivot also resolves both inputs before
+taking the process table lock. Self links therefore complete without reentering
+those locks. Independent review finds no supported defect. The root and UID
+1000 C controls cover these paths, authorization, zombie/reap behavior and a
+private-namespace pivot control. Earlier failed runs retain their failed status.
+
+Both compatible repairs are qualified together on clean standard and main
+builds: all eighteen C executions and all 105 native cases pass without skips,
+and both published-input checks pass. Standard evidence is at
+`.work/tmp/proc-fs-links-standard-proof/`, with ELF SHA-256
+`cc13a52c4358fbf0aab95d8bb59befbc9d56e7f56c61da39f0bb2dae11efc40e`.
+Main evidence is at `.work/tmp/proc-fs-links-main-proof/`, with ELF SHA-256
+`242169ba4c45e8ca82cdbd444d045e4ad59fc75dbe1dc7c0a20eff7e0bfe1c96`.
+The original descriptor native test now passes. The updated fourteen-case
+diagnostic at `.work/tmp/native-fourteen-replay-d9487ffc5-1b74449a5/` has twelve
+passes and two failures: TCP socket diagnostics and host sampling. Its UID 1000
+observation finds `/proc/vmstat` and `/proc/diskstats` unavailable. Full native
+qualification and final-pin maintained replay remain open.
 
 The maintained replay at `ba0383234` passes both backends and ten recovery rounds.
 It retains its own XSH pin and does not qualify this successor kernel. Final-pin
