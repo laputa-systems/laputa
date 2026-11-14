@@ -743,5 +743,5 @@ the rebuilt bundle contains xinit artifact `d47fc8bc86a1` and backup artifact `6
 whose installed scripts match the reviewed sources byte for byte. Host checks pass 396 PM
 tests (one Tailscale fixture skip), 67 xinit tests and all fourteen quiescence tests.
 
-A full `make publish` still fails on `laputa-diagnostics` (`fs-install: No such file or directory` for
-`repository/system/diagnostics.xsh`), with or without the changes above; no drill depends on it.
+`laputa-diagnostics` builds and publishes: its recipe installs the collector by its staged
+basename, as PM resolves local sources.

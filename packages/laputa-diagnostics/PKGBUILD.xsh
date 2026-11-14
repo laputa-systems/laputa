@@ -64,6 +64,6 @@ export const filetree = [
 
 ## Install the XSH collector and service module.
 export proc build(dest: Path) [fs, error] {
-  fs.install(p"repository/system/diagnostics.xsh", fp"{dest}/usr/lib/laputa/diagnostics.xsh", 0o644, parents: true, overwrite: true)
+  fs.install(p"diagnostics.xsh", fp"{dest}/usr/lib/laputa/diagnostics.xsh", 0o644, parents: true, overwrite: true)
   fs.install(p"service.xsh", fp"{dest}/usr/lib/xinit/services/diagnostics.xsh", 0o644, parents: true, overwrite: true)
 }
