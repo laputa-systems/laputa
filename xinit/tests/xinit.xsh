@@ -2326,3 +2326,167 @@ export let service = {
   assert restarts >= 1, saved
   assert fp"{log_root}/crasher/current".read_text()?.lines().len() >= 2
 }
+
+test test_control_requests_parse_owner_qualifiers [fs, process, error] { |ctx|
+  let source = xinit_policy_source()? + """
+let plain = parse_control_request(b"down")?
+assert plain.verb == "down" and plain.owner == "" and plain.if_owner == ""
+let owned = parse_control_request(b"down owner=bk-1.a_B")?
+assert owned.verb == "down" and owned.owner == "bk-1.a_B" and owned.if_owner == ""
+let released = parse_control_request(b" up if-owner=bk-1\\n")?
+assert released.verb == "up" and released.owner == "" and released.if_owner == "bk-1"
+for refused in [b"up owner=x", b"down if-owner=x", b"restart owner=x", b"reload if-owner=x", b"down owner=", b"down owner=a/b", b"up if-owner=a b", b"down owner=x extra", b"down extra=x", b"up if-owner=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] {
+  assert parse_control_request(refused) is Err(_)
+}
+assert parse_control_request(b"down owner=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") is Ok(_)
+assert 12 + 32 <= control_request_limit and 11 + 32 <= control_request_limit
+"""
+  let result = test.run_xsh(ctx, source, name: "control-qualifiers.xsh")?
+  assert result.success, result.stderr
+}
+
+test test_stale_owned_release_does_not_override_an_operator_command [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-owner")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  service_dir.mkdir()
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "")
+  let source = xinit_policy_source()? + """
+prepare_control_inbox()
+let inbox = inbox_dir()?
+var units = [unit_init(load_service("app")?)]
+
+proc post(text: Str) {
+  fp"{inbox}/app".write(text, mode: 0o770)
+}
+
+proc owner_of() -> Result[Str] {
+  read_control_owner("app")?
+}
+
+post("down owner=bk1")
+units = drain_inbox(units)?
+assert units[0].desired == "down" and units[0].state == "stopped"
+assert owner_of()? == "bk1"
+
+# An operator stop after acquisition supersedes the attempt's ownership.
+post("down")
+units = drain_inbox(units)?
+assert owner_of()? == ""
+assert units[0].desired == "down"
+
+# The attempt's stale release must not start the service the operator stopped.
+post("up if-owner=bk1")
+units = drain_inbox(units)?
+assert units[0].desired == "down" and units[0].state == "stopped", units[0].state
+assert ! fp"{inbox}/app".exists()?
+
+# A release that still owns the stop restores it, clears ownership, and is idempotent.
+post("down owner=bk2")
+units = drain_inbox(units)?
+assert owner_of()? == "bk2"
+post("up if-owner=bk2")
+units = drain_inbox(units)?
+assert units[0].desired == "up" and units[0].state == "pending"
+assert owner_of()? == ""
+let settled = units
+post("up if-owner=bk2")
+units = drain_inbox(units)?
+assert units == settled
+
+# Reload does not change who owns the stop.
+post("down owner=bk3")
+units = drain_inbox(units)?
+post("reload")
+units = drain_inbox(units)?
+assert owner_of()? == "bk3"
+assert units[0].desired == "down"
+
+# An operator start after acquisition also wins over the stale release.
+post("up")
+units = drain_inbox(units)?
+assert owner_of()? == ""
+post("up if-owner=bk3")
+units = drain_inbox(units)?
+assert units[0].desired == "up"
+"""
+  let result = test.run_xsh(ctx, source, env: {
+    XINIT_SERVICE_DIR: service_dir.display(),
+    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_TEST_ALLOW_NON_PID1: "1",
+  }, name: "control-owner.xsh")?
+  assert result.success, result.stderr
+  assert result.stderr.count_lines() == 3, result.stderr
+  assert "xinit-control-skipped: service=app" in result.stderr
+  assert "reason=owner-mismatch" in result.stderr
+  assert result.stdout.count_lines() == 7, result.stdout
+}
+
+test test_owned_requests_never_replace_a_pending_operator_request [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-pending")?
+  let run_dir = fp"{root}/run"
+  let source = xinit_policy_source()? + """
+prepare_control_inbox()
+let queued = fp"{inbox_dir()?}/app"
+
+queued.write("down", mode: 0o770)
+match request_desired("app", "up", "if-owner=bk1") {
+  Ok(_) => { assert false, "an owned release replaced a pending operator request" }
+  Err(failure) => { assert "another control request is pending" in failure.message, failure.message }
+}
+assert queued.read_text()? == "down"
+
+queued.remove()
+request_desired("app", "down", "owner=bk1")?
+assert queued.read_text()? == "down owner=bk1"
+request_desired("app", "up")?
+assert queued.read_text()? == "up"
+"""
+  let result = test.run_xsh(ctx, source, env: {
+    XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+  }, name: "control-pending.xsh")?
+  assert result.success, result.stderr
+}
+
+test test_owner_qualifiers_need_a_scanner_and_a_stop_or_start [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-qualifier-cli")?
+  let run_dir = fp"{root}/run"
+  let service_dir = fp"{root}/services"
+  let inbox = fp"{run_dir}/inbox"
+  service_dir.mkdir()
+  inbox.mkdir()
+  inbox.chmod(0o770)
+  let vars = {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}
+
+  assert_failed_with(run_xinit(ctx, ["stop", "--owner", "bk1", "app"], vars)?, "needs a running scanner")
+  assert ! fp"{inbox}/app".exists()?
+
+  fp"{run_dir}/scanner.json".write(json.encode({pid: process.current_pid()?})?)
+  assert xinit_text(ctx, ["stop", "--owner", "bk1", "app"], vars)? == "app down queued\n"
+  assert fp"{inbox}/app".read_text()? == "down owner=bk1"
+  fp"{inbox}/app".remove()
+  assert xinit_text(ctx, ["start", "--if-owner", "bk1", "app"], vars)? == "app up queued\n"
+  assert fp"{inbox}/app".read_text()? == "up if-owner=bk1"
+  assert_failed_with(run_xinit(ctx, ["stop", "--owner", "bad token", "app"], vars)?, "malformed owner token")
+  assert_failed_with(run_xinit(ctx, ["restart", "--owner", "bk1", "app"], vars)?, "")
+}
+
+test test_scan_applies_an_owned_stop_and_clears_ownership_on_start [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-scan-owner")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  let log_root = fp"{root}/logs"
+  let unix_log = fp"{root}/unix.jsonl"
+  service_dir.mkdir()
+  fp"{run_dir}/inbox".mkdir()
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "")
+  fp"{run_dir}/app.control".write("stale")
+  fp"{run_dir}/inbox/app".write("down owner=bk1")
+  test.unix_fake(ctx, {log: unix_log, event_kind: "poll"})
+  let scan = xinit_text(ctx, ["scan", "app"], scan_env(service_dir, run_dir, log_root, 1))?
+  test.unix_fake(ctx, {})
+
+  assert "verb=down" in scan
+  assert fp"{run_dir}/app.control".read_text()? == "bk1"
+  assert xinit_text(ctx, ["status", "app"], scan_env(service_dir, run_dir, log_root, 1))? == "app down pid=0 ready=false log=append desired=down restarts=0\n"
+}

@@ -20,6 +20,11 @@ export const TIMER_STATE_FORMAT = "laputa-timers-state-1"
 ## Version of the live inspection snapshot.
 export const TIMER_STATUS_FORMAT = "laputa-timers-status-1"
 
+## Version of one durable snapshot-writer record.
+export const TIMER_WRITER_FORMAT = "laputa-timer-writer-1"
+## The state subdirectory holding one writer record per running attempt.
+export const TIMER_WRITER_DIR = "runs"
+
 ## The generation-owned job definition directory.
 export const TIMER_JOB_DIR = p"/etc/laputa/timers/jobs.d"
 ## The state-disk directory that holds run state and cancellation markers.
@@ -213,6 +218,20 @@ export type TimerRunning = {
 
 ## One attempted start: the live child, or the failure it recorded.
 export type TimerStartOutcome = {started: TimerRunning?, state: TimerState, runtime: TimerRuntime}
+
+## The process identity the supervisor persists for one attempt. `pid` is also the
+## process group the attempt leads; `start_time_ms` is the leader's kernel start time.
+export type TimerWriter = {
+  name: Str,
+  attempt: Int,
+  boot_id: Str,
+  pid: Int,
+  start_time_ms: Int,
+  started_wall_ms: Int,
+}
+
+## Where writer records live, and the boot they are judged against.
+export type TimerWriterStore = {dir: Path, boot_id: Str}
 
 type SchedulerConfig = {job_dir: Path, state_dir: Path, run_dir: Path}
 
@@ -725,6 +744,52 @@ export pure timer_state_from_json(value: Any) -> Result[TimerState, Error] {
   })
 }
 
+## Whether the recorded writer group is `gone` or may still be `alive`. A differing
+## boot proves every process died; a live group whose leader pid now has another
+## start time is a recycled id; a live group without its leader holds orphans.
+export pure timer_writer_verdict(
+  record_boot_id: Str,
+  boot_id: Str,
+  group_present: Bool,
+  leader_start_ms: Int,
+  recorded_start_ms: Int,
+) -> Str {
+  if record_boot_id != "" and boot_id != "" and record_boot_id != boot_id {
+    return "gone"
+  }
+  if ! group_present {
+    return "gone"
+  }
+  if leader_start_ms > 0 and recorded_start_ms > 0 and leader_start_ms != recorded_start_ms {
+    return "gone"
+  }
+  "alive"
+}
+
+## Decode one writer record, refusing anything this scheduler did not write.
+export pure timer_writer_from_json(value: Any) -> Result[TimerWriter, Error] {
+  let format = json.get(value, ["format"], "").require(Str)?
+  guard format == TIMER_WRITER_FORMAT else {
+    return Err(error.failure(f"unsupported writer record format {format}"))
+  }
+  let name = json.get(value, ["name"], "").require(Str)?
+  guard timer_name_ok(name) else {
+    return Err(error.failure("writer record has an invalid job name"))
+  }
+  let pid = json.get(value, ["pid"], 0).require(Int)?
+  guard pid > 1 else {
+    return Err(error.failure(f"writer record for {name} has an invalid process id"))
+  }
+  Ok({
+    name: name,
+    attempt: json.get(value, ["attempt"], 0).require(Int)?,
+    boot_id: json.get(value, ["boot_id"], "").require(Str)?,
+    pid: pid,
+    start_time_ms: json.get(value, ["start_time_ms"], 0).require(Int)?,
+    started_wall_ms: json.get(value, ["started_wall_ms"], 0).require(Int)?,
+  })
+}
+
 pure timer_options(argv: List[Str]) -> Result[TimerOptions, Str] {
   var options = TimerOptions(
     action: "run",
@@ -1060,13 +1125,162 @@ export proc timer_print_status(snapshot: TimerStatus, as_json: Bool) [io, time, 
   }
 }
 
+proc timer_writer_file(store: TimerWriterStore, name: Str) -> Path {
+  fp"{store.dir}/{name}.json"
+}
+
+## The kernel start time of a live process in milliseconds, or 0 when it is not listed.
+export proc timer_process_start_ms(pid: Int) [process, error] -> Result[Int, Error] {
+  for entry in process.list()? {
+    if entry.pid == pid {
+      return Ok(entry.start_time_ms)
+    }
+  }
+  Ok(0)
+}
+
+## Durably record one attempt's writer identity, replacing any previous record of the job.
+export proc timer_writer_save(store: TimerWriterStore, record: TimerWriter) [fs, error] -> Result[Unit, Error] {
+  store.dir.mkdir(parents: true)?
+  let file = timer_writer_file(store, record.name)
+  let body = json.encode({
+    format: TIMER_WRITER_FORMAT,
+    name: record.name,
+    attempt: record.attempt,
+    boot_id: record.boot_id,
+    pid: record.pid,
+    start_time_ms: record.start_time_ms,
+    started_wall_ms: record.started_wall_ms,
+  })? + "\n"
+  atomically replace file as next {
+    next.write(body, mode: 0o600)
+    fs.fsync(next)
+  }
+  fs.fsync(store.dir)
+}
+
+## The names with a writer record, in file-name order.
+export proc timer_writer_names(store: TimerWriterStore) [fs, error] -> Result[List[Str], Error] {
+  if ! store.dir.exists() {
+    return Ok([])
+  }
+  let names = collect {
+    for entry in fs.children(store.dir)? |> sort-by .name {
+      if entry.name.ends_with(".json") {
+        yield entry.name.byte_slice(0, entry.name.byte_len() - 5)
+      }
+    }
+  }
+  Ok(names)
+}
+
+proc timer_writer_observe(record: TimerWriter, boot_id: Str) [process, error] -> Result[Str, Error] {
+  let present = match process.kill_group(record.pid, "0") {
+    Ok(_) => true
+    Err(problem) => {
+      guard problem.errno == 3 else {
+        return Err(problem)
+      }
+      false
+    }
+  }
+  var leader = 0
+  var members = 0
+  if present {
+    for entry in process.list()? {
+      if entry.pid == record.pid {
+        leader = entry.start_time_ms
+      }
+      if (entry.pgrp ?? 0) == record.pid and ! entry.status.starts_with("Z") {
+        members += 1
+      }
+    }
+  }
+  Ok(timer_writer_verdict(record.boot_id, boot_id, members > 0, leader, record.start_time_ms))
+}
+
+proc timer_writer_wait_gone(record: TimerWriter, boot_id: Str, limit_ms: Int) [process, time, error] -> Result[Bool, Error] {
+  var waited = 0
+  while true {
+    if timer_writer_observe(record, boot_id)? == "gone" {
+      return Ok(true)
+    }
+    guard waited < limit_ms else {
+      return Ok(false)
+    }
+    time.sleep(50ms)?
+    waited += 50
+  }
+  Ok(false)
+}
+
+## Stop whatever is left of the recorded writer group and report `gone` (nothing was
+## left), `stopped` (this call ended the last member) or `alive` (not proven stopped).
+export proc timer_writer_stop(record: TimerWriter, boot_id: Str) [process, time, error] -> Result[Str, Error] {
+  if timer_writer_observe(record, boot_id)? == "gone" {
+    return Ok("gone")
+  }
+  match process.kill_group(record.pid, "TERM") {
+    Ok(_) => {}
+    Err(problem) => {
+      guard problem.errno == 3 else {
+        return Err(problem)
+      }
+    }
+  }
+  if timer_writer_wait_gone(record, boot_id, TIMER_KILL_GRACE_MS)? {
+    return Ok("stopped")
+  }
+  match process.kill_group(record.pid, "KILL") {
+    Ok(_) => {}
+    Err(problem) => {
+      guard problem.errno == 3 else {
+        return Err(problem)
+      }
+    }
+  }
+  if timer_writer_wait_gone(record, boot_id, TIMER_KILL_GRACE_MS)? {
+    return Ok("stopped")
+  }
+  Ok("alive")
+}
+
+## Prove the named job's recorded writer stopped, then retire its record. Returns
+## `none` (no record), `settled`, or `unproven`, which keeps the record for the next try.
+export proc timer_writer_settle(store: TimerWriterStore, name: Str) [fs, process, time, io, error] -> Result[Str, Error] {
+  let file = timer_writer_file(store, name)
+  if ! file.exists() {
+    return Ok("none")
+  }
+  let record = timer_writer_from_json(json.read(file)?)?
+  let outcome = match timer_writer_stop(record, store.boot_id) {
+    Ok(result) => result
+    Err(problem) => {
+      timer_log(f"event=writer-error name={name} pid={record.pid} message={problem.message}")?
+      "alive"
+    }
+  }
+  if outcome == "alive" {
+    timer_log(f"event=writer-unproven name={name} attempt={record.attempt} pid={record.pid}")?
+    return Ok("unproven")
+  }
+  file.remove(missing_ok: true)?
+  fs.fsync(store.dir)
+  timer_log(f"event=writer-settled name={name} attempt={record.attempt} pid={record.pid} result={outcome}")?
+  Ok("settled")
+}
+
 proc timer_launch(
   job: TimerJob,
   occurrence_wall_ms: Int,
   attempt: Int,
   missed: Int,
   now: TimerClock,
-) [process, error] -> Result[TimerRunning, Error] {
+  store: TimerWriterStore,
+) [fs, process, time, io, error] -> Result[TimerRunning, Error] {
+  if timer_writer_settle(store, job.name)? == "unproven" {
+    return Err(error.failure(f"the previous attempt of {job.name} is not proven stopped"))
+  }
   var job_env: Map[Bytes] = {}
   job_env["LAPUTA_TIMER_NAME"] = bytes.from_text(job.name)
   job_env["LAPUTA_TIMER_ATTEMPT"] = bytes.from_text(f"{attempt}")
@@ -1076,6 +1290,24 @@ proc timer_launch(
   job_env["LAPUTA_TIMER_START_MONO_MS"] = bytes.from_text(f"{now.mono_ms}")
   let plan = process.command_argv(job.argv[0], job.argv, cwd: p"/", env: job_env, stdin: p"/dev/null")
   let handle = spawn plan?
+  let record = TimerWriter(
+    name: job.name,
+    attempt: attempt,
+    boot_id: store.boot_id,
+    pid: handle.pid,
+    start_time_ms: timer_process_start_ms(handle.pid) ?? 0,
+    started_wall_ms: now.wall_ms,
+  )
+  match timer_writer_save(store, record) {
+    Ok(_) => {}
+    Err(problem) => {
+      match process.kill_group(handle.pid, "KILL") {
+        Ok(_) => {}
+        Err(_) => {}
+      }
+      return Err(problem)
+    }
+  }
   let deadline = if job.timeout_ms > 0 { now.mono_ms + job.timeout_ms } else { 0 }
   Ok({
     name: job.name,
@@ -1095,8 +1327,9 @@ proc timer_start(
   attempt: Int,
   missed: Int,
   now: TimerClock,
-) [process, io, error] -> Result[TimerStartOutcome, Error] {
-  match timer_launch(job, occurrence_wall_ms, attempt, missed, now) {
+  store: TimerWriterStore,
+) [fs, process, time, io, error] -> Result[TimerStartOutcome, Error] {
+  match timer_launch(job, occurrence_wall_ms, attempt, missed, now, store) {
     Ok(started) => Ok({started: started, state: timer_state_started(state, now.wall_ms), runtime: runtime})
     Err(problem) => {
       timer_log(f"event=job-spawn-error name={job.name} attempt={attempt} message={problem.message}")?
@@ -1344,6 +1577,10 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
   let stored = timer_load_state(fp"{config.state_dir}/{TIMER_STATE_NAME}")?
   let armed = timer_read_clock()?
   let boot_id = timer_read_boot_id()
+  let store = TimerWriterStore(dir: fp"{config.state_dir}/{TIMER_WRITER_DIR}", boot_id: boot_id)
+  for name in timer_writer_names(store)? {
+    let _ = timer_writer_settle(store, name)?
+  }
   var states: Map[TimerState] = {}
   var runtimes: Map[TimerRuntime] = {}
   var dirty = false
@@ -1428,9 +1665,10 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
         var runtime = runtimes.get(entry.name) ?? timer_initial_runtime(job, state, now)
         runtime.running = false
         timer_log(f"event=job-timeout name={entry.name} attempt={entry.attempt} timeout_ms={job.timeout_ms}")?
+        let _ = timer_writer_settle(store, entry.name)?
         if ! (entry.name in cancelled) {
           if runtime.queued {
-            let attempt = timer_start(job, state, runtime, runtime.queued_wall_ms, 1, 0, now)?
+            let attempt = timer_start(job, state, runtime, runtime.queued_wall_ms, 1, 0, now, store)?
             state = attempt.state
             runtime = attempt.runtime
             runtime.queued = false
@@ -1481,9 +1719,10 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
         var runtime = runtimes.get(entry.name) ?? timer_initial_runtime(job, state, now)
         runtime.running = false
         timer_log(f"event=job-finish name={entry.name} attempt={entry.attempt} outcome={outcome} exit={code ?? -1}")?
+        let _ = timer_writer_settle(store, entry.name)?
         if ! (entry.name in cancelled) {
           if runtime.queued {
-            let attempt = timer_start(job, state, runtime, runtime.queued_wall_ms, 1, 0, now)?
+            let attempt = timer_start(job, state, runtime, runtime.queued_wall_ms, 1, 0, now, store)?
             state = attempt.state
             runtime = attempt.runtime
             runtime.queued = false
@@ -1533,6 +1772,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
               state = timer_state_finished(state, now.wall_ms, "cancelled", null)
               state = timer_state_counted(state, 0, 0, 0, 0, 1)
               timer_log(f"event=job-cancel name={job.name} attempt={entry.attempt}")?
+              let _ = timer_writer_settle(store, job.name)?
               changed = true
             } else {
               kept += [entry]
@@ -1571,7 +1811,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
           runtimes[job.name] = runtime
           continue
         }
-        let attempt = timer_start(job, state, runtime, runtime.retry_wall_ms, runtime.retry_attempt + 1, runtime.retry_missed, now)?
+        let attempt = timer_start(job, state, runtime, runtime.retry_wall_ms, runtime.retry_attempt + 1, runtime.retry_missed, now, store)?
         state = attempt.state
         runtime = attempt.runtime
         if let launched = attempt.started {
@@ -1590,7 +1830,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
       }
       if runtime.pending_start {
         state = timer_state_counted(state, runtime.pending_missed, 0, 0, 0, 0)
-        let attempt = timer_start(job, state, runtime, now.wall_ms, 1, runtime.pending_missed, now)?
+        let attempt = timer_start(job, state, runtime, now.wall_ms, 1, runtime.pending_missed, now, store)?
         state = attempt.state
         runtime = attempt.runtime
         runtime.pending_start = false
@@ -1672,7 +1912,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
         continue
       }
       state = timer_state_counted(state, due.missed, 0, 0, 0, 0)
-      let attempt = timer_start(job, state, runtime, scheduled_wall, 1, due.missed, now)?
+      let attempt = timer_start(job, state, runtime, scheduled_wall, 1, due.missed, now, store)?
       state = attempt.state
       runtime = attempt.runtime
       runtime.next_mono_ms = if job.schedule == "calendar" { 0 } else { due.next_mono_ms }

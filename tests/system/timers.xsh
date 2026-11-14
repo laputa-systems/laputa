@@ -335,3 +335,113 @@ test test_definition_rejects_unbounded_retries_and_bad_overlap [error] {
   assert timers.timer_job_from_json("probe", raw_job({overlap: "restart"})?) is Err(_)
   assert timers.timer_job_from_json("probe", raw_job({missed: "burst"})?) is Err(_)
 }
+
+test test_writer_verdict_proves_a_stopped_group_only_by_identity [error] {
+  assert timers.timer_writer_verdict("boot-a", "boot-a", false, 0, 700) == "gone"
+  assert timers.timer_writer_verdict("boot-a", "boot-a", true, 700, 700) == "alive"
+  assert timers.timer_writer_verdict("boot-a", "boot-a", true, 0, 700) == "alive"
+  assert timers.timer_writer_verdict("boot-a", "boot-a", true, 900, 700) == "gone"
+  assert timers.timer_writer_verdict("boot-a", "boot-b", true, 700, 700) == "gone"
+  assert timers.timer_writer_verdict("boot-a", "", true, 700, 700) == "alive"
+  assert timers.timer_writer_verdict("", "boot-b", true, 700, 700) == "alive"
+}
+
+test test_writer_record_refuses_foreign_or_malformed_input [error] {
+  let good = {format: timers.TIMER_WRITER_FORMAT, name: "backup", attempt: 2, boot_id: "b", pid: 4242, start_time_ms: 9, started_wall_ms: 5}
+  let record = timers.timer_writer_from_json(good)?
+  assert record.name == "backup" and record.pid == 4242 and record.attempt == 2
+  assert timers.timer_writer_from_json({format: "other", name: "backup", pid: 4242}) is Err(_)
+  assert timers.timer_writer_from_json({format: timers.TIMER_WRITER_FORMAT, name: "../x", pid: 4242}) is Err(_)
+  assert timers.timer_writer_from_json({format: timers.TIMER_WRITER_FORMAT, name: "backup", pid: 1}) is Err(_)
+  assert timers.timer_writer_from_json({format: timers.TIMER_WRITER_FORMAT, name: "backup", pid: "x"}) is Err(_)
+}
+
+proc writer_group_live(pid: Int) [process, error] -> Result[Bool, Error] {
+  for entry in process.list()? {
+    if (entry.pgrp ?? 0) == pid and ! entry.status.starts_with("Z") {
+      return Ok(true)
+    }
+  }
+  Ok(false)
+}
+
+proc writer_spawn(root: Path, script: Str) [fs, process, error] -> Result[ProcessHandle, Error] {
+  let handle = spawn process.command_argv("/bin/sh", ["sh", "-c", script], cwd: root, stdin: p"/dev/null")?
+  Ok(handle)
+}
+
+proc writer_record(store: timers.TimerWriterStore, handle: ProcessHandle, name: Str) [fs, process, error] -> Result[timers.TimerWriter, Error] {
+  let record = timers.TimerWriter(
+    name: name,
+    attempt: 1,
+    boot_id: store.boot_id,
+    pid: handle.pid,
+    start_time_ms: timers.timer_process_start_ms(handle.pid)?,
+    started_wall_ms: 0,
+  )
+  timers.timer_writer_save(store, record)?
+  Ok(record)
+}
+
+test test_restarted_supervisor_proves_an_orphaned_writer_group_stopped [fs, process, time, io, error] { |ctx|
+  test.timeout(ctx, 60s)
+  let root = test.temp_dir(ctx, name: "writer-orphan")?
+  let store = timers.TimerWriterStore(dir: fp"{root}/runs", boot_id: "boot-1")
+  let handle = writer_spawn(root, "sleep 300 & echo $! > child.pid; wait")?
+  let record = writer_record(store, handle, "backup")?
+  var waited = 0
+  while ! fp"{root}/child.pid".exists()? and waited < 5000 {
+    time.sleep(50ms)?
+    waited += 50
+  }
+  assert fp"{root}/child.pid".exists()?
+  assert timers.timer_writer_names(store)? == ["backup"]
+
+  # The job leader dies first and leaves the snapshot writer behind in its group.
+  process.kill(handle.pid, "KILL")?
+  let _ = process.wait_timeout([handle], 5s)?
+  assert writer_group_live(record.pid)?
+
+  # A restarted supervisor has only the record; it must stop the orphan before it reports success.
+  let restarted = timers.TimerWriterStore(dir: store.dir, boot_id: "boot-1")
+  assert timers.timer_writer_settle(restarted, "backup")? == "settled"
+  assert ! writer_group_live(record.pid)?
+  assert timers.timer_writer_names(restarted)? == []
+  assert timers.timer_writer_settle(restarted, "backup")? == "none"
+}
+
+test test_recycled_or_foreign_boot_records_never_signal_a_live_group [fs, process, time, io, error] { |ctx|
+  test.timeout(ctx, 60s)
+  let root = test.temp_dir(ctx, name: "writer-recycled")?
+  let store = timers.TimerWriterStore(dir: fp"{root}/runs", boot_id: "boot-1")
+  let bystander = writer_spawn(root, "sleep 300")?
+  let live = writer_record(store, bystander, "backup")?
+  let recycled = timers.TimerWriter(
+    name: live.name,
+    attempt: 1,
+    boot_id: "boot-1",
+    pid: live.pid,
+    start_time_ms: live.start_time_ms + 1000,
+    started_wall_ms: 0,
+  )
+  timers.timer_writer_save(store, recycled)?
+  assert timers.timer_writer_settle(store, "backup")? == "settled"
+  assert writer_group_live(live.pid)?
+
+  let other_boot = timers.TimerWriter(
+    name: live.name,
+    attempt: 1,
+    boot_id: "boot-0",
+    pid: live.pid,
+    start_time_ms: live.start_time_ms,
+    started_wall_ms: 0,
+  )
+  timers.timer_writer_save(store, other_boot)?
+  assert timers.timer_writer_settle(store, "backup")? == "settled"
+  assert writer_group_live(live.pid)?
+
+  timers.timer_writer_save(store, live)?
+  assert timers.timer_writer_settle(store, "backup")? == "settled"
+  let _ = process.wait_timeout([bystander], 5s)?
+  assert ! writer_group_live(live.pid)?
+}

@@ -3,6 +3,7 @@ error XinitError = Failed(kind: Str, message: Str)
 
 const control_group_name = "xinit-admin"
 const control_request_limit = 64
+const control_token_re = rx"^[A-Za-z0-9_.-]{1,32}$"
 const signal_permission_denied = 1
 
 type InittabEntry = {key: Str, id: Str, action: Str, command: Str, argv: List[Str]}
@@ -50,6 +51,8 @@ type DeadMark = {runtime: List[RuntimeEntry], event: Str}
 
 type InittabPolicy = {delay_ms: UInt, launch_limit: UInt}
 type InitArguments = {command: Str, action: Str, args: List[Str]}
+
+type ControlRequest = {verb: Str, owner: Str, if_owner: Str}
 
 type StartPlan = {done: List[Str], out: List[Str]}
 
@@ -163,6 +166,10 @@ proc log_root() [env, error] -> Result[Path] {
 
 proc inbox_dir() -> Result[Path] {
   fp"{run_dir()?.display()}/inbox"
+}
+
+proc control_owner_path(name: Str) -> Result[Path] {
+  fp"{run_dir()?.display()}/{name}.control"
 }
 
 proc scanner_marker_path() -> Result[Path] {
@@ -1382,16 +1389,33 @@ proc scanner_active() -> Result[Bool] {
   observed > 0 and (start_time_ms <= 0 or observed == start_time_ms)
 }
 
-proc request_desired(name: Str, desired: Str) {
+proc request_desired(name: Str, desired: Str, qualifier: Str = "") {
   let dir = inbox_dir()?
   let group_gid = control_group_gid()?
   let target = fp"{dir}/{name}"
   let scratch = fp"{dir}/.{name}.{process.current_pid()?}.tmp"
+  let text = if qualifier == "" { desired } else { f"{desired} {qualifier}" }
 
-  scratch.write(desired, mode: 0o770)
-  defer scratch.remove()
+  scratch.write(text, mode: 0o770)
+  defer scratch.remove(missing_ok: true)
   fs.set_owner(scratch, gid: group_gid)
-  scratch.rename(to: target, overwrite: true)
+
+  if qualifier == "" {
+    scratch.rename(to: target, overwrite: true)
+  } else {
+    match scratch.rename(to: target, overwrite: false) {
+      Ok(_) => {}
+      Err(failure) => {
+        return Err(
+          XinitError.Failed(
+            kind: "xinit-control-busy",
+            message: f"{name}: another control request is pending: {failure.message}",
+          ),
+        )
+      }
+    }
+  }
+
   wake_scanner()?
   print f"{name} {desired} queued"
 }
@@ -1419,9 +1443,19 @@ proc wake_scanner() {
   }
 }
 
-proc start_service(name: Str) {
+proc require_scanner_for_owner(qualifier: Str) {
+  if qualifier != "" and ! scanner_active() {
+    return Err(
+      XinitError.Failed(kind: "xinit-control", message: "an owner qualifier needs a running scanner"),
+    )
+  }
+}
+
+proc start_service(name: Str, qualifier: Str = "") {
+  require_scanner_for_owner(qualifier)?
+
   if scanner_active() {
-    request_desired(name, "up")
+    request_desired(name, "up", qualifier)
     return
   }
 
@@ -1456,9 +1490,11 @@ proc running_dependents(name: Str) -> Result[List[Str]] {
   out
 }
 
-proc stop_service(name: Str) {
+proc stop_service(name: Str, qualifier: Str = "") {
+  require_scanner_for_owner(qualifier)?
+
   if scanner_active() {
-    request_desired(name, "down")
+    request_desired(name, "down", qualifier)
     return
   }
 
@@ -1996,14 +2032,77 @@ proc apply_request(units: List[ServiceUnit], name: Str, desired: Str) -> Result[
   reconcile_child_exits(updated, children, elapsed_now_ms()?)?
 }
 
-pure parse_control_verb(data: Bytes) -> Result[Str] {
-  let desired = data.utf8()?.trim()
-
-  guard desired == "up" or desired == "down" or desired == "restart" or desired == "reload" else {
+pure control_verb_word(word: Str) -> Result[Str] {
+  guard word == "up" or word == "down" or word == "restart" or word == "reload" else {
     return Err(XinitError.Failed(kind: "xinit-control-refused", message: "unknown control verb"))
   }
 
-  desired
+  word
+}
+
+pure parse_control_verb(data: Bytes) -> Result[Str] {
+  control_verb_word(data.utf8()?.trim())?
+}
+
+pure control_token(word: Str, prefix: Str) -> Result[Str] {
+  let token = word.byte_slice(prefix.byte_len())
+
+  guard control_token_re.matches(token) else {
+    return Err(XinitError.Failed(kind: "xinit-control-refused", message: "malformed control token"))
+  }
+
+  token
+}
+
+pure parse_control_request(data: Bytes) -> Result[ControlRequest] {
+  let words = data.utf8()?.words()
+
+  guard words.len() == 1 or words.len() == 2 else {
+    return Err(XinitError.Failed(kind: "xinit-control-refused", message: "unknown control verb"))
+  }
+
+  let verb = control_verb_word(words[0])?
+
+  return ControlRequest(verb:, owner: "", if_owner: "") when words.len() == 1
+
+  if words[1].starts_with("owner=") and verb == "down" {
+    return ControlRequest(verb:, owner: control_token(words[1], "owner=")?, if_owner: "")
+  }
+
+  if words[1].starts_with("if-owner=") and verb == "up" {
+    return ControlRequest(verb:, owner: "", if_owner: control_token(words[1], "if-owner=")?)
+  }
+
+  Err(XinitError.Failed(kind: "xinit-control-refused", message: "unsupported control qualifier"))
+}
+
+proc read_control_owner(name: Str) -> Result[Str] {
+  let path_value = control_owner_path(name)?
+
+  return "" unless path_value.exists()
+
+  let token = path_value.read_text()?.trim()
+
+  return "" unless control_token_re.matches(token)
+
+  token
+}
+
+proc set_control_owner(name: Str, owner: Str) {
+  let dir = run_dir()?
+  dir.mkdir()
+
+  if owner == "" {
+    control_owner_path(name)?.remove(missing_ok: true)
+  } else {
+    control_owner_path(name)?.write_atomic(owner)
+  }
+}
+
+proc control_skipped(request: ControlRequest, name: Str) -> Result[Bool] {
+  return false when request.if_owner == ""
+
+  read_control_owner(name)? != request.if_owner
 }
 
 proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
@@ -2061,10 +2160,17 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
       continue
     }
 
-    match parse_control_verb(observed.data) {
-      Ok(desired) => {
-        print --flush f"xinit-control accepted service={entry.name} uid={uid} verb={desired}"
-        out = apply_request(out, entry.name, desired)?
+    match parse_control_request(observed.data) {
+      Ok(request) => {
+        if control_skipped(request, entry.name)? {
+          eprint --flush f"xinit-control-skipped: service={entry.name} uid={uid} verb={request.verb} reason=owner-mismatch"
+        } else {
+          print --flush f"xinit-control accepted service={entry.name} uid={uid} verb={request.verb}"
+          if request.verb != "reload" and unit_state_of(out, entry.name) != "" {
+            set_control_owner(entry.name, request.owner)?
+          }
+          out = apply_request(out, entry.name, request.verb)?
+        }
       }
       Err(failure) => {
         eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason={failure.message}"
@@ -2129,6 +2235,11 @@ proc scan_units(names: List[Str]) {
   var remaining = if test_mode() { env_int("XINIT_TEST_MAX_EVENTS", -1)? } else { -1 }
   var shutting_down = false
   prepare_control_inbox()
+
+  for unit in units {
+    set_control_owner(unit.service.name, "")?
+  }
+
   let wake_path = scanner_wake_path()?
   defer wake_path.remove()
   let wake_fd = prepare_scanner_wake()?
@@ -2240,11 +2351,34 @@ proc graph_service(name: Str) {
   }
 }
 
-proc control(verb: Str, name: Str) {
+proc control_qualifier(parsed: Record) -> Result[Str] {
+  let owner = json.get(parsed, ["owner"], "").require(Str)?
+  let if_owner = json.get(parsed, ["if_owner"], "").require(Str)?
+
+  guard owner == "" or control_token_re.matches(owner) else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: "malformed owner token"))
+  }
+
+  guard if_owner == "" or control_token_re.matches(if_owner) else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: "malformed owner token"))
+  }
+
+  return f"owner={owner}" when owner != ""
+
+  return f"if-owner={if_owner}" when if_owner != ""
+
+  ""
+}
+
+proc control(verb: Str, name: Str, qualifier: Str = "") {
+  if qualifier != "" and verb != "start" and verb != "up" and verb != "stop" and verb != "down" {
+    return Err(XinitError.Failed(kind: "xinit-control", message: f"{verb} takes no owner qualifier"))
+  }
+
   if verb == "start" or verb == "up" {
-    start_service(name)
+    start_service(name, qualifier)
   } else if verb == "stop" or verb == "down" {
-    stop_service(name)
+    stop_service(name, qualifier)
   } else if verb == "restart" {
     restart_service(name)
   } else if verb == "reload" {
@@ -2308,6 +2442,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io, net] {
         aliases: [
           "up",
         ],
+        options: {if_owner: {kind: "Str", default: ""}},
         rest: "args",
       },
       stop: {
@@ -2315,6 +2450,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io, net] {
         aliases: [
           "down",
         ],
+        options: {owner: {kind: "Str", default: ""}},
         rest: "args",
       },
       restart: {
@@ -2400,7 +2536,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error, io, net] {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit <action> SERVICE"))
     }
 
-    control(parsed.action, parsed_raw.get("service")?.require()?)
+    control(parsed.action, parsed_raw.get("service")?.require()?, control_qualifier(parsed_raw)?)
   } else if parsed.command == "check" {
     if parsed.args.len() > 1 {
       return Err(XinitError.Failed(kind: "xinit-control", message: "usage: xinit check [SERVICE|PATH]"))

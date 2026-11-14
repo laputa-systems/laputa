@@ -154,6 +154,23 @@ not observable inside the guest and moves no deadline; the scheduler simply
 resumes with the remaining budget. No pause or step can produce a catch-up
 burst.
 
+## Writer identity
+
+Immediately after spawning an attempt, the scheduler records it in `/var/lib/laputa-timers/runs/NAME.json` (format
+`laputa-timer-writer-1`; a scheduler killed between spawn and this write leaves no record): job, attempt, boot id, the leader pid, which is also
+the process group the attempt leads, and the leader's kernel start time. The
+record is replaced atomically and synced. The scheduler removes it only after
+`timer_writer_settle` proves the group has no live member: it signals the group
+with `TERM`, then `KILL` after the grace period, and judges liveness by
+non-zombie members, so an orphaned child of a killed leader still counts. A
+record from another boot is proof that every process died. A live group whose
+leader pid now has a different start time is a recycled id and is never
+signalled. At startup the scheduler settles every record left by a previous
+scheduler before it admits any job, and a job whose previous attempt is
+unproven does not start. Finish, timeout, and cancellation settle the group the
+same way. The record does not yet release quiesced services; that step belongs
+after this proof ([XSH-89](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-89-backup-quiescence-recovery.md)).
+
 ## Inspection
 
 Local:

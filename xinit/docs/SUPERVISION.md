@@ -91,6 +91,25 @@ signal probe is the fallback only when no start time is recorded, and it counts
 that refusal is not evidence the service is gone. The scanner does not need
 that check, because it clears a unit's pid the instant its child exits.
 
+### Control ownership
+
+A stop can carry an owner token (`xinit stop --owner TOKEN SERVICE`, request
+text `down owner=TOKEN`), and a start can be conditional on it (`xinit start
+--if-owner TOKEN SERVICE`, `up if-owner=TOKEN`). Tokens match
+`[A-Za-z0-9_.-]{1,32}`. The scanner records the owner in
+`${XINIT_RUN_DIR}/SERVICE.control` when it applies the stop. Every
+unqualified `up`, `down`, or `restart` clears it, so a later operator command
+always supersedes an earlier owned stop; `reload` leaves it. A conditional
+start is checked and applied in the same scanner pass: if the recorded owner is
+not the token, the scanner logs `xinit-control-skipped` and changes nothing.
+A conditional start that applies also clears the owner, so repeating it is a
+no-op. Qualified requests are created without replacing a queued request, and
+fail with `xinit-control-busy` when one is pending, so they cannot erase an
+operator command that has not been applied yet. Qualifiers need a running
+scanner, and a new scanner clears every owner record. The client reports a
+queued request, not its outcome; callers observe `SERVICE.json` and
+`SERVICE.control`.
+
 ### Request credentials
 
 The control path is a directory inbox, not a socket, so the request credential
@@ -110,8 +129,8 @@ non-member cannot place a request at all. The scanner opens each entry through `
 symlinks in every path component and opens without blocking. It requires a
 regular single-link file of at most 64 bytes and accepts it
 only when the owner uid is 0 or resolves through the account database to a
-current `xinit-admin` member. The file content is only a verb; no field in it
-names a requester. The client writes through a hidden temporary name with mode
+current `xinit-admin` member. The file content is a verb with at most one ownership
+qualifier; no field in it names a requester. The client writes through a hidden temporary name with mode
 `0770`, group `xinit-admin`, then renames it, so a scanner pass never reads a
 partial request.
 
