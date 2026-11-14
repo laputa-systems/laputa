@@ -97,7 +97,7 @@ proc note(text: Str) [fs, error] {
 proc run_diag(phase: Str) [process, error] {
   match process.run(process.command_argv(
     p"/usr/bin/xsh",
-    ["xsh", "/etc/laputa/diagnostics.xsh", "--phase", phase, "--canary", "/etc/laputa/diagnostics-canary"],
+    ["xsh", "/usr/lib/laputa/diagnostics.xsh", "--phase", phase, "--canary", "/etc/laputa/diagnostics-canary"],
     env: {XSH_MODULE_PATH: "/usr/lib/xsh/core"},
     stdout: p"/dev/console",
     stderr: p"/dev/console",
@@ -115,8 +115,9 @@ proc main() [fs, process, time, error] {
   p"/dev/console".write("LAPUTA_DIAGNOSTICS_SELFTEST_START\n")
   wait until p"/run/laputa-health.json".exists()? within 90s every 200ms
   p"/dev/console".write("LAPUTA_DIAGNOSTICS_SELFTEST_HEALTH\n")
-  time.sleep(2s)?
+  wait until p"/run/xinit/diagnostics.json".exists()? within 90s every 200ms
   run_diag("boot")?
+  p"/dev/console".write("LAPUTA_DIAGNOSTICS_SELFTEST_BOOT_DONE\n")
   let cmdline = p"/proc/cmdline".read_text()?
   if "LAPUTA_FAILED_GENERATION=" in cmdline {
     let filled = process.run(process.command_argv(p"/usr/bin/xsh", ["xsh", "/etc/laputa/diagnostics-fill.xsh", "fill"]))?
@@ -240,7 +241,6 @@ def stage_state(staging):
 
     laputa_etc = staging / "etc/laputa"
     laputa_etc.mkdir(parents=True, exist_ok=True)
-    shutil.copy(str(root / "system/diagnostics.xsh"), str(laputa_etc / "diagnostics.xsh"))
     (laputa_etc / "diagnostics-selftest.xsh").write_text(SELFTEST)
     (laputa_etc / "diagnostics-fill.xsh").write_text(FILL)
     hooks = staging / "etc/network/if-up.d"
@@ -339,11 +339,12 @@ def markers(text, prefix):
 
 
 def wait_boot(console, timeout=480):
-    wait_for(console, f"{PERSISTED} phase=boot", timeout)
+    wait_for(console, "LAPUTA_DIAGNOSTICS_SELFTEST_BOOT_DONE", timeout)
     fail_if_bad(console)
     text = console.read_text(errors="replace")
     boots = markers(text, BOOT)
     persisted = markers(text, PERSISTED)
+    assert text.count("LAPUTA_DIAGNOSTICS_DONE phase=boot") >= 2, "packaged service and selftest did not both finish"
     assert boots and boots[-1]["phase"] == "boot", boots
     assert persisted and persisted[-1]["phase"] == "boot", persisted
     return boots[-1], persisted[-1]
@@ -390,6 +391,7 @@ def validate_fallback(console):
     text = console.read_text(errors="replace")
     fail_if_bad(console)
     assert DONE in text, "fallback diagnostics selftest did not finish"
+    assert text.count("LAPUTA_DIAGNOSTICS_DONE phase=boot") >= 2, "packaged service and selftest did not both finish"
     boots = markers(text, BOOT)
     final = boots[-1]
     assert final["generation"] == "a", final

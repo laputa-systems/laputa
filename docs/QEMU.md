@@ -493,8 +493,8 @@ PM `generation_sha256` is publisher identity, not a signature.
 boot oneshot `usr/lib/xinit/services/diagnostics.xsh`. The oneshot runs
 `/usr/bin/xsh /usr/lib/laputa/diagnostics.xsh --phase boot` with
 `XSH_MODULE_PATH=/usr/lib/xsh/core` and `after` on `logger`; it never gates
-boot, rescue, or login. The profile must select the package; its package-root
-list is profile-owned.
+boot, rescue, or login. The maintained profile selects the package in its
+package-root list.
 
 One collection writes `/var/log/diagnostics/` on the maintained state disk:
 
@@ -545,7 +545,8 @@ journald-compatible store is implied.
 
 `tests/system/diagnostics.xsh` covers redaction, retention, history, lease
 projection, bundle bounds, and write-failure preservation offline.
-`tests/integration/diagnostics_reboot.py` boots a maintained generation,
+`tests/integration/diagnostics_reboot.py` runs the installed service and collector
+in a maintained generation,
 kills QEMU twice while generation B is pending, and proves on the fallback
 boot that the persistent store names failed generation B with its service
 history, stays inside the declared bounds while the state disk is filled to
