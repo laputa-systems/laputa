@@ -2105,82 +2105,125 @@ proc control_skipped(request: ControlRequest, name: Str) -> Result[Bool] {
   read_control_owner(name)? != request.if_owner
 }
 
-proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
-  let dir = inbox_dir()?
-
-  return units unless dir.exists()
-
-  let inbox = fs.open_root(dir)?
-  var out = units
-
-  for entry in fs.children(dir)? |> sort-by .name {
-    continue when entry.name.starts_with(".")
-
-    let path_value = entry.path
-    let leaf: RelPath = fp"{entry.name}".require()?
-    let observed = match inbox.read_regular(leaf, max_bytes: control_request_limit) {
-      Ok(opened) => opened
-      Err(failure) => {
-        let info = fs.stat(path_value, follow_symlinks: false)
-        let uid = match info { Ok(value) => value.uid, Err(_) => -1 }
-        let kind = match info { Ok(value) => value.kind, Err(_) => "" }
-        let oversized = match info { Ok(value) => value.size > control_request_limit, Err(_) => false }
-        let reason = if kind != "" and kind != "file" {
-          "not-a-single-regular-file"
-        } else if oversized {
-          "oversized"
-        } else {
-          failure.message
-        }
-        eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason={reason}"
-        match info {
-          Ok(value) => { path_value.remove() when value.kind != "dir" }
-          Err(_) => {}
-        }
-        continue
+proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: Path, name: Str) -> Result[List[ServiceUnit]] {
+  var out = out_units
+  let leaf: RelPath = fp"{name}".require()?
+  let observed = match processing.read_regular(leaf, max_bytes: control_request_limit) {
+    Ok(opened) => opened
+    Err(failure) => {
+      let info = fs.stat(path_value, follow_symlinks: false)
+      let uid = match info { Ok(value) => value.uid, Err(_) => -1 }
+      let kind = match info { Ok(value) => value.kind, Err(_) => "" }
+      let oversized = match info { Ok(value) => value.size > control_request_limit, Err(_) => false }
+      let reason = if kind != "" and kind != "file" {
+        "not-a-single-regular-file"
+      } else if oversized {
+        "oversized"
+      } else {
+        failure.message
       }
-    }
-
-    let uid = observed.uid
-
-    if observed.nlink != 1 {
-      eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason=not-a-single-regular-file"
-      path_value.remove()
-      continue
-    }
-
-    let refusal = match authorize_control(uid) {
-      Ok(_) => ""
-      Err(failure) => failure.message
-    }
-
-    if refusal != "" {
-      eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason={refusal}"
-      path_value.remove()
-      continue
-    }
-
-    match parse_control_request(observed.data) {
-      Ok(request) => {
-        if control_skipped(request, entry.name)? {
-          eprint --flush f"xinit-control-skipped: service={entry.name} uid={uid} verb={request.verb} reason=owner-mismatch"
-        } else {
-          print --flush f"xinit-control accepted service={entry.name} uid={uid} verb={request.verb}"
-          if request.verb != "reload" and unit_state_of(out, entry.name) != "" {
-            set_control_owner(entry.name, request.owner)?
+      eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={reason}"
+      match info {
+        Ok(value) => {
+          if value.kind == "dir" {
+            let target = fp"{inbox_dir()?}/{name}"
+            match fs.rename_noreplace(path_value, target) {
+              Ok(_) => {}
+              Err(failure) => {
+                return Err(failure) unless fs.stat(target, follow_symlinks: false) is Ok(_)
+                let refused = fp"{path_value.parent()}/.refused-{name}-{process.current_pid()?}-{time.monotonic()?}"
+                fs.rename_noreplace(path_value, refused)?
+              }
+            }
+          } else {
+            processing.remove(leaf)?
           }
-          out = apply_request(out, entry.name, request.verb)?
         }
+        Err(_) => {}
       }
-      Err(failure) => {
-        eprint --flush f"xinit-control-refused: service={entry.name} uid={uid} reason={failure.message}"
-      }
+      return out
     }
-
-    path_value.remove()
   }
 
+  let uid = observed.uid
+
+  if observed.nlink != 1 {
+    eprint --flush f"xinit-control-refused: service={name} uid={uid} reason=not-a-single-regular-file"
+    path_value.remove()
+    return out
+  }
+
+  let refusal = match authorize_control(uid) {
+    Ok(_) => ""
+    Err(failure) => failure.message
+  }
+
+  if refusal != "" {
+    eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={refusal}"
+    path_value.remove()
+    return out
+  }
+
+  match parse_control_request(observed.data) {
+    Ok(request) => {
+      if control_skipped(request, name)? {
+        eprint --flush f"xinit-control-skipped: service={name} uid={uid} verb={request.verb} reason=owner-mismatch"
+      } else {
+        print --flush f"xinit-control accepted service={name} uid={uid} verb={request.verb}"
+        if request.verb != "reload" and unit_state_of(out, name) != "" {
+          set_control_owner(name, request.owner)?
+        }
+        out = apply_request(out, name, request.verb)?
+      }
+    }
+    Err(failure) => {
+      eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={failure.message}"
+    }
+  }
+
+  path_value.remove()
+
   out
+}
+
+proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
+  let dir = inbox_dir()?
+  return units unless dir.exists()
+  let run_path = run_dir()?
+  let run_info = run_path.metadata()?
+  guard run_info.kind == "dir" and run_info.uid == control_owner_uid()? and run_info.mode.bit_and(0o022) == 0 else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: f"unsafe run directory: {run_path}"))
+  }
+  let claims = fp"{run_path}/inbox-processing"
+  if ! claims.exists() {
+    with root = fs.open_root(run_path)? {
+      root.mkdir(p"inbox-processing".require()?, mode: 0o700)
+    }
+  }
+  let info = fs.stat(claims, follow_symlinks: false)?
+  guard info.kind == "dir" and info.uid == control_owner_uid()? and info.mode.bit_and(0o7777) == 0o700 else {
+    return Err(XinitError.Failed(kind: "xinit-control", message: f"unsafe inbox processing directory: {claims}"))
+  }
+  with processing = fs.open_root(claims)? {
+    var out = units
+    for entry in fs.children(claims)? |> sort-by .name {
+      continue when entry.name.starts_with(".")
+      out = drain_claim(out, processing, entry.path, entry.name)?
+    }
+    for entry in fs.children(dir)? |> sort-by .name {
+      continue when entry.name.starts_with(".")
+      let claimed = fp"{claims}/{entry.name}"
+      match fs.rename_noreplace(entry.path, claimed) {
+        Ok(_) => { out = drain_claim(out, processing, claimed, entry.name)? }
+        Err(failure) => {
+          if fs.stat(claimed, follow_symlinks: false) is Ok(_) { continue }
+          if fs.stat(entry.path, follow_symlinks: false) is Err(_) { continue }
+          return Err(failure)
+        }
+      }
+    }
+    out
+  }
 }
 
 pure readiness_poll_ms() -> Int {
