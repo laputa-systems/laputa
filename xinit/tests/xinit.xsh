@@ -1088,7 +1088,7 @@ test test_control_read_keeps_the_opened_request_after_replacement [fs, process, 
     assert "verb=down" in result.stdout, result.stdout
     assert ! ("verb=restart" in result.stdout), result.stdout
     assert fp"{root}/outside".read_text()? == "restart"
-    assert ! fp"{inbox}/app".exists()?
+    assert fp"{inbox}/app".exists()?
   }
 }
 
@@ -2420,6 +2420,97 @@ assert units[0].desired == "up"
   assert "xinit-control-skipped: service=app" in result.stderr
   assert "reason=owner-mismatch" in result.stderr
   assert result.stdout.count_lines() == 7, result.stdout
+}
+
+test test_inbox_replacement_survives_owned_release [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-overlap")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  service_dir.mkdir()
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "")
+  let hook = "proc authorize_control(uid: Int) {"
+  let source = xinit_policy_source()?
+  assert source.split(hook).len() == 2
+  let changed = source.replace(hook, with: hook + """
+  let replacement = fp"{env.path("XINIT_RUN_DIR")?}/replacement"
+  if replacement.exists()? {
+    replacement.rename(to: fp"{env.path("XINIT_RUN_DIR")?}/inbox/app", overwrite: true)
+  }
+""") + """
+prepare_control_inbox()
+let queued = fp"{inbox_dir()?}/app"
+var units = [unit_init(load_service("app")?)]
+queued.write("down owner=bk1")
+units = drain_inbox(units)?
+assert read_control_owner("app")? == "bk1"
+queued.write("up if-owner=bk1")
+fp"{run_dir()?}/replacement".write("down")
+units = drain_inbox(units)?
+assert queued.exists()?, "operator stop was deleted"
+assert queued.read_text()? == "down"
+units = drain_inbox(units)?
+assert units[0].desired == "down" and units[0].state == "stopped"
+assert read_control_owner("app")? == ""
+"""
+  let result = test.run_xsh(ctx, changed, env: {
+    XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+  }, name: "control-overlap.xsh")?
+  assert result.success, result.stderr
+}
+
+test test_inbox_retained_claim_precedes_new_request [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-recovery")?
+  let services = fp"{root}/services"
+  let runtime = fp"{root}/run"
+  services.mkdir()
+  write_named_service(fp"{services}/app.xsh", "app", "process.command_argv(\"app\", [\"app\"])", ["boot"], "")
+  let source = xinit_policy_source()? + """
+prepare_control_inbox()
+let claims = fp"{run_dir()?}/inbox-processing"
+claims.mkdir()
+claims.chmod(0o700)
+fp"{claims}/app".write("up")
+fp"{inbox_dir()?}/app".write("down")
+let units = drain_inbox([unit_init(load_service("app")?)])?
+assert units[0].desired == "down" and units[0].state == "stopped"
+assert ! fp"{claims}/app".exists()?
+assert ! fp"{inbox_dir()?}/app".exists()?
+"""
+  let result = test.run_xsh(ctx, source, env: {XINIT_SERVICE_DIR: services.display(), XINIT_RUN_DIR: runtime.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-recovery.xsh")?
+  assert result.success, result.stderr
+  assert "verb=up" in result.stdout.lines()[0] and "verb=down" in result.stdout.lines()[1], result.stdout
+}
+
+test test_inbox_retains_claimed_directory_when_new_request_arrives [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-directory")?
+  let hook = "  let observed = match processing.read_regular(leaf, max_bytes: control_request_limit) {"
+  let original = xinit_policy_source()?
+  assert original.split(hook).len() == 2
+  let source = original.replace(hook, with: """
+  let replacement = fp"{run_dir()?}/replacement"
+  if replacement.exists()? { replacement.rename(to: fp"{inbox_dir()?}/app", overwrite: true) }
+""" + hook) + """
+prepare_control_inbox()
+fp"{inbox_dir()?}/app".mkdir()
+fp"{inbox_dir()?}/app/keep".write("keep")
+fp"{run_dir()?}/replacement".write("down")
+let units: List[ServiceUnit] = []
+let drained = drain_inbox(units)?
+assert drained.is_empty()
+let drained_again = drain_inbox(drained)?
+assert drained_again.is_empty()
+let retained = fs.walk(fp"{run_dir()?}/inbox-processing", hidden: true)?
+  |> where .kind == "file" and .path.name() == "keep"
+  |> collect
+assert retained.len() == 1
+assert retained[0].path.read_text()? == "keep"
+assert ! fp"{inbox_dir()?}/app".exists()?
+assert ! fp"{run_dir()?}/inbox-processing/app".exists()?
+"""
+  let result = test.run_xsh(ctx, source, env: {XINIT_RUN_DIR: root.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-directory.xsh")?
+  assert result.success, result.stderr
+  assert "reason=not-a-single-regular-file" in result.stderr
+  assert "service=app" in result.stdout and "verb=down" in result.stdout
 }
 
 test test_owned_requests_never_replace_a_pending_operator_request [fs, process, error] { |ctx|

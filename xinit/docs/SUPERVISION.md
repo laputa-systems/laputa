@@ -150,10 +150,18 @@ uid, and an unprivileged process cannot make a request appear to come from
 root. Symlinks, directories, hard-linked files, oversized files, and unknown
 verbs that are present when the entry is observed are refused rather than
 followed. A refusal uses the typed
-`xinit-control-refused` error, is logged with the observed uid, and removes only
-the offending entry; the root scanner stays alive. Accepted and refused requests
+`xinit-control-refused` error, is logged with the observed uid; the root scanner stays alive. Accepted and refused requests
 are logged to stdout and stderr respectively. Status, list, logs, and inspect
 reads stay unauthenticated and unchanged.
+
+The scanner atomically moves each request into a private processing directory
+under the run directory before opening it. A replacement remains in the inbox
+for a later pass. Retained claims are processed before new inbox entries after
+an interruption, so an applied request may be replayed. A claimed directory is
+refused and restored without replacement when possible; if its inbox name is
+occupied, the directory is retained under a private hidden refusal name for
+administrator attention, and the newer request can proceed. Other refused
+entries are unlinked without following symlinks or traversing directories.
 
 The request bytes and credential metadata come from the same open descriptor.
 Replacing the directory entry after it is opened cannot change either the
