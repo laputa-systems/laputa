@@ -64,6 +64,21 @@ test test_valid_input_decodes_and_plans_the_same_changes [fs, process, error] { 
   assert "add address 192.0.2.3/24" in ran.stdout, ran.stdout
 }
 
+test test_ipv6_fixture_plans_through_the_command_and_rejects_a_noncanonical_address [fs, process, error] { |ctx|
+  let text = policy.network_read_input(p"tests/system/fixtures/network-policy-ipv6.json")?
+  let ran = run_planner(ctx, text)?
+  assert ran.code == 0, ran.stderr
+  assert "add address 2001:db8:1::3/64" in ran.stdout, ran.stdout
+  assert "add default via fe80::1 metric 1024" in ran.stdout, ran.stdout
+  assert "remove owned default via 2001:db8:1::1 metric 300" in ran.stdout, ran.stdout
+  assert "2001:db8:ff::2" not in ran.stdout and "2001:db8:ff::1" not in ran.stdout, ran.stdout
+  let upper = text.replace("2001:db8:1::3", with: "2001:DB8:1::3")
+  let refused = run_planner(ctx, upper)?
+  assert refused.code != 0
+  assert refused.stdout == "", refused.stdout
+  assert "invalid IPv6 intent" in refused.stderr, refused.stderr
+}
+
 test test_unknown_fields_are_rejected_at_every_depth_with_their_path [fs, process, error] { |ctx|
   let cases = [
     {text: with_top_level_field("\"extra\":1"), field: "extra"},

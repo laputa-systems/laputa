@@ -5,7 +5,7 @@ test test_live_network_host_accepts_only_complete_raw_console_marker_lines [fs, 
   assert source.split(entry).len() == 2
   let checks = r"""
 let paths = build.outputs(Path(args[0]))
-let markers = ["NETWORK_LIVE_KVM_OK", "NETWORK_IPV4_LIVE_GUEST_OK", "NETWORK_GUEST_CORE_OVERLAY_HASHES_OK", "NETWORK_APPLIER_OK"]
+let markers = ["NETWORK_LIVE_KVM_OK", "NETWORK_IPV4_LIVE_GUEST_OK", "NETWORK_IPV6_LIVE_GUEST_OK", "NETWORK_GUEST_CORE_OVERLAY_HASHES_OK", "NETWORK_APPLIER_OK"]
 let writer = "NETWORK_WRITER_IDENTITIES controller=84 writer=86 namespace=net:[4026532334]"
 let genuine = markers.join("\n") + "\n" + writer + "\n"
 paths.qemu_log.write(genuine)

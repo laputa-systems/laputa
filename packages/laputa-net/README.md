@@ -1,8 +1,11 @@
-# IPv4 network plan reference
+# Network plan reference (IPv4 and IPv6)
 
 `network_plan.xsh` provides an offline, read-only plan for one existing `veth`
-or `dummy` virtual Ethernet interface. The package's installed `ifup` service
-continues to own boot setup. The planner is a source-tree development command.
+or `dummy` virtual Ethernet interface and one address family, IPv4 or IPv6. The
+package's installed `ifup` service continues to own boot setup. The planner and
+the controller are source-tree development tools; nothing here is wired into
+boot, and the packaged `ipv6.conf` keeps IPv6 disabled (see
+[IPv6 cohort](#ipv6-cohort)).
 
 ```sh
 XSH_MODULE_PATH="$PWD" xsh packages/laputa-net/network_plan.xsh \
@@ -35,22 +38,35 @@ the selected path, observation state, errno, and stable error kind in the
 `NetworkReadFailed` variant. Resolution and root-opening errors propagate directly.
 
 `NetworkIntent` selects the interface by both index and name. It requests one
-canonical IPv4 address with a prefix from 1 through 32, an IPv4 gateway, and a
-nonnegative default-route metric.
+canonical address, a gateway of the same family, and a nonnegative default-route
+metric. The address text selects the family: any colon selects IPv6. An IPv4
+address has a prefix from 1 through 32. An IPv6 address has a prefix from 1
+through 128 and must be a global unicast address in the exact RFC 5952 text the
+kernel reports (lowercase, no leading zeros, the first longest zero run
+compressed, never a single group). Unspecified, loopback, link-local, multicast,
+IPv4-mapped and IPv4-compatible addresses are refused as intent addresses. An
+IPv6 gateway may also be link-local. A family mismatch between address and
+gateway is invalid. A dual-stack link is two intents, one per family, applied
+one after the other.
 
 `NetworkOwnership` grants authority over exact addresses and routes on that
 interface. Observation does not grant ownership. A desired resource already
 present without explicit ownership produces a conflict.
 
-`NetworkSnapshot` describes the complete selected IPv4 cohort. Addresses identify
-local address and prefix. Routes describe main-table unicast default routes on
-the selected interface, with a gateway and metric. Other route tables, source
-routes, multipath routes, IPv6, and physical interfaces have no representation
-in this cohort. A host adapter must reject unsupported or incomplete observations
-rather than discard information needed to recognize a conflict.
+`NetworkSnapshot` describes the complete selected cohort of the intent's
+family. Addresses identify local address and prefix. Routes describe main-table
+unicast default routes on the selected interface, with a gateway and metric.
+Other route tables, source routes, multipath routes, the other address family,
+and physical interfaces have no representation in this cohort. A snapshot or
+ownership list that holds a resource of the other family is invalid, so an IPv4
+plan never retires an IPv6 resource or the reverse. A host adapter must reject
+unsupported or incomplete observations rather than discard information needed
+to recognize a conflict.
 
 Each observed or owned list accepts at most 64 resources. Invalid addresses,
 duplicate resources, and another default route using the desired metric fail.
+An IPv6 intent whose local address is already present with another prefix fails,
+because the kernel refuses a second prefix for the same local address.
 The caller increments `sequence` for each complete observation. The sequence is
 an observation ordinal, not a kernel generation or atomic snapshot guarantee.
 
@@ -97,9 +113,11 @@ notice to `NetworkLostEvents`.
 `network_project_dump` requires `net_state.project` to accept the dump: an
 incomplete, interrupted, truncated or undecodable socket, link, address or route
 dump is an error, never an empty state. `network_project_state` then requires the
-selected independent virtual Ethernet interface. It rejects selected secondary
+selected independent virtual Ethernet interface and projects only the intent's
+family; the other family's objects, even unsupported ones, neither enter nor
+block the projection. It rejects selected secondary
 IPv4 addresses, point-to-point addresses, and unsupported selected default
-routes. An empty projected route list therefore follows observed absence, never
+routes, and applies the IPv6 rules below. An empty projected route list therefore follows observed absence, never
 a fallback.
 
 `network_project_state` projects a selected default route only when it is an
@@ -124,6 +142,70 @@ one hop with no gateway out of the managed link, priority 0, and no unmodeled
 attributes. Connected, local, and broadcast destinations must also match the
 address's exact derived shape. This exception does not grant mutation authority.
 
+## IPv6 cohort
+
+IPv6 uses the same `State` and `Change` records, the same plan, and the same
+reconcile pass as IPv4. These kernel specifics shape the cohort, and each is
+measured on Linux 7.2.9 in a private network namespace.
+
+- **Metric.** An IPv6 default added without a priority is stored with metric
+  1024, never 0. An intent metric of 0 therefore means 1024:
+  `network_desired_route` is the single source for it, and the plan, the
+  requests and `network_replay` all carry 1024, so the route is created and
+  removed with an explicit nonzero priority. The zero-metric removal hazard
+  below still refuses any observed or owned route with metric 0.
+- **Link-local addresses.** The kernel creates `fe80::/64` addresses on link up
+  and removes them with the stack. They are foreign state outside the cohort,
+  never a plan operand, and they survive every plan. An intent address in
+  `fe80::/10` is invalid.
+- **Lifetime-managed addresses.** An address without `IFA_F_PERMANENT` (SLAAC,
+  temporary) appears and expires without a request. It is foreign state outside
+  the cohort. A permanent address that is point-to-point, scoped other than
+  global, or flagged `HOMEADDRESS`, `MANAGETEMPADDR`, `NOPREFIXROUTE`,
+  `MCAUTOJOIN` or `SECONDARY`, is refused with an explicit conflict.
+- **Duplicate address detection.** A new static address is observed with
+  `IFA_F_TENTATIVE` set until detection completes, and the cohort treats it as
+  present: acknowledgement and a fresh observation establish that the kernel
+  holds the configuration, not that the address is usable. A selected address
+  with `IFA_F_DADFAILED` fails the projection with `selected IPv6 address failed
+  duplicate address detection`, so a duplicate is an explicit failure on the
+  next observation and never a silent success. A pass that adds an address
+  returns before detection finishes. `network_project_stable_states` therefore
+  reports an observation as changed while the flags settle.
+- **Router advertisements.** A default route with protocol `RTPROT_RA` (9) is
+  kernel-managed foreign state: it comes and goes with the advertised lifetime.
+  The projection leaves it out of the cohort, so no plan removes or counts it.
+  The cohort cannot see its metric, so a desired default at the same metric is
+  refused by the kernel (`EEXIST`) as a denied operation with re-observation,
+  and the advertised route survives. Any other protocol on a selected default
+  (for example static, 4) still fails the projection as outside the supported
+  cohort, as for IPv4.
+- **Route attributes.** Every IPv6 route dump carries `RTA_CACHEINFO` (12) and
+  `RTA_PREF` (20). They are the only unmodeled attributes accepted on an IPv6
+  selected default; metrics, encapsulation and any other attribute are refused as
+  `selected default route carries unsupported attributes`. `net_state.Route`
+  reports only the attribute kinds, so the router preference value itself is not
+  visible. Route identity in the kernel's lookup ignores it.
+- **Preferred source.** The kernel does not give address-derived IPv6 routes a
+  preferred source, so any route (on any interface) whose preferred source is a
+  selected IPv6 address is a foreign dependency and refuses the projection.
+- **No primary and secondary addresses.** The IPv4 same-prefix promotion rule
+  does not apply to IPv6.
+- **Disabled stack.** `ipv6.conf` packages `disable_ipv6 = 1`, `accept_ra = 0`
+  and `autoconf = 0` for `all` and `default`; `interfaces` configures only
+  loopback. The kernel refuses an address on a link with the stack disabled. The
+  controller reports that as `NetworkDenied` with a re-observation request and
+  mutates nothing; it neither detects nor changes the sysctl. A test reads the
+  packaged files so the policy these rules assume cannot drift unnoticed. The
+  maintained profile's status service relies on the same file to report IPv6 as
+  unsupported, so enabling IPv6 for a managed link needs an explicit override of
+  that drop-in, not a change to the controller.
+
+Default routes through a link-local gateway need no address. A default through a
+global gateway needs the gateway on-link, which the kernel derives from the
+address's prefix route. Neither the on-link rule nor reachability is checked by
+the controller; a gateway the kernel refuses is reported as a denial.
+
 ## Reconciliation
 
 `network_reconcile` runs observe -> pure plan -> apply with preconditions ->
@@ -132,7 +214,7 @@ first observation, so a change after that observation is visible either in a
 lost notification or in the next complete observation.
 
 `network_apply_plan` refuses the whole change set before any effect unless the
-plan is exactly what `network_plan` computes, every same-prefix address
+plan is exactly what `network_plan` computes, every IPv4 same-prefix address
 addition is unambiguous, and every change is exactly encodable. It then applies
 the changes in plan order through `net_state.apply`. Before each change it
 re-observes and requires the plan's predicted cohort for that step; after each
@@ -188,6 +270,7 @@ XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" xsht test tests/system/network_policy_kern
 XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" xsht test tests/system/network_policy_input.xsh
 XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" XSH_ROOT="$XSH_ROOT" XSH_HOST="$XSH" \
   xsht test tests/system/network_policy_applier.xsh
+XSH_MODULE_PATH="$PWD:$XSH_ROOT/core" xsht test tests/system/network_policy_schema.xsh
 bash tests/system/network_policy_docker.sh /absolute/path/to/xsh-tools
 ```
 
@@ -195,7 +278,9 @@ bash tests/system/network_policy_docker.sh /absolute/path/to/xsh-tools
 through `linux.run_in_namespaces` with a private user and network namespace. That
 is the cheapest disposable environment that performs real kernel mutations: the
 process owns the namespace, so both veth endpoints and every address and route it
-creates disappear with it, and no host or guest network state is touched. It
+creates disappear with it, and no host or guest network state is touched. The
+same fixture runs the IPv4 cases and then the IPv6 cases against one veth pair,
+so each family is also checked to leave the other's state alone. It
 requires unprivileged user namespaces; the test skips when the kernel or the
 container refuses them, and the fixture itself refuses to run outside its
 `disposable-namespace` scope. The live IPv4 guest qualification below executes
@@ -369,7 +454,76 @@ or a shared generation across the four dumps in `linux.network_dump`. The
 controller reports observed divergence and loss. It does not provide a kernel
 transaction, persist ownership, supervise networking or prove packet delivery.
 
-IPv6 remains unsupported by this controller: `NetworkAddress`, `NetworkIntent`,
-`NetworkSnapshot` and `NetworkOwnership` are IPv4-only. `valid_address` refuses
-non-IPv4 input, and projection selects `Family.Inet` explicitly. Linux aarch64,
-Asterinas, physical networking and cross-dump atomicity remain unqualified.
+## Live IPv6 guest qualification
+
+The same driver, `tests/system/network_policy_live_vm.sh`, executes the IPv6
+cases: `network_policy_applier.xsh` runs the IPv4 witness and then
+`ipv6_cohort` in one private user and network namespace inside the KVM guest, and
+`network-policy-live-guest.xsh` requires each IPv6 transcript line and prints
+`NETWORK_IPV6_LIVE_GUEST_OK`, which the host driver now also requires from the raw
+console. A skipped case still fails the proof.
+
+On 2026-11-14 it passed with clean XSH `befe5ced1ab8a75b1c92b21c55ed6d6b86f2d4bb`
+as the tool overlay on canonical A (Linux 7.2.9, 2 CPUs, 4 GiB, KVM): all five
+native cases passed with no skips, the host driver exited 0 with
+`NETWORK_LIVE_KVM_HOST_OK`, and the four original-root hashes were unchanged.
+The installed `xsh` SHA-256 was
+`61fb3eceed9132a429afd642ec83af7166270b2745e627d87c994d2f0bdf5464` and `xsht` was
+`051489f2e0fa87896472188f3d3944524b357078c03be7afd6de0371014d7a2b`. The tree ran
+uncommitted on top of Laputa `6e4c90ec1add11b64607c22a7128404dbaf2bb9d`; the
+retained evidence `.work/tmp/network-live.XXDdiFEf` holds the source hashes of the
+ten files the driver records, which match the files at the time of writing.
+`net_state.xsh` is byte-identical in that seed and in the XSH tree used for the
+host runs.
+
+The IPv6 cases, all in the guest and all deterministic across twelve host runs:
+
+- A link with the stack disabled (`disable_ipv6 = 1`, the packaged policy) refuses
+  the first address. The pass reports `NetworkDenied` for operation 0 and a
+  re-observation request, adds nothing, and the link has no link-local address.
+- With the stack enabled, one pass converges an owned `2001:db8:1::2/64` and a
+  global-gateway default at metric 100. A foreign static address on the link, a
+  lifetime-managed address added with `IFA_CACHEINFO`, the link-local addresses, a
+  router-advertisement-protocol default (protocol 9), an operator static default
+  and an operator route on the peer, and the IPv4 resources of the earlier cases
+  all survive. The observed address settles to permanent once detection finishes.
+- Reapplication plans nothing, attempts nothing, and leaves the full IPv6
+  address and route view of the namespace unchanged.
+- A separate process adds a different IPv6 address after planning. Its distinct
+  PID, parent PID and network namespace are checked. The stale pass reports
+  `NetworkReobserve` before operation 0 and attempts no change; the old address is
+  kept, the replacement is never added, and the writer's address survives. A fresh
+  observation then converges to a link-local gateway, and a second pass plans
+  nothing.
+- An intent metric of 0 means 1024. An advertised default at 1024 occupies that
+  metric, so the kernel refuses the addition (`NetworkDenied`, re-observation),
+  the advertised route and the owned metric-200 route both survive; once the
+  advertised route is gone the pass converges, the observed route has priority
+  1024 and the retired metric-200 route is removed.
+- A real overrun of a one-byte receive buffer by forty IPv6 address additions
+  requires a full observation, attempts nothing and keeps the old address.
+- An address that a peer on the link already holds fails duplicate address
+  detection (`IFA_F_DADFAILED`). The pass that adds it may return while detection
+  is pending; every later observation and reconcile is refused with
+  `selected IPv6 address failed duplicate address detection`.
+
+Native tests cover the same guarantees over fixture States without effects:
+malformed, partial and truncated dumps are errors, never an empty state;
+consecutive dumps must agree; each family ignores the other's state; and every
+forged, stale or zero-metric plan is refused before any request is encoded.
+
+IPv6 limits:
+
+- Convergence means the kernel holds the configuration. It does not mean the
+  address passed duplicate address detection (reported on the next observation),
+  that the gateway is reachable, or that packets are delivered.
+- Router advertisements are foreign. The cohort cannot see an advertised
+  default's metric, so a collision is caught by the kernel, not the plan. An
+  operator who enables `accept_ra` or `autoconf` on a managed link gets
+  kernel-moving state that the controller tolerates but never owns.
+- The router preference value and the cache information in each route are not
+  modeled by `net_state.Route`; only their attribute kinds are visible.
+- A dual-stack link is two sequential passes, each with its own observation and
+  precondition; there is no joint plan or cross-family atomicity. The four
+  separate dumps, per-operation atomicity, the `sysctl` state itself, Linux
+  aarch64, Asterinas and physical networking remain unqualified.

@@ -1,6 +1,17 @@
-##! Fail-closed virtual-interface projection from typed network state and the mapping of plan operations onto typed changes.
+##! Fail-closed virtual-interface projection from typed network state and the mapping of plan operations onto typed changes, for IPv4 and IPv6.
 use network_plan as policy
 use lib.net_state
+
+const IFA_F_NODAD = 2
+const IFA_F_OPTIMISTIC = 4
+const IFA_F_DADFAILED = 8
+const IFA_F_DEPRECATED = 32
+const IFA_F_TENTATIVE = 64
+const IFA_F_PERMANENT = 128
+const IFA_F_IPV6_COHORT = 238
+const RT_SCOPE_LINK = 253
+const RTPROT_RA = 9
+const IPV6_KERNEL_ROUTE_ATTRIBUTES = [12, 20]
 
 ## Rejected observation, stale precondition, or unsupported mutation input.
 export error NetworkKernelError = Conflict(message: Str)
@@ -46,7 +57,7 @@ pure address_derived_route(route: net_state.Route, address: net_state.Address, i
   Ok(false)
 }
 
-pure selected_default_route(route: net_state.Route) -> Result[policy.NetworkDefaultRoute, Error] {
+pure selected_default_route(route: net_state.Route, family: net_state.Family) -> Result[policy.NetworkDefaultRoute, Error] {
   if route.tos != 0 {
     return Err(NetworkKernelError.Conflict("selected default route is TOS-specific and cannot converge with ordinary traffic"))
   }
@@ -54,10 +65,38 @@ pure selected_default_route(route: net_state.Route) -> Result[policy.NetworkDefa
   if route.table != net_state.TABLE_MAIN or route.route_type != 1 or route.scope != 0 or route.protocol != 3 or route.flags != 0 or gateway == null or route.destination != null or route.source != null or route.preferred_source != null or route.source_prefix != 0 {
     return Err(NetworkKernelError.Conflict("selected default route is outside the supported main-table unicast cohort"))
   }
-  if !route.other_attributes.is_empty() {
+  let unmodeled = [kind for kind in route.other_attributes if family == .Inet or kind not in IPV6_KERNEL_ROUTE_ATTRIBUTES]
+  if !unmodeled.is_empty() {
     return Err(NetworkKernelError.Conflict("selected default route carries unsupported attributes"))
   }
   Ok({gateway, metric: route.priority})
+}
+
+pure intent_family(intent: policy.NetworkIntent) -> net_state.Family {
+  if policy.network_is_ipv6(intent.address.local) { .Inet6 } else { .Inet }
+}
+
+pure family_name(family: net_state.Family) -> Str {
+  if family == .Inet6 { "IPv6" } else { "IPv4" }
+}
+
+pure project_inet6_addresses(selected: List[net_state.Address]) -> Result[List[net_state.Address], Error] {
+  var cohort: List[net_state.Address] = []
+  for address in selected {
+    continue when address.scope == RT_SCOPE_LINK
+    continue when address.flags.bit_and(IFA_F_PERMANENT) == 0
+    if address.peer != null or address.scope != 0 {
+      return Err(NetworkKernelError.Conflict("selected IPv6 address is outside the global unicast cohort"))
+    }
+    if address.flags.bit_and(IFA_F_DADFAILED) != 0 {
+      return Err(NetworkKernelError.Conflict("selected IPv6 address failed duplicate address detection"))
+    }
+    if address.flags != address.flags.bit_and(IFA_F_IPV6_COHORT) {
+      return Err(NetworkKernelError.Conflict("selected IPv6 address carries flags that require explicit policy"))
+    }
+    cohort += [address]
+  }
+  Ok(cohort)
 }
 
 ## Project a typed observation without silently accepting unsupported selected resources.
@@ -68,33 +107,46 @@ export pure network_project_state(state: net_state.State, intent: policy.Network
   if link.ifindex != intent.ifindex or link.name != intent.name or link.hardware_type != 1 or (link.kind != "veth" and link.kind != "dummy") or link.master_ifindex != null or link.kind == null {
     return Err(NetworkKernelError.Conflict("managed link is not the selected independent virtual Ethernet interface"))
   }
-  let selected = [address for address in net_state.addresses_of(state, intent.ifindex) if address.family == .Inet]
+  let family = intent_family(intent)
+  let on_link = [address for address in net_state.addresses_of(state, intent.ifindex) if address.family == family]
+  var selected: List[net_state.Address] = []
+  if family == .Inet6 {
+    selected = project_inet6_addresses(on_link)?
+  } else {
+    selected = on_link
+  }
   var addresses: List[policy.NetworkAddress] = []
   for address in selected {
-    if address.peer != null or address.scope != 0 {
-      return Err(NetworkKernelError.Conflict("selected IPv4 address is outside the global unicast cohort"))
-    }
-    if address.flags.bit_and(1) != 0 {
-      return Err(NetworkKernelError.Conflict("selected secondary IPv4 addresses require explicit promotion policy"))
+    if family == .Inet {
+      if address.peer != null or address.scope != 0 {
+        return Err(NetworkKernelError.Conflict("selected IPv4 address is outside the global unicast cohort"))
+      }
+      if address.flags.bit_and(1) != 0 {
+        return Err(NetworkKernelError.Conflict("selected secondary IPv4 addresses require explicit promotion policy"))
+      }
     }
     addresses += [{local: address.local, prefix: address.prefix}]
   }
   var routes: List[policy.NetworkDefaultRoute] = []
   for route in state.routes {
-    continue when route.family != .Inet
+    continue when route.family != family
     if route.preferred_source != null {
       for address in selected {
         continue when address.local != route.preferred_source
+        if family == .Inet6 {
+          return Err(NetworkKernelError.Conflict("foreign preferred-source route depends on a selected IPv6 address"))
+        }
         if !address_derived_route(route, address, intent.ifindex)? {
           return Err(NetworkKernelError.Conflict("foreign preferred-source route depends on a selected IPv4 address"))
         }
       }
     }
     continue when route.prefix != 0
-    let on_link = [hop for hop in route.hops if hop.ifindex == intent.ifindex]
-    continue when on_link.is_empty()
+    let hops_on_link = [hop for hop in route.hops if hop.ifindex == intent.ifindex]
+    continue when hops_on_link.is_empty()
+    continue when family == .Inet6 and route.protocol == RTPROT_RA
     if route.hops.len() != 1 { return Err(NetworkKernelError.Conflict("selected default route is outside the supported main-table unicast cohort")) }
-    routes += [selected_default_route(route)?]
+    routes += [selected_default_route(route, family)?]
   }
   let projected: policy.NetworkSnapshot = {
     sequence, ifindex: link.ifindex, name: intent.name, kind: link.kind,
@@ -149,12 +201,14 @@ pure validated_plan(plan: policy.NetworkPlan) -> Result[Unit, Error] {
   for operation in plan.operations {
     match operation {
       policy.NetworkAddAddress(address) => {
-        let requested = subnet(address)?
-        for existing in predicted.addresses {
-          if existing.prefix == address.prefix {
-            let current_subnet = subnet(existing)?
-            if current_subnet.network == requested.network {
-              return Err(NetworkKernelError.Conflict("same-prefix IPv4 additions require explicit promotion policy"))
+        if !policy.network_is_ipv6(address.local) {
+          let requested = subnet(address)?
+          for existing in predicted.addresses {
+            if existing.prefix == address.prefix {
+              let current_subnet = subnet(existing)?
+              if current_subnet.network == requested.network {
+                return Err(NetworkKernelError.Conflict("same-prefix IPv4 additions require explicit promotion policy"))
+              }
             }
           }
         }
@@ -200,13 +254,17 @@ export pure network_after(plan: policy.NetworkPlan, count: Int) -> Result[policy
   Ok(predicted)
 }
 
+pure text_family(text: Str) -> net_state.Family {
+  if policy.network_is_ipv6(text) { .Inet6 } else { .Inet }
+}
+
 pure typed_address(address: policy.NetworkAddress, ifindex: Int) -> net_state.Address {
-  {ifindex, family: .Inet, local: address.local, prefix: address.prefix, peer: null, broadcast: null, scope: 0, flags: 0}
+  {ifindex, family: text_family(address.local), local: address.local, prefix: address.prefix, peer: null, broadcast: null, scope: 0, flags: 0}
 }
 
 pure typed_default_route(route: policy.NetworkDefaultRoute, ifindex: Int) -> net_state.Route {
   {
-    family: .Inet, table: net_state.TABLE_MAIN, destination: null, prefix: 0,
+    family: text_family(route.gateway), table: net_state.TABLE_MAIN, destination: null, prefix: 0,
     source: null, source_prefix: 0, preferred_source: null, tos: 0, priority: route.metric,
     protocol: 3, scope: 0, route_type: 1, flags: 0,
     hops: [{ifindex, gateway: route.gateway}], other_attributes: [],

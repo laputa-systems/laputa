@@ -1,0 +1,30 @@
+{
+  "intent": {
+    "ifindex": 7,
+    "name": "veth-test",
+    "address": {"local": "2001:db8:1::3", "prefix": 64},
+    "gateway": "fe80::1",
+    "metric": 0
+  },
+  "owned": {
+    "ifindex": 7,
+    "name": "veth-test",
+    "addresses": [{"local": "2001:db8:1::2", "prefix": 64}],
+    "routes": [{"gateway": "2001:db8:1::1", "metric": 300}]
+  },
+  "observed": {
+    "sequence": 1,
+    "ifindex": 7,
+    "name": "veth-test",
+    "kind": "veth",
+    "up": true,
+    "addresses": [
+      {"local": "2001:db8:1::2", "prefix": 64},
+      {"local": "2001:db8:ff::2", "prefix": 64}
+    ],
+    "routes": [
+      {"gateway": "2001:db8:1::1", "metric": 300},
+      {"gateway": "2001:db8:ff::1", "metric": 2048}
+    ]
+  }
+}
