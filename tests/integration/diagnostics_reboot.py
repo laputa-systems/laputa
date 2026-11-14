@@ -266,7 +266,7 @@ def setup():
     staging = work / "state-staging"
     stage_state(staging)
     subprocess.run(
-        ["/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"],
+        ["unshare", "-Ur", "/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"],
         check=True,
     )
     state_image.chmod(0o600)

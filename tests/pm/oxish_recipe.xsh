@@ -1,10 +1,10 @@
-##! The oxish recipe consumes one pinned ssh-build release archive and installs its four executables.
+##! The oxish recipe consumes one pinned ssh-build release archive and installs its six executables.
 use packages.oxish.PKGBUILD as oxish_recipe
 use pm.recipe
 use pm.types
 use pm.util
 
-const executables = ["oxish", "oxish-keygen", "oxish-server", "oxish-session"]
+const executables = ["oxish", "oxish-keygen", "oxish-scp", "oxish-server", "oxish-session", "oxish-sftp"]
 const documents = ["LICENSE-APACHE", "LICENSE-MIT", "THIRD-PARTY.md", "provenance.json"]
 
 proc stage_release(root: Path, omit: Str) [fs, error] -> Result[Path] {
@@ -78,7 +78,7 @@ test oxish_recipe_installs_the_release_executables_and_service_modules [fs, erro
 }
 
 test oxish_recipe_refuses_a_release_missing_an_executable_or_document [fs, error] { |ctx|
-  for omit in ["bin/oxish", "bin/oxish-session", "provenance.json"] {
+  for omit in ["bin/oxish", "bin/oxish-session", "bin/oxish-scp", "bin/oxish-sftp", "provenance.json"] {
     let root = test.temp_dir(ctx, name: f"oxish missing {omit.replace("/", with: "-")}")?
     let release = stage_release(root, omit)?
     assert oxish_recipe.install_release(release, p"packages/oxish", fp"{root}/dest") is Err(_)

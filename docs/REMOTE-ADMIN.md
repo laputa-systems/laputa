@@ -68,9 +68,42 @@ a trusted channel such as the console. The oneshot never replaces an existing ke
 
 ## Qualification
 
-The drills below are written for `oxish-server --mode login`. They were migrated from
-the previous SSH server and have not been run against a published `oxish` release
-(LAP-57); their earlier passing runs do not carry over.
+The drills below run against `oxish-server --mode login` from the pinned `oxish` 0.2.0
+package (ssh-build `release-ba4e5e2`, artifact `64565a0a`). On 2026-11-14, on Linux
+x86_64/KVM at Laputa `98e9f542` with the XSH seed built from `befe5ced1`, each passed:
+`remote_admin.py` (16 s), `ssh_network_recovery.py` (61 s), `g2_lifecycle.py` steps 1-6 (252 s),
+`maintained_guest.py --proof`, `--fallback` and `--firewall`, `dhcp_lifecycle.py`,
+`diagnostics_reboot.py`, `backup_schedule.py`, `timers_guest.py` and
+`installer-qemu-test.xsh`. Per-drill results are in [QEMU](QEMU.md#oxish-and-nfcrt-guest-qualification).
+No Asterinas run exists for the login server.
+
+The first runs found three Laputa defects, fixed with regression tests where code was
+involved, and two behaviors of OxiSH that the drills had assumed away. Neither behavior is
+an OxiSH defect:
+
+- **Writable `/usr/bin`.** `oxish-server` refuses to start when the directory holding
+  its session helper is writable by others. Root composition created every parent
+  directory a payload does not list with mode 0777, because a rooted `mkdir` ignores
+  the umask. `confined.ensure_dir` now creates them 0755
+  (`test_root_creates_implicit_parent_directories_without_world_write`).
+- **State-disk ownership.** `oxish-server` also requires `/etc` and `/etc/oxish` to be
+  owned by root. Drills that populated the state disk with `mkfs.ext4 -d` as the host
+  user gave them the host uid; `maintained_guest.py` and `diagnostics_reboot.py` now run
+  the formatter under `unshare -Ur` so every inode is root-owned and the journal stays.
+- **No banner before the client's.** `oxish-server` sends its identification string only
+  after reading the client's, so the host-side readiness probes (`remote_admin.py`,
+  `g2_lifecycle.py`) send one before they read.
+- **Sessions end with the connection.** When a connection closes, OxiSH ends the
+  session's command (stdin EOF, then `TERM`, then `KILL`); Dropbear left it running. The
+  activation disconnect drill (`activation_ssh.py`, run by `g2_lifecycle.py`) therefore
+  starts its tracing writer in its own session, so the write that the disconnect
+  interrupts still completes and the reconnect can reconcile it. A writer left in the
+  session did not finish. A protocol client must treat a lost connection as a possible
+  interruption of the remote program, not only as a lost reply.
+- **Installer target.** `installer/setup-laputa.xsh` wrote a group file without
+  `xinit-admin`, so the boot scanner exited and no service started; the smoke target also
+  carried `oxish` without `crabtables`, whose `firewall` oneshot `oxish` needs. Both are
+  fixed, and the installer's bare path literals in the boot hooks now use `p"..."`.
 
 `tests/system/remote_guest.xsh` runs the guest program as a script and covers
 refusals, bounded input and the staging contract. `tests/integration/remote_admin.py`

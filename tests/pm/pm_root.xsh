@@ -592,6 +592,23 @@ test test_root_runtime_closure_ignores_build_only_dependency [fs, error] { |ctx|
   assert fp"{output}/usr/bin/compiler".exists()? == false
 }
 
+test test_root_creates_implicit_parent_directories_without_world_write [fs, error] { |ctx|
+  let store_root = test.temp_dir(ctx, name: "root-implicit-parent-store")?
+  let artifact = commit_artifact(
+    ctx,
+    store_root,
+    "implicit",
+    types.Payload,
+    [payload_file("usr/bin/app", "app"), payload_file("etc/ssl/certs/ca.pem", "pem")],
+  )?
+  let plan = root.preflight(types.target_aarch64(), [artifact])?
+  let output = fp"{test.temp_dir(ctx, name: "root-implicit-parent-output")?}/root"
+  let _ = root.compose_artifacts(output, plan, [artifact])?
+  for directory in ["usr", "usr/bin", "etc", "etc/ssl", "etc/ssl/certs"] {
+    assert fp"{output}/{directory}".metadata()?.mode.bit_and(0o7777) == 0o755
+  }
+}
+
 test test_root_failed_composition_leaves_completed_output_untouched [fs, error] { |ctx|
   let store_root = test.temp_dir(ctx, name: "root-immutable-store")?
   let artifact = commit_artifact(

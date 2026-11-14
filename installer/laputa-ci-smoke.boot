@@ -1,4 +1,24 @@
 #!/bin/xsh
+# The QEMU harness reads the serial console: the PL011 UART on aarch64 virt,
+# the 16550 UART on x86_64 pc. The kernel's /dev/console may be tty0 instead.
+proc report(marker: Str) {
+  print $marker
+
+  for serial in [p"/dev/ttyAMA0", p"/dev/ttyS0"] {
+    match serial.exists() {
+      Ok(true) => {
+        match serial.write(f"""{marker}
+""") {
+          Ok(_) | Err(_) => {}
+        }
+
+        return
+      }
+      Ok(false) | Err(_) => {}
+    }
+  }
+}
+
 proc main() [fs, process, time, error] {
   # 1. Assert external networking is NOT yet configured (no DHCP by default).
   let observed = linux.network_dump()?
@@ -17,7 +37,7 @@ proc main() [fs, process, time, error] {
   if has_ext_addr {
     # The script already ran (or something else brought the interface up).
     # The interface being up is the desired end state, so treat it as OK.
-    print "LAPUTA_TARGET_CI_OK"
+    report("LAPUTA_TARGET_CI_OK")
     return
   }
 
@@ -58,7 +78,7 @@ iface eth0 inet dhcp
   }
 
   if ! got_lease {
-    print "LAPUTA_TARGET_CI_FAILED: no DHCP lease after 15 s"
+    report("LAPUTA_TARGET_CI_FAILED: no DHCP lease after 15 s")
     return
   }
 
@@ -73,12 +93,12 @@ iface eth0 inet dhcp
   }
 
   if ! has_default {
-    print "LAPUTA_TARGET_CI_FAILED: no default route after DHCP"
+    report("LAPUTA_TARGET_CI_FAILED: no default route after DHCP")
     return
   }
 
   # 6. Smoke test passed.
-  print "LAPUTA_TARGET_CI_OK"
+  report("LAPUTA_TARGET_CI_OK")
 }
 
 main()

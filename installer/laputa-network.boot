@@ -21,7 +21,7 @@ proc main() [fs, process, net, error] {
     return
   }
 
-  let path_value = /etc/network/interfaces
+  let path_value = p"/etc/network/interfaces"
 
   return unless path_value.exists()
 

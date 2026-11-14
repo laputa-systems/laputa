@@ -110,7 +110,7 @@ def ensure_state_image(ruleset="packaged", apply_args=(), trust_store=False):
         seed_trust_store(staging)
     run_xsh(str(apply_fixture), "--", str(staging), *apply_args)
     subprocess.run(
-        ["/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"],
+        ["unshare", "-Ur", "/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"],
         check=True,
     )
     state_image.chmod(0o600)
@@ -136,6 +136,7 @@ def launch(argv, console, errlog, extra_cmdline=""):
         pathlib.Path(socket).unlink(missing_ok=True)
     except (ValueError, IndexError):
         pass
+    pathlib.Path(console).unlink(missing_ok=True)
     err = open(errlog, "wb")
     child = subprocess.Popen(fixed, stdout=subprocess.DEVNULL, stderr=err, cwd=root)
     return child, err

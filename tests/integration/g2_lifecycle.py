@@ -531,6 +531,7 @@ def wait_ssh(child, console, port, timeout=240):
         try:
             with socket.create_connection(("127.0.0.1", port), timeout=2) as probe:
                 probe.settimeout(2)
+                probe.sendall(b"SSH-2.0-laputa-probe\r\n")
                 if probe.recv(64).startswith(b"SSH-2.0-"):
                     return
         except OSError:
@@ -858,6 +859,7 @@ def step_remote(args, work, port, key, pin, hostname, digest, console, operator_
         with socket.create_connection(("127.0.0.1", port), timeout=3) as probe:
             probe.settimeout(5)
             try:
+                probe.sendall(b"SSH-2.0-laputa-probe\r\n")
                 banner = probe.recv(64)
             except OSError:
                 banner = b""

@@ -321,6 +321,26 @@ proc prompt_network_method(ci: Bool) -> Result[Str] {
   "dhcp"
 }
 
+## The target's group database. `xinit-admin` has baselayout's gid: the boot scanner refuses to start without it.
+export pure installer_target_group() -> Str {
+  """root:x:0:
+wheel:x:4:pazu
+tty:x:5:
+disk:x:9:
+dialout:x:11:
+audio:x:12:
+video:x:13:
+network:x:21:
+kvm:x:24:
+input:x:25:
+seat:x:26:
+nogroup:x:99:
+users:x:100:
+pazu:x:1000:
+xinit-admin:x:124:
+"""
+}
+
 ## The normal installed target's inittab: one boot scanner and the operator logins.
 export pure normal_target_inittab(serial_console: Str) -> Str {
   f"""::sysinit:/usr/lib/init/rc.boot
@@ -382,24 +402,7 @@ nobody:*:0:0:99999:7:::
   )
   fp"{root}/etc/shadow".chmod(0o600)
 
-  write_file(
-    fp"{root}/etc/group",
-    """root:x:0:
-wheel:x:4:pazu
-tty:x:5:
-disk:x:9:
-dialout:x:11:
-audio:x:12:
-video:x:13:
-network:x:21:
-kvm:x:24:
-input:x:25:
-seat:x:26:
-nogroup:x:99:
-users:x:100:
-pazu:x:1000:
-""",
-  )
+  write_file(fp"{root}/etc/group", installer_target_group())
 
   write_file(fp"{root}/etc/network/interfaces", target_interfaces(network_method)?)
 

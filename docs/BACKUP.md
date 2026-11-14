@@ -187,5 +187,33 @@ cancelled failing backup stops advancing its failure counter.
   backup is reported through timer state, and a second boot restores the
   receipt's snapshot onto a blank disk and verifies identity and the quiesced
   writer boundary.
+- `tests/integration/backup_recovery.py` proves the recovery described under
+  Quiescence on a rebuilt `qemu-maintained` bundle under KVM. Timer jobs run the
+  shipped quiesce hook, with the shipped recovery flags read from
+  `profiles/qemu-maintained/etc/laputa/backup.json`, over `logger` and `dhcp-eth0`
+  plus `oxish`, which the test stops first, and then block as a backup does while
+  rustic runs. Each job is lost a different way: its timeout expires, an operator
+  cancels it, its leader is killed with SIGKILL, and the scheduler restarts. The
+  drill requires, for every case, that the record names `logger` and `dhcp-eth0` as
+  acquired and `oxish` as not, that both acquired services stand down under the
+  attempt's token, that both are `desired=up state=running` again within the
+  published bound (124.5 s here: 0.5 + 4 + 2 x 60), that `oxish` stays `desired=down`
+  with its control file and state untouched, that the record is gone, that the
+  scheduler logged exactly one `quiesce-released` and no `quiesce-release-exhausted`,
+  and that two further `backup-quiesce.xsh reconcile JOB` runs print `released=false`
+  and move no service. After the cancellation it also requires that no attempt or
+  retry starts, though the job allows two retries. On 2026-11-14 it passed with
+  exit 0; a subsequent independently reviewed rerun released in 3.9 s (timeout),
+  4.3 s (cancel), 4.1 s (SIGKILL) and 3.5 s (scheduler restart). The timeout
+  measurement starts at the host's run request plus the configured timeout,
+  no later than the actual timeout deadline, so detection and cancellation are included.
+  A fifth lost attempt verifies that an operator stop of `logger` after acquisition
+  survives recovery while `dhcp-eth0` resumes; it completed in 3.1 s. Current rerun logs are in
+  `.work/logs/resume-backup-recovery-final.log` in the guest-drills worktree.
+  The drill uses a tap with no DHCP server and
+  leaves `/usr` untouched: the jobs and a runner script live on the state disk.
+- `tests/integration/backup_schedule.py` passed on the same date with exit 0 in 103 s
+  (five scheduled runs, three snapshots kept, receipt-bound restore of the quiesced
+  state). `tests/integration/timers_guest.py` passed in 91 s.
 - `tests/integration/restore_drill.py` remains the primary manual restore
   proof, including the two-key and masterkey recovery checks.

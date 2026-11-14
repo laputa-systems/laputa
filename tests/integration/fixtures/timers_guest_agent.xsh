@@ -126,6 +126,9 @@ proc handle(fd: Int, line: Str) -> Result[Unit, Error] {
   } else if op == "timers" {
     let arguments = json.get(request, ["args"], []).require(List[Str])?
     reply(fd, {ok: true, result: run_timers(arguments)?})?
+  } else if op == "sync" {
+    let status = process.run(process.command_argv(p"/usr/bin/xsh", ["xsh", "/usr/lib/xsh/core/sync"], cwd: p"/", timeout: 30s))?
+    reply(fd, {ok: true, result: {exit: status.exit_code()?}})?
   } else if op == "restart" {
     reply(fd, {ok: true, result: xinit_restart()?})?
   } else if op == "remote" {

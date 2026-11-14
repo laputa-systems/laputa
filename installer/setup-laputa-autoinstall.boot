@@ -4,7 +4,7 @@
 proc report(marker: Str) {
   print $marker
 
-  for serial in [/dev/ttyAMA0, /dev/ttyS0] {
+  for serial in [p"/dev/ttyAMA0", p"/dev/ttyS0"] {
     match serial.exists() {
       Ok(true) => {
         match serial.write(f"""{marker}
@@ -25,7 +25,7 @@ proc main() [fs, process, error] {
 
   p"/etc/laputa-installer/ci.started".write("1\n")
 
-  match process.run(process.command_argv(/usr/bin/setup-laputa, ["setup-laputa", "--ci"], timeout: 120s)) {
+  match process.run(process.command_argv(p"/usr/bin/setup-laputa", ["setup-laputa", "--ci"], timeout: 120s)) {
     Ok(status) => report(if status.ok { "LAPUTA_INSTALLER_CI_OK" } else { "LAPUTA_INSTALLER_CI_FAILED" })
     Err(err) => {
       print ${err.message}

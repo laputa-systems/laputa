@@ -3,7 +3,7 @@
 
 One virtio-serial agent, installed only on the disposable state disk, drives the
 guest. The test runs a short-interval job and a bounded-retry job, cancels and
-resumes a job, pauses the VM through QMP, hard-resets it, restarts the scheduler
+resumes a job, pauses the VM through QMP, flushes state before a cold boot, restarts the scheduler
 through xinit, and reads the same status through the existing remote program.
 It exercises only the state disk; the immutable generation is unchanged.
 """
@@ -417,11 +417,13 @@ def run(args):
         reboot_calendar_next = named(reboot_status, "calendar")["next"]["wall_ms"]
         reboot_daily_next = named(reboot_status, "daily-sync")["next"]["wall_ms"]
         boot_id = reboot_before["boot_id"]
+        if agent.request("sync").get("exit") != 0:
+            raise AssertionError("the guest could not flush its state disk before the cold boot")
         dl.stop_guest(guest, errlog, qmp)
         guest = errlog = qmp = None
         agent.close()
         agent = None
-        dl.log("guest stopped; cold booting the same state disk")
+        dl.log("guest flushed and stopped; cold booting the same state disk")
         tap_fd = dl.create_tap(args, "ttap1", "192.0.4.1")
         console2 = scratch / "timers-console-2.log"
         guest, errlog, control, qmp_path = dl.launch(args, scratch, "reboot", state, tap_fd, console2)

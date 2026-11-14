@@ -123,6 +123,18 @@ rather than a silent empty cohort: `ipv6=unsupported disabled=1 policy=installed
 sysctl=1 addresses=0 routes=0 enumerated=1`. Any other state is a failure. This
 reports IPv6 as unsupported; it does not add IPv6 support.
 
+### Run the backup recovery drill
+
+`python3 tests/integration/backup_recovery.py` needs the built `qemu-maintained` image and
+KVM, owns a user and network namespace and a tap with no DHCP server, and talks to the guest
+through the same virtio-serial agent style as the timers drill
+(`tests/integration/fixtures/backup_recovery_agent.xsh`, installed only on the disposable state
+disk). It starts timer jobs that quiesce `logger` and `dhcp-eth0` and then block, loses each
+attempt (timeout, cancellation, SIGKILL of its leader, scheduler restart), and requires the
+services back within the bound [BACKUP](BACKUP.md#verification) publishes, a previously stopped
+service still down, a later operator stop preserved, no new attempt after the cancellation, and a repeated recovery that moves
+nothing. Pass `--xsh`, `--core` and `--bundle` for a seed other than `.out/seed/x86_64`.
+
 ### Run the maintained clock drill
 
 `python3 tests/integration/maintained_ntp.py` needs the built `qemu-maintained` image,

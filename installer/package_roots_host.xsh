@@ -6,10 +6,11 @@ error InstallerPackageHostError = Failed : InvalidData
 ## Where `prepare` composes the installer's three roots.
 export type InstallerRoots = {target: Path, installer: Path, tools: Path}
 
-pure target_roots(kernel_package: Str, smoke: Bool) -> List[Str] {
+## The target root's packages. The `oxish` service needs the `firewall` oneshot, so the smoke target carries `crabtables` with it.
+export pure installer_target_roots(kernel_package: Str, smoke: Bool) -> List[Str] {
   var roots = ["baselayout", "doas-rs", "xsh", "xinit", "laputa-pm", "laputa-net", "ca-certificates", kernel_package]
   if smoke {
-    roots += ["oxish"]
+    roots += ["oxish", "crabtables"]
   }
 
   roots
@@ -57,7 +58,7 @@ export proc prepare(
   let store = fp"{packages}/store"
   var plan_roots = []
 
-  for name in [@target_roots(kernel_package, smoke), @installer_roots(), @tools_roots()] {
+  for name in [@installer_target_roots(kernel_package, smoke), @installer_roots(), @tools_roots()] {
     if name not in plan_roots {
       plan_roots += [name]
     }
@@ -73,7 +74,7 @@ export proc prepare(
   world.require_mirror_plan(plan, repo_url)
   world.host_pm_build(repo_url, input: plan, store:, jobs:)
 
-  compose(repo_url, plan, store, roots.target, target_roots(kernel_package, smoke))
+  compose(repo_url, plan, store, roots.target, installer_target_roots(kernel_package, smoke))
   compose(repo_url, plan, store, roots.installer, installer_roots())
   compose(repo_url, plan, store, roots.tools, tools_roots())
 }

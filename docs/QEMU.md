@@ -634,7 +634,8 @@ On 2026-10-29, Linux x86_64/KVM proofs established:
 - rejection of changed kernel/disk bytes, mismatched receipts, incomplete publication,
   missing state, and public state permissions before consuming a boot attempt;
 - fresh guests with missing or rejected firewall rules keeping the SSH server down
-  (proved before SSHB-7 with the previous SSH server; the `oxish` service has not rerun it, see LAP-57).
+  (proved before SSHB-7 with the previous SSH server and rerun with `oxish` and `nfcrt` on 2026-11-14, see
+  [OxiSH and nfcrt guest qualification](#oxish-and-nfcrt-guest-qualification)).
 
 All owned QEMU PIDs were reaped. The initial writable-generation reboot proof was
 superseded by the separate-state proof. The firewall fixtures and initial fallback
@@ -674,3 +675,73 @@ holding `oxish-server`, `oxish-session` and `oxish-keygen` (an unpacked release
 archive's `bin/`); it runs as an unprivileged account with `XSH_HOST` naming the host `xsh`.
 It verifies a real owned listener and a conflicting foreign listener, then stops
 and reaps every child it starts.
+
+### OxiSH and nfcrt guest qualification
+
+On 2026-11-14 the maintained guest drills ran, one VM at a time, against `oxish-server --mode login`
+(package `oxish` 0.2.0, ssh-build `release-ba4e5e2`) and the `nfcrt` firewall (package `crabtables`
+0.1.0, laputa-systems/crabtables `38646b8f2f6e`). Host: Linux x86_64, KVM, QEMU 11.1.2; guest kernel
+`linux` 7.2.9; Laputa `98e9f542` plus the fixes listed below; XSH seed `befe5ced1`. Logs are under
+the worktree's `.work/logs/` and `target/laputa/qemu-maintained/`. All exit codes are 0.
+
+| Drill | Result |
+|---|---|
+| `remote_admin.py --xsh .out/seed/x86_64/xsh --oxish-keygen oxish-keygen` | `PASS: administered one headless Laputa VM over the native SSH client` (wrong host key refused, pinned key verified, `mlkem768x25519-sha256` with `aes128-gcm@openssh.com`, run/stage/digest, 96 MiB transfer interrupted at 120 ms and reconciled, scratch removed), 16 s |
+| `ssh_network_recovery.py` | `PASS ssh network recovery`: verified SSH on the DHCP address survived link loss, lease expiry, daemon restart and NIC reappearance, with `ipv6=unsupported`, 61 s |
+| `g2_lifecycle.py --oxish-keygen oxish-keygen` | `PASS: G2 steps 1-6 on one installed x86_64/KVM VM`, including the SSH disconnect drill against the same guest, 252 s |
+| `maintained_guest.py --proof` | `PASS proof: identity survived the reboot with logger and dhcp supervised`, 29 s |
+| `maintained_guest.py --fallback` | three `PASS fallback` lines (two power cuts, failed generation named, record rests on `a`), 124 s |
+| `maintained_guest.py --firewall` | `PASS firewall: missing ruleset` and `invalid ruleset left the firewall failed and oxish down`: `nfcrt` rejects the invalid file, 48 s |
+| `diagnostics_reboot.py` | `PASS diagnostics-reboot`, 98 s |
+| `dhcp_lifecycle.py` | `PASS dhcp lifecycle` and `PASS offline boot` with `oxish` running, 96 s |
+| `maintained_ntp_offline.py` | `PASS maintained ntpd-rs offline`: ready at stratum 16 and stable for 120 s, 129 s |
+| `maintained_ntp.py` (real NTS operators) | `PASS maintained clock: offline`: stratum 2, an `nfcrt`-inserted rule drops UDP 123 and TCP 4460, the clock moved 1 ms, 315 s |
+| `backup_schedule.py` | `PASS scheduled-backup`: five runs, three snapshots kept, receipt-bound restore, 103 s |
+| `timers_guest.py` | `PASS timers guest`: interval, retries, cancellation, pause, reboot, restart, remote status, 91 s |
+| `backup_recovery.py` | `PASS backup recovery`: four loss cases and a later operator stop, see [backup](BACKUP.md#verification) and `.work/logs/resume-backup-recovery-final.log` |
+| `installer-qemu-test.xsh` (x86_64, KVM, local mirror) | installer and installed target boot; `LAPUTA_TARGET_CI_OK`; SSH as `pazu` shows `oxish running` and `xsh --help`; 75 s |
+
+The shipped ruleset admits TCP 22 under `policy drop`: every SSH drill above reaches the guest through
+it. `nfcrt` loaded the same `/etc/nftables.conf` that `nft` did and the drills required no change to it.
+The Asterinas guest has no `NETLINK_NETFILTER` socket, so the firewall service cannot run there; keep
+Asterinas out of the firewall profile until its kernel implements `NETLINK_NETFILTER` and nf_tables.
+
+Fixes made by these runs, each with the check that now covers it:
+
+- `pm/confined.xsh`: implicit payload parent directories (`/usr/bin`, `/etc/ssl`, ...) were created 0777,
+  which `oxish-server` refuses (`tests/pm/pm_root.xsh`, `test_root_creates_implicit_parent_directories_without_world_write`).
+- `installer/laputa-network.boot` and `setup-laputa-autoinstall.boot` used bare path literals that the
+  current XSH rejects, so the installer's PID 1 exited with status 3 and panicked; `make check` covers them.
+- `installer/setup-laputa.xsh` wrote a group file without `xinit-admin`, so `xinit scan boot` failed
+  with `group-not-found` and no service started (`tests/system/inittab_scan.xsh`).
+- The installer smoke target now carries `crabtables`, since `oxish` needs the `firewall` oneshot
+  (`tests/system/installer_target_roots.xsh`).
+- `installer/laputa-ci-smoke.boot` printed its marker on `/dev/console`, which is `tty0` under
+  `console=ttyS0 console=tty0`; it now also writes the serial device like the autoinstall hook.
+- `maintained_guest.py` and `diagnostics_reboot.py` build the state disk under `unshare -Ur` so the inodes
+  are root-owned, and `maintained_guest.py` removes a stale console log before each launch (a leftover
+  `LAPUTA_MAINTAINED_PROOF_READY` from an earlier run satisfied the wait and the guest was killed at once).
+- `tests/pm/oxish_recipe.xsh` staged a four-executable release; it now stages the six the recipe installs.
+- `remote_admin.py` and `g2_lifecycle.py` send a client identification before reading the banner, and the
+  activation disconnect fixture detaches its writer; see [remote administration](REMOTE-ADMIN.md#qualification).
+- `timers_guest.py` syncs the state disk before its cold boot and retains its limit of three observed
+  interval runs across reboot catch-up.
+- The operator-stop recovery case exposed an unnecessary wait for that service to become up.
+  `backup_quiesce.xsh` now preserves the newer down state without waiting for it to change
+  (`tests/system/backup_quiesce.xsh`). The scanner claims inbox requests before reading them,
+  so removing a consumed request cannot delete a newer operator command (`xinit/tests/xinit.xsh`).
+
+The maintained state disk is formatted by `laputa-fs`'s `mkfs.ext4.xsh`, which writes no journal. A
+guest killed mid-write corrupted it (`EXT4-fs error ... doubly allocated`, then `EUCLEAN` from `xinit`),
+which is how `timers_guest.py` first failed. Drills that stop a guest without a power-cut intent flush
+first (`xsh /usr/lib/xsh/core/sync`). Whether the product state disk should carry a journal is open.
+
+The final rerun also passes remote administration, SSH network recovery and G2 steps 1-6 with
+the XSH `1598ef041` release client, plus the five-case backup recovery drill and scheduled
+backup/restore. Logs use the `.work/logs/resume-` prefix. The guest keeps seed `befe5ced1`;
+the rebuilt bundle contains xinit artifact `d47fc8bc86a1` and backup artifact `691c5d89aa7d`,
+whose installed scripts match the reviewed sources byte for byte. Host checks pass 396 PM
+tests (one Tailscale fixture skip), 67 xinit tests and all fourteen quiescence tests.
+
+A full `make publish` still fails on `laputa-diagnostics` (`fs-install: No such file or directory` for
+`repository/system/diagnostics.xsh`), with or without the changes above; no drill depends on it.

@@ -257,7 +257,15 @@ test test_an_operator_stop_after_acquisition_survives_recovery [fs, process, tim
   quiesce.quiesce_stop_service(r.env, record, "dhcp-eth0")?
   let operator = process.run(process.command_argv(r.env.xinit[0], r.env.xinit + ["stop", "logger"]))?
   assert operator.ok
-  assert quiesce.quiesce_release_record(r.env, "backup", 0)?
+  let release = test.run_script(ctx, """use system.backup_quiesce as quiesce
+let qe: quiesce.QuiesceEnv = {
+  xinit: [args[0], args[1], args[2]], state_dir: Path(args[2]),
+  records: Path(args[3]), writers: Path(args[4]), scratch: Path(args[5]),
+}
+assert quiesce.quiesce_release_record(qe, "backup", 0)?
+""", [@r.env.xinit, r.env.records.display(), r.env.writers.display(), r.env.scratch.display()])?
+  assert release.success, release.stderr
+  assert "did not reach up" not in release.stdout, release.stdout
   assert transitions(r)? == ["logger down", "dhcp-eth0 down", "logger down", "dhcp-eth0 up"]
   assert status_of(r, "logger")? == "down"
   assert status_of(r, "dhcp-eth0")? == "up"

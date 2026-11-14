@@ -751,7 +751,7 @@ archive: the `oxish` package pins that archive by checksum and installs
 login shell, and serves the `sftp` subsystem as the account (OpenSSH `sftp` and
 `scp`, and `oxish-sftp`/`oxish-scp`). It provides no forwarding, agent, X11 or
 password login; those stay out of scope until a consumer needs them. The package
-pins ssh-build `release-ba4e5e2`; the guest drills that need it are migrated but unrun (LAP-57).
+pins ssh-build `release-ba4e5e2`; the guest drills that need it passed on 2026-11-14 ([Remote administration](REMOTE-ADMIN.md#qualification)).
 
 [xsh-infra](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-56-xsh-infra.md)
 is a separate pyinfra-inspired tool over the same client, for hosts without a

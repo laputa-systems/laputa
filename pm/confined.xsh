@@ -21,8 +21,9 @@ export proc create_staging(publication: FsRoot, parent: Str, name: Str) [fs, err
   staging
 }
 
-## Creates every missing directory of canonical relative `path_value` beneath `root`; each
-## existing component must already be a directory, never a symlink.
+## Creates every missing directory of canonical relative `path_value` beneath `root` with mode
+## 0755, since a rooted `mkdir` ignores the umask; each existing component must already be a
+## directory, never a symlink.
 export proc ensure_dir(root: FsRoot, path_value: Str) [fs, error] {
   var prefix = ""
 
@@ -30,7 +31,7 @@ export proc ensure_dir(root: FsRoot, path_value: Str) [fs, error] {
     prefix = joined(prefix, component)
     let relative = rel(prefix)?
 
-    match root.mkdir(relative) {
+    match root.mkdir(relative, mode: 0o755) {
       Ok(_) => {}
       Err(problem) => guard root.stat(relative)?.kind == "dir" else {
         return Err(types.PmError.PackageConflict(f"{prefix} is not a directory: {problem.message}"))

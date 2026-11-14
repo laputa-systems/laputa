@@ -277,6 +277,10 @@ proc quiesce_wait(qe: QuiesceEnv, service: Str, up: Bool, timeout_ms: Int) [fs, 
   while true {
     let value = quiesce_status(qe, service)?
     if up {
+      if value != null and json.get(value, ["desired"], "down").require(Str)? == "down" {
+        print f"quiesce service={service} desired=down note=operator-state-preserved"
+        return Ok()
+      }
       if quiesce_up(value) {
         print f"quiesce service={service} desired=up state=running"
         return Ok()
