@@ -212,6 +212,15 @@ cancelled failing backup stops advancing its failure counter.
   `.work/logs/resume-backup-recovery-final.log` in the guest-drills worktree.
   The drill uses a tap with no DHCP server and
   leaves `/usr` untouched: the jobs and a runner script live on the state disk.
+- The same guest drill also kills supervised jobs after the record's fsync,
+  the first and last stops, the first and last releases, and record retirement.
+  It imports a copy of the installed helper whose complete bytes must match
+  the shipped module. Each cut must restore acquired services without restarting
+  untouched services, leave a previously stopped service alone, and make repeated
+  reconciliation a no-op. A final case pauses the scanner, requires a failed
+  bounded release to retain its record, resumes the scanner, and requires retry
+  to complete within the fixture's declared policy. All twelve cases pass;
+  evidence is in `.work/archive/backup-recovery-windows/recovery-windows-complete.log`.
 - `tests/integration/backup_schedule.py` passed on the same date with exit 0 in 103 s
   (five scheduled runs, three snapshots kept, receipt-bound restore of the quiesced
   state). `tests/integration/timers_guest.py` passed in 91 s.

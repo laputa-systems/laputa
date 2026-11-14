@@ -21,7 +21,13 @@ proc control_port() -> Result[Path, Error] {
 }
 
 proc reply(fd: Int, value: Any) -> Result[Unit, Error] {
-  let _ = unix.write_fd(fd, bytes.from_text(json.encode(value)? + "\n"))?
+  let body = bytes.from_text(json.encode(value)? + "\n")
+  var sent = 0
+  while sent < body.len() {
+    let written = unix.write_fd(fd, body[sent..])?
+    guard written > 0 else { return Err(error.failure("the control port stopped accepting the reply")) }
+    sent += written
+  }
 }
 
 proc text_of(source: Path, limit: Int) -> Result[Str, Error] {

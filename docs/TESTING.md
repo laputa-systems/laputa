@@ -134,6 +134,10 @@ attempt (timeout, cancellation, SIGKILL of its leader, scheduler restart), and r
 services back within the bound [BACKUP](BACKUP.md#verification) publishes, a previously stopped
 service still down, a later operator stop preserved, no new attempt after the cancellation, and a repeated recovery that moves
 nothing. Pass `--xsh`, `--core` and `--bundle` for a seed other than `.out/seed/x86_64`.
+The same VM then interrupts jobs at six durable helper boundaries and pauses
+the scanner to exercise a failed release and its bounded retry. The helper
+copy must match the installed module byte for byte; these cases use the real
+guest filesystem and xinit. Scanner pause is paired with resume in `finally`.
 
 ### Run the maintained clock drill
 

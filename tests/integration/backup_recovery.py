@@ -56,6 +56,53 @@ proc main(...argv: List[Str]) [fs, process, time, env, error] -> Result[Unit, Er
 """
 
 
+WINDOW_RUNNER = """#!/usr/bin/xsh
+use backup_quiesce
+
+proc mark(job: Str, cut: Str) [fs, process, time, error] -> Result[Unit, Error] {
+  fp"/var/lib/backup-recovery/{job}.window".write(f"{cut} {process.current_pid()?}\\n")?
+  time.sleep(900s)?
+}
+
+proc main(...argv: List[Str]) [fs, process, time, io, env, error] -> Result[Unit, Error] {
+  let job = e"LAPUTA_TIMER_NAME" ?? ""
+  let attempt = (e"LAPUTA_TIMER_ATTEMPT" ?? "0").parse_int()?
+  let cut = argv[0]
+  let options = match backup_quiesce.quiesce_options(["stop"] + argv[1..]) {
+    Ok(value) => value,
+    Err(problem) => { return Err(error.failure(problem)) },
+  }
+  let qe = backup_quiesce.quiesce_env_default()
+  let record = backup_quiesce.quiesce_plan(qe, job, attempt, options.services, p"/proc/sys/kernel/random/boot_id".read_text()?.trim(), time.now(), options)?
+  backup_quiesce.quiesce_write_record(qe, record)?
+  if cut == "record" { mark(job, cut)? }
+  var stopped = 0
+  for service in record.services {
+    if service.acquired {
+      backup_quiesce.quiesce_stop_service(qe, record, service.name)?
+      stopped += 1
+      if stopped == 1 and cut == "first-stop" { mark(job, cut)? }
+    }
+  }
+  if cut == "all-stops" or cut == "retry" { mark(job, cut)? }
+  var released = 0
+  for service in record.services {
+    if service.acquired {
+      backup_quiesce.quiesce_release_service(qe, record, service.name, record.release_timeout_ms)?
+      released += 1
+      if released == 1 and cut == "first-release" { mark(job, cut)? }
+    }
+  }
+  if cut == "last-release" { mark(job, cut)? }
+  let _ = backup_quiesce.quiesce_release_record(qe, job, 0)?
+  if cut == "retired" { mark(job, cut)? }
+}
+"""
+
+WINDOWS = ("record", "first-stop", "all-stops", "first-release", "last-release", "retired", "retry")
+RETRY_OPTIONS = {"--recover-timeout-ms": 1000, "--recover-retry-ms": 3000, "--recover-attempts": 5}
+
+
 def require_prerequisites(args):
     missing = []
     for name, path in (
@@ -161,6 +208,8 @@ def provision_state(args, scratch, jobs):
     runner.parent.mkdir(parents=True)
     runner.write_text(RUNNER_SOURCE)
     runner.chmod(0o755)
+    (runner.parent / "window.xsh").write_text(WINDOW_RUNNER)
+    shutil.copyfile(ROOT / "system/backup_quiesce.xsh", runner.parent / "backup_quiesce.xsh")
     shutil.copy(AGENT_FIXTURE, staging / "etc/laputa/recovery-agent.xsh")
     (staging / "etc/laputa/recovery-agent.xsh").chmod(0o755)
     boot_hooks = staging / "etc/rc.d"
@@ -395,6 +444,94 @@ def after_restart(guest, job, observation):
     assert pid and pid != SCHEDULER_BEFORE[job], f"{job}: the scheduler did not restart ({SCHEDULER_BEFORE[job]} -> {pid})"
 
 
+def window_attempt(guest, cut, bound, retry_options):
+    job = f"backup-window-{cut}"
+    marker = f"{PROOF_DIR}/{job}.window"
+    record_path = f"{QUIESCE_DIR}/{job}.json"
+    before = guest.observe()
+    assert all(is_up(before, name) for name in ("logger", "dhcp-eth0"))
+    assert is_down(before, STOPPED)
+    guest.timers("run-now", job)
+    writer_path = f"/var/lib/laputa-timers/runs/{job}.json"
+    observed = dl.wait_until(
+        lambda: (lambda value: value if value["files"][marker].strip() else None)(guest.observe(marker, record_path, writer_path)),
+        120, f"{job} marker", interval=1,
+    )
+    label, pid = observed["files"][marker].split()
+    assert label == cut
+    leader = int(pid)
+    assert leader > 1
+    assert json.loads(observed["files"][writer_path])["pid"] == leader
+    owned = ()
+    if cut != "retired":
+        record = json.loads(observed["files"][record_path])
+        assert {item["name"]: item["acquired"] for item in record["services"]} == {"logger": True, "dhcp-eth0": True, STOPPED: False}
+        token = record["token"]
+        owned = {"record": (), "first-stop": ("logger",), "all-stops": ("logger", "dhcp-eth0"), "retry": ("logger", "dhcp-eth0"), "first-release": ("dhcp-eth0",), "last-release": ()}[cut]
+        for name in ("logger", "dhcp-eth0"):
+            assert (observed["services"][name]["control"] == token) == (name in owned), (cut, name, observed["services"][name])
+            if name in owned:
+                assert is_down(observed, name), (cut, name, service_of(observed, name))
+        if cut == "record":
+            assert all(is_up(observed, name) for name in ("logger", "dhcp-eth0"))
+        if cut == "first-stop":
+            assert is_up(observed, "dhcp-eth0")
+    else:
+        assert not observed["files"][record_path].strip()
+    untouched = tuple(name for name in ("logger", "dhcp-eth0") if name not in owned)
+    observed = dl.wait_until(
+        lambda: (lambda value: value if all(is_up(value, name) for name in untouched) else None)(guest.observe(record_path)),
+        60, f"{job} untouched services ready",
+    )
+    assert identity(observed, STOPPED) == identity(before, STOPPED)
+    scanner = None
+    try:
+        if cut == "retry":
+            scanner = json.loads(guest.observe("/run/xinit/scanner.json")["files"]["/run/xinit/scanner.json"])["pid"]
+            assert scanner > 1, f"refusing to stop scanner pid {scanner}"
+            reply = guest.exec("/usr/bin/kill", "-STOP", str(scanner))
+            assert reply["exit"] == 0, reply
+        started, _ = stimulus_kill(guest, job, leader, time.monotonic())
+        if cut == "retry":
+            failed = dl.wait_until(lambda: (lambda value: value if count_events(value["scheduler_log"], "quiesce-release-failed", job) else None)(guest.observe(record_path)), 30, f"{job} release failure", interval=0.2)
+            assert failed["files"][record_path].strip(), "failed release retired its record"
+            assert count_events(failed["scheduler_log"], "quiesce-release-exhausted", job) == 0
+    finally:
+        if scanner is not None:
+            reply = guest.exec("/usr/bin/kill", "-CONT", str(scanner))
+            assert reply["exit"] == 0, reply
+    def recovered():
+        value = guest.observe(record_path)
+        return value if all(is_up(value, name) for name in ("logger", "dhcp-eth0")) and not value["files"][record_path].strip() else None
+    recovery_bound = bound
+    if cut == "retry":
+        acquired_count = sum(item["acquired"] for item in record["services"])
+        retry_cycle_ms = acquired_count * retry_options["--recover-timeout-ms"] + retry_options["--recover-retry-ms"]
+        recovery_bound = published_bound_seconds(acquired_count, retry_options) + (retry_options["--recover-attempts"] - 1) * retry_cycle_ms / 1000
+    value = dl.wait_until(recovered, recovery_bound + 5, f"{job} recovery", interval=0.5)
+    assert time.monotonic() - started <= recovery_bound
+    assert identity(value, STOPPED) == identity(before, STOPPED)
+    for name in untouched:
+        assert identity(value, name) == identity(observed, name), f"{job}: recovery restarted untouched {name}"
+    assert value["services"][STOPPED]["control"] == before["services"][STOPPED]["control"]
+    for name in ("logger", "dhcp-eth0"):
+        assert not value["services"][name]["queued"]
+    if cut != "retired":
+        dl.wait_until(lambda: count_events(guest.observe()["scheduler_log"], "quiesce-released", job) == 1, 15, f"{job} released")
+    settled = guest.observe()
+    for _ in range(2):
+        assert f"quiesce job={job} released=false" in guest.reconcile(job).lower()
+    again = guest.observe(record_path)
+    assert not again["files"][record_path].strip()
+    for name in WATCHED:
+        assert identity(again, name) == identity(settled, name)
+        assert again["services"][name]["control"] == settled["services"][name]["control"]
+    assert count_events(again["scheduler_log"], "quiesce-release-exhausted", job) == 0
+    if cut == "retry":
+        assert 1 <= count_events(again["scheduler_log"], "quiesce-release-failed", job) < retry_options["--recover-attempts"]
+    print(f"PASS backup-window-{cut}: recovered and repeated reconcile was a no-op")
+
+
 def run(args):
     require_prerequisites(args)
     services, flags, options = shipped_quiesce()
@@ -420,6 +557,13 @@ def run(args):
         document["command"] = command
         document["timeout_ms"] = timeout_ms
         jobs.append(document)
+    retry_options = {**options, **RETRY_OPTIONS}
+    for cut in WINDOWS:
+        document = job_document(f"backup-window-{cut}")
+        document["schedule"] = schedule
+        window_flags = [word for key, value in retry_options.items() for word in (key, str(value))] if cut == "retry" else flags
+        document["command"] = ["/usr/bin/xsh", "/etc/laputa/backup-recovery/window.xsh", cut, *services, STOPPED, *window_flags]
+        jobs.append(document)
     guest = errlog = qmp = agent = tap_fd = None
     try:
         tap_fd = dl.create_tap(args, "rtap0", "192.0.5.1")
@@ -433,6 +577,10 @@ def run(args):
         agent.ping()
         qmp = dl.Qmp(qmp_path)
         harness = Guest(agent)
+        copy_path = "/etc/laputa/backup-recovery/backup_quiesce.xsh"
+        shipped_path = "/usr/lib/laputa/backup-quiesce.xsh"
+        copies = harness.observe(copy_path, shipped_path)["files"]
+        assert copies[copy_path] == copies[shipped_path] == (ROOT / "system/backup_quiesce.xsh").read_text(), "installed quiesce helper differs from pinned source"
         wait_scheduler(harness)
         dl.wait_until(lambda: all(is_up(harness.observe(), name) for name in ("logger", "dhcp-eth0")), 120, "logger and dhcp-eth0 up")
         harness.xinit("stop", STOPPED)
@@ -452,6 +600,10 @@ def run(args):
             )
         elapsed, _ = lost_attempt(harness, "backup-operator", bound, stimulus_kill, after_kill, operator_stop="logger")
         print(f"PASS backup-operator: recovery in {elapsed:.1f}s preserved the operator's later logger stop and restored dhcp-eth0")
+        harness.xinit("start", "logger")
+        dl.wait_until(lambda: is_up(harness.observe(), "logger"), 60, "logger restored for windows")
+        for cut in WINDOWS:
+            window_attempt(harness, cut, bound, retry_options)
         print("PASS backup recovery: timeout, cancellation, SIGKILL and scheduler restart restored acquired services and preserved later operator intent")
     except Exception:
         if agent is not None:
