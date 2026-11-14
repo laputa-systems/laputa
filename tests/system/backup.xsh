@@ -62,6 +62,28 @@ test test_shipped_job_is_a_bounded_daily_calendar_backup [fs, error] {
   assert timers.timer_calendar_next(3, 47, BASE) == BASE + 3 * HOUR + 47 * MINUTE
 }
 
+type QuiesceBound = {transition_ms: Int, release_ms: Int, retry_ms: Int, attempts: Int}
+
+pure quiesce_flag(command: List[Str], flag: Str) -> Result[Int, Error] {
+  var index = 0
+  while index < command.len() - 1 {
+    if command[index] == flag {
+      return Ok(command[index + 1].parse_int()?)
+    }
+    index += 1
+  }
+  Err(error.failure(f"the shipped quiesce command does not publish {flag}"))
+}
+
+pure quiesce_bound(command: List[Str]) -> Result[QuiesceBound, Error] {
+  Ok({
+    transition_ms: quiesce_flag(command, "--timeout-ms")?,
+    release_ms: quiesce_flag(command, "--recover-timeout-ms")?,
+    retry_ms: quiesce_flag(command, "--recover-retry-ms")?,
+    attempts: quiesce_flag(command, "--recover-attempts")?,
+  })
+}
+
 test test_shipped_config_defines_the_backup_contract [fs, error] {
   let value = json.read(p"profiles/qemu-maintained/etc/laputa/backup.json")?
   let config = backup.backup_config_from_json(value)?
@@ -78,6 +100,13 @@ test test_shipped_config_defines_the_backup_contract [fs, error] {
     assert "stop" in quiesce.command
     assert "logger" in quiesce.command
     assert "dhcp-eth0" in quiesce.command
+    let published = quiesce_bound(quiesce.command)?
+    assert published.transition_ms == 30000 and published.release_ms == 60000
+    assert published.retry_ms == 30000 and published.attempts == 5
+    assert quiesce.timeout_ms >= 2 * published.transition_ms
+    if let release = config.release {
+      assert release.timeout_ms >= 2 * published.release_ms
+    }
   } else {
     fail "the shipped config has no quiesce hook"
   }

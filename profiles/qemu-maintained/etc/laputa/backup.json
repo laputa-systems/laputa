@@ -6,12 +6,12 @@
   "exclude_if_present": ".no-backup",
   "retention": {"keep_last": 3},
   "quiesce": {
-    "command": ["/usr/bin/xsh", "/usr/lib/laputa/backup-quiesce.xsh", "stop", "logger", "dhcp-eth0"],
-    "timeout_ms": 60000
+    "command": ["/usr/bin/xsh", "/usr/lib/laputa/backup-quiesce.xsh", "stop", "logger", "dhcp-eth0", "--timeout-ms", "30000", "--recover-timeout-ms", "60000", "--recover-retry-ms", "30000", "--recover-attempts", "5"],
+    "timeout_ms": 90000
   },
   "release": {
     "command": ["/usr/bin/xsh", "/usr/lib/laputa/backup-quiesce.xsh", "start", "logger", "dhcp-eth0"],
-    "timeout_ms": 60000
+    "timeout_ms": 130000
   },
   "rustic": "/usr/bin/rustic"
 }

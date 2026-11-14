@@ -24,6 +24,14 @@ export const TIMER_STATUS_FORMAT = "laputa-timers-status-1"
 export const TIMER_WRITER_FORMAT = "laputa-timer-writer-1"
 ## The state subdirectory holding one writer record per running attempt.
 export const TIMER_WRITER_DIR = "runs"
+## The state subdirectory holding one quiescence record per job, written by the job's hook.
+export const TIMER_QUIESCE_DIR = "quiesce"
+## The state subdirectory of run-now markers; the file name is the job.
+export const TIMER_TRIGGER_DIR = "trigger"
+## The command that releases one job's quiescence record; the job name is appended.
+export const TIMER_RELEASE_COMMAND = ["/usr/bin/xsh", "/usr/lib/laputa/backup-quiesce.xsh", "reconcile"]
+## Extra time the supervisor grants a release command beyond its own per-service bounds.
+export const TIMER_RELEASE_MARGIN_MS = 10000
 
 ## The generation-owned job definition directory.
 export const TIMER_JOB_DIR = p"/etc/laputa/timers/jobs.d"
@@ -66,12 +74,13 @@ export const TIMER_DAY_MS = 86400000
 const TIMER_HOUR_MS = 3600000
 const TIMER_MINUTE_MS = 60000
 const TIMER_NAME_RE = rx"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
-const TIMER_USAGE = """usage: timers [run|status|cancel NAME|resume NAME] [--jobs DIR] [--state DIR] [--run-dir DIR] [--json]
+const TIMER_USAGE = """usage: timers [run|status|cancel NAME|resume NAME|run-now NAME] [--jobs DIR] [--state DIR] [--run-dir DIR] [--json]
 
 run     supervise the job definitions until stopped (default)
 status  print last and next results per job
 cancel  stop starting one job and terminate its running process
 resume  clear one job's cancellation
+run-now start one job's attempt now, under supervision
 """
 
 ## One monotonic and wall reading taken together. `mono_ms` is process-local and never persisted.
@@ -219,8 +228,8 @@ export type TimerRunning = {
 ## One attempted start: the live child, or the failure it recorded.
 export type TimerStartOutcome = {started: TimerRunning?, state: TimerState, runtime: TimerRuntime}
 
-## The process identity the supervisor persists for one attempt. `pid` is also the
-## process group the attempt leads; `start_time_ms` is the leader's kernel start time.
+## The process identity the supervisor persists for one attempt. `pid` is the session the
+## attempt leads, which also contains every tool group the job starts; `start_time_ms` is the leader's kernel start time.
 export type TimerWriter = {
   name: Str,
   attempt: Int,
@@ -231,7 +240,13 @@ export type TimerWriter = {
 }
 
 ## Where writer records live, and the boot they are judged against.
-export type TimerWriterStore = {dir: Path, boot_id: Str}
+export type TimerWriterStore = {dir: Path, quiesce_dir: Path, boot_id: Str}
+
+## The supervisor's release bookkeeping for one job. Monotonic values never leave the process.
+export type TimerRelease = {due_mono_ms: Int, attempts: Int, reported: Bool}
+
+## The release bounds a job's hook published in its quiescence record.
+export type TimerReleasePolicy = {release_timeout_ms: Int, retry_delay_ms: Int, max_attempts: Int, services: Int}
 
 type SchedulerConfig = {job_dir: Path, state_dir: Path, run_dir: Path}
 
@@ -790,6 +805,32 @@ export pure timer_writer_from_json(value: Any) -> Result[TimerWriter, Error] {
   })
 }
 
+## Whether a job's release is due: `run`, `wait` for its retry delay, or `exhausted` after the
+## published number of failed attempts.
+export pure timer_release_due(release: TimerRelease, now_mono_ms: Int, max_attempts: Int) -> Str {
+  if release.attempts >= max_attempts {
+    return "exhausted"
+  }
+  if now_mono_ms < release.due_mono_ms {
+    return "wait"
+  }
+  "run"
+}
+
+## The bookkeeping after one release attempt.
+export pure timer_release_after(release: TimerRelease, now_mono_ms: Int, retry_delay_ms: Int, counted: Bool) -> TimerRelease {
+  {
+    due_mono_ms: now_mono_ms + retry_delay_ms,
+    attempts: if counted { release.attempts + 1 } else { release.attempts },
+    reported: release.reported,
+  }
+}
+
+## The longest one release command may run for a record naming `services` services.
+export pure timer_release_cap_ms(policy: TimerReleasePolicy) -> Int {
+  policy.release_timeout_ms * (if policy.services > 0 { policy.services } else { 1 }) + TIMER_RELEASE_MARGIN_MS
+}
+
 pure timer_options(argv: List[Str]) -> Result[TimerOptions, Str] {
   var options = TimerOptions(
     action: "run",
@@ -835,23 +876,23 @@ pure timer_options(argv: List[Str]) -> Result[TimerOptions, Str] {
       return Err(f"unknown option {word}")
     }
     if options.action == "run" and ! saw_action {
-      guard word in ["run", "status", "cancel", "resume"] else {
+      guard word in ["run", "status", "cancel", "resume", "run-now"] else {
         return Err(f"unknown action {word}")
       }
       options.action = word
       saw_action = true
       continue
     }
-    if options.action == "cancel" or options.action == "resume" {
+    if options.action == "cancel" or options.action == "resume" or options.action == "run-now" {
       guard options.name == "" and timer_name_ok(word) else {
-        return Err("cancel and resume take exactly one valid job name")
+        return Err("cancel, resume, and run-now take exactly one valid job name")
       }
       options.name = word
       continue
     }
     return Err(f"unexpected argument {word}")
   }
-  if options.action == "cancel" or options.action == "resume" {
+  if options.action == "cancel" or options.action == "resume" or options.action == "run-now" {
     guard options.name != "" else {
       return Err(f"{options.action} requires a job name")
     }
@@ -1174,36 +1215,49 @@ export proc timer_writer_names(store: TimerWriterStore) [fs, error] -> Result[Li
   Ok(names)
 }
 
-proc timer_writer_observe(record: TimerWriter, boot_id: Str) [process, error] -> Result[Str, Error] {
-  let present = match process.kill_group(record.pid, "0") {
-    Ok(_) => true
-    Err(problem) => {
-      guard problem.errno == 3 else {
-        return Err(problem)
-      }
-      false
-    }
-  }
+type TimerWriterScan = {verdict: Str, groups: List[Int]}
+
+proc timer_writer_observe(record: TimerWriter, boot_id: Str) [process, error] -> Result[TimerWriterScan, Error] {
   var leader = 0
-  var members = 0
-  if present {
-    for entry in process.list()? {
-      if entry.pid == record.pid {
-        leader = entry.start_time_ms
-      }
-      if (entry.pgrp ?? 0) == record.pid and ! entry.status.starts_with("Z") {
-        members += 1
+  var groups: List[Int] = []
+  for entry in process.list()? {
+    if entry.pid == record.pid {
+      leader = entry.start_time_ms
+    }
+    let pgid = entry.pgrp ?? 0
+    if (entry.session ?? 0) == record.pid and pgid > 1 and ! entry.status.starts_with("Z") {
+      if ! (pgid in groups) {
+        groups += [pgid]
       }
     }
   }
-  Ok(timer_writer_verdict(record.boot_id, boot_id, members > 0, leader, record.start_time_ms))
+  let verdict = timer_writer_verdict(record.boot_id, boot_id, ! groups.is_empty(), leader, record.start_time_ms)
+  Ok({verdict: verdict, groups: if verdict == "gone" { [] } else { groups }})
 }
 
-proc timer_writer_wait_gone(record: TimerWriter, boot_id: Str, limit_ms: Int) [process, time, error] -> Result[Bool, Error] {
+proc timer_writer_signal(groups: List[Int], signal: Str) [process, error] -> Result[Unit, Error] {
+  for pgid in groups {
+    match process.kill_group(pgid, signal) {
+      Ok(_) => {}
+      Err(problem) => {
+        guard problem.errno == 3 else {
+          return Err(problem)
+        }
+      }
+    }
+  }
+  Ok()
+}
+
+proc timer_writer_wait_gone(record: TimerWriter, boot_id: Str, resend: Str, limit_ms: Int) [process, time, error] -> Result[Bool, Error] {
   var waited = 0
   while true {
-    if timer_writer_observe(record, boot_id)? == "gone" {
+    let scan = timer_writer_observe(record, boot_id)?
+    if scan.verdict == "gone" {
       return Ok(true)
+    }
+    if resend != "" {
+      timer_writer_signal(scan.groups, resend)?
     }
     guard waited < limit_ms else {
       return Ok(false)
@@ -1214,32 +1268,20 @@ proc timer_writer_wait_gone(record: TimerWriter, boot_id: Str, limit_ms: Int) [p
   Ok(false)
 }
 
-## Stop whatever is left of the recorded writer group and report `gone` (nothing was
-## left), `stopped` (this call ended the last member) or `alive` (not proven stopped).
+## Stop whatever is left of the recorded writer and report `gone` (nothing was left),
+## `stopped` (this call ended the last member) or `alive` (not proven stopped). The writer is
+## the attempt's whole session: a snapshot tool the job started in its own process group
+## is still a member.
 export proc timer_writer_stop(record: TimerWriter, boot_id: Str) [process, time, error] -> Result[Str, Error] {
-  if timer_writer_observe(record, boot_id)? == "gone" {
+  let scan = timer_writer_observe(record, boot_id)?
+  if scan.verdict == "gone" {
     return Ok("gone")
   }
-  match process.kill_group(record.pid, "TERM") {
-    Ok(_) => {}
-    Err(problem) => {
-      guard problem.errno == 3 else {
-        return Err(problem)
-      }
-    }
-  }
-  if timer_writer_wait_gone(record, boot_id, TIMER_KILL_GRACE_MS)? {
+  timer_writer_signal(scan.groups, "TERM")?
+  if timer_writer_wait_gone(record, boot_id, "", TIMER_KILL_GRACE_MS)? {
     return Ok("stopped")
   }
-  match process.kill_group(record.pid, "KILL") {
-    Ok(_) => {}
-    Err(problem) => {
-      guard problem.errno == 3 else {
-        return Err(problem)
-      }
-    }
-  }
-  if timer_writer_wait_gone(record, boot_id, TIMER_KILL_GRACE_MS)? {
+  if timer_writer_wait_gone(record, boot_id, "KILL", TIMER_KILL_GRACE_MS)? {
     return Ok("stopped")
   }
   Ok("alive")
@@ -1270,6 +1312,104 @@ export proc timer_writer_settle(store: TimerWriterStore, name: Str) [fs, process
   Ok("settled")
 }
 
+## The jobs with a quiescence record, in file-name order.
+export proc timer_quiesce_names(store: TimerWriterStore) [fs, error] -> Result[List[Str], Error] {
+  if ! store.quiesce_dir.exists() {
+    return Ok([])
+  }
+  let names = collect {
+    for entry in fs.children(store.quiesce_dir)? |> sort-by .name {
+      if entry.name.ends_with(".json") {
+        yield entry.name.byte_slice(0, entry.name.byte_len() - 5)
+      }
+    }
+  }
+  Ok(names)
+}
+
+proc timer_release_policy(store: TimerWriterStore, name: Str) [fs, error] -> Result[TimerReleasePolicy, Error] {
+  let value = json.read(fp"{store.quiesce_dir}/{name}.json")?
+  let format = json.get(value, ["format"], "").require(Str)?
+  guard format == "laputa-quiesce-1" else {
+    return Err(error.failure(f"unsupported quiescence record format {format}"))
+  }
+  let timeout = json.get(value, ["release_timeout_ms"], 60000).require(Int)?
+  let delay = json.get(value, ["retry_delay_ms"], 30000).require(Int)?
+  let attempts = json.get(value, ["max_attempts"], 5).require(Int)?
+  let services = json.get(value, ["services"], []).require(List[Any])?
+  guard timeout >= 1 and timeout <= TIMER_MAX_RETRY_DELAY_MS and delay >= 1 and delay <= TIMER_MAX_RETRY_DELAY_MS and attempts >= 1 and attempts <= 20 else {
+    return Err(error.failure(f"quiescence record of {name} has out-of-range release bounds"))
+  }
+  Ok({release_timeout_ms: timeout, retry_delay_ms: delay, max_attempts: attempts, services: services.len()})
+}
+
+proc timer_release_run(command: List[Str], name: Str, policy: TimerReleasePolicy) [process, error] -> Result[Bool, Error] {
+  match process.run(process.command_argv(
+    command[0],
+    command + [name],
+    cwd: p"/",
+    stdin: p"/dev/null",
+    timeout: time.millis(timer_release_cap_ms(policy)),
+  )) {
+    Ok(status) => Ok(status.ok)
+    Err(_) => Ok(false)
+  }
+}
+
+## Release the quiescence of every job that has no live attempt, once its writer is proven
+## stopped. A failed release keeps the record and is retried after the record's own delay, up
+## to its attempt bound; an unproven writer delays without using an attempt.
+export proc timer_quiesce_reconcile(
+  store: TimerWriterStore,
+  command: List[Str],
+  running: List[TimerRunning],
+  releases: Map[TimerRelease],
+  now: TimerClock,
+) [fs, process, time, io, error] -> Result[Map[TimerRelease], Error] {
+  var out = releases
+  let names = timer_quiesce_names(store)?
+  for name in names {
+    if timer_is_running(running, name) {
+      continue
+    }
+    let tracker = out.get(name) ?? TimerRelease(due_mono_ms: 0, attempts: 0, reported: false)
+    let policy = match timer_release_policy(store, name) {
+      Ok(value) => value
+      Err(problem) => {
+        if ! tracker.reported {
+          timer_log(f"event=quiesce-record-invalid name={name} message={problem.message}")?
+          out[name] = TimerRelease(due_mono_ms: tracker.due_mono_ms, attempts: tracker.attempts, reported: true)
+        }
+        continue
+      }
+    }
+    let decision = timer_release_due(tracker, now.mono_ms, policy.max_attempts)
+    if decision == "wait" {
+      continue
+    }
+    if decision == "exhausted" {
+      if ! tracker.reported {
+        timer_log(f"event=quiesce-release-exhausted name={name} attempts={tracker.attempts}")?
+        out[name] = TimerRelease(due_mono_ms: tracker.due_mono_ms, attempts: tracker.attempts, reported: true)
+      }
+      continue
+    }
+    if timer_writer_settle(store, name)? == "unproven" {
+      out[name] = timer_release_after(tracker, now.mono_ms, policy.retry_delay_ms, false)
+      continue
+    }
+    if timer_release_run(command, name, policy)? and ! fp"{store.quiesce_dir}/{name}.json".exists()? {
+      timer_log(f"event=quiesce-released name={name} attempts={tracker.attempts + 1}")?
+      out = out.remove(name)
+    } else {
+      let next = timer_release_after(tracker, now.mono_ms, policy.retry_delay_ms, true)
+      timer_log(f"event=quiesce-release-failed name={name} attempts={next.attempts} max={policy.max_attempts}")?
+      out[name] = next
+    }
+  }
+  Ok(out)
+}
+
 proc timer_launch(
   job: TimerJob,
   occurrence_wall_ms: Int,
@@ -1281,6 +1421,9 @@ proc timer_launch(
   if timer_writer_settle(store, job.name)? == "unproven" {
     return Err(error.failure(f"the previous attempt of {job.name} is not proven stopped"))
   }
+  if job.name in timer_quiesce_names(store)? {
+    return Err(error.failure(f"the quiescence of the previous attempt of {job.name} is not released"))
+  }
   var job_env: Map[Bytes] = {}
   job_env["LAPUTA_TIMER_NAME"] = bytes.from_text(job.name)
   job_env["LAPUTA_TIMER_ATTEMPT"] = bytes.from_text(f"{attempt}")
@@ -1288,7 +1431,7 @@ proc timer_launch(
   job_env["LAPUTA_TIMER_SCHEDULED_WALL_MS"] = bytes.from_text(f"{occurrence_wall_ms}")
   job_env["LAPUTA_TIMER_START_WALL_MS"] = bytes.from_text(f"{now.wall_ms}")
   job_env["LAPUTA_TIMER_START_MONO_MS"] = bytes.from_text(f"{now.mono_ms}")
-  let plan = process.command_argv(job.argv[0], job.argv, cwd: p"/", env: job_env, stdin: p"/dev/null")
+  let plan = process.command_argv(job.argv[0], job.argv, cwd: p"/", env: job_env, stdin: p"/dev/null", new_session: true)
   let handle = spawn plan?
   let record = TimerWriter(
     name: job.name,
@@ -1577,7 +1720,12 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
   let stored = timer_load_state(fp"{config.state_dir}/{TIMER_STATE_NAME}")?
   let armed = timer_read_clock()?
   let boot_id = timer_read_boot_id()
-  let store = TimerWriterStore(dir: fp"{config.state_dir}/{TIMER_WRITER_DIR}", boot_id: boot_id)
+  let store = TimerWriterStore(
+    dir: fp"{config.state_dir}/{TIMER_WRITER_DIR}",
+    quiesce_dir: fp"{config.state_dir}/{TIMER_QUIESCE_DIR}",
+    boot_id: boot_id,
+  )
+  var releases: Map[TimerRelease] = {}
   for name in timer_writer_names(store)? {
     let _ = timer_writer_settle(store, name)?
   }
@@ -1653,6 +1801,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
     }
     previous = now
     cancelled = timer_load_cancels(fp"{config.state_dir}/{TIMER_CANCEL_DIR}")?
+    releases = timer_quiesce_reconcile(store, TIMER_RELEASE_COMMAND, running, releases, now)?
 
     var started_now: List[TimerRunning] = []
     var keep: List[TimerRunning] = []
@@ -1762,6 +1911,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
       var state = states.get(job.name) ?? timer_state_new(job.name)
       var runtime = runtimes.get(job.name) ?? timer_initial_runtime(job, state, now)
       if job.name in cancelled {
+        fp"{config.state_dir}/{TIMER_TRIGGER_DIR}/{job.name}".remove(missing_ok: true)?
         var changed = false
         if timer_is_running(running, job.name) {
           runtime.running = false
@@ -1805,6 +1955,14 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
           dirty = true
         }
         continue
+      }
+      let trigger = fp"{config.state_dir}/{TIMER_TRIGGER_DIR}/{job.name}"
+      if trigger.exists()? and ! runtime.running and ! runtime.queued and ! runtime.pending_start and runtime.retry_at_mono_ms == 0 {
+        trigger.remove(missing_ok: true)?
+        fs.fsync(trigger.parent())
+        runtime.pending_start = true
+        runtime.pending_missed = 0
+        timer_log(f"event=job-run-now name={job.name}")?
       }
       if runtime.retry_at_mono_ms > 0 {
         if now.mono_ms < runtime.retry_at_mono_ms {
@@ -1941,6 +2099,21 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
   }
 }
 
+proc timers_run_now(config: SchedulerConfig, name: Str) [fs, io, error] -> Result[Unit, Error] {
+  let loaded = timer_load_jobs(config.job_dir)?
+  guard timer_find_job(loaded.jobs, name) != null else {
+    return Err(error.failure(f"unknown timer job {name}"))
+  }
+  let dir = fp"{config.state_dir}/{TIMER_TRIGGER_DIR}"
+  dir.mkdir(parents: true)?
+  atomically replace fp"{dir}/{name}" as next {
+    next.write("run-now\n", mode: 0o644)
+    fs.fsync(next)
+  }
+  fs.fsync(dir)
+  print f"laputa-timers run-now {name}"
+}
+
 proc timers_cancel(config: SchedulerConfig, name: Str, active: Bool) [fs, io, error] -> Result[Unit, Error] {
   let loaded = timer_load_jobs(config.job_dir)?
   guard timer_find_job(loaded.jobs, name) != null else {
@@ -1971,6 +2144,7 @@ export proc timers_main(...argv: List[Str]) [fs, process, time, env, io, error] 
     "status" => timers_status(config, parsed.json)
     "cancel" => timers_cancel(config, parsed.name, true)
     "resume" => timers_cancel(config, parsed.name, false)
+    "run-now" => timers_run_now(config, parsed.name)
     else => Err(error.failure(f"unknown timer action {parsed.action}"))
   }
 }

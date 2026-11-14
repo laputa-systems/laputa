@@ -158,18 +158,41 @@ burst.
 
 Immediately after spawning an attempt, the scheduler records it in `/var/lib/laputa-timers/runs/NAME.json` (format
 `laputa-timer-writer-1`; a scheduler killed between spawn and this write leaves no record): job, attempt, boot id, the leader pid, which is also
-the process group the attempt leads, and the leader's kernel start time. The
+the session the attempt leads (each attempt is spawned in a new session), and the leader's kernel start time. The
 record is replaced atomically and synced. The scheduler removes it only after
-`timer_writer_settle` proves the group has no live member: it signals the group
-with `TERM`, then `KILL` after the grace period, and judges liveness by
-non-zombie members, so an orphaned child of a killed leader still counts. A
+`timer_writer_settle` proves the session has no live member: it signals every
+process group in the session with `TERM`, then `KILL` after the grace period,
+and judges liveness by non-zombie members. A snapshot tool the job started in
+its own process group, or an orphan of a killed leader, still counts. A
 record from another boot is proof that every process died. A live group whose
 leader pid now has a different start time is a recycled id and is never
 signalled. At startup the scheduler settles every record left by a previous
 scheduler before it admits any job, and a job whose previous attempt is
 unproven does not start. Finish, timeout, and cancellation settle the group the
-same way. The record does not yet release quiesced services; that step belongs
-after this proof ([XSH-89](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-89-backup-quiescence-recovery.md)).
+same way.
+
+### Quiescence recovery
+
+A job's hook may leave a quiescence record in
+`/var/lib/laputa-timers/quiesce/JOB.json` ([backup](BACKUP.md#quiescence)). On
+every pass the scheduler releases the record of each job that has no live
+attempt: it settles the job's writer, then runs
+`backup-quiesce.xsh reconcile JOB` with a cap of the record's per-service
+release bound times its service count plus ten seconds. An unproven writer
+delays the release without using an attempt; a failed release is retried after
+the record's retry delay up to its attempt bound, then logged as
+`quiesce-release-exhausted` and left for an operator or a scheduler restart. A
+job whose previous writer is unproven, or whose quiescence is unreleased, is not
+started. This runs at scheduler startup before any job is admitted. A record
+from another boot needs no clock comparison: its writer record carries the old
+boot id, and xinit's ownership files in `/run` are gone, so the release finds
+nothing to restart and retires the record.
+
+`xsh /usr/lib/laputa/timers.xsh run-now NAME` writes
+`/var/lib/laputa-timers/trigger/NAME`; the next pass starts the job as an
+immediate attempt unless it is running, queued, awaiting a retry, or cancelled
+(cancellation discards the marker). An interval job's next deadline is
+re-anchored from that start. Quiescing backups started by hand use this path.
 
 ## Inspection
 

@@ -49,8 +49,10 @@ The runner:
 
 A failed quiesce, backup, check, prune, receipt write, or release exits
 nonzero. Ordinary caught failures attempt the release hook. A killed or crashed
-runner can bypass that epilogue and leave services stopped; recovery ownership
-is open in [XSH-89](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-89-backup-quiescence-recovery.md).
+runner can bypass that epilogue; the timer supervisor then restores the
+services (see Quiescence). Quiescence runs only under the supervisor: start a
+backup by hand with `xsh /usr/lib/laputa/timers.xsh run-now backup`, not by
+running `backup.xsh run` yourself, which refuses to quiesce.
 
 ## Target and keys
 
@@ -86,12 +88,53 @@ policy count before it writes a receipt.
 
 ## Quiescence
 
-`/usr/lib/laputa/backup-quiesce.xsh` invokes xinit and waits for the observed
-state. xinit queues each desired-state request and wakes the live scanner
-through its control FIFO; without an active scanner, it applies the transition
-directly. The shipped hook stops `logger` and `dhcp-eth0`, waits for
-`desired=down` with a stopped, down, or dead state, and starts both on release
-until they report running. It does not retain their prior desired states.
+`/usr/lib/laputa/backup-quiesce.xsh stop SERVICE...` runs inside a supervised
+attempt. It first writes a durable record
+`/var/lib/laputa-timers/quiesce/JOB.json` (`laputa-quiesce-1`): the job, an
+ownership token, the boot id, each service's prior desired state, and the
+recovery bounds below. Only services whose desired state was `up` are
+acquired; a service that was already down stays down and is never started. The
+record is synced before the first stop. Each acquired service is then stopped
+with `xinit stop --owner TOKEN`, and the hook waits for `desired=down`.
+
+`start SERVICE...` (the release hook) and the supervisor's
+`backup-quiesce.xsh reconcile JOB` do the same thing: for each acquired
+service, read xinit's `SERVICE.control`. Only when it still names the token is
+the stop handed back with `xinit start --if-owner TOKEN`; xinit checks the
+owner and applies the start in one scanner pass
+([control ownership](../xinit/docs/SUPERVISION.md#control-ownership)). A
+service an operator stopped or started after acquisition, or one the attempt
+never stopped, is left exactly as it is. A request queued in the inbox is waited
+out before the owner is judged. The record is removed only after every acquired
+service is released, and a repeat costs no transition. A release that fails
+keeps the record.
+
+If the backup job is lost (timeout, cancellation, SIGKILL, scheduler restart)
+the supervisor settles the attempt's writer first and then releases the record
+([Timers](TIMERS.md#writer-identity)).
+
+The recovery bound is published in the `quiesce` command of
+`profiles/qemu-maintained/etc/laputa/backup.json` and copied into the record:
+
+| Flag | Shipped | Meaning |
+|---|---|---|
+| `--timeout-ms` | 30000 | Per service stop or start transition. |
+| `--recover-timeout-ms` | 60000 | One release attempt, per service. |
+| `--recover-retry-ms` | 30000 | Wait between the supervisor's release attempts. |
+| `--recover-attempts` | 5 | Failed release attempts before the record is left for an operator. |
+
+With these defaults and the two shipped services, a lost job is detected within
+0.5 s, its writer is proven stopped within 4 s, and the release that follows
+takes seconds when xinit answers and at most 60 s per service (120 s) when it
+does not, so services are back within about 125 s in the worst first attempt. A release that keeps
+failing is retried up to 5 times, 30 s apart, which bounds the whole recovery
+at 4 + 5 x (120 + 30) = 754 s, after which the record is left in place and
+logged as `quiesce-release-exhausted`.
+The shipped hook timeouts (90 s and 130 s) stay above these bounds, which
+`tests/system/backup.xsh` checks. Restarting the supervisor starts a fresh
+attempt count. An operator can release by hand with
+`xsh /usr/lib/laputa/backup-quiesce.xsh reconcile backup`.
+
 This bounds writes to `/var/log`, `/var/lib/dhcpc`, and `/etc/resolv.conf`
 during the snapshot.
 
