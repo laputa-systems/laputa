@@ -1,7 +1,7 @@
 def outcome:
   if startswith("ok ") then "passed"
   elif startswith("skipped") then "skipped"
-  elif startswith("FAILED") then "failed"
+  elif startswith("FAILED") or startswith("TIMEOUT ") then "failed"
   else empty end;
 
 ($ids[0]) as $discovered

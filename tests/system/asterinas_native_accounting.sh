@@ -91,4 +91,20 @@ if bash "$repo_root/infra/asterinas/account-native.sh" "$account_root/discovered
     printf 'accounting accepted a timed-out undiscovered case\n' >&2
     exit 1
 fi
+mkdir -p "$account_root/reported-timeout"
+: > "$account_root/reported-timeout/interrupted.txt"
+printf '%s\n' \
+    'core/tests/b.xsh::t_in_flight ... TIMEOUT 2m' \
+    '---- core/tests/b.xsh::t_in_flight ----' \
+    'TIMEOUT after 2m' \
+    'canceled: process work was canceled by signal 15' \
+    'test result: FAILED. 0 passed; 1 failed; 0 skipped' \
+    > "$account_root/reported-timeout/1.console.log"
+bash "$repo_root/infra/asterinas/account-native.sh" "$account_root/discovered.json" "$account_root/reported-timeout" > /dev/null
+[[ "$(jaq -c '[.passed, .failed, (.unexecuted | length)]' "$account_root/reported-timeout/accounting.json")" == '[[],["core/tests/b.xsh::t_in_flight"],4]' ]]
+printf 'core/tests/z.xsh::t_other ... TIMEOUT 2m\n' >> "$account_root/reported-timeout/1.console.log"
+if bash "$repo_root/infra/asterinas/account-native.sh" "$account_root/discovered.json" "$account_root/reported-timeout" > /dev/null 2>&1; then
+    printf 'accounting accepted a reported timeout for an undiscovered case\n' >&2
+    exit 1
+fi
 printf 'Asterinas native accounting checks passed.\n'
