@@ -15,7 +15,7 @@ pure complete_marker(console: Str, marker: Str) -> Bool {
 proc live_proof_complete(paths: build.ProfileOutputs) -> Result[Bool, Error] {
   return false unless paths.console_log.exists()?
   let console = paths.console_log.read_text()?
-  for marker in ["NETWORK_LIVE_KVM_OK", "NETWORK_IPV4_LIVE_GUEST_OK", "NETWORK_GUEST_CORE_OVERLAY_HASHES_OK", "NETWORK_APPLIER_OK"] {
+  for marker in ["NETWORK_LIVE_KVM_OK", "NETWORK_IPV4_LIVE_GUEST_OK", "NETWORK_IPV6_LIVE_GUEST_OK", "NETWORK_GUEST_CORE_OVERLAY_HASHES_OK", "NETWORK_APPLIER_OK"] {
     return false unless complete_marker(console, marker)
   }
   let lines = console.split("\n")

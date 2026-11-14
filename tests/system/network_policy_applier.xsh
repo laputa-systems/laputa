@@ -51,6 +51,56 @@ customized-observed true
 customized-projection refused selected default route carries unsupported attributes
 customized-kept true
 customized-added-nothing true
+== IPv6: the packaged policy disables the stack, so the kernel refuses and the controller reports a denial
+disabled6 reobserve plans=2 attempts=1 reason=operation 0 denied; partial state requires observation
+disabled6-added-nothing true
+disabled6-no-link-local true
+== IPv6: static convergence leaves link-local, advertised, dynamic, operator and IPv4 state alone
+dynamic6-errno 0
+dynamic6-not-permanent true
+applied6 converged plans=2 attempts=2 owned=2001:db8:1::2/64|2001:db8:1::1:100
+applied6-address true
+applied6-route true
+applied6-settled true
+foreign6-address true
+peer6-address true
+dynamic6-address true
+link-local6-kept true
+advertised6-route true
+operator6-route true
+foreign6-route true
+ipv4-untouched true
+== IPv6: a settled cohort plans nothing and mutates nothing
+settled6 converged plans=0 attempts=0 owned=2001:db8:1::2/64|2001:db8:1::1:100
+settled6-state-unchanged true
+== IPv6: a second process changes kernel state between planning and application
+writer6-distinct true
+conflict6 reobserve plans=4 attempts=0 reason=observation changed before operation 0
+writer6-completed true
+conflict6-kept-old true
+conflict6-untouched-new true
+conflict6-concurrent true
+== IPv6: a fresh observation converges to a link-local gateway and then plans nothing
+recovered6 converged plans=2 attempts=2 owned=2001:db8:1::2/64|fe80::1:200
+recovered6-settled converged plans=0 attempts=0 owned=2001:db8:1::2/64|fe80::1:200
+recovered6-concurrent true
+recovered6-foreign true
+recovered6-advertised true
+== IPv6: a zero metric means the kernel default 1024, and an advertised route at that metric is refused by the kernel
+default6-occupied reobserve plans=2 attempts=1 reason=operation 0 denied; partial state requires observation
+default6-advertised-kept true
+default6-owned-kept true
+default6 converged plans=2 attempts=2 owned=2001:db8:1::2/64|fe80::1:1024
+default6-metric-1024 true
+default6-retired-200 true
+== IPv6: lost notifications require a full observation and mutate nothing
+lost6 reobserve plans=2 attempts=0 reason=lost events require full observation
+lost6-untouched-new true
+lost6-kept-old true
+== IPv6: a duplicate address fails detection and the next observation reports it
+dup6-first-pass explicit-or-tentative
+dup6-observation refused selected IPv6 address failed duplicate address detection
+dup6-reconcile refused selected IPv6 address failed duplicate address detection
 NETWORK_APPLIER_OK
 """
 
@@ -77,6 +127,7 @@ test test_live_applier_converges_and_reports_conflicts_in_a_disposable_namespace
       assert status.shell_code()? == 0, f"{output}{stderr.read_text()?}"
       assert output == expected_transcript, output
       assert "NETWORK_WRITER_IDENTITIES controller=" in stderr.read_text()?
+      assert " family=inet6" in stderr.read_text()?
       io.write_stdout(output)
       io.write_stderr(stderr.read_text()?)
     }

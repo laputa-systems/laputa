@@ -1,4 +1,4 @@
-##! Qualify the live IPv4 applier inside the disposable self-hosting KVM guest.
+##! Qualify the live IPv4 and IPv6 applier inside the disposable self-hosting KVM guest.
 use pm.generation
 
 proc main(scope: Str) {
@@ -17,11 +17,16 @@ proc main(scope: Str) {
     let diagnostics = stderr.read_text()?
     io.write_stdout(output)
     io.write_stderr(diagnostics)
-    assert status.exited_with(0), "live IPv4 qualification failed"
+    assert status.exited_with(0), "live IPv4 and IPv6 qualification failed"
     assert "0 skipped" in output and "0 failed" in output, "the guest must execute every network qualification case"
     assert "NETWORK_APPLIER_OK" in output
     assert "NETWORK_WRITER_IDENTITIES controller=" in output + diagnostics
     assert "writer-distinct true" in output and "writer-completed true" in output
+    assert " family=inet6" in output + diagnostics
+    for line in ["writer6-distinct true", "writer6-completed true", "applied6 converged", "settled6 converged plans=0 attempts=0", "conflict6 reobserve plans=4 attempts=0", "recovered6 converged", "default6-metric-1024 true", "lost6 reobserve plans=2 attempts=0", "dup6-observation refused selected IPv6 address failed duplicate address detection"] {
+      assert line in output, f"missing live IPv6 evidence: {line}"
+    }
   }
   print "NETWORK_IPV4_LIVE_GUEST_OK"
+  print "NETWORK_IPV6_LIVE_GUEST_OK"
 }
