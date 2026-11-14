@@ -2513,6 +2513,29 @@ assert ! fp"{run_dir()?}/inbox-processing/app".exists()?
   assert "service=app" in result.stdout and "verb=down" in result.stdout
 }
 
+test test_inbox_quarantines_a_maximum_length_directory_without_losing_its_replacement [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "control-long-directory")?
+  let source = xinit_policy_source()? + """
+prepare_control_inbox()
+let name = ["a" for _ in range(255)].join("")
+let claims = fp"{run_dir()?}/inbox-processing"
+claims.mkdir()
+claims.chmod(0o700)
+fp"{claims}/{name}".mkdir()
+fp"{claims}/{name}/keep".write("keep")
+fp"{inbox_dir()?}/{name}".write("down")
+let units: List[ServiceUnit] = []
+let drained = drain_inbox(units)?
+assert drained.is_empty()
+assert ! fp"{inbox_dir()?}/{name}".exists()?
+assert ! fp"{claims}/{name}".exists()?
+let retained = fs.walk(claims, hidden: true)? |> where .kind == "file" |> collect
+assert retained.len() == 1 and retained[0].path.read_text()? == "keep"
+"""
+  let result = test.run_xsh(ctx, source, env: {XINIT_RUN_DIR: root.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-long-directory.xsh")?
+  assert result.success, result.stderr
+}
+
 test test_owned_requests_never_replace_a_pending_operator_request [fs, process, error] { |ctx|
   let root = test.temp_dir(ctx, name: "control-pending")?
   let run_dir = fp"{root}/run"

@@ -2129,9 +2129,9 @@ proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: P
             let target = fp"{inbox_dir()?}/{name}"
             match fs.rename_noreplace(path_value, target) {
               Ok(_) => {}
-              Err(failure) => {
-                return Err(failure) unless fs.stat(target, follow_symlinks: false) is Ok(_)
-                let refused = fp"{path_value.parent()}/.refused-{name}-{process.current_pid()?}-{time.monotonic()?}"
+              Err(_) => {
+                let key = bytes.from_text(name).sha256().hex()
+                let refused = fp"{path_value.parent()}/.refused-{key}-{process.current_pid()?}-{time.monotonic()?}"
                 fs.rename_noreplace(path_value, refused)?
               }
             }
