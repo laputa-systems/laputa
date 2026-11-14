@@ -2,6 +2,21 @@
 
 Use Linux x86_64 with writable KVM, QEMU, Docker, Python 3, jaq, flock, Git, Bash, and GNU tar. The saved disk-tools image must contain `/usr/sbin/debugfs` and `/sbin/mkfs.ext4`. Reserve 12 GiB and two CPUs for build phases. Runtime boot checks use 4 GiB and two CPUs. Rust uses two jobs.
 
+The closed C, Rust, and XSH cohort was qualified on 2026-11-14 with
+`nightly-2026-11-09` and compiler image
+`sha256:0945d878e03536b232d642bdb42ee6232f20948e56f24d57b5dec63b9997eab7`,
+built from XSH `Dockerfile.test`. With the installed PM seed from XSH
+`befe5ced1ab8a75b1c92b21c55ed6d6b86f2d4bb`, run:
+
+```sh
+bash tests/docker/closed_build.sh .out/seed/x86_64 sha256:0945d878e03536b232d642bdb42ee6232f20948e56f24d57b5dec63b9997eab7
+```
+
+The two independent stores matched all three package keys, payload digests,
+and archive bytes. Hostile read, write, and TCP builds were refused, and a
+kernel without Landlock was refused before a build child ran. This result
+qualifies the closed cohort; it does not rerun the successor boot workflow below.
+
 ## Prepare the saved inputs
 
 Set these variables to exact saved inputs:
@@ -13,7 +28,7 @@ Set these variables to exact saved inputs:
 - `PM_SEED`: the canonical PM seed directory containing its existing manifest, binaries, core tree, and core archive.
 - `SOURCE_CACHE`: the pinned source cache with `sha256/` entries for the selected package closure.
 - `SAVED_ARTIFACTS`: the existing immutable PM artifact store.
-- `SEED_IMAGE`: the saved xsh-test image ID containing nightly-2026-09-15 for x86_64 musl.
+- `SEED_IMAGE`: the saved xsh-test image ID containing nightly-2026-11-09 for x86_64 musl.
 - `PACKAGE_TOOLS_IMAGE`: the saved package-tools image ID for composing A.
 - `TOOLS_IMAGE`: the saved disk-tools image ID containing `debugfs` and `mkfs.ext4`; use the package-tools image when it contains both.
 - `KACHE_TOOL` and `MOLD_TOOL`: the declared bootstrap executable paths.

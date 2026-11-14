@@ -27,7 +27,7 @@ COPY --from=seed /stage/lib/ /usr/lib/
 COPY --from=seed /usr/bin/ld /usr/bin/ld
 COPY --from=seed /usr/bin/readelf /usr/bin/readelf
 COPY links/ /
-COPY --from=seed /root/.rustup/toolchains/nightly-2026-09-15-x86_64-unknown-linux-musl /seed/rust
+COPY --from=seed /root/.rustup/toolchains/nightly-2026-11-09-x86_64-unknown-linux-musl /seed/rust
 COPY --from=seed /probe /seed/probe
 COPY bin/ /bin/
 COPY core/ /usr/lib/xsh/core/
