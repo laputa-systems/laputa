@@ -54,6 +54,8 @@ def stage_root(seed, stage):
         (stage / directory).mkdir(parents=True, exist_ok=True)
 
     shutil.copytree(seed / "core", stage / "core", symlinks=True, dirs_exist_ok=True)
+    for name in ("passwd", "group"):
+        copy(stage, root / "packages/baselayout/files/rootfs/etc" / name, f"/etc/{name}", 0o644)
     copy(stage, seed / "xsh", "/bin/xsh", 0o755)
     copy(stage, root / "xinit/xinit.xsh", "/usr/bin/xinit", 0o755)
     (stage / "init").symlink_to(pathlib.Path("usr/bin/xinit"))
