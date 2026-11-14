@@ -25,7 +25,7 @@ Gates, narrowest first:
   RPATH/RUNPATH must match, without rpath, with `install_rpath` and with a
   build-only `build_rpath`.
 - `tests/upstream/musl.sh` — static-musl bins via Docker (pinned
-  `rust:nightly-2026-09-15`, `--platform linux/amd64`, `x86_64-unknown-linux-musl`) that
+  `rust:nightly-2026-11-09`, `--platform linux/amd64`, `x86_64-unknown-linux-musl`) that
   run `--version` in the container. CI builds the same target directly with
   `musl-tools` (see [decisions.md](decisions.md)).
 - `tests/benchmarks/run.sh` — cold Meson setup, reconfigure, Ninja `-n` at

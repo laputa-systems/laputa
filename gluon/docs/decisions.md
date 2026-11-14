@@ -41,7 +41,7 @@ reverses.
   informational; its divergences are logged, never gating. The pin file is
   `tests/upstream/PINS` (reference versions, import SHAs, Docker image,
   libplacebo hash). Every reference update needs differential tests first.
-  Rust toolchain is `nightly-2026-09-15` via `rust-toolchain.toml` (also in
+  Rust toolchain is `nightly-2026-11-09` via `rust-toolchain.toml` (also in
   `tests/upstream/PINS`).
 - **P-4 Dependency gate.** New crates must show build-time, binary-size, and
   startup deltas and be the smallest viable option; no
