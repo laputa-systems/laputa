@@ -165,6 +165,14 @@ returning. Group cleanup allows up to `stop_timeout_ms` for TERM and up to
 100 ms after KILL. It returns early after every owned group is reaped.
 A group surviving that bound produces an `xinit-cleanup` error.
 
+The scanner records each worker's process group, leader PID, and Linux start
+ticks atomically in its run directory. If the scanner dies, PID 1 checks the
+recorded group and leader identity, sends TERM, waits up to two seconds, and
+checks identity again before KILL and scanner restart. Two limits remain: a
+whole group can exit and its PID be reused between identity check and signal,
+and SIGKILL can arrive between spawn and record publication; closing these
+requires Linux 6.9+ pidfd group signalling and an XSH spawn handshake.
+
 While a live `${XINIT_RUN_DIR}/scanner.json` marks a scanner,
 `start`/`stop`/`restart`/`reload SERVICE` post a request to
 `${XINIT_RUN_DIR}/inbox/SERVICE` instead of acting, and the scanner applies it

@@ -2604,3 +2604,39 @@ test test_scan_applies_an_owned_stop_and_clears_ownership_on_start [fs, process,
   assert fp"{run_dir}/app.control".read_text()? == "bk1"
   assert xinit_text(ctx, ["status", "app"], scan_env(service_dir, run_dir, log_root, 1))? == "app down pid=0 ready=false log=append desired=down restarts=0\n"
 }
+
+
+test test_worker_record_roundtrip_and_stale_identity [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "worker-record")?
+  let source = xinit_policy_source()? + """
+let pid = process.current_pid()?
+add_worker(pid)
+let added = worker_records(pid)?
+assert added.len() == 1 and added[0].leader == pid and added[0].start_ticks > 0
+remove_worker(pid)
+assert ! worker_record_path(pid)?.exists()?
+let record: WorkerRecord = {pgid: 123, leader: 123, start_ticks: 42}
+write_worker_records(77, [record])
+assert worker_records(77)? == [record]
+write_worker_records(77, [])
+assert worker_records(77)?.is_empty()
+assert worker_attributed(record, 42, true)
+assert ! worker_attributed(record, 43, true)
+"""
+  let result = test.run_xsh(ctx, source, [], [], {XINIT_RUN_DIR: root.display()}, name: "worker-record.xsh")?
+  assert result.success, result.stderr
+}
+
+
+test test_scanner_worker_recovery_order_and_empty_group [fs, process, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "worker-recovery")?
+  let source = xinit_policy_source()? + """
+let record: WorkerRecord = {pgid: 99999999, leader: 99999999, start_ticks: 1}
+assert ! worker_group_live(record)?
+write_worker_records(77, [record])
+let _ = reap_scanner_workers(77)?
+assert ! worker_record_path(77)?.exists()?
+"""
+  let result = test.run_xsh(ctx, source, [], [], {XINIT_RUN_DIR: root.display()}, name: "worker-recovery.xsh")?
+  assert result.success, result.stderr
+}

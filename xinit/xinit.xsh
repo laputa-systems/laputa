@@ -69,6 +69,8 @@ type SavedStatus = {
   start_time_ms: Int,
 }
 
+type WorkerRecord = {pgid: Int, leader: Int, start_ticks: Int}
+
 type SpawnResult = {status: SavedStatus, notify_fd: Int}
 
 type ChildExit = {pid: Int, status: Status}
@@ -174,6 +176,100 @@ proc control_owner_path(name: Str) -> Result[Path] {
 
 proc scanner_marker_path() -> Result[Path] {
   fp"{run_dir()?.display()}/scanner.json"
+}
+
+proc worker_record_path(scanner: Int) -> Result[Path] {
+  fp"{run_dir()?.display()}/scanner.{scanner}.workers"
+}
+
+proc worker_records(scanner: Int) -> Result[List[WorkerRecord]] {
+  let path_value = worker_record_path(scanner)?
+  return [] unless path_value.exists()
+  json.read(path_value)?.require(List[WorkerRecord])?
+}
+
+proc write_worker_records(scanner: Int, records: List[WorkerRecord]) {
+  let target = worker_record_path(scanner)?
+  target.parent.mkdir(parents: true)
+  let scratch = fp"{target.display()}.tmp"
+  scratch.write(json.encode(records)?, mode: 0o600)
+  scratch.rename(to: target, overwrite: true)
+}
+
+proc worker_start_ticks(pid: Int) -> Result[Int] {
+  for entry in process.list()? {
+    if entry.pid == pid {
+      return entry.start_ticks ?? 0
+    }
+  }
+  0
+}
+
+proc add_worker(pid: Int) {
+  return when fake_pids()
+  let scanner = process.current_pid()?
+  let ticks = worker_start_ticks(pid)?
+  guard ticks > 0 else {
+    return Err(XinitError.Failed(kind: "xinit-worker", message: f"cannot identify worker {pid}"))
+  }
+  write_worker_records(scanner, worker_records(scanner)? + [{pgid: pid, leader: pid, start_ticks: ticks}])
+}
+
+proc remove_worker(pid: Int) {
+  return when fake_pids()
+  let scanner = process.current_pid()?
+  let path_value = worker_record_path(scanner)?
+  return unless path_value.exists()
+  let remaining = [record for record in worker_records(scanner)? if record.leader != pid]
+  if remaining.is_empty() {
+    path_value.remove()
+  } else {
+    write_worker_records(scanner, remaining)
+  }
+}
+
+pure worker_attributed(record: WorkerRecord, leader_ticks: Int, group_live: Bool) -> Bool {
+  group_live and (leader_ticks == 0 or leader_ticks == record.start_ticks)
+}
+
+proc worker_group_live(record: WorkerRecord) -> Result[Bool] {
+  var live = false
+  var ticks = 0
+  for entry in process.list()? {
+    if entry.pid == record.leader { ticks = entry.start_ticks ?? 0 }
+    if entry.pgrp == record.pgid and entry.status != "Z" { live = true }
+  }
+  worker_attributed(record, ticks, live)
+}
+
+proc reap_scanner_workers(scanner: Int) -> Result[List[ChildExit]] {
+  let path_value = worker_record_path(scanner)?
+  return [] unless path_value.exists()
+  let records = worker_records(scanner)?
+  for record in records {
+    if worker_group_live(record)? { unix.kill_process_group(record.pgid, "TERM") }
+  }
+  let deadline = elapsed_now_ms()? + 2000
+  var live = true
+  while live and elapsed_now_ms()? < deadline {
+    live = false
+    for record in records {
+      if worker_group_live(record)? { live = true }
+    }
+    if live { time.sleep(25ms) }
+  }
+  var reaped: List[ChildExit] = []
+  for record in records {
+    if worker_group_live(record)? {
+      let cleanup = unix.shutdown_process_groups([record.pgid], 0ms, 100ms)?
+      guard cleanup.remaining.is_empty() else {
+        return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"scanner retained worker group {record.pgid}"))
+      }
+      reaped += cleanup.reaped
+    }
+  }
+  path_value.remove()
+  reaped
 }
 
 proc scanner_wake_path() -> Result[Path] {
@@ -519,6 +615,16 @@ proc finalize(kind: Str) {
   }
 }
 
+pure signal_event(signal: Str) -> Str {
+  match signal {
+    "HUP" => "restart",
+    "USR1" => "halt",
+    "USR2" | "INT" => "poweroff",
+    "TERM" => "reboot",
+    else => "",
+  }
+}
+
 proc run_pid1(inittab: Path, policy: InittabPolicy) {
   let allow = test_mode()?
   unix.pid1_setup(["HUP", "TERM", "USR1", "USR2", "INT"], subreaper: true, allow_non_pid1: allow)
@@ -537,17 +643,22 @@ proc run_pid1(inittab: Path, policy: InittabPolicy) {
     let pid_event = unix.wait_pid1_event()?
 
     if pid_event.kind == "signal" {
-      if pid_event.signal == "HUP" {
-        event = "restart"
-      } else if pid_event.signal == "USR1" {
-        event = "halt"
-      } else if pid_event.signal == "USR2" or pid_event.signal == "INT" {
-        event = "poweroff"
-      } else if pid_event.signal == "TERM" {
-        event = "reboot"
-      }
+      event = signal_event(pid_event.signal)
     } else if pid_event.kind == "children" {
-      for child in pid_event.children {
+      var pending = pid_event.children
+      var index = 0
+      while index < pending.len() {
+        let child = pending[index]
+        index += 1
+        if worker_record_path(child.pid)?.exists() {
+          pending += reap_scanner_workers(child.pid)?
+          let drained = unix.wait_pid1_event(timeout: 0ms)?
+          if drained.kind == "children" {
+            pending += drained.children
+          } else if drained.kind == "signal" and signal_event(drained.signal) != "" {
+            event = signal_event(drained.signal)
+          }
+        }
         let marked = mark_dead(entries, runtime, child.pid)
         runtime = marked.runtime
 
@@ -1295,6 +1406,7 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
 
   if service.log == "none" {
     let child = unix.spawn_process_group(service.command, notify: use_notify)?
+    if notify { add_worker(child.pid) }
     let ready = if use_notify or defer_ready { false } else { wait_ready(service)? }
 
     return {
@@ -1323,6 +1435,7 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
 
   maybe_rotate_log(service.name, service.log_max_size, service.log_keep)
   let child = unix.spawn_process_group_log(service.command, path_value, notify: use_notify)?
+  if notify { add_worker(child.pid) }
   let ready = if use_notify or defer_ready { false } else { wait_ready(service)? }
 
   {
@@ -1881,6 +1994,7 @@ proc reconcile_child_exits(units: List[ServiceUnit], children: List[ChildExit], 
           return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"service {unit.service.name} retained process group {unit.pid}"))
         }
 
+        remove_worker(unit.pid)
         pending = pending + cleanup.reaped
       }
     }
@@ -1912,6 +2026,7 @@ proc kill_unit(unit: ServiceUnit) -> Result[List[ChildExit]] {
     children = cleanup.reaped
   }
 
+  if unit.pid > 0 { remove_worker(unit.pid) }
   run_finish(unit)
   children
 }

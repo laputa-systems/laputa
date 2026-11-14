@@ -221,6 +221,11 @@ def run_guest(seed, kernel, qemu, timeout):
         require(restart[0]["scanners"] == 1, f"scanner process count was not one: {restart[0]}", console)
         require(restart[0]["starts_base"] == 2 and restart[0]["starts_app"] == 3 and restart[0]["starts_slow"] == 2, f"scanner restart duplicated starts: {restart[0]}", console)
 
+        killed = markers(console, "R1_SCANNER_KILL")
+        require(len(killed) == 1 and killed[0]["old"] != killed[0]["new"], "missing SIGKILL scanner restart", console)
+        require(killed[0]["duplicates"] == 0 and killed[0]["survivors"] == 0, f"SIGKILL left old workers: {killed}", console)
+        require(all(killed[0][f"workers_{name}"] == 1 for name in ("base", "app", "slow")), f"SIGKILL worker counts: {killed}", console)
+
         malformed = markers(console, "R1_MALFORMED")
         require(len(malformed) == 1 and malformed[0]["status"] != 0, "malformed configuration did not fail", console)
         require(malformed[0]["field"] == "typo" and malformed[0]["source"] == "/etc/r1/broken.xsh", f"malformed status was not explicit: {malformed}", console)

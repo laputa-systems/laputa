@@ -270,6 +270,24 @@ proc main() [fs, process, env, time, io, error] -> Result[Unit] {
   }
   say(f"R1_SCANNER_RESTART {json.encode({old: old_scanner, new: new_scanner, base: new_base, app: new_app, slow: new_slow, duplicates: duplicates, workers_base: workers_base, workers_app: workers_app, workers_slow: workers_slow, scanners: scanners, starts_base: base_restart_starts, starts_app: app_restart_starts, starts_slow: slow_restart_starts})?}")?
 
+  process.kill(new_scanner, "KILL")?
+  let killed_scanner = await_scanner(new_scanner, 15000)?
+  let killed_base = await_running("r1-base", new_base, true, 15000)?
+  let killed_app = await_running("r1-app", new_app, true, 15000)?
+  let killed_slow = await_running("r1-slow", new_slow, false, 15000)?
+  let killed_duplicates = count_events("duplicate.")?
+  let killed_base_count = worker_count("r1-base")?
+  let killed_app_count = worker_count("r1-app")?
+  let killed_slow_count = worker_count("r1-slow")?
+  var old_survivors = 0
+  for entry in process.list()? {
+    if entry.status != "Z" and (entry.pgrp ?? 0) in [new_base, new_app, new_slow] { old_survivors += 1 }
+  }
+  guard killed_duplicates == 0 and killed_base_count == 1 and killed_app_count == 1 and killed_slow_count == 1 and old_survivors == 0 else {
+    return Err(error.failure(f"SIGKILL recovery duplicates={killed_duplicates} workers={killed_base_count},{killed_app_count},{killed_slow_count} survivors={old_survivors}"))
+  }
+  say(f"R1_SCANNER_KILL {json.encode({old: new_scanner, new: killed_scanner, base: killed_base, app: killed_app, slow: killed_slow, duplicates: killed_duplicates, workers_base: killed_base_count, workers_app: killed_app_count, workers_slow: killed_slow_count, survivors: old_survivors})?}")?
+
   let malformed = check_broken()?
   guard malformed.code != 0 else {
     return Err(error.failure("malformed service configuration was accepted"))
