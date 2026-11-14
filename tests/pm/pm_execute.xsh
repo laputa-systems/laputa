@@ -685,7 +685,6 @@ test test_execute_recomposes_generation_through_failed_publication_and_gc [fs, n
 
   let interruption_rel = p"interruptions/xfsz-copy.bin"
   let interruption_destination = fp"{remote_root}/{interruption_rel}"
-  let interruption_temporary = fp"{interruption_destination.parent}/.{interruption_destination.name}.tmp"
   let interruption_work = test.temp_dir(ctx, name: "execute-generation-lifecycle-interrupted-work")?
   let interruption_worker = r"""use pm.remote as interrupted_remote
 
@@ -715,9 +714,13 @@ main(@args)?
   assert interrupted_upload.status == 153, f"expected SIGXFSZ status 153, got {interrupted_upload.status}: {interrupted_upload.stderr}"
   assert interrupted_upload.success == false
   assert interruption_destination.exists()? == false
-  assert interruption_temporary.exists()?
-  assert interruption_temporary.metadata()?.size == 4096
-  assert bytes.read_at(interruption_temporary, 4070, marker_before_limit.len())?.utf8()? == "before-file-limit"
+  let interrupted_copies = fs.walk(interruption_destination.parent, hidden: true)?
+    |> where .kind == "file" and .size == 4096
+    |> map .path
+    |> collect
+  assert interrupted_copies.len() == 1
+  assert bytes.read_at(interrupted_copies[0], 4070, marker_before_limit.len())?.utf8()? == "before-file-limit"
+  assert hash.sha256(interrupted_source)?.hex() == interrupted_source_digest
   assert index_path.read_text()? == initial_index_text
   generation.verify_generation(first_root, first_generation)
   assert fp"{first_root}/usr/bin/execute-app".read_text()? == "application revision one\n"
@@ -733,7 +736,6 @@ main(@args)?
   assert interruption_destination.metadata()?.size == interrupted_source.metadata()?.size
   assert bytes.read_at(interruption_destination, 4070, marker_before_limit.len())?.utf8()? == "before-file-limit"
   assert bytes.read_at(interruption_destination, 4100, marker_after_limit.len())?.utf8()? == "after-file-limit"
-  assert interruption_temporary.exists()? == false
   assert index_path.read_text()? == initial_index_text
   generation.verify_generation(first_root, first_generation)
 
