@@ -4,12 +4,12 @@ set -euo pipefail
 finish() {
     native_status=$?
     trap - EXIT
+    sync
     if (( native_status == 0 )); then
         printf 'XSH_NATIVE_RESULT pass\n'
     else
         printf 'XSH_NATIVE_RESULT fail status=%s\n' "$native_status"
     fi
-    sync
     /sbin/poweroff -f
     exit "$native_status"
 }
