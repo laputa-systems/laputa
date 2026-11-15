@@ -31,10 +31,25 @@ It never runs `ssh`.
 | Library call | Guest operation | Behavior |
 |---|---|---|
 | `remote_inspect` | `inspect` | running generation receipt, health report, xinit service states, hostname, kernel |
-| `remote_run` | `run` | an explicit argv without a shell; exact exit status, signal, bounded stdout and stderr |
+| `remote_run` | `run`, `run-scoped` | an explicit argv without a shell, with an optional environment overlay and working directory; exact exit status, signal, bounded stdout and stderr |
 | `remote_stage`, `remote_digest` | `stage` | stream a file into `~/staging`, verify size and the caller's SHA-256, publish without replacing |
 | `remote_staged` | `staged` | whether a name is staged, its digest, and any scratch files a failed transfer left |
 | `remote_diagnose`, `remote_diagnose_afresh` | `diagnose` | unhealthy services and bounded log tails |
+
+### Remote command environment and directory
+
+`remote_run` takes an optional `environment` (`Map[Str]`) and `cwd` (an
+absolute directory path). The environment overlays the operator's: variables it
+does not name are inherited. Without `cwd`, the command runs in the guest
+program's working directory. Names must be nonempty and contain neither `=` nor
+NUL, values cannot contain NUL, and `cwd` must be an existing directory; the
+guest refuses anything else with kind `env` or `cwd` before running. The command
+keeps the operator's authority and runs without a shell.
+
+Either option sends the `run-scoped` operation instead of `run`. A guest that
+predates it refuses the unknown operation before running anything, so an older
+guest never runs the command without the requested environment or directory.
+`run` itself is unchanged.
 
 Staging verifies size and digest only. The digest should come from a trusted
 receipt, not from the file just sent, and verified staging is not an authenticity

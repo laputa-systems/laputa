@@ -133,9 +133,17 @@ export proc remote_inspect(session: RemoteSession, program: Str) [fs, net, error
   }
 }
 
+## The `run` request for an argv; an environment overlay or working directory selects
+## `run-scoped`, which guests without that operation refuse before running anything.
+export pure remote_run_request(argv: List[Str], timeout_ms: Int, environment: Map[Str]?, cwd: Str?) -> Record {
+  let base = {protocol: REMOTE_PROTOCOL, op: "run", argv: argv, timeout_ms: timeout_ms}
+  return base when environment == null and cwd == null
+  {...base, op: "run-scoped", env: environment ?? {}, cwd: cwd}
+}
+
 ## Runs an explicit argv, without a shell, with the operator's authority.
-export proc remote_run(session: RemoteSession, program: Str, argv: List[Str], timeout_ms: Int = 30000) [fs, net, error] -> Result[RemoteRun, Error] {
-  let reply = call(session, program, {protocol: REMOTE_PROTOCOL, op: "run", argv: argv, timeout_ms: timeout_ms}, null, timeout_ms + 15000)?
+export proc remote_run(session: RemoteSession, program: Str, argv: List[Str], timeout_ms: Int = 30000, environment: Map[Str]? = null, cwd: Str? = null) [fs, net, error] -> Result[RemoteRun, Error] {
+  let reply = call(session, program, remote_run_request(argv, timeout_ms, environment, cwd), null, timeout_ms + 15000)?
   {
     exit_code: json.get(reply, ["exit_code"], -1).require(Int)?,
     signaled: json.get(reply, ["signaled"], false).require(Bool)?,

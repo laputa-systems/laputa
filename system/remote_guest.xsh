@@ -86,7 +86,7 @@ proc diagnose() [fs, error] -> Result[Record, Error] {
   }
 }
 
-proc run_argv(header: Record) [process, error] -> Result[Record, Error] {
+proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[Record, Error] {
   let argv = json.get(header, ["argv"], []).require(List[Str])?
   guard ! argv.is_empty() and ! argv[0].is_empty() else {
     return Err(refuse("argv", "argv must name an executable"))
@@ -95,7 +95,36 @@ proc run_argv(header: Record) [process, error] -> Result[Record, Error] {
   guard timeout_ms > 0 and timeout_ms <= run_timeout_limit_ms else {
     return Err(refuse("timeout", "timeout_ms is out of range"))
   }
-  let result = run.capture --bytes --timeout=time.millis(timeout_ms) @argv
+  var overlay: Map[Str] = {}
+  var dir = fs.cwd()?
+  if scoped {
+    let entries = json.get(header, ["env"], {}).require(Record)?
+    for name in entries.keys() {
+      guard ! name.is_empty() and "=" not in name and "\u{0}" not in name else {
+        return Err(refuse("env", "invalid environment name"))
+      }
+      let value = json.get(entries, [name], null).require(Str)?
+      guard "\u{0}" not in value else {
+        return Err(refuse("env", "invalid environment value"))
+      }
+      overlay = overlay.set(name, value)
+    }
+    let requested: Str? = json.get(header, ["cwd"], null).require(Str?)?
+    if requested != null {
+      guard requested.starts_with("/") and "\u{0}" not in requested else {
+        return Err(refuse("cwd", "cwd must be an absolute directory"))
+      }
+      dir = Path(requested)
+      guard dir.exists()? and dir.is_dir()? else {
+        return Err(refuse("cwd", "cwd must be an existing directory"))
+      }
+    }
+  }
+  let result = cd (dir) {
+    env (overlay) {
+      run.capture --bytes --timeout=time.millis(timeout_ms) @argv
+    }?
+  }?
   let stdout = result.stdout
   let stderr = result.stderr
   {
@@ -217,14 +246,20 @@ proc main() [env, fs, io, process, error] {
   let outcome = match op {
     "inspect" => inspect(),
     "diagnose" => diagnose(),
-    "run" => run_argv(header),
+    "run" => run_argv(header, false),
+    "run-scoped" => run_argv(header, true),
     "stage" => stage(header),
     "staged" => staged_state(header),
     else => Err(refuse("unknown-op", f"unknown operation {op}")),
   }
   match outcome {
     Ok(result) => reply_ok(result)?,
-    Err(error) => reply_error("failed", error.message)?,
+    Err(error) => match error {
+      RemoteError.Refused {kind, message} => {
+        if kind == "env" or kind == "cwd" { reply_error(kind, message)? } else { reply_error("failed", message)? }
+      },
+      other => reply_error("failed", error.message)?,
+    },
   }
 }
 
