@@ -178,6 +178,26 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** root-cause
 - **Effort:** M
 
+### LAP-57 · P2 · Put the payload archiver in package build keys
+
+- **Area:** PM build identity
+- **Where:** `pm/build.xsh` (`archive.create` of `payload.tar.gz`), build-key derivation, `pm/repo.xsh` immutable publish
+- **Problem:** On 2026-11-15, `make publish` to the long-lived local mirror failed with `PmError.PackageConflict`. The object `packages/x86_64/alsa-ucm-conf/alsa-ucm-conf-1.2.16.1-1-1d85d5b38df7.tar.gz` already existed with different bytes. Both archives list the same 833 members with the same modes, owners and mtimes; only the ustar header encoding differs. The 2026-10-28 object writes mode `0100644` with NUL-filled uid and gid fields, while the payload built with the XSH `efecae07c` seed writes `0000644` with zero-filled octal fields. PM packs payloads with the seed's `archive.create`, but the build key covers only the `xsh` package's own seed inputs. A change to XSH's tar writer therefore yields new bytes under an already-published key.
+- **Recommendation:** Hash the archiver's identity, or a declared archive-format version, into every payload's build key. Alternatively, have PM own a canonical payload encoding that does not depend on the seed's writer. Then decide whether existing mirrors need a format bump.
+- **Acceptance:** Changing only the seed's tar header encoding changes every affected build key, or leaves payload bytes unchanged. Republishing an unchanged world after a seed rebuild then never reports an immutable conflict.
+- **Fix with:** single-source-of-truth
+- **Effort:** S
+
+### LAP-58 · P3 · Reject a seed older than the XSH that Laputa code requires
+
+- **Area:** Seed and image builds
+- **Where:** `seed/xsh_seed.xsh`, `packages/xsh/PKGBUILD.xsh`, `infra/asterinas/inputs.lock`, `infra/asterinas/select-xsh-target.sh`
+- **Problem:** On 2026-11-15, `make profile-test` booted an image whose `/init` xinit calls `unix.spawn_process_group(new_session:)`. That call needs XSH `d62ee5746`, but the image used a seed built from XSH `befe5ced`. PID 1 failed its check with `unknown named parameter new_session`, and the kernel panicked. Bumping `inputs.lock` does not refresh the seed, and no check compares the two. Separately, `.out/xsh-target` was an absolute symlink into the repository's old path. After the checkout moved, `make seed` failed with `fs-mkdir: ... File exists`.
+- **Recommendation:** Have image builds require that the seed manifest's `xsh_commit` contains the locked `XSH_COMMIT`. Make `select-xsh-target.sh` write a relative link, or have `make seed` repair a dangling one.
+- **Acceptance:** A stale seed fails before any image build with an error naming both commits, and `make seed` succeeds after the checkout moves.
+- **Fix with:** single-source-of-truth
+- **Effort:** S
+
 ### LAP-55 · P3 · Close the Asterinas IPv4 state and DHCP obligations
 
 - **Area:** Asterinas networking
