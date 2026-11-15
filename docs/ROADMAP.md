@@ -346,8 +346,15 @@ the SSH server and networking from their boot-target modules; `mdev.supervise` i
 gone, and the guest proof reads the scanner line from baselayout. PID 1 starts each respawn
 entry in its own session and sweeps that session when the leader exits, so a
 SIGKILLed scanner's workers, including one spawned just before the kill, stop
-before the scanner restarts and no service runs twice ([init](../xinit/docs/INIT.md)). The guest proof also gives one slow worker a helper process group that no record names; it stays single across both scanner restarts and is gone before reboot, while the record-based xinit leaked three. Open: the installer QEMU smoke image was not rebuilt
-to exercise the CI scanner, and the graphical reference was not rerun.
+before the scanner restarts and no service runs twice ([init](../xinit/docs/INIT.md)). The guest proof also gives one slow worker a helper process group that no record names; it stays single across both scanner restarts and is gone before reboot, while the record-based xinit leaked three. On 2026-11-15 at Laputa `428a4360`, with a seed built from XSH `efecae07c`,
+`make profile-test` passed the graphical reference (`qemu-tinyland-ghostty`). A
+rebuilt `make installer-qemu-test` image installs a target whose inittab starts
+`xinit scan boot`; the installer and target reached their CI markers, and over
+SSH `xinit status oxish` reported `oxish running` and `xsh --help` succeeded.
+The world was published to the mirror's data directory through `file://`,
+because HTTP publishing cannot yet upload objects above the mirror's 128 MiB
+PUT limit (LAP-59). The image build also needs a seed that includes XSH
+`d62ee5746` (LAP-58).
 
 ## R2: Persistent VM networking and time
 
