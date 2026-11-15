@@ -143,6 +143,10 @@ wait
   let unix_log_text = unix_log.read_text()?
   assert "once-service" in unix_log_text
   assert "respawn-service" in unix_log_text
+  for line in unix_log_text.lines() {
+    if "once-service" in line { assert "\"new_session\":\"false\"" in line, line }
+    if "respawn-service" in line { assert "\"new_session\":\"true\"" in line, line }
+  }
   let poweroff_inittab = fp"{root}/poweroff.inittab"
 
   poweroff_inittab.write("""::sysinit:/bin/echo boot
@@ -2606,37 +2610,64 @@ test test_scan_applies_an_owned_stop_and_clears_ownership_on_start [fs, process,
 }
 
 
-test test_worker_record_roundtrip_and_stale_identity [fs, process, error] { |ctx|
-  let root = test.temp_dir(ctx, name: "worker-record")?
-  let source = xinit_policy_source()? + """
-let pid = process.current_pid()?
-add_worker(pid)
-let added = worker_records(pid)?
-assert added.len() == 1 and added[0].leader == pid and added[0].start_ticks > 0
-remove_worker(pid)
-assert ! worker_record_path(pid)?.exists()?
-let record: WorkerRecord = {pgid: 123, leader: 123, start_ticks: 42}
-write_worker_records(77, [record])
-assert worker_records(77)? == [record]
-write_worker_records(77, [])
-assert worker_records(77)?.is_empty()
-assert worker_attributed(record, 42, true)
-assert ! worker_attributed(record, 43, true)
+test test_session_sweep_terminates_groups_no_record_names_and_spares_other_sessions [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "session-sweep")?
+  let runner = process.which("xsh")?
+  let leader_script = fp"{root}/leader.xsh"
+  leader_script.write(r"""let marker = Path(args[0])
+let helper = unix.spawn_process_group(process.command_argv("sleep", ["sleep", "300"]))?
+marker.write(f"{helper.pid}")?
+while true { time.sleep(500ms) }
+""")?
+  let marker_literal = json.encode(fp"{root}/helper".display())?
+  let runner_literal = json.encode(runner.display())?
+  let leader_literal = json.encode(leader_script.display())?
+  let source = xinit_policy_source()? + f"""
+unix.pid1_setup([], subreaper: true, allow_non_pid1: true)
+let marker = Path({marker_literal})
+let leader = unix.spawn_process_group(process.command_argv(Path({runner_literal}), ["xsh", {leader_literal}, marker.display()]), new_session: true)?
+let outsider = unix.spawn_process_group(process.command_argv("sleep", ["sleep", "300"]))?
+var tries = 0
+while ! marker.exists()? and tries < 500 {{
+  time.sleep(10ms)
+  tries += 1
+}}
+let helper = marker.read_text()?.parse_int()?
+assert helper != leader.pid
+assert helper in live_session_groups(leader.pid)?
+process.kill(leader.pid, signal: "KILL")?
+var leader_reaped = false
+var waits = 0
+while ! leader_reaped and waits < 100 {{
+  let event = unix.wait_pid1_event(timeout: 100ms)?
+  if event.kind == "children" {{
+    for child in event.children {{
+      if child.pid == leader.pid {{ leader_reaped = true }}
+    }}
+  }}
+  waits += 1
+}}
+assert leader_reaped
+var helper_reaped = false
+for exit in sweep_session(leader.pid)? {{
+  if exit.pid == helper {{ helper_reaped = true }}
+}}
+var drains = 0
+while ! helper_reaped and drains < 50 {{
+  let event = unix.wait_pid1_event(timeout: 100ms)?
+  if event.kind == "children" {{
+    for child in event.children {{
+      if child.pid == helper {{ helper_reaped = true }}
+    }}
+  }}
+  drains += 1
+}}
+assert helper_reaped
+assert live_session_groups(leader.pid)?.is_empty()
+assert process.kill(outsider.pid, signal: "0") is Ok(_)
+let _ = unix.shutdown_process_groups([outsider.pid], 0ms, 1s)?
+assert sweep_session(leader.pid)?.is_empty()
 """
-  let result = test.run_xsh(ctx, source, [], [], {XINIT_RUN_DIR: root.display()}, name: "worker-record.xsh")?
-  assert result.success, result.stderr
-}
-
-
-test test_scanner_worker_recovery_order_and_empty_group [fs, process, error] { |ctx|
-  let root = test.temp_dir(ctx, name: "worker-recovery")?
-  let source = xinit_policy_source()? + """
-let record: WorkerRecord = {pgid: 99999999, leader: 99999999, start_ticks: 1}
-assert ! worker_group_live(record)?
-write_worker_records(77, [record])
-let _ = reap_scanner_workers(77)?
-assert ! worker_record_path(77)?.exists()?
-"""
-  let result = test.run_xsh(ctx, source, [], [], {XINIT_RUN_DIR: root.display()}, name: "worker-recovery.xsh")?
+  let result = test.run_xsh(ctx, source, [], [], {XINIT_RUN_DIR: root.display()}, name: "session-sweep.xsh")?
   assert result.success, result.stderr
 }

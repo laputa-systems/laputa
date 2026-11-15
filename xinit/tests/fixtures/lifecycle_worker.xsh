@@ -25,6 +25,9 @@ proc main(...argv: List[Str]) [fs, process, env, time, net, error] -> Result[Uni
   }
   defer fs.unlock(lock)
   fp"{events}/start.{name}.{started}.{pid}".write(f"{started}\n")?
+  if mode == "slow" {
+    let _ = unix.spawn_process_group(process.command_argv("sleep", ["sleep", "3001"]))?
+  }
 
   var notify = ""
   if let Ok(value) = env.get("NOTIFY_FD") {

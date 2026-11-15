@@ -165,13 +165,19 @@ returning. Group cleanup allows up to `stop_timeout_ms` for TERM and up to
 100 ms after KILL. It returns early after every owned group is reaped.
 A group surviving that bound produces an `xinit-cleanup` error.
 
-The scanner records each worker's process group, leader PID, and Linux start
-ticks atomically in its run directory. If the scanner dies, PID 1 checks the
-recorded group and leader identity, sends TERM, waits up to two seconds, and
-checks identity again before KILL and scanner restart. Two limits remain: a
-whole group can exit and its PID be reused between identity check and signal,
-and SIGKILL can arrive between spawn and record publication; closing these
-requires Linux 6.9+ pidfd group signalling and an XSH spawn handshake.
+PID 1 starts every `respawn` inittab entry, gettys included, as the leader of
+a new session. When that leader exits, PID 1 sends TERM to every live process
+group in its session, waits up to two seconds while TERMing groups that appear
+meanwhile, and then KILLs and reaps what remains, in at most ten rounds. It
+sweeps before it respawns the entry, so a SIGKILLed scanner's workers stop
+before a new scanner starts them again. The session ID needs no record, so a
+worker spawned just before the scanner died is found too. Shutdown sweeps each
+respawn session after stopping the inittab groups. Three limits remain. A
+process that calls `setsid` leaves the session and escapes the sweep. Services
+that a console login starts directly with `xinit start` share that getty's
+session, so they are stopped when the getty respawns. On Linux, a process
+group number can be reused between listing and signalling once PIDs wrap;
+Asterinas never reuses PIDs.
 
 While a live `${XINIT_RUN_DIR}/scanner.json` marks a scanner,
 `start`/`stop`/`restart`/`reload SERVICE` post a request to

@@ -142,6 +142,25 @@ proc worker_count(name: Str) -> Result[Int] {
   total
 }
 
+proc helper_pids() -> Result[List[Int]] {
+  var pids: List[Int] = []
+  for entry in process.list()? {
+    if entry.status != "Z" and "sleep" in entry.argv and "3001" in entry.argv { pids += [entry.pid] }
+  }
+  pids
+}
+
+proc await_replaced_helper(previous: List[Int], timeout_ms: Int) -> Result[List[Int]] {
+  let deadline = time.boottime()? / 1000000 + timeout_ms
+  var current = helper_pids()?
+  while time.boottime()? / 1000000 < deadline {
+    current = helper_pids()?
+    if current.len() == 1 and ! (current[0] in previous) { return current }
+    time.sleep(25ms)?
+  }
+  current
+}
+
 proc scanner_count() -> Result[Int] {
   var total = 0
   for entry in process.list()? {
@@ -243,11 +262,13 @@ proc main() [fs, process, env, time, io, error] -> Result[Unit] {
   let old_base = status_pid("r1-base")?
   let old_app = status_pid("r1-app")?
   let old_slow = status_pid("r1-slow")?
+  let restart_helpers_before = helper_pids()?
   process.kill(old_scanner, "TERM")?
   let new_scanner = await_scanner(old_scanner, 15000)?
   let new_base = await_running("r1-base", old_base, true, 15000)?
   let new_app = await_running("r1-app", old_app, true, 15000)?
   let new_slow = await_running("r1-slow", old_slow, false, 15000)?
+  let restart_helpers = await_replaced_helper(restart_helpers_before, 5000)?
   let duplicates = count_events("duplicate.")?
   let workers_base = worker_count("r1-base")?
   let workers_app = worker_count("r1-app")?
@@ -268,13 +289,19 @@ proc main() [fs, process, env, time, io, error] -> Result[Unit] {
   guard base_restart_starts == 2 and app_restart_starts == 3 and slow_restart_starts == 2 else {
     return Err(error.failure(f"scanner restart duplicated starts base={base_restart_starts} app={app_restart_starts} slow={slow_restart_starts}"))
   }
-  say(f"R1_SCANNER_RESTART {json.encode({old: old_scanner, new: new_scanner, base: new_base, app: new_app, slow: new_slow, duplicates: duplicates, workers_base: workers_base, workers_app: workers_app, workers_slow: workers_slow, scanners: scanners, starts_base: base_restart_starts, starts_app: app_restart_starts, starts_slow: slow_restart_starts})?}")?
+  say(f"R1_SCANNER_RESTART {json.encode({old: old_scanner, new: new_scanner, base: new_base, app: new_app, slow: new_slow, duplicates: duplicates, workers_base: workers_base, workers_app: workers_app, workers_slow: workers_slow, scanners: scanners, starts_base: base_restart_starts, starts_app: app_restart_starts, starts_slow: slow_restart_starts, helpers_before: restart_helpers_before.len(), helpers: restart_helpers.len()})?}")?
 
+  let kill_helpers_before = helper_pids()?
   process.kill(new_scanner, "KILL")?
   let killed_scanner = await_scanner(new_scanner, 15000)?
   let killed_base = await_running("r1-base", new_base, true, 15000)?
   let killed_app = await_running("r1-app", new_app, true, 15000)?
   let killed_slow = await_running("r1-slow", new_slow, false, 15000)?
+  let kill_helpers = await_replaced_helper(kill_helpers_before, 5000)?
+  var stale_helpers = 0
+  for helper in kill_helpers {
+    if helper in kill_helpers_before { stale_helpers += 1 }
+  }
   let killed_duplicates = count_events("duplicate.")?
   let killed_base_count = worker_count("r1-base")?
   let killed_app_count = worker_count("r1-app")?
@@ -286,7 +313,7 @@ proc main() [fs, process, env, time, io, error] -> Result[Unit] {
   guard killed_duplicates == 0 and killed_base_count == 1 and killed_app_count == 1 and killed_slow_count == 1 and old_survivors == 0 else {
     return Err(error.failure(f"SIGKILL recovery duplicates={killed_duplicates} workers={killed_base_count},{killed_app_count},{killed_slow_count} survivors={old_survivors}"))
   }
-  say(f"R1_SCANNER_KILL {json.encode({old: new_scanner, new: killed_scanner, base: killed_base, app: killed_app, slow: killed_slow, duplicates: killed_duplicates, workers_base: killed_base_count, workers_app: killed_app_count, workers_slow: killed_slow_count, survivors: old_survivors})?}")?
+  say(f"R1_SCANNER_KILL {json.encode({old: new_scanner, new: killed_scanner, base: killed_base, app: killed_app, slow: killed_slow, duplicates: killed_duplicates, workers_base: killed_base_count, workers_app: killed_app_count, workers_slow: killed_slow_count, survivors: old_survivors, helpers_before: kill_helpers_before.len(), helpers: kill_helpers.len(), stale_helpers: stale_helpers})?}")?
 
   let malformed = check_broken()?
   guard malformed.code != 0 else {

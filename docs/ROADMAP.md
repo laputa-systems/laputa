@@ -343,9 +343,10 @@ that sees no owned workers while the root is still writable. The proof found
 `rc.shutdown` running a command named `hook` instead of each hook. The baselayout
 and installer inittabs each start one `xinit scan boot`, which starts mdevd,
 the SSH server and networking from their boot-target modules; `mdev.supervise` is
-gone, and the guest proof reads the scanner line from baselayout. A SIGKILLed scanner's
-recorded worker groups are terminated by PID 1 before the scanner restarts, so no
-service runs twice ([init](../xinit/docs/INIT.md)). Open: the installer QEMU smoke image was not rebuilt
+gone, and the guest proof reads the scanner line from baselayout. PID 1 starts each respawn
+entry in its own session and sweeps that session when the leader exits, so a
+SIGKILLed scanner's workers, including one spawned just before the kill, stop
+before the scanner restarts and no service runs twice ([init](../xinit/docs/INIT.md)). Open: the guest lifecycle proof was not rerun with the session sweep, the installer QEMU smoke image was not rebuilt
 to exercise the CI scanner, and the graphical reference was not rerun.
 
 ## R2: Persistent VM networking and time

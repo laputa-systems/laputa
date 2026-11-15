@@ -69,7 +69,6 @@ type SavedStatus = {
   start_time_ms: Int,
 }
 
-type WorkerRecord = {pgid: Int, leader: Int, start_ticks: Int}
 
 type SpawnResult = {status: SavedStatus, notify_fd: Int}
 
@@ -178,97 +177,48 @@ proc scanner_marker_path() -> Result[Path] {
   fp"{run_dir()?.display()}/scanner.json"
 }
 
-proc worker_record_path(scanner: Int) -> Result[Path] {
-  fp"{run_dir()?.display()}/scanner.{scanner}.workers"
-}
-
-proc worker_records(scanner: Int) -> Result[List[WorkerRecord]] {
-  let path_value = worker_record_path(scanner)?
-  return [] unless path_value.exists()
-  json.read(path_value)?.require(List[WorkerRecord])?
-}
-
-proc write_worker_records(scanner: Int, records: List[WorkerRecord]) {
-  let target = worker_record_path(scanner)?
-  target.parent.mkdir(parents: true)
-  let scratch = fp"{target.display()}.tmp"
-  scratch.write(json.encode(records)?, mode: 0o600)
-  scratch.rename(to: target, overwrite: true)
-}
-
-proc worker_start_ticks(pid: Int) -> Result[Int] {
+proc live_session_groups(session: Int) -> Result[List[Int]] {
+  var groups: List[Int] = []
   for entry in process.list()? {
-    if entry.pid == pid {
-      return entry.start_ticks ?? 0
+    let pgrp = entry.pgrp ?? 0
+    if (entry.session ?? 0) == session and entry.status != "Z" and pgrp > 0 and ! (pgrp in groups) {
+      groups += [pgrp]
     }
   }
-  0
+  groups
 }
 
-proc add_worker(pid: Int) {
-  return when fake_pids()
-  let scanner = process.current_pid()?
-  let ticks = worker_start_ticks(pid)?
-  guard ticks > 0 else {
-    return Err(XinitError.Failed(kind: "xinit-worker", message: f"cannot identify worker {pid}"))
-  }
-  write_worker_records(scanner, worker_records(scanner)? + [{pgid: pid, leader: pid, start_ticks: ticks}])
-}
-
-proc remove_worker(pid: Int) {
-  return when fake_pids()
-  let scanner = process.current_pid()?
-  let path_value = worker_record_path(scanner)?
-  return unless path_value.exists()
-  let remaining = [record for record in worker_records(scanner)? if record.leader != pid]
-  if remaining.is_empty() {
-    path_value.remove()
-  } else {
-    write_worker_records(scanner, remaining)
-  }
-}
-
-pure worker_attributed(record: WorkerRecord, leader_ticks: Int, group_live: Bool) -> Bool {
-  group_live and (leader_ticks == 0 or leader_ticks == record.start_ticks)
-}
-
-proc worker_group_live(record: WorkerRecord) -> Result[Bool] {
-  var live = false
-  var ticks = 0
-  for entry in process.list()? {
-    if entry.pid == record.leader { ticks = entry.start_ticks ?? 0 }
-    if entry.pgrp == record.pgid and entry.status != "Z" { live = true }
-  }
-  worker_attributed(record, ticks, live)
-}
-
-proc reap_scanner_workers(scanner: Int) -> Result[List[ChildExit]] {
-  let path_value = worker_record_path(scanner)?
-  return [] unless path_value.exists()
-  let records = worker_records(scanner)?
-  for record in records {
-    if worker_group_live(record)? { unix.kill_process_group(record.pgid, "TERM") }
-  }
+## Terminates what a dead respawn entry left in its session. PID 1 starts each respawn entry as a
+## session leader, and descendants keep that session unless they call setsid, so the session ID
+## finds workers no record could name, including one started just before the leader died.
+proc sweep_session(session: Int) -> Result[List[ChildExit]] {
+  return [] when fake_pids()
+  var groups = live_session_groups(session)?
+  return [] when groups.is_empty()
+  for pgrp in groups { unix.kill_process_group(pgrp, "TERM") }
   let deadline = elapsed_now_ms()? + 2000
-  var live = true
-  while live and elapsed_now_ms()? < deadline {
-    live = false
-    for record in records {
-      if worker_group_live(record)? { live = true }
+  while ! groups.is_empty() and elapsed_now_ms()? < deadline {
+    time.sleep(25ms)
+    let current = live_session_groups(session)?
+    for pgrp in current {
+      if ! (pgrp in groups) { unix.kill_process_group(pgrp, "TERM") }
     }
-    if live { time.sleep(25ms) }
+    groups = current
   }
   var reaped: List[ChildExit] = []
-  for record in records {
-    if worker_group_live(record)? {
-      let cleanup = unix.shutdown_process_groups([record.pgid], 0ms, 100ms)?
-      guard cleanup.remaining.is_empty() else {
-        return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"scanner retained worker group {record.pgid}"))
-      }
-      reaped += cleanup.reaped
+  var rounds = 0
+  while ! groups.is_empty() {
+    guard rounds < 10 else {
+      return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"session {session} kept starting process groups"))
     }
+    let cleanup = unix.shutdown_process_groups(groups, 0ms, 100ms)?
+    guard cleanup.remaining.is_empty() else {
+      return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"session {session} retained {cleanup.remaining.len()} process groups"))
+    }
+    reaped += cleanup.reaped
+    groups = live_session_groups(session)?
+    rounds += 1
   }
-  path_value.remove()
   reaped
 }
 
@@ -451,6 +401,13 @@ proc run_phase(entries: List[InittabEntry], action: Str) {
   }
 }
 
+pure respawn_pid(runtime: List[RuntimeEntry], pid: Int) -> Bool {
+  for current in runtime {
+    return true when current.pid == pid and current.action == "respawn"
+  }
+  false
+}
+
 pure runtime_get(runtime: List[RuntimeEntry], key: Str) -> RuntimeEntry {
   for item in runtime {
     return item when item.key == key
@@ -504,7 +461,7 @@ proc spawn_entries(
         let command = command_from_argv(entry.argv)
 
         let child = if entry.id == "" {
-          unix.spawn_process_group(command)?
+          unix.spawn_process_group(command, new_session: entry.action == "respawn")?
         } else {
           unix.spawn_with_tty(command, tty: entry.id)?
         }
@@ -588,6 +545,12 @@ proc shutdown_runtime(entries: List[InittabEntry], runtime: List[RuntimeEntry], 
     let timeout = if fast { 0ms } else { 2s }
     let _ = unix.shutdown_process_groups(groups, timeout)?
   }
+
+  for current in runtime {
+    if current.pid > 0 and current.action == "respawn" {
+      let _ = sweep_session(current.pid)?
+    }
+  }
 }
 
 proc finalize(kind: Str) {
@@ -650,8 +613,8 @@ proc run_pid1(inittab: Path, policy: InittabPolicy) {
       while index < pending.len() {
         let child = pending[index]
         index += 1
-        if worker_record_path(child.pid)?.exists() {
-          pending += reap_scanner_workers(child.pid)?
+        if respawn_pid(runtime, child.pid) {
+          pending += sweep_session(child.pid)?
           let drained = unix.wait_pid1_event(timeout: 0ms)?
           if drained.kind == "children" {
             pending += drained.children
@@ -1406,7 +1369,6 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
 
   if service.log == "none" {
     let child = unix.spawn_process_group(service.command, notify: use_notify)?
-    if notify { add_worker(child.pid) }
     let ready = if use_notify or defer_ready { false } else { wait_ready(service)? }
 
     return {
@@ -1435,7 +1397,6 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
 
   maybe_rotate_log(service.name, service.log_max_size, service.log_keep)
   let child = unix.spawn_process_group_log(service.command, path_value, notify: use_notify)?
-  if notify { add_worker(child.pid) }
   let ready = if use_notify or defer_ready { false } else { wait_ready(service)? }
 
   {
@@ -1994,7 +1955,6 @@ proc reconcile_child_exits(units: List[ServiceUnit], children: List[ChildExit], 
           return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"service {unit.service.name} retained process group {unit.pid}"))
         }
 
-        remove_worker(unit.pid)
         pending = pending + cleanup.reaped
       }
     }
@@ -2026,7 +1986,6 @@ proc kill_unit(unit: ServiceUnit) -> Result[List[ChildExit]] {
     children = cleanup.reaped
   }
 
-  if unit.pid > 0 { remove_worker(unit.pid) }
   run_finish(unit)
   children
 }
