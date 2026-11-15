@@ -168,6 +168,16 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** L (weeks)
 
+### LAP-60 · P3 · Expose TCP telemetry to Asterinas inet_diag
+
+- **Area:** Asterinas networking
+- **Where:** `asterinas/` (`kernel/libs/aster-bigtcp`, `kernel/core/src/net/socket/netlink/sock_diag`, smoltcp)
+- **Problem:** Two native `ss` tests fail on every kernel through `d57e24fdd`: `core/tests/test-ss.xsh::test_ss_tcp_info_text_follows_the_reference_order` and `test_ss_extended_and_timer_text`. inet_diag responses carry no `INET_DIAG_INFO` (`struct tcp_info`), `INET_DIAG_CONG` or cgroup attribute, and no timer state. The kernel cannot report these truthfully. Asterinas builds smoltcp 0.11 without a congestion-control feature, so the stack runs `NoControl` with an unlimited window and has no algorithm name. smoltcp keeps its RTT estimator and retransmit and keepalive timers private, so `aster-bigtcp`'s diagnostic snapshot cannot read them.
+- **Recommendation:** Enable a smoltcp congestion controller (Reno or CUBIC), and expose RTT, cwnd, bytes sent and acked, retransmits and the armed timer through a small accessor patch to the smoltcp fork Asterinas consumes. Then fill `tcp_info` at its Linux size, zero the untracked fields, and emit `INET_DIAG_CONG` and the timer fields.
+- **Acceptance:** Both IDs and all of `core/tests/test-ss.xsh` pass in the guest. A C witness that requests `INET_DIAG_INFO|INET_DIAG_CONG` on a loopback ESTAB pair passes on Linux, fails on `d57e24fdd`, and passes on the fix.
+- **Fix with:** reference-parity
+- **Effort:** M
+
 ### LAP-56 · P2 · Fix Asterinas heap exhaustion in the full native corpus
 
 - **Area:** Asterinas kernel memory
