@@ -9,7 +9,7 @@ umount refusal with `EBUSY`. Each lane's Linux control, baseline rejection and
 guest proof is recorded in XSH `dev/campaign/RESUME-2026-11-14.md`. The kernel
 ELF SHA-256 is
 `13416bbca8d3ba8eb64e16544595d128d68a63fef81c5cf3e4cd8d2d01c0c6ef`.
-Full current-pin native qualification remains open.
+Full current-pin native qualification remains open; the corpus run below has 36 failures.
 
 XSH moved from `d7b4c9c85` to `ce036ba50` with the kernel because the old pin's
 `Dockerfile.test` downloads the deleted `llvm-musl-23.1.5-2f0b039` release; it
@@ -32,6 +32,45 @@ cannot qualify this QEMU profile. Evidence is at
 deadline or poweroff requirement changed. A worktree replay needs
 `make asterinas-fetch` and the operator's
 `packages/ca-certificates/files/trust-update-key` first.
+
+The full native corpus at this pin ran on 2026-11-15 from a fixture built from
+XSH `d62ee5746` verification products, which the pinned Linux verification had
+built. That suite's only two failures, `factor` parallel and `ln`
+force-replace, passed when rerun alone. Discovery found 15,673 IDs. The guest
+kernel is a standard build of `6cc3e6471` with ELF SHA-256
+`6532fb69f87e635267866ab62d17bf3cd2d2c84a5abe55f3f5c994bc69b83563`. That hash
+differs from the published-pin hash above, so the build is not bit-identical.
+The first guest stopped after 12,663 s on a kernel heap failure, `Failed to
+allocate a large slot` for a 4 MiB layout (LAP-56). By then it had 14,133
+passes, 36 failures, 302 skips and 1,202 unexecuted IDs. A fresh guest ran
+exactly those 1,202 IDs: 1,198 passed, none failed and 4 were skipped. The
+combined accounting is 15,331 passed, 36 failed, 306 skipped, and no
+unexecuted or unknown IDs.
+
+Compared with the previous pin's run, `native-full-d304ba2dd-9ebef8747`, no
+previously passing ID fails. Sixty-five previously failing IDs now pass, and
+the ten new failures were all unexecuted in that run. All 36 failures reproduce
+in a third guest that runs only them. They fall into these groups:
+
+- `RENAME_EXCHANGE` (`mv` exchange) and inotify (`tail`).
+- Absent `/sys/kernel/profiling` and `/proc/modules` (`wc`, `cp`, `head`,
+  `tail`, `linux.modules`, embedded sealing).
+- Hard-link error precedence (`ln` reports `EPERM` where Linux reports the
+  existing name).
+- `mountpoint` on real mounts.
+- `cat` of a domain socket.
+- `ls` allocation size.
+- `ss` extended TCP info.
+- `px` process path resolution.
+- Ptrace-traced system-report checks.
+- One gate test.
+- Five `dd` FIFO cases whose helper executable is missing from the fixture.
+
+This is not a full native-suite pass. Evidence is at
+`.work/tmp/native-full-d62ee5746-6cc3e6471/`,
+`.work/tmp/native-rest-d62ee5746-6cc3e6471/` and
+`.work/tmp/native-fail36-d62ee5746-6cc3e6471/`, with the base fixture at
+`.work/tmp/native-fixture-d62ee5746/`.
 
 The maintained cohorts below were qualified at kernel `d59567c40` by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort

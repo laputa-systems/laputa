@@ -168,6 +168,16 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** L (weeks)
 
+### LAP-56 · P2 · Fix Asterinas heap exhaustion in the full native corpus
+
+- **Area:** Asterinas kernel memory
+- **Where:** `asterinas/` (kernel heap allocator), `infra/asterinas/`
+- **Problem:** On 2026-11-15, kernel `6cc3e6471` stopped with `Failed to allocate a large slot` (`Layout { size: 0x400000, align: 8 }`). It had run 12,663 s of the full native corpus in a 4 GiB, two-vCPU Firecracker guest, after 14,471 completed cases. The last case reported was `tests/xsh/stdlib/path_lines.xsh::test_read_lines_lint_fix_keeps_values_and_failures`. A fresh guest then ran the remaining 1,202 IDs without failure, so the exhaustion depends on accumulated state, not on one case. Evidence is in `.work/tmp/native-full-d62ee5746-6cc3e6471/001.console.log`.
+- **Recommendation:** Find whether the kernel leaks large-slot allocations or fragments the large-slot pool. Sample kernel heap use across a long native batch, and compare the slot count before and after modules that create many processes or files. Fix the leak or the pool policy with a regression that runs a bounded churn loop.
+- **Acceptance:** A single guest completes the full 15,673-ID corpus without kernel allocation failure, and the churn regression fails on `6cc3e6471` and passes on the fix.
+- **Fix with:** root-cause
+- **Effort:** M
+
 ### LAP-55 · P3 · Close the Asterinas IPv4 state and DHCP obligations
 
 - **Area:** Asterinas networking
