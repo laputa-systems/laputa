@@ -54,6 +54,13 @@ test test_seed_rejects_registry_cache_after_cargo_source_changes [fs, process, e
   fp"{xsh_root}/.cargo".mkdir()
   fp"{xsh_root}/Cargo.lock".write("locked dependencies")
   fp"{xsh_root}/Dockerfile.test".write("image")
+  let init = process.run(process.command_argv(p"git", ["git", "init", "-q", xsh_root.display()], root))?
+  assert init.ok
+  let commit = process.run(process.command_argv(p"git", ["git", "-C", xsh_root.display(), "-c", "user.name=Seed test", "-c", "user.email=seed@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], root))?
+  assert commit.ok
+  let revision = (run.text git -C $xsh_root rev-parse HEAD).trim()
+  fp"{root}/infra/asterinas".mkdir()
+  fp"{root}/infra/asterinas/inputs.lock".write(f"XSH_COMMIT={revision}\n")
   let config = fp"{xsh_root}/.cargo/config.toml"
   config.write("first source")
   let arch = xsh_seed.xsh_seed_arch("x86_64")?

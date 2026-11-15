@@ -37,3 +37,15 @@ bash "$repo_root/infra/asterinas/select-xsh-target.sh" "$work" "$first_hash"
 legacy_files=("$work"/.out/asterinas-firecracker/xsh-targets/legacy.*/legacy)
 [[ ${#legacy_files[@]} == 1 && "$(cat "${legacy_files[0]}")" == 'preserved legacy cache' ]]
 printf 'asterinas-xsh: preserved-mtime source switches select distinct reusable binaries\n'
+
+[[ "$(readlink "$work/.out/xsh-target")" == "asterinas-firecracker/xsh-targets/$first_hash" ]]
+moved="$work-moved"
+mv "$work" "$moved"
+work="$moved"
+[[ "$($work/.out/xsh-target/program)" == first-api ]]
+printf 'asterinas-xsh: relative link resolves after checkout moves\n'
+rm "$work/.out/xsh-target"
+ln -s "$work/old-location/missing" "$work/.out/xsh-target"
+bash "$repo_root/infra/asterinas/select-xsh-target.sh" "$work" "$first_hash"
+[[ "$($work/.out/xsh-target/program)" == first-api ]]
+printf 'asterinas-xsh: dangling legacy link repaired\n'

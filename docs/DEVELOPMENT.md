@@ -78,6 +78,12 @@ make seed-asterinas-shell # opt-in xshi integration variant; the pinned backend 
 make seed-smoke  # the seed runs, plans, and passes a PM subset in the image with --network none
 ```
 
+`make seed` requires `XSH_ROOT` HEAD to contain the XSH commit pinned in
+`infra/asterinas/inputs.lock`. The host checks an existing seed manifest against
+that pin before other `need-xsh` targets; rebuild a stale seed with `make seed`.
+A moved checkout keeps the relative `.out/xsh-target` cache link usable, and
+the seed build removes an obsolete dangling link before creating its target.
+
 `make seed` builds `XSH_ROOT` with the release profile inside `xsh-test`,
 reusing the cargo target `.out/xsh-target`, which `make host-xsh` shares.
 `.out/seed/<arch>/manifest.json` records each product's sha256 and the XSH

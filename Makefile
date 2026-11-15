@@ -93,7 +93,7 @@ PNPM_VERSION ?= 12.18.0
 PNPM_ROOT ?= target/pnpm
 
 .PHONY: check lint test test-components-integration test-pm mirror-bin test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
-	need-xsh host-xsh host-mirror fetch-mirror \
+	need-xsh need-host-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
 	asterinas-setup asterinas-preflight asterinas-fetch asterinas-build \
 	asterinas-test asterinas-boot asterinas-clean asterinas-viability asterinas-shell \
@@ -172,7 +172,15 @@ distclean: clean
 
 # Every target that runs host XSH names this first, so a fresh Linux host
 # learns to run `make host-xsh` instead of failing on a missing binary.
-need-xsh:
+need-xsh: need-host-xsh
+	@if [ -f ".out/seed/$(ARCH)/manifest.json" ]; then \
+	    locked="$$(bash seed/locked-xsh.sh "$(CURDIR)")" || exit 1; \
+	    commit="$$( $(HOST_XSH_ENV) $(XSH) seed/manifest-commit.xsh -- ".out/seed/$(ARCH)/manifest.json" )" || exit 1; \
+	    git -C "$(XSH_ROOT_ABS)" merge-base --is-ancestor "$$locked" "$$commit" || { \
+	        echo "XSH seed commit $$commit does not contain locked XSH commit $$locked; run \`make seed\`" >&2; exit 1; }; \
+	fi
+
+need-host-xsh:
 	@for tool in "$(XSH)" "$(XSHT)"; do \
 	    command -v "$$tool" >/dev/null || { \
 	        echo "no host XSH at $$tool: run \`make host-xsh\` (Linux), or build $(XSH_ROOT_ABS) with cargo build --release" >&2; exit 1; }; \
@@ -260,12 +268,12 @@ host-mirror:
 # Offline: static musl xsh/xshi/xsht and core.tar.xz from XSH_ROOT under
 # .out/seed/$(ARCH), then the package-tools image. Incremental through the
 # cargo target dir in .out/xsh-target.
-seed: need-xsh
+seed: need-host-xsh
 	$(SEED) build $(SEED_ARGS) --jobs $(CARGO_JOBS)
 
 # Offline: build the ordinary seed plus xshi's Laputa Asterinas integration
 # feature. Only the Asterinas shell proof consumes this variant.
-seed-asterinas-shell: need-xsh
+seed-asterinas-shell: need-host-xsh
 	$(SEED) build $(SEED_ARGS) --jobs $(CARGO_JOBS) --asterinas-shell
 
 # Offline proof that the seed runs in package-tools with --network none.
@@ -323,22 +331,22 @@ fetch-mirror: fetch-seed
 # The networked seed inputs: XSH's crates for XSH_ROOT's Cargo.lock in
 # .cache/cargo, the xsh-test image (XSH's Dockerfile.test), and the
 # host-tools base saved under .cache/images/.
-fetch-seed: need-xsh
+fetch-seed: need-host-xsh
 	$(SEED) fetch $(SEED_ARGS)
 
 # The typed profile CLI is the sole core-system orchestration surface. The
 # canonical profile is the Tinyland Ghostty kiosk; it needs a virgl-capable
 # host QEMU and GPU render node (docs/QEMU.md).
-profile-plan:
+profile-plan: need-xsh
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- plan qemu-tinyland-ghostty
 
-profile-build:
+profile-build: need-xsh
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- build qemu-tinyland-ghostty
 
-profile-test:
+profile-test: need-xsh
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- test qemu-tinyland-ghostty
 
-profile-boot:
+profile-boot: need-xsh
 	$(LAPUTA_PROFILE_ENV) $(XSH_HOST) laputa.xsh -- boot qemu-tinyland-ghostty
 
 profile-clean:

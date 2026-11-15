@@ -9,8 +9,8 @@ repo_root="$(cd "$1" && pwd -P)"
 inputs_sha256="$2"
 cache_root="$repo_root/.out/asterinas-firecracker/xsh-targets"
 link="$repo_root/.out/xsh-target"
-target="$cache_root/$inputs_sha256"
-mkdir -p "$target"
+target="asterinas-firecracker/xsh-targets/$inputs_sha256"
+mkdir -p "$cache_root/$inputs_sha256"
 if [[ -e "$link" && ! -L "$link" ]]; then
     [[ -d "$link" ]] || { printf 'asterinas-xsh: target cache is not a directory: %s\n' "$link" >&2; exit 1; }
     legacy="$(mktemp -d "$cache_root/legacy.XXXXXXXX")"

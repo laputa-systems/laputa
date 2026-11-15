@@ -334,8 +334,16 @@ export proc xsh_seed_build(
   }
 
   xsh_seed_require_checkout(xsh_root)
+  let locked = (run.text bash seed/locked-xsh.sh $laputa_root).trim()
+  let head = xsh_seed_git_text(xsh_root, ["rev-parse", "HEAD"])?
+  let status = process.run(process.command_argv(p"git", ["git", "-C", xsh_root.display(), "merge-base", "--is-ancestor", locked, head], laputa_root))?
+  if ! status.ok {
+    return Err(SeedError.Failed(f"XSH checkout commit {head} does not contain locked XSH commit {locked}; update XSH_ROOT to a descendant of {locked}"))
+  }
   let image = xsh_seed_require_fetched(docker, laputa_root, xsh_root)?
-  xsh_seed_cargo_target(laputa_root).mkdir()
+  let target = xsh_seed_cargo_target(laputa_root)
+  xsh_seed_run(p"bash", ["bash", "-c", "if [ -L \"$1\" ] && [ ! -e \"$1\" ]; then rm -- \"$1\"; fi", "seed-target", target.display()], laputa_root, "repairing the seed target directory")
+  target.mkdir()
   xsh_seed_run(
     docker,
     xsh_seed_cargo_build_argv(docker, image, laputa_root, xsh_root, value, jobs, asterinas_shell)?,

@@ -178,16 +178,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** root-cause
 - **Effort:** M
 
-### LAP-58 · P3 · Reject a seed older than the XSH that Laputa code requires
-
-- **Area:** Seed and image builds
-- **Where:** `seed/xsh_seed.xsh`, `packages/xsh/PKGBUILD.xsh`, `infra/asterinas/inputs.lock`, `infra/asterinas/select-xsh-target.sh`
-- **Problem:** On 2026-11-15, `make profile-test` booted an image whose `/init` xinit calls `unix.spawn_process_group(new_session:)`. That call needs XSH `d62ee5746`, but the image used a seed built from XSH `befe5ced`. PID 1 failed its check with `unknown named parameter new_session`, and the kernel panicked. Bumping `inputs.lock` does not refresh the seed, and no check compares the two. Separately, `.out/xsh-target` was an absolute symlink into the repository's old path. After the checkout moved, `make seed` failed with `fs-mkdir: ... File exists`.
-- **Recommendation:** Have image builds require that the seed manifest's `xsh_commit` contains the locked `XSH_COMMIT`. Make `select-xsh-target.sh` write a relative link, or have `make seed` repair a dangling one.
-- **Acceptance:** A stale seed fails before any image build with an error naming both commits, and `make seed` succeeds after the checkout moves.
-- **Fix with:** single-source-of-truth
-- **Effort:** S
-
 ### LAP-55 · P3 · Close the Asterinas IPv4 state and DHCP obligations
 
 - **Area:** Asterinas networking
