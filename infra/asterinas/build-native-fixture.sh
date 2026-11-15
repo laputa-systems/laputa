@@ -13,7 +13,7 @@ output="$(realpath "$(dirname "$4")")/$(basename "$4")"
 [[ ! -e "$output" ]] || { printf 'native fixture output already exists: %s\n' "$output" >&2; exit 2; }
 [[ -z "$(git -C "$xsh_source" status --porcelain=v1 --untracked-files=all)" ]] || { printf 'native fixture requires a clean XSH checkout\n' >&2; exit 2; }
 xsh_commit="$(git -C "$xsh_source" rev-parse HEAD)"
-for product in xsh xsht xshi; do
+for product in xsh xsht xshi xsh-test-helper; do
     [[ -x "$xsh_products/$product" ]] || { printf 'native fixture product missing: %s\n' "$product" >&2; exit 2; }
 done
 [[ -x /usr/local/bin/mold && -f "$xsh_source/dev/musl-linker.sh" ]] || { printf 'native fixture requires the qualified mold linker\n' >&2; exit 2; }
@@ -42,7 +42,7 @@ tar -xf /stage/image.tar -C /stage/rootfs
 rm /stage/image.tar
 mkdir -p /stage/rootfs/work/target/x86_64-unknown-linux-musl/verification
 cp -a /stage/source/. /stage/rootfs/work/
-for product in xsh xsht xshi; do
+for product in xsh xsht xshi xsh-test-helper; do
     cp "/inputs/products/$product" "/stage/rootfs/usr/bin/$product"
     ln -sfn "/usr/bin/$product" "/stage/rootfs/work/target/x86_64-unknown-linux-musl/verification/$product"
 done
@@ -78,7 +78,8 @@ jaq -n --arg image "$test_image" --arg commit "$xsh_commit" \
     --arg xsh "$(sha256sum "$xsh_products/xsh" | awk '{print $1}')" \
     --arg xsht "$(sha256sum "$xsh_products/xsht" | awk '{print $1}')" \
     --arg xshi "$(sha256sum "$xsh_products/xshi" | awk '{print $1}')" \
-    '{format:"xsh-native-fixture-1", image:$image, xsh_commit:$commit, root_sha256:$root, init_sha256:$init, products:{xsh:$xsh,xsht:$xsht,xshi:$xshi}, uid:1000, gid:1000, jobs:1}' > "$stage/fixture.json"
+    --arg helper "$(sha256sum "$xsh_products/xsh-test-helper" | awk '{print $1}')" \
+    '{format:"xsh-native-fixture-1", image:$image, xsh_commit:$commit, root_sha256:$root, init_sha256:$init, products:{xsh:$xsh,xsht:$xsht,xshi:$xshi,"xsh-test-helper":$helper}, uid:1000, gid:1000, jobs:1}' > "$stage/fixture.json"
 rm -r "$stage/source"
 chmod a-w "$stage/root.ext2"
 mv "$stage" "$output"
