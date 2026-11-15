@@ -1,6 +1,6 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `6cc3e6471`, with XSH `ce036ba50`, recorded with
+The checked-in kernel pin is `6cc3e6471`, with XSH `d62ee5746`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published. The
 kernel adds 46 commits to the previous pin `9ebef8747`: iterative dentry
 ancestor release, `/proc/net` socket tables, default POSIX ACLs, `waitid`
@@ -11,20 +11,27 @@ ELF SHA-256 is
 `13416bbca8d3ba8eb64e16544595d128d68a63fef81c5cf3e4cd8d2d01c0c6ef`.
 Full current-pin native qualification remains open.
 
-The XSH pin moved with the kernel because the previous pin `d7b4c9c85` can no
-longer be rebuilt: its `Dockerfile.test` downloads the deleted
-`llvm-musl-23.1.5-2f0b039` release. `ce036ba50` uses the current
-`llvm-musl-23.1.5-dc0d9b9`, so the replay qualifies both pins together.
+XSH moved from `d7b4c9c85` to `ce036ba50` with the kernel because the old pin's
+`Dockerfile.test` downloads the deleted `llvm-musl-23.1.5-2f0b039` release; it
+then moved to `d62ee5746`, whose `unix.spawn_process_group(new_session:)` the
+xinit session sweep needs, because the image builds xinit with the pinned XSH.
 
-Maintained replay at Laputa `7700d115` plus this pin passes both backends and
-all ten recovery rounds: `LAPUTA_RECOVERY_REPEATS=10 bash
-infra/asterinas/qualify.sh all --backend both` exits zero after a fresh
-published-input check. Its Linux input is the retained legacy-ACPI reference
-kernel, supplied through `LAPUTA_LINUX_KERNEL_PACKAGE`; the mirror's
-reduced-hardware-only ACPI kernel cannot qualify this QEMU profile. Evidence is
-at `.work/tmp/pin-6cc3e647-maintained/`. No cohort assertion, deadline or
-poweroff requirement changed. A worktree replay needs `make asterinas-fetch`
-and the operator's `packages/ca-certificates/files/trust-update-key` first.
+Maintained replay of the xinit session sweep with this pin passes every
+cohort on both backends, including all ten
+recovery rounds, except the Linux reference's clock `pause` case: on the loaded
+host its QEMU peer held the guest for 10.3 s against the 5 s margin. A
+`bash infra/asterinas/qualify.sh clock --backend both` rerun then passed all six
+clock cases on both backends, and `qualify.sh published-inputs --backend
+asterinas` confirms both pins are published and match the lock and gitlink.
+The replay uses `LAPUTA_RECOVERY_REPEATS=10`; both runs use the retained
+legacy-ACPI reference kernel, supplied through
+`LAPUTA_LINUX_KERNEL_PACKAGE`; the mirror's reduced-hardware-only ACPI kernel
+cannot qualify this QEMU profile. Evidence is at
+`.work/tmp/pin-xsh-d62ee574-maintained/`; the kernel's first replay at XSH
+`ce036ba50` is at `.work/tmp/pin-6cc3e647-maintained/`. No cohort assertion,
+deadline or poweroff requirement changed. A worktree replay needs
+`make asterinas-fetch` and the operator's
+`packages/ca-certificates/files/trust-update-key` first.
 
 The maintained cohorts below were qualified at kernel `d59567c40` by
 `bash infra/asterinas/qualify.sh all --backend both`, which runs every cohort
