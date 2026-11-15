@@ -1192,6 +1192,22 @@ fn http_rejects_unauthorized_and_oversized_before_body() {
 }
 
 #[test]
+fn http_accepts_package_metadata_larger_than_the_request_limit() {
+    let (addr, state, _tmp) = start_http(make_local_state());
+    let body = format!(r#"{{"metadata_sha256":"{}"}}"#, "a".repeat(210 * 1024));
+    for path in [
+        "/metadata/x86_64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json",
+        "/proofs/x86_64/zlib/zlib-1.3.2-5-0123456789ab-fedcba987654.json",
+    ] {
+        let mut stream = raw_connection(addr, format!("PUT {path} HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).as_bytes());
+        stream.write_all(body.as_bytes()).unwrap();
+        let response = response_text(stream);
+        assert!(response.starts_with("HTTP/1.1 201"), "{path}: {response}");
+        assert_eq!(state.storage.get(&path[1..]).unwrap().unwrap(), body.as_bytes());
+    }
+}
+
+#[test]
 fn http_limits_chunked_body_and_rejects_partial_upload() {
     let (addr, state, _tmp) = start_http(make_local_state());
     let mut stream = raw_connection(addr, b"POST /_uploads/test/complete HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n10001\r\n");

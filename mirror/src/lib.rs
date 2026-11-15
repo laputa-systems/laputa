@@ -120,7 +120,7 @@ async fn handle(request: h12tiny::web::Request, state: Arc<AppState>) -> ::http:
     }
     let limit = if method == "PUT" && (path.starts_with("/packages/") || path.starts_with("/sources/") || path.starts_with("/_uploads/")) {
         UPLOAD_LIMIT
-    } else if method == "PUT" && (path == "/index.json" || path.starts_with("/indexes/")) {
+    } else if method == "PUT" && (path == "/index.json" || path.starts_with("/indexes/") || path.starts_with("/metadata/") || path.starts_with("/proofs/")) {
         INDEX_LIMIT
     } else { BODY_LIMIT };
     if request.body().size_hint().upper().is_some_and(|n| n > limit as u64) {
