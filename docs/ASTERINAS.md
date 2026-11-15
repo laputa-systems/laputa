@@ -1,6 +1,6 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `d57e24fdd`, with XSH `86215d2a2`, recorded with
+The checked-in kernel pin is `d57e24fdd`, with XSH `3913c9be3`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published. The
 kernel adds 14 commits to the previous pin `6cc3e6471`:
 - empty `/proc/modules` and `/sys/kernel/profiling`;
@@ -16,7 +16,9 @@ kernel adds 14 commits to the previous pin `6cc3e6471`:
 The kernel ELF SHA-256 is
 `42dd853f2ba11870e0c63ec7b2f91bd59b02757e4fbc18cb5416fc2e97f4d925`.
 XSH moved from `d62ee5746` because Laputa's chunked uploads use
-`random.bytes`, which XSH added in `86215d2a2`.
+`random.bytes`, which XSH added in `86215d2a2`. `3913c9be3` renames the
+bindings that the new `random` module made shadow errors; at `86215d2a2`
+they broke `mktemp`.
 
 On 2026-11-15 the maintained replay with this pin passed every cohort on both
 backends, including all ten recovery rounds and the clock `pause` case:
@@ -25,7 +27,8 @@ backends, including all ten recovery rounds and the clock `pause` case:
 published and match the lock and the gitlink. The Linux reference used the
 retained legacy-ACPI kernel, supplied through `LAPUTA_LINUX_KERNEL_PACKAGE`;
 the mirror's reduced-hardware-only ACPI kernel cannot qualify this QEMU
-profile. Evidence is at `.work/tmp/pin-d57e24fdd-maintained/`. No cohort
+profile. Evidence is at `.work/tmp/pin-3913c9be3-maintained/`; the run at
+XSH `86215d2a2` is at `.work/tmp/pin-d57e24fdd-maintained/`. No cohort
 assertion, deadline or poweroff requirement changed. A worktree replay needs
 `make asterinas-fetch` and the operator's
 `packages/ca-certificates/files/trust-update-key` first.
@@ -38,6 +41,29 @@ kernel, 32 of them pass. The 4 that still fail:
 - `ls` allocation size, whose fixed test postdates that fixture.
 
 Evidence is at `.work/tmp/final36-d57e24fdd/`.
+
+The full native corpus at this pin ran on 2026-11-15 as eight parallel
+two-vCPU, 4 GiB guests, from a fixture built from XSH `3913c9be3`
+verification products. Each guest runs an interleaved eighth of the 15,675
+discovered IDs. 15,171 passed, 12 failed and 300 were skipped. 92 were not
+executed: shard 0 stopped after 3,947 s on `Failed to allocate a large slot`
+for an 8 MiB layout (LAP-56). The failures:
+
+- the two `ss` TCP-telemetry cases (LAP-60);
+- three gate tests that exceed their budgets while the guest runs
+  `git status` over the 110k-file fixture;
+- `tail` on `/sys/kernel/profiling`: sysfs attributes reported size 0, so
+  `tail -f` saw the file as truncated and re-read it forever;
+- `yes_log`: `strace -f` never exits after its tracee dies, a regression
+  from the ptrace clone-event commit `541b68f1b` (LAP-61);
+- two `timeout` signal-forwarding cases and `ls` allocation size, which were
+  test races and a stale expectation, fixed in XSH `f08174ef2`;
+- `ln` force-replace, a timing flake that passed in two reruns;
+- the `api-tool` surface reference, which lacked the `random` module, fixed
+  in XSH `c3c574aa1`.
+
+Evidence is at `.work/tmp/native-shard-3913c9be3-d57e24fdd-s00/` through
+`-s07/`, with the fixture at `.work/tmp/native-fixture-3913c9be3/`.
 
 The full native corpus at the previous pin `6cc3e6471` ran on 2026-11-15 from a fixture built from
 XSH `d62ee5746` verification products, which the pinned Linux verification had

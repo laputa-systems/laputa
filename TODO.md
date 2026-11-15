@@ -168,6 +168,16 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** L (weeks)
 
+### LAP-61 · P3 · Fix strace -f hanging after its tracee dies on Asterinas
+
+- **Area:** Asterinas ptrace
+- **Where:** `asterinas/` (`kernel/core/src/process/`)
+- **Problem:** `core/tests/test-gnu-misc.xsh::test_gnu_misc_yes_log` passes on `6cc3e6471` and fails on `d57e24fdd`. In `strace -f -o /dev/null -e inject=...:error=ENOSYS yes | head -n 2`, `yes` dies of SIGPIPE but strace never exits, so XSH kills it with SIGKILL. Reverse-applying `541b68f1b` (ptrace clone, fork and vfork events) fixes it. A tracer-wakeup ordering bug found on the way is fixed on the integration branch with the `fork_exit_wait` witness. A minimal traced SIGPIPE-death witness passes on both Linux and the guest, so the trigger also needs strace's own option set or its syscall injection. Evidence is in `.work/tmp/lane-evidence-20261115/lane-ptrace3-out/`.
+- **Recommendation:** Trace the guest's strace with an in-guest ptrace logger, or narrow strace's options (`-f` alone, `-e inject` alone) to find the missing stop or event. Compare with Linux `ptrace_event` and `exit_notify`.
+- **Acceptance:** The test passes in the guest, and a witness that reproduces the hang fails on `d57e24fdd` and passes on the fix, as on Linux.
+- **Fix with:** root-cause
+- **Effort:** M
+
 ### LAP-60 · P3 · Expose TCP telemetry to Asterinas inet_diag
 
 - **Area:** Asterinas networking
@@ -181,12 +191,12 @@ qualification remains open; manual cross-build evidence is bounded in
 ### LAP-56 · P2 · Fix Asterinas heap exhaustion in the full native corpus
 
 - **Area:** Asterinas kernel memory
-- **Where:** `asterinas/` (kernel heap allocator), `infra/asterinas/`
-- **Problem:** On 2026-11-15, kernel `6cc3e6471` stopped with `Failed to allocate a large slot` (`Layout { size: 0x400000, align: 8 }`). It had run 12,663 s of the full native corpus in a 4 GiB, two-vCPU Firecracker guest, after 14,471 completed cases. The last case reported was `tests/xsh/stdlib/path_lines.xsh::test_read_lines_lint_fix_keeps_values_and_failures`. A fresh guest then ran the remaining 1,202 IDs without failure, so the exhaustion depends on accumulated state, not on one case. Evidence is in `.work/tmp/native-full-d62ee5746-6cc3e6471/001.console.log`.
-- **Recommendation:** Find whether the kernel leaks large-slot allocations or fragments the large-slot pool. Sample kernel heap use across a long native batch, and compare the slot count before and after modules that create many processes or files. Fix the leak or the pool policy with a regression that runs a bounded churn loop.
-- **Acceptance:** A single guest completes the full 15,673-ID corpus without kernel allocation failure, and the churn regression fails on `6cc3e6471` and passes on the fix.
+- **Where:** `asterinas/` (`kernel/core/src/process/signal/poll.rs`), `infra/asterinas/`
+- **Problem:** Full native corpus guests stop with `Failed to allocate a large slot`. Kernel `6cc3e6471` failed on a 4 MiB layout after 14,471 cases, and `d57e24fdd` failed on an 8 MiB layout. Bounding cached negative dentries did not help: the single-guest run on the 2026-11-15 integration kernel failed at the same point, with 14,160 passed and 1,202 unexecuted. Tracing every allocation of at least 1 MiB on shard 0 of the parallel run (1,960 IDs, which fails after 3,947 s) found one Vec doubling from 1 to 16 MiB. That Vec is the epoll entry's poll handle. Each `EPOLL_CTL_MOD` appended the same pollee to `PollHandle::pollees` again, and `PollHandle::reset` never cleared it, so a long-lived timerfd modified in a loop grew it without bound until a contiguous large slot failed. Evidence is in `.work/tmp/heap3-trace-s00/` and `.work/tmp/native-shard-3913c9be3-d57e24fdd-s00/`.
+- **Recommendation:** Land the fix on the integration branch. `register_poller` skips a pollee the handle already holds, and `reset` drains the list. The witness `epoll_mod_repeat` makes 4 million modifications and fails if `MemFree` drops by more than 16 MiB: it grew 31,832 KiB on `d57e24fdd` and passes on Linux and on the fix. Then rerun shard 0 and the single-guest corpus.
+- **Acceptance:** Shard 0 and a single guest both complete without kernel allocation failure, and the witness fails on `d57e24fdd` and passes on the fix.
 - **Fix with:** root-cause
-- **Effort:** M
+- **Effort:** S
 
 ### LAP-55 · P3 · Close the Asterinas IPv4 state and DHCP obligations
 
