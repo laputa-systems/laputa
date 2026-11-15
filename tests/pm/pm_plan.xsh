@@ -2,6 +2,7 @@
 use pm.catalog
 use pm.fingerprint
 use pm.plan
+use pm.payload_archive
 use pm.plan_json
 use pm.policy
 use pm.recipe
@@ -26,6 +27,28 @@ proc copied_executor(ctx: TestContext) -> Result[Path] {
 
 proc build_input(pkg: types.Package) -> Result[Str] {
   fingerprint.package_build_input(p".", pkg, types.Aarch64LinuxMusl)?
+}
+
+test test_payload_encoding_changes_payload_keys_but_not_metapackage_keys [fs, env, error] { |ctx|
+  let pkg = copied_package(ctx, "payload-encoding-key")?
+  for kind in [types.package_payload(), types.package_meta()] {
+    let selected = {...pkg, kind}
+    let actual = fingerprint.package_build_input(p".", selected, types.target_x86_64())?
+    let actual_encoding = payload_archive.encoding_fingerprint()?
+    test.eq(actual, fingerprint.package_build_input_with_encoding(p".", selected, types.target_x86_64(), actual_encoding)?)
+    let first = fingerprint.package_build_input_with_encoding(p".", selected, types.target_x86_64(), "encoding-a")?
+    let repeat = fingerprint.package_build_input_with_encoding(p".", selected, types.target_x86_64(), "encoding-a")?
+    let changed = fingerprint.package_build_input_with_encoding(p".", selected, types.target_x86_64(), "encoding-b")?
+    let first_key = plan.artifact_key_for(types.target_x86_64(), 2, "example-1-1", first, [])?
+    let repeat_key = plan.artifact_key_for(types.target_x86_64(), 2, "example-1-1", repeat, [])?
+    let changed_key = plan.artifact_key_for(types.target_x86_64(), 2, "example-1-1", changed, [])?
+    assert first_key == repeat_key
+    if kind == types.package_meta() {
+      assert first_key == changed_key
+    } else {
+      assert first_key != changed_key
+    }
+  }
 }
 
 test test_package_build_fingerprint_is_repeatable_and_ignores_mtime [fs, env, error] { |ctx|

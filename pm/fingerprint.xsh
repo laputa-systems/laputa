@@ -1,4 +1,5 @@
 ##! Exact semantic fingerprints for package inputs and executor provenance.
+use payload_archive
 use types
 use util
 
@@ -168,6 +169,17 @@ export proc package_build_input(
   pkg: types.Package,
   target: types.Target,
 ) [fs, error] -> Result[Str, Error] {
+  let encoding = if pkg.kind == types.package_meta() { "" } else { payload_archive.encoding_fingerprint()? }
+  package_build_input_with_encoding(repo_root, pkg, target, encoding)?
+}
+
+## Hashes package build inputs using the supplied payload encoding fingerprint.
+export proc package_build_input_with_encoding(
+  repo_root: Path,
+  pkg: types.Package,
+  target: types.Target,
+  encoding: Str,
+) [fs, error] -> Result[Str, Error] {
   if types.pm_target_arch(target) == "" {
     return Err(types.PmError.PackageContract("package build input target is unsupported"))
   }
@@ -179,6 +191,10 @@ export proc package_build_input(
     f"target\t{types.target_text(target)}",
     f"nostrip\t{pkg.nostrip}",
   ]
+
+  if pkg.kind != types.package_meta() {
+    lines += [f"payload-encoding\t{encoding}"]
+  }
 
   for dependency in pkg.deps {
     lines += [f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}"]

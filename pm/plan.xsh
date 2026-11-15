@@ -41,13 +41,14 @@ pure plan_sorted_unique_names(names: List[Str]) -> List[Str] {
   result
 }
 
-proc artifact_key_for(
+## Derives an artifact key from its recorded build inputs and dependency keys.
+export proc artifact_key_for(
   target: types.Target,
   build_epoch: Int,
   package_id: Str,
   recipe_sha256: Str,
   dependencies: List[types.PlanDependency],
-) -> Result[Str] {
+) -> Result[Str, Error] {
   var lines = [
     "format\tlaputa-package-artifact-key-2",
     f"build-epoch\t{build_epoch}",

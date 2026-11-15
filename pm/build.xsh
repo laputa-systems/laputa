@@ -1,6 +1,7 @@
 ##! Isolated package payload construction for the immutable plan executor.
 use fingerprint
 use local
+use payload_archive
 use pm.env as pm_env
 use recipe
 use types
@@ -289,5 +290,5 @@ main(@args)?
   local.write_package_db(dest, pkg, manifest, etcsums)
   let archive_paths = local.collect_archive_paths(dest, pkg.filetree)?
   tarball.parent.mkdir()
-  archive.create(tarball, dest, archive_paths, .Tar, compression: .Gzip, collision: .Replace)
+  payload_archive.create(tarball, dest, archive_paths)?
 }

@@ -283,7 +283,12 @@ An artifact key (`pm/plan.xsh::artifact_key_for`) hashes the target, the
 package id, the recipe input digest (recipe `.xsh` files, `files/` and `patches/` except `proof.xsh` and
 `proof_deps.xsh`, source records and checksums, local files and directories the
 recipe declares as sources, and `repository/` inputs), `pm/policy.xsh::BUILD_EPOCH`,
-and the key of every direct `deps` and `mkdeps_*` dependency. Each of those is
+and the key of every direct `deps` and `mkdeps_*` dependency. Payload recipe
+input digests also include a process-cached SHA-256 fingerprint of the payload
+encoder: PM archives a fixed file, directory, and symlink with the same helper
+and options used for payloads. A changed encoding changes every payload key.
+Metapackages do not include this fingerprint directly, but their keys change
+when a build dependency key changes. Each dependency is
 installed into the build root with its runtime closure, because recipes link
 against libraries they declare only in `deps`; each dependency key covers that
 dependency's own closure. Runtime-only dependency keys are excluded, and Store
@@ -297,9 +302,10 @@ reloading recipes. The proof key binds
 the payload key, proof input, and each proof dependency artifact key; changing
 a proof tool re-proves the payload without rebuilding it.
 
-Executor identity (XSH runners, PM tree, and core applets) is provenance, not a
-payload identity input. Artifact metadata records the executor (`executor`),
-and receipts record its digest (`executor_sha256`). Artifact keys exclude both
+Executor identity (XSH runners, PM tree, and core applets) is provenance; the
+payload encoding fingerprint is the exception in payload identity. Artifact
+metadata records the executor (`executor`), and receipts record its digest
+(`executor_sha256`). Artifact keys exclude both
 values. A changed executor does not automatically invalidate cache entries.
 Fingerprints cannot tell whether an executor change alters recipe meaning.
 
