@@ -210,7 +210,7 @@ export proc publish(
   remote_repo: Str,
   token: Str,
   work: Path,
-) [fs, net, time, error] {
+) [fs, net, env, time, error] {
   let arch = types.pm_target_arch(repo_snapshot.target)
 
   if repo_snapshot.format != "laputa-repo-snapshot-1" or arch == "" {
@@ -288,7 +288,7 @@ export proc publish_snapshot(
   work: Path,
   snapshot_dir: Path,
   keys: List[Bytes],
-) [fs, net, time, error] {
+) [fs, net, env, time, error] {
   if remote_repo == "" {
     return Err(types.PmError.RemoteRepo("repository snapshot publication needs a remote repository"))
   }

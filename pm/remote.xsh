@@ -56,11 +56,8 @@ export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: 
   net_put_file(util.repo_url_for(repo, rel)?, source, token)
 }
 
-proc upload_immutable_chunks(repo: Str, rel: Path, source: Path, token: Str, size: Int) [fs, net, error] -> Result[Int, Error] {
-  let unique = fs.tempdir()?
-  let unique_path = unique.host_path()?
-  defer unique_path.remove()
-  let upload_id = f"{hash.sha256(source)?.hex()}-{unique_path.bytes().sha256().hex()}"
+proc upload_immutable_chunks(repo: Str, rel: Path, source: Path, token: Str, size: Int) [fs, net, env, error] -> Result[Int, Error] {
+  let upload_id = f"{hash.sha256(source)?.hex()}-{random.bytes(16)?.sha256().hex()}"
   let headers = remote_auth_headers(token)
   var offset = 0
   var index = 0
@@ -100,7 +97,7 @@ export proc upload_immutable_repo_file(
   source: Path,
   token: Str,
   work: Path,
-) [fs, net, error] -> Result[Bool, Error] {
+) [fs, net, env, error] -> Result[Bool, Error] {
   guard util.is_file_url(repo) else {
     let size = source.metadata()?.size
     let status = if size <= IMMUTABLE_CHUNK_SIZE {

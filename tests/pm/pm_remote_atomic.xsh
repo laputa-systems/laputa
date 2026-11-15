@@ -4,7 +4,7 @@ test test_concurrent_immutable_file_publication [fs, process, env, time, net, er
   let root = test.temp_dir(ctx, name: "atomic-remote")?
   let script = fp"{root}/worker.xsh"
   script.write("""use pm.remote
-proc main(...argv: List[Str]) [fs, net, time, error] {
+proc main(...argv: List[Str]) [fs, net, env, time, error] {
   fp"{argv[2]}".write("ready")
   wait until fp"{argv[3]}".exists() within 10s every 10ms
   let _ = remote.upload_immutable_repo_file(argv[0], p"objects/key", fp"{argv[1]}", "", fp"{argv[4]}")?

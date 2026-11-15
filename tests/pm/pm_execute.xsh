@@ -369,7 +369,7 @@ proc write_execute_publish_worker(script: Path) [fs, error] {
     """use pm.plan_json
 use pm.repo as execute_repo
 
-proc main(...argv: List[Str]) [fs, net, time, error] {
+proc main(...argv: List[Str]) [fs, net, env, time, error] {
   let ready = fp"{argv[5]}"
   ready.write("ready")
   wait until fp"{argv[4]}".exists() within 10s every 10ms
@@ -688,7 +688,7 @@ test test_execute_recomposes_generation_through_failed_publication_and_gc [fs, n
   let interruption_work = test.temp_dir(ctx, name: "execute-generation-lifecycle-interrupted-work")?
   let interruption_worker = r"""use pm.remote as interrupted_remote
 
-proc main(...argv: List[Str]) [fs, net, process, error] -> Result[Unit] {
+proc main(...argv: List[Str]) [fs, net, env, process, error] -> Result[Unit] {
   if argv[4] == "limited" {
     let _ = process.set_signal_action("XFSZ", "default")?
     let _ = process.set_rlimit("fsize", soft: 4096)?
