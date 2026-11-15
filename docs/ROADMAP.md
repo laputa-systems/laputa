@@ -346,7 +346,7 @@ the SSH server and networking from their boot-target modules; `mdev.supervise` i
 gone, and the guest proof reads the scanner line from baselayout. PID 1 starts each respawn
 entry in its own session and sweeps that session when the leader exits, so a
 SIGKILLed scanner's workers, including one spawned just before the kill, stop
-before the scanner restarts and no service runs twice ([init](../xinit/docs/INIT.md)). Open: the guest lifecycle proof was not rerun with the session sweep, the installer QEMU smoke image was not rebuilt
+before the scanner restarts and no service runs twice ([init](../xinit/docs/INIT.md)). The guest proof also gives one slow worker a helper process group that no record names; it stays single across both scanner restarts and is gone before reboot, while the record-based xinit leaked three. Open: the installer QEMU smoke image was not rebuilt
 to exercise the CI scanner, and the graphical reference was not rerun.
 
 ## R2: Persistent VM networking and time

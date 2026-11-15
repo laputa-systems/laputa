@@ -145,7 +145,7 @@ proc worker_count(name: Str) -> Result[Int] {
 proc helper_pids() -> Result[List[Int]] {
   var pids: List[Int] = []
   for entry in process.list()? {
-    if entry.status != "Z" and "sleep" in entry.argv and "3001" in entry.argv { pids += [entry.pid] }
+    if entry.status != "Z" and "helper" in entry.argv and "3001" in entry.argv { pids += [entry.pid] }
   }
   pids
 }

@@ -4,6 +4,9 @@ proc boot_ms() -> Result[Int] {
 }
 
 proc main(...argv: List[Str]) [fs, process, env, time, net, error] -> Result[Unit] {
+  if argv == ["helper", "3001"] {
+    while true { time.sleep(1s)? }
+  }
   guard argv.len() >= 2 else {
     return Err(error.failure("lifecycle worker needs a name and a mode"))
   }
@@ -26,7 +29,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, net, error] -> Result[Uni
   defer fs.unlock(lock)
   fp"{events}/start.{name}.{started}.{pid}".write(f"{started}\n")?
   if mode == "slow" {
-    let _ = unix.spawn_process_group(process.command_argv("sleep", ["sleep", "3001"]))?
+    let _ = unix.spawn_process_group(process.command_argv("/bin/xsh", ["xsh", "/etc/r1/worker.xsh", "helper", "3001"]))?
   }
 
   var notify = ""
