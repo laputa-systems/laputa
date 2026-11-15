@@ -351,9 +351,9 @@ before the scanner restarts and no service runs twice ([init](../xinit/docs/INIT
 rebuilt `make installer-qemu-test` image installs a target whose inittab starts
 `xinit scan boot`; the installer and target reached their CI markers, and over
 SSH `xinit status oxish` reported `oxish running` and `xsh --help` succeeded.
-The world was published to the mirror's data directory through `file://`,
-because HTTP publishing cannot yet upload objects above the mirror's 128 MiB
-PUT limit (LAP-59). The image build also needs a seed that includes XSH
+That run published the world through `file://`. Since `e19f241f`, PM
+uploads objects above 64 MiB in chunks, and a full HTTP publish to a fresh
+`make mirror` succeeds. The image build also needs a seed that includes XSH
 `d62ee5746` (LAP-58).
 
 ## R2: Persistent VM networking and time
