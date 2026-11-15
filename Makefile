@@ -30,10 +30,14 @@ ifeq ($(HOST_OS),Linux)
 FETCH_HOST_MIRROR := fetch-mirror
 MIRROR_SERVER_DEPS := host-mirror
 MIRROR_SERVER = "$(HOST_TOOLS_DIR)/laputa-mirror"
+MIRROR_BIN_DEPS := host-mirror
+MIRROR_BIN = $(HOST_TOOLS_DIR)/laputa-mirror
 else
 FETCH_HOST_MIRROR :=
 MIRROR_SERVER_DEPS :=
 MIRROR_SERVER = cd $(MIRROR) && $(CARGO) run -j $(CARGO_JOBS) --locked --bin laputa-mirror --
+MIRROR_BIN_DEPS := mirror-bin
+MIRROR_BIN = $(CURDIR)/$(MIRROR)/target/debug/laputa-mirror
 endif
 
 XSH_RELEASE_DIR := $(XSH_ROOT_ABS)/target/release
@@ -88,7 +92,7 @@ endif
 PNPM_VERSION ?= 12.18.0
 PNPM_ROOT ?= target/pnpm
 
-.PHONY: check lint test test-components-integration test-pm test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
+.PHONY: check lint test test-components-integration test-pm mirror-bin test-system test-xinit test-linux verify store-gc clean distclean fetch fetch-seed seed seed-asterinas-shell seed-smoke \
 	need-xsh host-xsh host-mirror fetch-mirror \
 	plan build publish root \
 	asterinas-setup asterinas-preflight asterinas-fetch asterinas-build \
@@ -116,8 +120,12 @@ test-components-integration:
 	$(MAKE) test
 	$(MAKE) profile-test
 
-test-pm: need-xsh
-	$(HOST_XSH_ENV) $(XSHT) test tests/pm
+# The chunked-publication test serves a real mirror from LAPUTA_MIRROR_BIN.
+test-pm: need-xsh $(MIRROR_BIN_DEPS)
+	LAPUTA_MIRROR_BIN="$(MIRROR_BIN)" $(HOST_XSH_ENV) $(XSHT) test tests/pm
+
+mirror-bin:
+	cd $(MIRROR) && $(CARGO) build -j $(CARGO_JOBS) --locked --bin laputa-mirror
 
 # `xsht test` takes one filter per run.
 test-system: need-xsh

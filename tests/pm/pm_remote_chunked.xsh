@@ -17,7 +17,11 @@ test immutable_http_publication_across_chunk_boundary [fs, process, env, time, n
   let root = test.temp_dir(ctx, name: "chunked-mirror")?
   let data = fp"{root}/data"
   let output = fp"{root}/server.log"
-  let mirror = path.absolute(p".out/host/x86_64/laputa-mirror")?
+  let configured = env.get("LAPUTA_MIRROR_BIN") ?? ""
+  guard configured != "" else {
+    return test.fail("LAPUTA_MIRROR_BIN must name a built laputa-mirror; run this test through make test-pm")
+  }
+  let mirror = path.absolute(fp"{configured}")?
   let child = spawn run $mirror --local $data --listen "127.0.0.1:0" > $output 2> $output ?
   defer stop_mirror(child)?
   wait until output.exists()? and "(local mode, no auth)" in output.read_text()? within 20s every 50ms
