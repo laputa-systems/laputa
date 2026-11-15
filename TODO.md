@@ -178,16 +178,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** root-cause
 - **Effort:** M
 
-### LAP-57 · P2 · Put the payload archiver in package build keys
-
-- **Area:** PM build identity
-- **Where:** `pm/build.xsh` (`archive.create` of `payload.tar.gz`), build-key derivation, `pm/repo.xsh` immutable publish
-- **Problem:** On 2026-11-15, `make publish` to the long-lived local mirror failed with `PmError.PackageConflict`. The object `packages/x86_64/alsa-ucm-conf/alsa-ucm-conf-1.2.16.1-1-1d85d5b38df7.tar.gz` already existed with different bytes. Both archives list the same 833 members with the same modes, owners and mtimes; only the ustar header encoding differs. The 2026-10-28 object writes mode `0100644` with NUL-filled uid and gid fields, while the payload built with the XSH `efecae07c` seed writes `0000644` with zero-filled octal fields. PM packs payloads with the seed's `archive.create`, but the build key covers only the `xsh` package's own seed inputs. A change to XSH's tar writer therefore yields new bytes under an already-published key.
-- **Recommendation:** Hash the archiver's identity, or a declared archive-format version, into every payload's build key. Alternatively, have PM own a canonical payload encoding that does not depend on the seed's writer. Then decide whether existing mirrors need a format bump.
-- **Acceptance:** Changing only the seed's tar header encoding changes every affected build key, or leaves payload bytes unchanged. Republishing an unchanged world after a seed rebuild then never reports an immutable conflict.
-- **Fix with:** single-source-of-truth
-- **Effort:** S
-
 ### LAP-58 · P3 · Reject a seed older than the XSH that Laputa code requires
 
 - **Area:** Seed and image builds
