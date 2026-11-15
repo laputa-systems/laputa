@@ -10,7 +10,12 @@ export type SeedEnvVar = {name: Str, value: Str}
 export error SeedError = Usage : Usage | Missing : NotFound | Failed : ProcessFailure
 
 ## The XSH image whose toolchain and musl CRT objects every Linux XSH build links against.
-export const xsh_seed_build_image = "xsh-test"
+## Each Dockerfile.test pins its own nightly and builds run offline, so the tag
+## names the Dockerfile's digest; the Makefile's XSH_TEST_IMAGE derives the same tag.
+export proc xsh_seed_build_image(xsh_root: Path) -> Result[Str, Error] {
+  let digest = hash.sha256(fp"{xsh_root}/Dockerfile.test")?.hex()
+  f"xsh-test:{digest[..16]}"
+}
 
 const xsh_seed_manifest_format = "laputa-xsh-seed-1"
 
@@ -82,6 +87,7 @@ export pure xsh_seed_rustflags_env(value: SeedArch) -> Result[SeedEnvVar, Error]
 ## Construct the offline release build of the three XSH products inside `xsh-test`.
 export pure xsh_seed_cargo_build_argv(
   docker: Path,
+  image: Str,
   laputa_root: Path,
   xsh_root: Path,
   value: SeedArch,
@@ -115,7 +121,7 @@ export pure xsh_seed_cargo_build_argv(
     "CARGO_PROFILE_RELEASE_INCREMENTAL=true",
     "--env",
     f"{rustflags.name}={rustflags.value}",
-    xsh_seed_build_image,
+    image,
     "cargo",
     "build",
     "--locked",
@@ -144,7 +150,7 @@ export pure xsh_seed_cargo_build_argv(
 }
 
 ## Construct the networked crate fetch that fills `.cache/cargo/registry` for every target.
-export pure xsh_seed_cargo_fetch_argv(docker: Path, laputa_root: Path, xsh_root: Path, value: SeedArch) -> List[Str] {
+export pure xsh_seed_cargo_fetch_argv(docker: Path, image: Str, laputa_root: Path, xsh_root: Path, value: SeedArch) -> List[Str] {
   [
     docker.display(),
     "run",
@@ -157,7 +163,7 @@ export pure xsh_seed_cargo_fetch_argv(docker: Path, laputa_root: Path, xsh_root:
     f"type=bind,src={xsh_seed_cargo_registry(laputa_root)},dst=/root/.cargo/registry",
     "--workdir",
     "/work",
-    xsh_seed_build_image,
+    image,
     "cargo",
     "fetch",
     "--locked",
@@ -190,8 +196,9 @@ proc xsh_seed_require_checkout(xsh_root: Path) {
 ## Fetch the seed's networked inputs: the `xsh-test` image and the crate registry for XSH_ROOT's Cargo.lock.
 export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, value: SeedArch) [fs, process, error] {
   xsh_seed_require_checkout(xsh_root)
+  let image = xsh_seed_build_image(xsh_root)?
 
-  if ! xsh_seed_image_exists(docker, xsh_seed_build_image, laputa_root) {
+  if ! xsh_seed_image_exists(docker, image, laputa_root) {
     xsh_seed_run(
       docker,
       [
@@ -200,29 +207,30 @@ export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, valu
         "--platform",
         value.docker_platform,
         "--tag",
-        xsh_seed_build_image,
+        image,
         "--file",
         fp"{xsh_root}/Dockerfile.test".display(),
         xsh_root.display(),
       ],
       laputa_root,
-      f"building {xsh_seed_build_image} from {xsh_root}/Dockerfile.test",
+      f"building {image} from {xsh_root}/Dockerfile.test",
     )
   }
 
   xsh_seed_cargo_registry(laputa_root).mkdir()
   xsh_seed_run(
     docker,
-    xsh_seed_cargo_fetch_argv(docker, laputa_root, xsh_root, value),
+    xsh_seed_cargo_fetch_argv(docker, image, laputa_root, xsh_root, value),
     laputa_root,
     "fetching XSH crates",
   )
   xsh_seed_registry_stamp(laputa_root).write_atomic(xsh_seed_registry_key(xsh_root)?)
 }
 
-proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) {
-  guard xsh_seed_image_exists(docker, xsh_seed_build_image, laputa_root) else {
-    return Err(SeedError.Missing(f"Docker image {xsh_seed_build_image} is missing; run `make fetch`"))
+proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) -> Result[Str] {
+  let image = xsh_seed_build_image(xsh_root)?
+  guard xsh_seed_image_exists(docker, image, laputa_root) else {
+    return Err(SeedError.Missing(f"Docker image {image} is missing; run `make fetch`"))
   }
 
   let stamp = xsh_seed_registry_stamp(laputa_root)
@@ -231,6 +239,8 @@ proc xsh_seed_require_fetched(docker: Path, laputa_root: Path, xsh_root: Path) {
   if ! stamp.exists() or stamp.read_text()?.trim() != lock {
     return Err(SeedError.Missing(f"the cached crate registry does not match {xsh_root}'s Cargo lock and configuration; run `make fetch`"))
   }
+
+  image
 }
 
 ## XSH release packaging installs commands without `.xsh` and keeps library
@@ -324,11 +334,11 @@ export proc xsh_seed_build(
   }
 
   xsh_seed_require_checkout(xsh_root)
-  xsh_seed_require_fetched(docker, laputa_root, xsh_root)
+  let image = xsh_seed_require_fetched(docker, laputa_root, xsh_root)?
   xsh_seed_cargo_target(laputa_root).mkdir()
   xsh_seed_run(
     docker,
-    xsh_seed_cargo_build_argv(docker, laputa_root, xsh_root, value, jobs, asterinas_shell)?,
+    xsh_seed_cargo_build_argv(docker, image, laputa_root, xsh_root, value, jobs, asterinas_shell)?,
     laputa_root,
     f"building the {value.arch} XSH seed",
   )

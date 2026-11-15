@@ -23,8 +23,8 @@ test test_seed_arch_names_each_tool_target [error] {
 
 test test_seed_build_is_an_offline_static_release_build_in_xsh_test [error] {
   let value = xsh_seed.xsh_seed_arch("aarch64")?
-  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", p"/work/laputa", p"/work/xsh", value, 4, false)?
-  assert xsh_seed.xsh_seed_build_image in argv
+  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", "xsh-test:0123456789abcdef", p"/work/laputa", p"/work/xsh", value, 4, false)?
+  assert "xsh-test:0123456789abcdef" in argv
   assert "--network" in argv and "none" in argv
   assert "--locked" in argv and "--offline" in argv and "--release" in argv
   assert ! ("--profile" in argv)
@@ -43,7 +43,7 @@ test test_seed_build_is_an_offline_static_release_build_in_xsh_test [error] {
 
 test test_xshi_asterinas_feature_is_opt_in [error] {
   let value = xsh_seed.xsh_seed_arch("x86_64")?
-  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", p"/work/laputa", p"/work/xsh", value, 4, true)?
+  let argv = xsh_seed.xsh_seed_cargo_build_argv(p"docker", "xsh-test:0123456789abcdef", p"/work/laputa", p"/work/xsh", value, 4, true)?
   assert "xshi/laputa-asterinas" in argv.join(" ")
 }
 
@@ -64,6 +64,20 @@ test test_seed_rejects_registry_cache_after_cargo_source_changes [fs, process, e
     Ok(_) => test.fail("a cache for a different Cargo source was accepted")
     Err(problem) => assert "cached crate registry" in problem.message
   }
+}
+
+test test_seed_build_image_names_the_xsh_root_dockerfile [fs, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "seed-build-image")?
+  fp"{root}/current".mkdir()
+  fp"{root}/pinned".mkdir()
+  fp"{root}/current/Dockerfile.test".write("RUN rustup toolchain install nightly-2026-11-09\n")
+  fp"{root}/pinned/Dockerfile.test".write("RUN rustup toolchain install nightly-2026-09-15\n")
+  let current = xsh_seed.xsh_seed_build_image(fp"{root}/current")?
+  let pinned = xsh_seed.xsh_seed_build_image(fp"{root}/pinned")?
+  let digest = hash.sha256(fp"{root}/current/Dockerfile.test")?.hex()
+
+  assert current == f"xsh-test:{digest[..16]}"
+  assert current != pinned
 }
 
 test test_seed_core_layout_matches_xsh_release_packaging [error] {
@@ -284,11 +298,11 @@ pure shell_word(item: Str) -> Str {
 
 type ImageSplit = {docker: List[Str], cargo: List[Str]}
 
-pure split_at_image(words: List[Str]) -> ImageSplit {
+pure split_at_image(words: List[Str], image: Str) -> ImageSplit {
   var index = 0
 
   while index < words.len() {
-    if words[index] == xsh_seed.xsh_seed_build_image {
+    if words[index] == image {
       return {docker: words[..index], cargo: words[index + 1..]}
     }
 
@@ -298,30 +312,36 @@ pure split_at_image(words: List[Str]) -> ImageSplit {
   {docker: words, cargo: []}
 }
 
-test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process, error] {
+test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process, error] { |ctx|
   let laputa_root = fs.cwd()?
+  let xsh_root = test.temp_dir(ctx, name: "host-xsh-parity")?
+  fp"{xsh_root}/Dockerfile.test".write("FROM alpine\n")
+  let image = xsh_seed.xsh_seed_build_image(xsh_root)?
+  let xsh_root_arg = f"XSH_ROOT={xsh_root}"
 
   for arch in ["aarch64", "x86_64"] {
     let host_arch = f"HOST_ARCH={arch}"
-    let dry_run = run.text make -n --no-print-directory host-xsh HOST_OS=Linux $host_arch XSH_ROOT=/work/xsh
+    let dry_run = run.text make -n --no-print-directory host-xsh HOST_OS=Linux $host_arch $xsh_root_arg
     let commands = dry_run.replace("\\\n", with: " ").lines() |> where "cargo build" in .
     assert commands.len() == 1
-    let made = split_at_image(commands[0].words())
+    let made = split_at_image(commands[0].words(), image)
+    assert ! made.cargo.is_empty()
     let made_docker = made.docker.join(" ")
 
     let seed_argv = xsh_seed.xsh_seed_cargo_build_argv(
       p"docker",
+      image,
       laputa_root,
-      p"/work/xsh",
+      xsh_root,
       xsh_seed.xsh_seed_arch(arch)?,
       4,
       false,
     )?
-    let seed = split_at_image([shell_word(item) for item in seed_argv].join(" ").words())
+    let seed = split_at_image([shell_word(item) for item in seed_argv].join(" ").words(), image)
     assert made.cargo == seed.cargo
     assert ! seed.cargo.is_empty()
 
-    let seed_options = split_at_image(seed_argv).docker
+    let seed_options = split_at_image(seed_argv, image).docker
     var index = 0
     while index + 1 < seed_options.len() {
       if seed_options[index] in ["--env", "--mount", "--platform", "--network"] {

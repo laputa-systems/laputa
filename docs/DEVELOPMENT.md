@@ -392,8 +392,11 @@ false. Its roots add OxiSH, crabtables (the `nfcrt` firewall loader and ruleset)
 
 `make clean` removes all derived state, including the `laputa-*` Docker
 images. `make distclean` also removes `.cache/`, after which `make fetch` has
-to download everything again. XSH's `xsh-test` image belongs to XSH, and both
-targets leave it in place.
+to download everything again. Both targets leave the `xsh-test` images in
+place. Laputa tags its build image `xsh-test:<digest>`, the first 16 hex digits
+of the SHA-256 of `XSH_ROOT`'s `Dockerfile.test`. Each Dockerfile pins its own
+nightly and the builds run offline, so an older XSH checkout keeps its own
+toolchain image. XSH's tooling builds `xsh-test:latest` separately.
 
 ## Make targets
 

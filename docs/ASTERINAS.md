@@ -140,8 +140,9 @@ reuses the original binary.
 The kernel, verified bundles, runtime disk copies, Firecracker configuration,
 and logs live under `.out/asterinas-firecracker/`; fetched Asterinas and XSH
 repositories under `.cache/asterinas/`. `asterinas-clean` runs `make distclean`
-and removes the pinned `xsh-test` and Asterinas dev images, so the next build
-is cold; tracked source checkouts stay. `asterinas-setup` builds the kernel and
+and removes the Asterinas dev image and the `xsh-test:<digest>` images Laputa
+builds, one per `Dockerfile.test`, so the next build is cold. XSH's own
+`xsh-test:latest` stays; tracked source checkouts stay. `asterinas-setup` builds the kernel and
 boots a small kernel/VMM smoke guest.
 
 Run the automated guest proof with:

@@ -178,8 +178,11 @@ need-xsh:
 # same target dir, crate registry, flags, and features: keep them identical,
 # so this build and `make seed` for the host arch share every compiled unit.
 # It is networked only while the image or XSH_ROOT's crates are missing; the
-# registry stamp is the one `make fetch` writes.
-XSH_TEST_IMAGE := xsh-test
+# registry stamp is the one `make fetch` writes. Each Dockerfile.test pins its
+# own nightly and these builds run offline, so the tag names the Dockerfile's
+# digest (seed/xsh_seed.xsh::xsh_seed_build_image derives the same tag).
+SHA256 := $(if $(filter Darwin,$(HOST_OS)),shasum -a 256,sha256sum)
+XSH_TEST_IMAGE := xsh-test:$(if $(wildcard $(XSH_ROOT_ABS)/Dockerfile.test),$(shell $(SHA256) "$(XSH_ROOT_ABS)/Dockerfile.test" | cut -c 1-16),missing-dockerfile)
 XSH_SEED_FEATURES := xsh/net xsh/ssh xsh/tools xsht/native-tests
 CARGO_REGISTRY := $(CURDIR)/.cache/cargo/registry
 CARGO_GIT := $(CURDIR)/.cache/cargo/git
@@ -188,7 +191,6 @@ XSH_CARGO_TARGET := $(CURDIR)/.out/xsh-target
 MIRROR_CARGO_TARGET := $(CURDIR)/.out/mirror-target
 HOST_RUSTFLAGS_VAR := CARGO_TARGET_$(if $(filter x86_64,$(HOST_ARCH)),X86_64,AARCH64)_UNKNOWN_LINUX_MUSL_RUSTFLAGS
 MUSL_RUSTFLAGS := -C target-feature=+crt-static -C link-arg=--defsym=__isoc23_sscanf=sscanf -C link-arg=--defsym=__isoc23_strtol=strtol
-SHA256 := $(if $(filter Darwin,$(HOST_OS)),shasum -a 256,sha256sum)
 HOST_DOCKER_RUN = docker run --rm --pull never --platform $(HOST_DOCKER_PLATFORM)
 HOST_CARGO_FETCH = $(HOST_DOCKER_RUN) \
 	--mount type=bind,src=$(CARGO_REGISTRY),dst=/root/.cargo/registry \

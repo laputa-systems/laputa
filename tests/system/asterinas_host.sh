@@ -45,11 +45,15 @@ cat > "$fake_bin/docker" <<'DOCKER'
 set -euo pipefail
 [[ "$1" == image ]]
 case "$2" in
+    ls)
+        [[ "$3" == --format && "$5" == xsh-test ]]
+        printf '%s\n' xsh-test:latest xsh-test:e813657fed6650ee xsh-test:0123456789abcdef
+        ;;
     inspect)
-        [[ "$3" == xsh-test || "$3" == "asterinas/dev:$ASTERINAS_TEST_DEV_IMAGE" ]]
+        [[ "$3" == xsh-test:e813657fed6650ee || "$3" == xsh-test:0123456789abcdef || "$3" == "asterinas/dev:$ASTERINAS_TEST_DEV_IMAGE" ]]
         ;;
     rm)
-        [[ "$3" == --force && ( "$4" == xsh-test || "$4" == "asterinas/dev:$ASTERINAS_TEST_DEV_IMAGE" ) ]]
+        [[ "$3" == --force && "$4" != xsh-test:latest ]]
         printf '%s\n' "$*" >> "$ASTERINAS_TEST_DOCKER_LOG"
         ;;
     *) exit 2 ;;
@@ -63,7 +67,8 @@ ASTERINAS_TEST_DEV_IMAGE="$ASTERINAS_DEV_IMAGE_VERSION" \
 [[ ! -e "$test_root/.out" ]]
 [[ ! -e "$test_root/target" ]]
 [[ ! -e "$test_root/.cache" ]]
-expected_clean_images="image rm --force xsh-test
+expected_clean_images="image rm --force xsh-test:e813657fed6650ee
+image rm --force xsh-test:0123456789abcdef
 image rm --force asterinas/dev:$ASTERINAS_DEV_IMAGE_VERSION"
 [[ "$(cat "$clean_image_log")" == "$expected_clean_images" ]]
 
