@@ -168,6 +168,16 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** L (weeks)
 
+### LAP-59 · P1 · Publish objects larger than the mirror's single-PUT limit
+
+- **Area:** PM publishing and mirror admission
+- **Where:** `pm/remote.xsh` (`upload_immutable_repo_file`), `mirror/src/lib.rs`, `mirror/src/packages.rs` (`complete_chunked_upload`), `mirror/README.md`
+- **Problem:** `5e900935` capped package PUTs at 128 MiB and documented chunked `/_uploads/` assembly for larger objects. PM still uploads every object with a single `net.upload` PUT. Publishing to an HTTP mirror therefore fails on the 265 MB `cargo` payload: the mirror rejects the body and the client reports `net-empty-reply: request dispatch failed`. The 153 MB `llvm-toolchain` payload is also over the cap. On 2026-11-15, `make publish` to a local HTTP mirror failed this way. Publishing through `file://` into the mirror's data directory worked. Chunk completion also overwrites an existing object, so a chunked path would bypass the `If-None-Match: *` immutability that single PUTs honor.
+- **Recommendation:** Upload objects above the cap as chunks of at most 64 MiB, then POST the completion. Make completion honor `If-None-Match: *`: refuse an existing object with 412 and keep the bytes-equal acceptance on the client.
+- **Acceptance:** `make publish` to `make mirror` succeeds for the full x86_64 world, including `cargo` and `llvm-toolchain`. Republishing is a no-op. A mirror test shows chunk completion refusing to replace an existing object.
+- **Fix with:** reference-parity
+- **Effort:** S
+
 ### LAP-56 · P2 · Fix Asterinas heap exhaustion in the full native corpus
 
 - **Area:** Asterinas kernel memory
