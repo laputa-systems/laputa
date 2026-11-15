@@ -37,7 +37,8 @@ package, source, and upload-chunk PUTs; 10 MiB for index PUTs; and 64 KiB for
 all other requests, including authentication and upload completion. Limits
 apply to both Content-Length and streamed HTTP chunked bodies. Rejected bodies
 receive 413, and body read timeouts receive 408. Protected writes are checked
-before their body is read.
+before their body is read. Larger objects use chunked upload; completion honors
+`If-None-Match: *` and refuses to replace an existing object.
 
 ## Local mode
 

@@ -653,10 +653,24 @@ fn local_mode_assembles_unauthenticated_chunked_uploads() {
         assert_eq!(resp.status, 201);
     }
     let body = format!(r#"{{"rel":"{SOURCE}","chunks":2}}"#);
-    let resp = packages::route("POST", "/_uploads/up/complete", &no_auth, body.as_bytes(), &state);
+    let immutable = headers(&[("if-none-match", "*")]);
+    let resp = packages::route("POST", "/_uploads/up/complete", &immutable, body.as_bytes(), &state);
     assert_eq!(resp.status, 201);
     assert_eq!(body_bytes(get(&state, &format!("/{SOURCE}"))), b"hello world");
     assert!(!state.upload_dir.join("up").exists());
+}
+
+#[test]
+fn chunk_completion_respects_if_none_match() {
+    let state = make_local_state();
+    let no_auth = headers(&[]);
+    let immutable = headers(&[("if-none-match", "*")]);
+    assert_eq!(packages::route("PUT", &format!("/{SOURCE}"), &no_auth, b"original", &state).status, 201);
+    assert_eq!(packages::route("PUT", "/_uploads/existing/0", &no_auth, b"replacement", &state).status, 201);
+    let body = format!(r#"{{"rel":"{SOURCE}","chunks":1}}"#);
+    assert_eq!(packages::route("POST", "/_uploads/existing/complete", &immutable, body.as_bytes(), &state).status, 412);
+    assert_eq!(body_bytes(get(&state, &format!("/{SOURCE}"))), b"original");
+    assert!(!state.upload_dir.join("existing").exists());
 }
 
 #[test]

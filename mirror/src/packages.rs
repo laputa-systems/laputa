@@ -371,6 +371,19 @@ fn complete_chunked_upload(
     }
 
     let dir = state.upload_dir.join(upload_id);
+    if headers.get("if-none-match").is_some_and(|value| value.trim() == "*") {
+        match state.storage.object_size(&key) {
+            Ok(Some(_)) => {
+                let _ = std::fs::remove_dir_all(&dir);
+                return Response::json(412, r#"{"error":"object already exists"}"#);
+            }
+            Ok(None) => {}
+            Err(error) => {
+                tracing::error!("object check failed for {key}: {error}");
+                return Response::error("object check failed");
+            }
+        }
+    }
     let assembled = dir.join("assembled-object");
     let out = match File::create(&assembled) {
         Ok(file) => file,

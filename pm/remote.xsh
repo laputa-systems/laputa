@@ -3,6 +3,8 @@ use repo_snapshot
 use types
 use util
 
+const IMMUTABLE_CHUNK_SIZE = 67108864
+
 ## The package repository PM reads indexes and artifacts from and publishes to:
 ## XSH_PM_REPO, typically the local mirror (`http://127.0.0.1:3000`) or a
 ## `file://` tree. Empty means offline; there is no default remote.
@@ -54,6 +56,42 @@ export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: 
   net_put_file(util.repo_url_for(repo, rel)?, source, token)
 }
 
+proc upload_immutable_chunks(repo: Str, rel: Path, source: Path, token: Str, size: Int) [fs, net, error] -> Result[Int, Error] {
+  let unique = fs.tempdir()?
+  let unique_path = unique.host_path()?
+  defer unique_path.remove()
+  let upload_id = f"{hash.sha256(source)?.hex()}-{unique_path.bytes().sha256().hex()}"
+  let headers = remote_auth_headers(token)
+  var offset = 0
+  var index = 0
+  while offset < size {
+    let length = if size - offset < IMMUTABLE_CHUNK_SIZE { size - offset } else { IMMUTABLE_CHUNK_SIZE }
+    let chunk = bytes.read_at(source, offset, length)?
+    let response = net.request({
+      method: "PUT",
+      url: util.repo_url_for(repo, fp"_uploads/{upload_id}/{index}")?,
+      body: chunk,
+      headers,
+      pool: "pm",
+      fail_status: false,
+    })?
+    if response.status < 200 or response.status >= 300 {
+      return Err(types.PmError.RemoteUpload(f"failed to upload immutable remote object {rel}: HTTP {response.status}"))
+    }
+    offset += length
+    index += 1
+  }
+  let response = net.request({
+    method: "POST",
+    url: util.repo_url_for(repo, fp"_uploads/{upload_id}/complete")?,
+    body: bytes.from_text(json.encode({rel: rel.display(), chunks: index})?),
+    headers: headers.push({name: "If-None-Match", value: "*"}),
+    pool: "pm",
+    fail_status: false,
+  })?
+  response.status
+}
+
 ## Publishes one immutable repository object. A file remote receives a temporary copy and no-replace rename;
 ## an existing object is accepted only when its exact bytes already match the requested source.
 export proc upload_immutable_repo_file(
@@ -64,18 +102,23 @@ export proc upload_immutable_repo_file(
   work: Path,
 ) [fs, net, error] -> Result[Bool, Error] {
   guard util.is_file_url(repo) else {
-    let response = net.upload({
-      method: "PUT",
-      url: util.repo_url_for(repo, rel)?,
-      source,
-      headers: remote_auth_headers(token).push({name: "If-None-Match", value: "*"}),
-      pool: "pm",
-      fail_status: false,
-    })?
+    let size = source.metadata()?.size
+    let status = if size <= IMMUTABLE_CHUNK_SIZE {
+      net.upload({
+        method: "PUT",
+        url: util.repo_url_for(repo, rel)?,
+        source,
+        headers: remote_auth_headers(token).push({name: "If-None-Match", value: "*"}),
+        pool: "pm",
+        fail_status: false,
+      })?.status
+    } else {
+      upload_immutable_chunks(repo, rel, source, token, size)?
+    }
 
-    return true when response.status >= 200 and response.status < 300
+    return true when status >= 200 and status < 300
 
-    if response.status == 409 or response.status == 412 {
+    if status == 409 or status == 412 {
       let existing = fp"{work}/immutable-existing/{rel.bytes().sha256().hex()}"
       existing.parent.mkdir()
       defer existing.remove()
@@ -88,7 +131,7 @@ export proc upload_immutable_repo_file(
       return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
     }
 
-    return Err(types.PmError.RemoteUpload(f"failed to upload immutable remote object {rel}: HTTP {response.status}"))
+    return Err(types.PmError.RemoteUpload(f"failed to upload immutable remote object {rel}: HTTP {status}"))
   }
 
   let dest = util.repo_file_path(repo, rel)?
