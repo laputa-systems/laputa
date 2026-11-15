@@ -353,8 +353,8 @@ rebuilt `make installer-qemu-test` image installs a target whose inittab starts
 SSH `xinit status oxish` reported `oxish running` and `xsh --help` succeeded.
 That run published the world through `file://`. Since `e19f241f`, PM
 uploads objects above 64 MiB in chunks, and a full HTTP publish to a fresh
-`make mirror` succeeds. The image build also needs a seed that includes XSH
-`d62ee5746` (LAP-58).
+`make mirror` succeeds. The image build also needs a seed that includes the locked
+XSH commit (LAP-58).
 
 ## R2: Persistent VM networking and time
 

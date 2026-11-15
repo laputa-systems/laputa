@@ -1,39 +1,45 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `6cc3e6471`, with XSH `d62ee5746`, recorded with
+The checked-in kernel pin is `d57e24fdd`, with XSH `86215d2a2`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published. The
-kernel adds 46 commits to the previous pin `9ebef8747`: iterative dentry
-ancestor release, `/proc/net` socket tables, default POSIX ACLs, `waitid`
-siginfo clearing, `CLD_EXITED`/`CLD_KILLED` child-exit siginfo, and busy
-umount refusal with `EBUSY`. Each lane's Linux control, baseline rejection and
-guest proof is recorded in XSH `dev/campaign/RESUME-2026-11-14.md`. The kernel
-ELF SHA-256 is
-`13416bbca8d3ba8eb64e16544595d128d68a63fef81c5cf3e4cd8d2d01c0c6ef`.
-Full current-pin native qualification remains open; the corpus run below has 36 failures.
+kernel adds 14 commits to the previous pin `6cc3e6471`:
+- empty `/proc/modules` and `/sys/kernel/profiling`;
+- ext2 `RENAME_EXCHANGE`, and `link` reporting `EEXIST` before `EPERM`;
+- `ENXIO` when opening a socket;
+- the TCP FIN counted in the diagnostic receive queue;
+- ptrace clone, fork and vfork events;
+- `statmount(2)` and `PR_GET_AUXV`;
+- `restart_syscall` with sleep restart blocks;
+- `netlink_diag`;
+- a bound on cached negative dentries (LAP-56).
 
-XSH moved from `d7b4c9c85` to `ce036ba50` with the kernel because the old pin's
-`Dockerfile.test` downloads the deleted `llvm-musl-23.1.5-2f0b039` release; it
-then moved to `d62ee5746`, whose `unix.spawn_process_group(new_session:)` the
-xinit session sweep needs, because the image builds xinit with the pinned XSH.
+The kernel ELF SHA-256 is
+`42dd853f2ba11870e0c63ec7b2f91bd59b02757e4fbc18cb5416fc2e97f4d925`.
+XSH moved from `d62ee5746` because Laputa's chunked uploads use
+`random.bytes`, which XSH added in `86215d2a2`.
 
-Maintained replay of the xinit session sweep with this pin passes every
-cohort on both backends, including all ten
-recovery rounds, except the Linux reference's clock `pause` case: on the loaded
-host its QEMU peer held the guest for 10.3 s against the 5 s margin. A
-`bash infra/asterinas/qualify.sh clock --backend both` rerun then passed all six
-clock cases on both backends, and `qualify.sh published-inputs --backend
-asterinas` confirms both pins are published and match the lock and gitlink.
-The replay uses `LAPUTA_RECOVERY_REPEATS=10`; both runs use the retained
-legacy-ACPI reference kernel, supplied through
-`LAPUTA_LINUX_KERNEL_PACKAGE`; the mirror's reduced-hardware-only ACPI kernel
-cannot qualify this QEMU profile. Evidence is at
-`.work/tmp/pin-xsh-d62ee574-maintained/`; the kernel's first replay at XSH
-`ce036ba50` is at `.work/tmp/pin-6cc3e647-maintained/`. No cohort assertion,
-deadline or poweroff requirement changed. A worktree replay needs
+On 2026-11-15 the maintained replay with this pin passed every cohort on both
+backends, including all ten recovery rounds and the clock `pause` case:
+`LAPUTA_RECOVERY_REPEATS=10 bash infra/asterinas/qualify.sh all --backend both`.
+`qualify.sh published-inputs --backend asterinas` confirms that both pins are
+published and match the lock and the gitlink. The Linux reference used the
+retained legacy-ACPI kernel, supplied through `LAPUTA_LINUX_KERNEL_PACKAGE`;
+the mirror's reduced-hardware-only ACPI kernel cannot qualify this QEMU
+profile. Evidence is at `.work/tmp/pin-d57e24fdd-maintained/`. No cohort
+assertion, deadline or poweroff requirement changed. A worktree replay needs
 `make asterinas-fetch` and the operator's
 `packages/ca-certificates/files/trust-update-key` first.
 
-The full native corpus at this pin ran on 2026-11-15 from a fixture built from
+The previous pin's corpus had 36 failures; see below. Probed alone on this
+kernel, 32 of them pass. The 4 that still fail:
+- the two `ss` TCP-telemetry cases (LAP-60);
+- the gate test's 60 s budget, which a guest `git status` over the
+  110k-file fixture exceeds;
+- `ls` allocation size, whose fixed test postdates that fixture.
+
+Evidence is at `.work/tmp/final36-d57e24fdd/`.
+
+The full native corpus at the previous pin `6cc3e6471` ran on 2026-11-15 from a fixture built from
 XSH `d62ee5746` verification products, which the pinned Linux verification had
 built. That suite's only two failures, `factor` parallel and `ln`
 force-replace, passed when rerun alone. Discovery found 15,673 IDs. The guest
