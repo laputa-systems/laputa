@@ -29,23 +29,19 @@ stage="$snapshot_dir/.snapshot-$$"
 rm -rf "$stage"
 mkdir -p "$stage"
 trap 'if [[ -d "$stage" ]]; then chmod -R u+w "$stage"; rm -rf "$stage"; fi' EXIT
-git --git-dir="$cache_dir" archive --format=tar "$XSH_COMMIT" | tar -xf - -C "$stage"
 git -C "$stage" init --quiet
-git -C "$stage" add --all --force
-GIT_AUTHOR_NAME='Laputa Asterinas build' GIT_AUTHOR_EMAIL='build@laputa.invalid' \
-    GIT_COMMITTER_NAME='Laputa Asterinas build' GIT_COMMITTER_EMAIL='build@laputa.invalid' \
-    GIT_AUTHOR_DATE='1970-01-01T00:00:00+0000' GIT_COMMITTER_DATE='1970-01-01T00:00:00+0000' \
-    git -C "$stage" -c user.name='Laputa Asterinas build' \
-        -c user.email='build@laputa.invalid' -c gc.auto=0 -c maintenance.auto=false commit --quiet -m 'Pinned XSH build input'
+git -C "$stage" -c gc.auto=0 -c maintenance.auto=false fetch --quiet --no-tags --depth=1 "file://$cache_dir" "$XSH_COMMIT"
+git -C "$stage" -c advice.detachedHead=false checkout --quiet --detach "$XSH_COMMIT"
 snapshot_tree="$(git -C "$stage" rev-parse HEAD^{tree})"
 xsh_build_inputs_hash="$(printf '%s\n' "$snapshot_tree" | sha256sum | awk '{print $1}')"
 snapshot="$snapshot_dir/$XSH_COMMIT-$xsh_build_inputs_hash"
 if [[ -d "$snapshot" ]]; then
+    existing_commit="$(git -C "$snapshot" rev-parse HEAD)" || fail "cached XSH snapshot is not a Git checkout: $snapshot"
     existing_tree="$(git -C "$snapshot" rev-parse HEAD^{tree})" || fail "cached XSH snapshot is not a Git checkout: $snapshot"
     existing_changes="$(GIT_OPTIONAL_LOCKS=0 git -C "$snapshot" status --porcelain --untracked-files=all)" || \
         fail "could not validate cached XSH snapshot: $snapshot"
-    [[ "$existing_tree" == "$snapshot_tree" && -z "$existing_changes" ]] || \
-        fail "cached XSH snapshot does not match the locked source: $snapshot"
+    [[ "$existing_commit" == "$XSH_COMMIT" && "$existing_tree" == "$snapshot_tree" && -z "$existing_changes" ]] || \
+        fail "cached XSH snapshot does not match the locked source; remove it and rerun: $snapshot"
     chmod -R u+w "$stage"
     rm -rf "$stage"
 else

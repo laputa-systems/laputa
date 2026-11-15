@@ -621,6 +621,10 @@ git --git-dir="$prepare_root/.cache/asterinas/xsh.git" \
 readarray -t prepared_xsh < <(bash "$prepare_root/infra/asterinas/prepare-xsh.sh")
 [[ ${#prepared_xsh[@]} == 2 ]]
 prepared_source="${prepared_xsh[0]}"
+[[ "$(git -C "$prepared_source" rev-parse HEAD)" == "$prepare_commit" ]] || {
+    printf 'XSH snapshot HEAD is not the locked XSH commit\n' >&2
+    exit 1
+}
 prepared_tree="$(git -C "$prepared_source" rev-parse 'HEAD^{tree}')"
 source_tree="$(git -C "$prepare_source" rev-parse 'HEAD^{tree}')"
 [[ "$prepared_tree" == "$source_tree" ]] || {
