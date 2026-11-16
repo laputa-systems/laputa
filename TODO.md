@@ -104,18 +104,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity, dead-code-archaeology
 - **Effort:** L (weeks)
 
-### LAP-40 · P4 · Pilot one trusted external CLI signature in Laputa recipes
-
-- **Area:** Tooling
-- **Where:** `packages/*/PKGBUILD.xsh`, `pm/`, `tests/pm/`, `docs/DEVELOPMENT.md`
-- **Problem:** Native XSH APIs and typed recipe boundaries are checked, but flags of a pinned external executable can be mistyped without a diagnostic. An always-on command-signature registry would add drift and inappropriate implicit authority.
-- **Recommendation:** Only after XSH-46 delivers its opt-in `xsht` checker, select one stable pinned executable invoked by a real recipe. Supply/reuse a reviewed complete flag signature and compare static diagnostics against the package's existing invocation tests. Keep dynamic targets and incomplete signatures conservative; the checker must not execute a tool to discover its options.
-- **Acceptance:** A controlled misspelling is caught without launching any process; correct recipe invocations check and build unchanged. Version mismatches or unverified subcommands produce advisory diagnostics, never false hard errors. Report the actual maintenance/compile-time cost and drop the pilot if not worth it; CLI flags do not establish process effects.
-- **Status:** XSH `167199111` and `a1e2bf152` provide the opt-in `[command-signature.NAME]` lint (XSH `docs/XSHT.md`), which checks only `run NAME ...` calls with a literal head and literal flags. On Laputa `24f258bf` no recipe under `packages/`, `pm/` or `tests/pm/` makes such a call apart from `run sh -c` in a test, so the pilot has no consumer. XSH parked XSH-46 for the same reason (`2a42c1733`). Owner decision: close this item, or name a recipe that should move to literal `run` calls.
-- **Coordination:** XSH-46 owns the optional tooling feature and signature trust policy.
-- **Fix with:** reference-parity
-- **Effort:** S (hours)
-
 ### LAP-51 · P3 · Establish the native-code census and replacement gates
 
 - **Area:** Dependencies
