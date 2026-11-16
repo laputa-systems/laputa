@@ -149,42 +149,13 @@ qualification remains open; manual cross-build evidence is bounded in
 
 - **Area:** Asterinas clock
 - **Where:** `asterinas/` (kernel `time` and `net` code), `infra/asterinas/`
-- **Problem:** `ADJ_OFFSET`, `ADJ_TICK`, the adjtime modes, `STA_PLL`, `STA_FLL`, and `STA_FREQHOLD` fail with `EINVAL` where Linux accepts them. Absolute realtime timers are not re-armed by a step, `settimeofday` is missing, and the vDSO reads through the system call while a correction is active. Transmit timestamps without `OPT_TSONLY` and hardware timestamps are missing, Firecracker has no RTC, and the 1000 s jump rejection is unexplored.
+- **Problem:** `ADJ_OFFSET`, `ADJ_TICK`, the adjtime modes, `STA_PLL`, `STA_FLL`, and `STA_FREQHOLD` fail with `EINVAL` where Linux accepts them. The vDSO reads through the system call while a correction is active. Transmit timestamps without `OPT_TSONLY` and hardware timestamps are missing, Firecracker has no RTC, and the 1000 s jump rejection is unexplored.
 - **Recommendation:** Take each obligation as a kernel change with a witness paired against Linux in `infra/asterinas/qualify.sh clock-abi` or `clock`, driven by a consumer that needs it. Do not claim an obligation without its paired witness.
 - **Progress:** Monotonic slew is done, consumer ntpd-rs. Kernel `434e2d626` derives CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE and CLOCK_BOOTTIME from the raw clocksource slewed by the adjtimex frequency, keeps CLOCK_MONOTONIC_RAW unslewed, and publishes the slewed base to the vDSO. `run-ktest.sh kernel/core/comps/time` passes 12 of 12. The paired witness `clock_adjust` (`a_frequency_correction_slews_monotonic_and_boottime_but_not_raw`) passes in `qualify.sh clock-abi --backend both`: under +200 ppm for 2 s, MONOTONIC and BOOTTIME each run 200 to 700 µs ahead of MONOTONIC_RAW on Linux and Asterinas, bracketed by raw reads so a preempted read cannot fail it.
   Leap seconds are done, consumer ntpd-rs `leap_update`. Kernel `63abb4552` runs Linux's leap state machine on `STA_INS` and `STA_DEL` through `ADJ_STATUS`: the leap falls at the next UTC day boundary, CLOCK_REALTIME repeats or skips that second, the TAI offset moves with it, and clearing the bit cancels a pending leap. The paired witness `time/leap_status` passes in `qualify.sh clock-abi --backend both`; `qualify.sh all --backend both` passes and the A0 native accounting loses no pass (1326 passed, 0 new failures).
+  Clock steps are done. Kernel `6ed63d5c2` (pin `d27b665aa`) adds `settimeofday` and `CLOCK_TAI`, and re-evaluates absolute realtime and TAI timers of `clock_nanosleep`, POSIX timers and timerfd after a step through `clock_settime`, `settimeofday` or `adjtimex` `ADJ_SETOFFSET`, cancelling timerfds armed with `TFD_TIMER_CANCEL_ON_SET`, as Linux `clock_was_set` does. The paired witnesses `time/settimeofday_step` and `time/realtime_step` run in `qualify.sh clock-abi`, which passes on both backends.
 - **Fix with:** reference-parity
 - **Effort:** L (weeks)
-
-### LAP-61 · P3 · Fix strace -f hanging after its tracee dies on Asterinas
-
-- **Area:** Asterinas ptrace
-- **Where:** `asterinas/` (`kernel/core/src/process/`)
-- **Problem:** `core/tests/test-gnu-misc.xsh::test_gnu_misc_yes_log` passes on `6cc3e6471` and fails on `d57e24fdd`. In `strace -f -o /dev/null -e inject=...:error=ENOSYS yes | head -n 2`, `yes` dies of SIGPIPE but strace never exits, so XSH kills it with SIGKILL. Reverse-applying `541b68f1b` (ptrace clone, fork and vfork events) fixes it. A tracer-wakeup ordering bug found on the way is fixed in `c505c5dc6` with the `fork_exit_wait` witness. A minimal traced SIGPIPE-death witness passes on both Linux and the guest, so the trigger also needs strace's own option set or its syscall injection. Evidence is in `.work/tmp/lane-evidence-20261115/lane-ptrace3-out/`.
-- **Recommendation:** Trace the guest's strace with an in-guest ptrace logger, or narrow strace's options (`-f` alone, `-e inject` alone) to find the missing stop or event. Compare with Linux `ptrace_event` and `exit_notify`.
-- **Acceptance:** The test passes in the guest, and a witness that reproduces the hang fails on `d57e24fdd` and passes on the fix, as on Linux.
-- **Fix with:** root-cause
-- **Effort:** M
-
-### LAP-60 · P3 · Expose TCP telemetry to Asterinas inet_diag
-
-- **Area:** Asterinas networking
-- **Where:** `asterinas/` (`kernel/libs/aster-bigtcp`, `kernel/core/src/net/socket/netlink/sock_diag`, smoltcp)
-- **Problem:** Two native `ss` tests fail on every kernel through `d57e24fdd`: `core/tests/test-ss.xsh::test_ss_tcp_info_text_follows_the_reference_order` and `test_ss_extended_and_timer_text`. inet_diag responses carry no `INET_DIAG_INFO` (`struct tcp_info`), `INET_DIAG_CONG` or cgroup attribute, and no timer state. The kernel cannot report these truthfully. Asterinas builds smoltcp 0.11 without a congestion-control feature, so the stack runs `NoControl` with an unlimited window and has no algorithm name. smoltcp keeps its RTT estimator and retransmit and keepalive timers private, so `aster-bigtcp`'s diagnostic snapshot cannot read them.
-- **Recommendation:** Enable a smoltcp congestion controller (Reno or CUBIC), and expose RTT, cwnd, bytes sent and acked, retransmits and the armed timer through a small accessor patch to the smoltcp fork Asterinas consumes. Then fill `tcp_info` at its Linux size, zero the untracked fields, and emit `INET_DIAG_CONG` and the timer fields.
-- **Acceptance:** Both IDs and all of `core/tests/test-ss.xsh` pass in the guest. A C witness that requests `INET_DIAG_INFO|INET_DIAG_CONG` on a loopback ESTAB pair passes on Linux, fails on `d57e24fdd`, and passes on the fix.
-- **Fix with:** reference-parity
-- **Effort:** M
-
-### LAP-62 · P3 · Answer AF_UNIX sock_diag requests on Asterinas
-
-- **Area:** Asterinas networking
-- **Where:** `asterinas/` (`kernel/core/src/net/socket/netlink/sock_diag`, `kernel/core/src/net/socket/unix/`)
-- **Problem:** `core/tests/test-ss.xsh::test_ss_unix_sockets_print_inodes_as_ports` fails in the guest: a `SOCK_DIAG_BY_FAMILY` request for `AF_UNIX` returns `ENOENT`, so `ss -x` lists no Unix sockets. The native corpus at kernel `c505c5dc6` skipped this ID only because its scratch path exceeded the 100-byte `sun_path` guard; the LAP-60 lane ran it with a short path and it failed on the same kernel code.
-- **Recommendation:** Add the `unix_diag` family handler: `struct unix_diag_req` filtering by state and inode, `struct unix_diag_msg` with type, state and inode, and the `UNIX_DIAG_NAME`, `UNIX_DIAG_PEER`, `UNIX_DIAG_RQLEN` and `UNIX_DIAG_SHUTDOWN` attributes from Linux `net/unix/diag.c`. `/proc/net/unix` already registers sockets by inode (kernel `c240c3000`).
-- **Acceptance:** The ID passes in the guest. A C witness that dumps a bound listener, its accepted pair and an unbound socket passes on Linux, fails on `c505c5dc6`, and passes on the fix as root and UID 1000.
-- **Fix with:** reference-parity
-- **Effort:** S
 
 ### LAP-55 · P3 · Close the Asterinas IPv4 state and DHCP obligations
 

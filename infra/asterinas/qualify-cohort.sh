@@ -30,7 +30,7 @@ case "$cohort" in
         transcript_prefix='DEV_'
         ;;
     clock-abi)
-        witnesses=(time/clock_adjust time/leap_status)
+        witnesses=(time/clock_adjust time/leap_status time/settimeofday_step time/realtime_step)
         ;;
     clock)
         witnesses=(network/udp_ancillary)

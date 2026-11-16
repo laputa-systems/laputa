@@ -1,29 +1,37 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `c505c5dc6`, with XSH `3913c9be3`, recorded with
+The checked-in kernel pin is `d27b665aa`, with XSH `748dc69e5`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published. The
-kernel adds 20 commits to the previous pin `6cc3e6471`:
-- empty `/proc/modules` and `/sys/kernel/profiling`;
-- sysfs attributes report a page-sized `st_size`, as Linux does;
-- ext2 `RENAME_EXCHANGE`, and `link` reporting `EEXIST` before `EPERM`;
-- `ENXIO` when opening a socket;
-- the TCP FIN counted in the diagnostic receive queue;
-- ptrace clone, fork and vfork events, and a tracer woken only after its
-  exiting leader is a zombie;
-- `statmount(2)` and `PR_GET_AUXV`;
-- `restart_syscall` with sleep restart blocks;
-- `netlink_diag`;
-- a bound on cached negative dentries;
-- epoll modifications that no longer grow the entry's poll handle; that
-  growth exhausted the kernel heap two thirds of the way through the native
-  corpus.
+kernel adds four lanes to the previous pin `c505c5dc6`:
+- TCP telemetry for inet_diag (LAP-60): `struct tcp_info` at Linux's size,
+  `INET_DIAG_CONG`, the cgroup attribute and the armed timer. smoltcp 0.11.0
+  is vendored at `asterinas/vendor/smoltcp` with counters and estimator
+  accessors; its state machine is unchanged. `pacing_rate` is computed as
+  Linux `tcp_update_pacing_rate` does, without enforcing pacing. TCP sockets
+  negotiate timestamps, as Linux does by default. Fields the stack does not
+  track are zero.
+- the process exit status reported to a tracer for a leader ended by another
+  thread's fatal signal (LAP-61), which made `strace -f yes | head -n 2` hang;
+- AF_UNIX sock_diag (LAP-62), so `ss -x` lists Unix sockets. Asterinas does
+  not account socket buffer memory: a connected stream's write queue reports
+  queued payload bytes, a datagram socket's write queue is empty and the
+  meminfo allocation counters are zero.
+- `settimeofday`, `CLOCK_TAI`, and Linux `clock_was_set` behaviour (LAP-54): a
+  step through `clock_settime`, `settimeofday` or `adjtimex` `ADJ_SETOFFSET`
+  re-evaluates absolute realtime and TAI timers of `clock_nanosleep`, POSIX
+  timers and timerfd, and cancels timerfds armed with
+  `TFD_TIMER_CANCEL_ON_SET`.
 
 The kernel ELF SHA-256 is
-`de84b64e1988812cc2ded72682fe090fff7cdbc1fdef5af7929289ab3d3fc203`.
-XSH moved from `d62ee5746` because Laputa's chunked uploads use
-`random.bytes`, which XSH added in `86215d2a2`. `3913c9be3` renames the
-bindings that the new `random` module made shadow errors; at `86215d2a2`
-they broke `mktemp`.
+`0f35d8551a84256e5a3fcd962cecdb1df2e363358733bc565ad5d1fd30b3c2e4`.
+Each lane has a C witness that passes on Linux and on this kernel as root and
+UID 1000 and fails on `c505c5dc6`: `network/tcp_diag_telemetry`,
+`process/ptrace/traced_group_exit`, `network/unix_diag`,
+`time/settimeofday_step` and `time/realtime_step`. The Laputa Linux reference
+kernel is built without `CONFIG_UNIX_DIAG`, so the `unix_diag` control ran on
+the Linux 7.2.9 host, as root in a container and as UID 1000. The two time
+witnesses join the `clock-abi` cohort. Lane evidence is at
+`.work/tmp/lane-evidence-20261116/`.
 
 On 2026-11-16 the maintained replay with this pin passed every cohort on both
 backends, including all ten recovery rounds and the clock `pause` case:
@@ -32,43 +40,31 @@ backends, including all ten recovery rounds and the clock `pause` case:
 published and match the lock and the gitlink. The Linux reference used the
 retained legacy-ACPI kernel, supplied through `LAPUTA_LINUX_KERNEL_PACKAGE`;
 the mirror's reduced-hardware-only ACPI kernel cannot qualify this QEMU
-profile. Evidence is at `.work/tmp/pin-c505c5dc6-maintained/`; the earlier
-runs at kernel `d57e24fdd` are at `.work/tmp/pin-3913c9be3-maintained/` and
-`.work/tmp/pin-d57e24fdd-maintained/`. No cohort
-assertion, deadline or poweroff requirement changed. A worktree replay needs
+profile. Evidence is at `.work/tmp/pin-d27b665aa-maintained/`; the previous
+pin's runs are at `.work/tmp/pin-c505c5dc6-maintained/`. No cohort assertion,
+deadline or poweroff requirement changed. A worktree replay needs
 `make asterinas-fetch` and the operator's
 `packages/ca-certificates/files/trust-update-key` first.
 
-The previous pin's corpus had 36 failures; see below. Probed alone on this
-kernel, 32 of them pass. The 4 that still fail:
-- the two `ss` TCP-telemetry cases (LAP-60);
-- the gate test's 60 s budget, which a guest `git status` over the
-  110k-file fixture exceeds;
-- `ls` allocation size, whose fixed test postdates that fixture.
-
-Evidence is at `.work/tmp/final36-d57e24fdd/`.
-
 The full native corpus at this pin ran on 2026-11-16 as eight parallel
-two-vCPU, 4 GiB guests, from a fixture built from XSH `3913c9be3`
-verification products. Each guest runs an interleaved eighth of the 15,675
-discovered IDs. Every ID ran, and no guest failed a kernel allocation.
-15,365 passed, 10 failed and 300 were skipped. The failures:
+two-vCPU, 4 GiB guests, from a fixture built from XSH `748dc69e5`
+verification products. Every one of the 15,675 discovered IDs ran: 15,670
+passed, 5 failed and 300 were skipped, with none unexecuted or unknown. The
+five failures were per-test timeouts under the parallel load (`wc` and
+`factor` parallel logs, `vdir` terminal quoting, `sensors` option rejection
+and the `lscpu` fixture), and all five pass when run alone in one guest on the
+same kernel and fixture. Every failure of the previous pin's corpus passes.
+Evidence is at `.work/tmp/native-shard-748dc69e5-d27b665aa-s00/` through
+`-s07/` and `.work/tmp/native-rerun5-748dc69e5-d27b665aa-s00/`, with the
+fixture at `.work/tmp/native-fixture-748dc69e5/`.
 
-- the two `ss` TCP-telemetry cases (LAP-60);
-- two gate tests that exceed their budgets while the guest runs
-  `git status` over the 110k-file fixture;
-- `yes_log`: `strace -f` never exits after its tracee dies, a regression
-  from the ptrace clone-event commit `541b68f1b` (LAP-61);
-- `ln` force-replace, a timing flake that passed in two reruns;
-- four cases whose XSH fixes postdate the fixture: the `api-tool` surface
-  reference (`c3c574aa1`), two `timeout` signal-forwarding races and the
-  `ls` 8K allocation total (`f08174ef2`).
-
-Evidence is at `.work/tmp/native-shard-3913c9be3-c505c5dc6-s00/` through
-`-s07/`, with the fixture at `.work/tmp/native-fixture-3913c9be3/`. The same
-run on `d57e24fdd` passed 15,171 and left 92 IDs unexecuted after shard 0
-failed to allocate an 8 MiB large slot; it is at
-`.work/tmp/native-shard-3913c9be3-d57e24fdd-s00/` through `-s07/`.
+The previous pin `c505c5dc6`, with XSH `3913c9be3`, stopped epoll
+modifications from growing an entry's poll handle without bound, which had
+exhausted the kernel heap two thirds of the way through the native corpus. Its
+eight-guest corpus passed 15,365 IDs, failed 10 and skipped 300; the failures
+are fixed by this pin's kernel lanes and by XSH `6ab5843ea`, `58df39400`,
+`c3c574aa1` and `f08174ef2`. Evidence is at
+`.work/tmp/native-shard-3913c9be3-c505c5dc6-s00/` through `-s07/`.
 
 The full native corpus at the previous pin `6cc3e6471` ran on 2026-11-15 from a fixture built from
 XSH `d62ee5746` verification products, which the pinned Linux verification had
