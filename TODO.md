@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 59
+Next: 63
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -187,6 +187,16 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Acceptance:** Both IDs and all of `core/tests/test-ss.xsh` pass in the guest. A C witness that requests `INET_DIAG_INFO|INET_DIAG_CONG` on a loopback ESTAB pair passes on Linux, fails on `d57e24fdd`, and passes on the fix.
 - **Fix with:** reference-parity
 - **Effort:** M
+
+### LAP-62 · P3 · Answer AF_UNIX sock_diag requests on Asterinas
+
+- **Area:** Asterinas networking
+- **Where:** `asterinas/` (`kernel/core/src/net/socket/netlink/sock_diag`, `kernel/core/src/net/socket/unix/`)
+- **Problem:** `core/tests/test-ss.xsh::test_ss_unix_sockets_print_inodes_as_ports` fails in the guest: a `SOCK_DIAG_BY_FAMILY` request for `AF_UNIX` returns `ENOENT`, so `ss -x` lists no Unix sockets. The native corpus at kernel `c505c5dc6` skipped this ID only because its scratch path exceeded the 100-byte `sun_path` guard; the LAP-60 lane ran it with a short path and it failed on the same kernel code.
+- **Recommendation:** Add the `unix_diag` family handler: `struct unix_diag_req` filtering by state and inode, `struct unix_diag_msg` with type, state and inode, and the `UNIX_DIAG_NAME`, `UNIX_DIAG_PEER`, `UNIX_DIAG_RQLEN` and `UNIX_DIAG_SHUTDOWN` attributes from Linux `net/unix/diag.c`. `/proc/net/unix` already registers sockets by inode (kernel `c240c3000`).
+- **Acceptance:** The ID passes in the guest. A C witness that dumps a bound listener, its accepted pair and an unbound socket passes on Linux, fails on `c505c5dc6`, and passes on the fix as root and UID 1000.
+- **Fix with:** reference-parity
+- **Effort:** S
 
 ### LAP-55 · P3 · Close the Asterinas IPv4 state and DHCP obligations
 
