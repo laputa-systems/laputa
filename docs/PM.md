@@ -622,6 +622,26 @@ command links only when Laputa needs them, and keep `su` outside `/usr/bin`.
 
 ## Filesystem authority limits
 
+On 2026-11-16, five interleaved traced and untraced compositions used the
+available x86_64 store and its plan with the 11 runtime roots listed in
+[the font-stack measurement](FONT-STACK.md#final-composed-root). This store's
+generation had 31 artifacts and 1,637 regular files; it is not the historical
+1,630-file generation. On a Ryzen 9 9950X, Linux 7.2.9 and ext4, with warm
+page cache, untraced wall median was 4.45 s (range 4.40–4.56) and user plus
+system CPU was 3.26 s (3.25–3.27). With `strace -c -w -f -e
+trace=fsync,fdatasync,syncfs`, wall was 5.63 s (5.58–5.80), CPU including
+the tracer was 4.18 s (4.16–4.36), and 1,815 `fsync` calls totaled 1.177 s
+(1.145–1.223), or 20.9% (20.2–21.4%) of traced wall. No `fdatasync` or
+`syncfs` calls occurred. Tracing adds overhead to both totals and syscall
+durations, so this is not a prediction of the benefit of removing sync. The
+composition used already committed artifacts; it did not time `store.commit`.
+Each run passed `perf-gate-ready` before and `perf-gate-ready -1` immediately
+after. The disposable driver and raw output are `.work/tmp/perf/run.sh` and
+`.work/tmp/perf/` respectively. The driver runs `/usr/bin/time -v` around
+`xsh pm.xsh -- root compose PLAN --store STORE` with the 11 `--runtime-root`
+arguments, alternating it with the traced command and the font measurements.
+All compositions returned the same generation and root digests.
+
 Store commit and generation composition (`store.commit`, `generation.compose`,
 `root.compose_artifacts`) open their publication directory once as an
 `FsRoot`: the Store's `v2/` layout, or the parent of the root or generation.

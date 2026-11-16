@@ -357,8 +357,28 @@ The earlier per-package table measured `rust-fontconfig` at 8 regular files and
 1,152,798 bytes. The Ghostty executable measures 27,206,760 bytes here versus
 27,206,776 in that table, a 16-byte difference. Play matches exactly.
 
-Remaining:
+On 2026-11-16, the packaged `librust_fontconfig.so.5.0.2` and musl loader
+were measured on the package-proof corpus: Hack, DejaVu Sans, Noto Sans
+Devanagari, Thai and CJK, and Noto Color Emoji. The isolated font directory
+contained nine files and produced 18 faces. The host page cache was warm.
+Five interleaved runs per operation passed `perf-gate-ready` before and
+`perf-gate-ready -1` immediately after; no readiness checks failed.
 
-- Cache-build peak RSS: deferred; no harness exists, and the package set ships no `fc-cache`.
-- Font cache build time and first-query latency: timing deferred by the owner, not measured.
-- aarch64 Ghostty and Play qualification: deferred with the rest of the campaign.
+| Measurement | Median (range) |
+|---|---:|
+| `fc_cache_build` wall | 1.654 ms (1.559–2.309) |
+| Cache-build process peak RSS | 4,052 KiB (3,844–4,200) |
+| First bold Hack `fc_cache_query` wall | 0.093 ms (0.090–0.184) |
+
+The C harness times the API calls with `CLOCK_MONOTONIC`, checks discovery
+and verifies the query selects `Hack-Bold.ttf`; `/usr/bin/time -v` measures
+peak RSS for the whole build process, including startup and enumeration.
+The cache is constructed anew in each process. These figures do not measure
+application startup, cold storage, or a persistent cache build. The temporary
+harness and interleaved driver are `.work/tmp/perf/font.c` and
+`.work/tmp/perf/run.sh`; the driver sets `FONTCONFIG_FILE` to a configuration
+pointing to the six composed proof packages, runs the packaged musl loader,
+and records `/usr/bin/time -v` output for every invocation.
+
+Remaining: aarch64 Ghostty and Play qualification and macOS execution are
+owner-deferred.
