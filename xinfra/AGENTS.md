@@ -41,7 +41,7 @@ the controller needs a qualified `xsh` and `xsht` and nothing else. Read
 - Do not run formatters or autofixers.
 - Commits are Conventional Commits (`type(scope): subject`, imperative,
   lowercase, at most 72 characters); the body says why. Commit directly to
-  `master`; never push without being asked.
+  `master`.
 - Scratch and worktrees go under `.work/`, which `.git/info/exclude` ignores.
   Never use `/tmp`.
 - Stop only the containers and processes you started, by ID.
