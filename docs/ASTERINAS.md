@@ -1,34 +1,40 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `d57e24fdd`, with XSH `3913c9be3`, recorded with
+The checked-in kernel pin is `c505c5dc6`, with XSH `3913c9be3`, recorded with
 the other inputs in `infra/asterinas/inputs.lock`; both are published. The
-kernel adds 14 commits to the previous pin `6cc3e6471`:
+kernel adds 20 commits to the previous pin `6cc3e6471`:
 - empty `/proc/modules` and `/sys/kernel/profiling`;
+- sysfs attributes report a page-sized `st_size`, as Linux does;
 - ext2 `RENAME_EXCHANGE`, and `link` reporting `EEXIST` before `EPERM`;
 - `ENXIO` when opening a socket;
 - the TCP FIN counted in the diagnostic receive queue;
-- ptrace clone, fork and vfork events;
+- ptrace clone, fork and vfork events, and a tracer woken only after its
+  exiting leader is a zombie;
 - `statmount(2)` and `PR_GET_AUXV`;
 - `restart_syscall` with sleep restart blocks;
 - `netlink_diag`;
-- a bound on cached negative dentries (LAP-56).
+- a bound on cached negative dentries;
+- epoll modifications that no longer grow the entry's poll handle; that
+  growth exhausted the kernel heap two thirds of the way through the native
+  corpus.
 
 The kernel ELF SHA-256 is
-`42dd853f2ba11870e0c63ec7b2f91bd59b02757e4fbc18cb5416fc2e97f4d925`.
+`de84b64e1988812cc2ded72682fe090fff7cdbc1fdef5af7929289ab3d3fc203`.
 XSH moved from `d62ee5746` because Laputa's chunked uploads use
 `random.bytes`, which XSH added in `86215d2a2`. `3913c9be3` renames the
 bindings that the new `random` module made shadow errors; at `86215d2a2`
 they broke `mktemp`.
 
-On 2026-11-15 the maintained replay with this pin passed every cohort on both
+On 2026-11-16 the maintained replay with this pin passed every cohort on both
 backends, including all ten recovery rounds and the clock `pause` case:
 `LAPUTA_RECOVERY_REPEATS=10 bash infra/asterinas/qualify.sh all --backend both`.
 `qualify.sh published-inputs --backend asterinas` confirms that both pins are
 published and match the lock and the gitlink. The Linux reference used the
 retained legacy-ACPI kernel, supplied through `LAPUTA_LINUX_KERNEL_PACKAGE`;
 the mirror's reduced-hardware-only ACPI kernel cannot qualify this QEMU
-profile. Evidence is at `.work/tmp/pin-3913c9be3-maintained/`; the run at
-XSH `86215d2a2` is at `.work/tmp/pin-d57e24fdd-maintained/`. No cohort
+profile. Evidence is at `.work/tmp/pin-c505c5dc6-maintained/`; the earlier
+runs at kernel `d57e24fdd` are at `.work/tmp/pin-3913c9be3-maintained/` and
+`.work/tmp/pin-d57e24fdd-maintained/`. No cohort
 assertion, deadline or poweroff requirement changed. A worktree replay needs
 `make asterinas-fetch` and the operator's
 `packages/ca-certificates/files/trust-update-key` first.
@@ -42,28 +48,27 @@ kernel, 32 of them pass. The 4 that still fail:
 
 Evidence is at `.work/tmp/final36-d57e24fdd/`.
 
-The full native corpus at this pin ran on 2026-11-15 as eight parallel
+The full native corpus at this pin ran on 2026-11-16 as eight parallel
 two-vCPU, 4 GiB guests, from a fixture built from XSH `3913c9be3`
 verification products. Each guest runs an interleaved eighth of the 15,675
-discovered IDs. 15,171 passed, 12 failed and 300 were skipped. 92 were not
-executed: shard 0 stopped after 3,947 s on `Failed to allocate a large slot`
-for an 8 MiB layout (LAP-56). The failures:
+discovered IDs. Every ID ran, and no guest failed a kernel allocation.
+15,365 passed, 10 failed and 300 were skipped. The failures:
 
 - the two `ss` TCP-telemetry cases (LAP-60);
-- three gate tests that exceed their budgets while the guest runs
+- two gate tests that exceed their budgets while the guest runs
   `git status` over the 110k-file fixture;
-- `tail` on `/sys/kernel/profiling`: sysfs attributes reported size 0, so
-  `tail -f` saw the file as truncated and re-read it forever;
 - `yes_log`: `strace -f` never exits after its tracee dies, a regression
   from the ptrace clone-event commit `541b68f1b` (LAP-61);
-- two `timeout` signal-forwarding cases and `ls` allocation size, which were
-  test races and a stale expectation, fixed in XSH `f08174ef2`;
 - `ln` force-replace, a timing flake that passed in two reruns;
-- the `api-tool` surface reference, which lacked the `random` module, fixed
-  in XSH `c3c574aa1`.
+- four cases whose XSH fixes postdate the fixture: the `api-tool` surface
+  reference (`c3c574aa1`), two `timeout` signal-forwarding races and the
+  `ls` 8K allocation total (`f08174ef2`).
 
-Evidence is at `.work/tmp/native-shard-3913c9be3-d57e24fdd-s00/` through
-`-s07/`, with the fixture at `.work/tmp/native-fixture-3913c9be3/`.
+Evidence is at `.work/tmp/native-shard-3913c9be3-c505c5dc6-s00/` through
+`-s07/`, with the fixture at `.work/tmp/native-fixture-3913c9be3/`. The same
+run on `d57e24fdd` passed 15,171 and left 92 IDs unexecuted after shard 0
+failed to allocate an 8 MiB large slot; it is at
+`.work/tmp/native-shard-3913c9be3-d57e24fdd-s00/` through `-s07/`.
 
 The full native corpus at the previous pin `6cc3e6471` ran on 2026-11-15 from a fixture built from
 XSH `d62ee5746` verification products, which the pinned Linux verification had
@@ -73,7 +78,7 @@ kernel is a standard build of `6cc3e6471` with ELF SHA-256
 `6532fb69f87e635267866ab62d17bf3cd2d2c84a5abe55f3f5c994bc69b83563`. That hash
 differs from the published-pin hash above, so the build is not bit-identical.
 The first guest stopped after 12,663 s on a kernel heap failure, `Failed to
-allocate a large slot` for a 4 MiB layout (LAP-56). By then it had 14,133
+allocate a large slot` for a 4 MiB layout, fixed in `c505c5dc6`. By then it had 14,133
 passes, 36 failures, 302 skips and 1,202 unexecuted IDs. A fresh guest ran
 exactly those 1,202 IDs: 1,198 passed, none failed and 4 were skipped. The
 combined accounting is 15,331 passed, 36 failed, 306 skipped, and no
