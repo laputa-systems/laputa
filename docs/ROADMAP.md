@@ -388,8 +388,9 @@ Use the network path as a shared-library consumer: observe actual state, compute
 a typed plan, apply with preconditions, then re-observe. Preserve foreign resources,
 including Tailscale/operator state; detect lost notifications and stale snapshots.
 Partial application requires reconciliation, not a promise of generic rollback.
-Recheck LAP-32/XSH-38 against the newer implementation and retire obsolete
-blockers only with the corresponding installed-system evidence.
+The typed-plan path is qualified for IPv4 and IPv6 on an installed KVM guest
+(`packages/laputa-net/README.md`); retire further blockers only with the
+corresponding installed-system evidence.
 
 Do not install a parallel network manager to paper over a failure. Reduce a
 rollout defect to a regression in the owning XSH or Laputa layer. DHCP/syslog

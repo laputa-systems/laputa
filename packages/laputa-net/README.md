@@ -463,6 +463,28 @@ cases: `network_policy_applier.xsh` runs the IPv4 witness and then
 `NETWORK_IPV6_LIVE_GUEST_OK`, which the host driver now also requires from the raw
 console. A skipped case still fails the proof.
 
+On 2026-11-17, the following run qualified both families on a clean committed
+Laputa tree, with clean XSH `86215d2a297885a00d15705409785a91940a02c7`
+overlaid on canonical A (Linux 7.2.9, x86_64 KVM):
+
+```sh
+git rev-parse HEAD
+# ab4a3ec527da0a76d76e86bb24dd55b328eb4acb
+git status --short
+# no output
+bash tests/system/network_policy_live_vm.sh .out/seed/x86_64 "$VM_ROOT"
+# exit 0: NETWORK_LIVE_KVM_HOST_OK
+```
+
+The guest transcript reports `5 passed; 0 failed; 0 skipped`,
+`NETWORK_IPV4_LIVE_GUEST_OK`, `NETWORK_IPV6_LIVE_GUEST_OK`, and
+`NETWORK_LIVE_KVM_OK`. The original bundle's four hashes passed the driver's
+after-run check. The seed's installed `xsh` SHA-256 was
+`6fd680860c3323665a528c646ddd5649041e119dadeae75f3809e5e2e370b1d4`
+and `xsht` was
+`2277f68473f04609997b62c0a92f993fd77358e60ef84373774fe2c09b866144`.
+`VM_ROOT` is the driver's freshly built guest directory for the run.
+
 On 2026-11-14 it passed with clean XSH `befe5ced1ab8a75b1c92b21c55ed6d6b86f2d4bb`
 as the tool overlay on canonical A (Linux 7.2.9, 2 CPUs, 4 GiB, KVM): all five
 native cases passed with no skips, the host driver exited 0 with
