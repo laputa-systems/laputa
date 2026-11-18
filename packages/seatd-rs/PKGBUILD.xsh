@@ -120,7 +120,10 @@ export proc build(dest: Path) [fs, process, env, error] {
     CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: x86_64_rustflags,
   }) {
     run $cargo build "--offline" "--locked" "--config" "source.crates-io.replace-with=\"vendored-sources\"" "--config" \
-      "source.vendored-sources.directory=\"vendor\"" "--config" "git-kbvm/.cargo-source.toml" "--release" "--target" $triple "--package" "seatd" "--bin" "seatd"
+      "source.vendored-sources.directory=\"vendor\"" "--config" \
+      "registries.mycrates.index=\"sparse+https://crates.17166969.xyz/current/registry/\"" "--config" \
+      "source.laputa-registry.registry=\"sparse+https://crates.17166969.xyz/current/registry/\"" "--config" \
+      "source.laputa-registry.replace-with=\"vendored-sources\"" "--config" "git-kbvm/.cargo-source.toml" "--release" "--target" $triple "--package" "seatd" "--bin" "seatd"
   }
 
   fs.install(fp"target/{triple}/release/seatd", fp"{dest}/usr/bin/seatd", 0o755, parents: true, overwrite: true)
