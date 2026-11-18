@@ -31,7 +31,7 @@ export let linux_kernel_source = {
 }
 
 ## The shared compositor, daemon, and protocol workspace commit.
-export const tinyland_revision = "314d6573099cec26bc2f0d6a2d784c4bc54222ba"
+export const tinyland_revision = "f5865e9804321f3339299ebb875e0748c3b8c9dc"
 
 ## Checksum-pinned workspace and dependency sources shared by its packages.
 export let tinyland_workspace_sources = [
@@ -39,13 +39,13 @@ export let tinyland_workspace_sources = [
     source: fp"https://github.com/laputa-systems/tinyland/archive/{tinyland_revision}.tar.gz",
     kind: "auto",
     architectures: ["all"],
-    checksums: [{arch: "all", sha256: "1af77c0721f25f19a38af8f4fa499bc4e079854317b890afcaf8338d30f60e05"}],
+    checksums: [{arch: "all", sha256: "c5c60d186ba3c72989c0db664ea41b5d2ef80ea2ed351dfb659c985eb923a689"}],
   },
   {
     source: fp"https://raw.githubusercontent.com/laputa-systems/tinyland/{tinyland_revision}/Cargo.lock => vendor",
     kind: "cargo-vendor",
     architectures: ["all"],
-    checksums: [{arch: "all", sha256: "5c0216fa18bd2f2ed14461554825c67fdba9c10d516274ce44d926835c8f9827"}],
+    checksums: [{arch: "all", sha256: "9e0a7eea02168f35f0332d7197b8cd27e4c1f45f0b23ac2620b7deddff30aafa"}],
   },
   {
     source: p"https://github.com/laputa-systems/kbvm/archive/c21a0508a6505639ec0d46e6f21a60de2d83e2e4.tar.gz => git-kbvm",

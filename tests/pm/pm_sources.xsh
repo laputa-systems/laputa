@@ -330,26 +330,19 @@ pure crate_set_lock(crates: List[sources.LockedCrate]) -> Str {
     " \"demo_crate\",",
     "]",
   ]
-  var index = 0
 
   for item in crates {
-    let source = if index % 2 == 0 {
-      "registry+https://github.com/rust-lang/crates.io-index"
-    } else {
-      "sparse+https://index.crates.io/"
-    }
     lines += [
       "",
       "[[package]]",
       f"name = \"{item.name}\"",
       f"version = \"{item.version}\"",
-      f"source = \"{source}\"",
+      f"source = \"{item.source}\"",
       f"checksum = \"{item.checksum}\"",
       "dependencies = [",
       " \"libc\",",
       "]",
     ]
-    index += 1
   }
 
   lines.join("\n") + "\n"
@@ -364,7 +357,7 @@ proc demo_crate(ctx: TestContext, name: Str, version: Str) -> Result[DemoCrate] 
   fp"{tree}/{name}-{version}/src/lib.rs".write("")
   let tarball = test.temp_path(ctx, name: f"{name}-{version}.tar.gz")
   archive.create(tarball, tree, [fp"{name}-{version}"], .Tar)
-  {item: {name, version, checksum: hash.sha256(tarball)?.hex()}, path: tarball}
+  {item: {name, version, checksum: hash.sha256(tarball)?.hex(), source: "registry+https://github.com/rust-lang/crates.io-index"}, path: tarball}
 }
 
 proc cache_file(cache: Path, file: Path) -> Result[Str] {
@@ -407,18 +400,20 @@ test test_cargo_lock_names_its_crates_io_crate_set [fs, error] { |ctx|
       name: "demo_crate",
       version: "0.1.0",
       checksum: "1111111111111111111111111111111111111111111111111111111111111111",
+      source: "registry+https://github.com/rust-lang/crates.io-index",
     },
     {
       name: "zstd-sys",
       version: "2.0.15+zstd.1.5.7",
       checksum: "2222222222222222222222222222222222222222222222222222222222222222",
+      source: "sparse+https://crates.17166969.xyz/current/registry/",
     },
   ]
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
   lockfile.write(crate_set_lock(crates))
 
   assert sources.cargo_lock_crates(lockfile)? == crates
-  assert sources.crate_download_url(crates[1]) == "https://crates.17166969.xyz/blobs/2222222222222222222222222222222222222222222222222222222222222222.crate"
+  assert sources.crate_download_url(crates[1]) == "https://crates-blobs.17166969.xyz/blobs/2222222222222222222222222222222222222222222222222222222222222222.crate"
 }
 
 test test_cargo_lock_rejects_crates_without_a_content_address [fs, error] { |ctx|
@@ -440,6 +435,19 @@ source = "git+https://example.invalid/forked?rev=abc#abc"
 
   lockfile.write(
     """[[package]]
+name = "other"
+version = "1.0.0"
+source = "sparse+https://example.invalid/registry/"
+checksum = "1111111111111111111111111111111111111111111111111111111111111111"
+""",
+  )
+  match sources.cargo_lock_crates(lockfile) {
+    Ok(_) => test.fail("an unknown registry was accepted")
+    Err(problem) => assert "only crates.io crates can be vendored" in problem.message
+  }
+
+  lockfile.write(
+    """[[package]]
 name = "old"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -452,11 +460,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
   }
 }
 
-test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, net, env, error] { |ctx|
+test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, net, process, env, error] { |ctx|
   let crate_file = demo_crate(ctx, "demo_crate", "0.1.0")?
+  let owned_demo = demo_crate(ctx, "owned_crate", "1.0.0")?
+  let owned_crate = {...owned_demo, item: {...owned_demo.item, source: "sparse+https://crates.17166969.xyz/current/registry/"}}
   let cache = test.temp_dir(ctx, name: "crate-set-cache")?
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
-  lockfile.write(crate_set_lock([crate_file.item]))
+  lockfile.write(crate_set_lock([crate_file.item, owned_crate.item]))
   let lock_sha256 = cache_file(cache, lockfile)?
   let src = test.temp_dir(ctx, name: "crate-set-src")?
   let pkg = crate_set_package("https://upstream.invalid/Cargo.lock", lock_sha256)
@@ -467,6 +477,15 @@ test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, ne
 
   assert (fs.children(src)? |> count()) == 0
   assert cache_file(cache, crate_file.path)? == crate_file.item.checksum
+  let items = sources.cargo_crate_fetch_items(cache, [pkg], "aarch64")?
+  assert {sha256: owned_crate.item.checksum, urls: [f"https://crates-blobs.17166969.xyz/blobs/{owned_crate.item.checksum}.crate"], packages: ["demo"]} in items
+  let owned_entry = sources.source_cache_entry(cache, owned_crate.item.checksum)
+  crate_file.path.copy(to: owned_entry)
+  env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
+    expect_stage_error(pkg, src, [f"expected {owned_crate.item.checksum}"])
+  }
+  assert (fs.children(src)? |> count()) == 0
+  assert cache_file(cache, owned_crate.path)? == owned_crate.item.checksum
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
     sources.stage_package_sources(pkg, src)
@@ -476,6 +495,49 @@ test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, ne
   assert "name = \"demo_crate\"" in fp"{vendored}/Cargo.toml".read_text()?
   let marker = fp"{vendored}/.cargo-checksum.json".read_text()?
   assert json.decode(marker)? == json.decode(f"""{{"files": {{}}, "package": "{crate_file.item.checksum}"}}""")?
+  let owned = fp"{src}/vendor/owned_crate-1.0.0"
+  assert "name = \"owned_crate\"" in fp"{owned}/Cargo.toml".read_text()?
+  assert json.decode(fp"{owned}/.cargo-checksum.json".read_text()?)? == json.decode(f"""{{"files": {{}}, "package": "{owned_crate.item.checksum}"}}""")?
+  fp"{src}/Cargo.toml".write("[package]\nname = \"consumer\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[dependencies]\nowned_crate = { version = \"1.0.0\", registry = \"mycrates\" }\n")
+  fp"{src}/src".mkdir()
+  fp"{src}/src/lib.rs".write("")
+  fp"{src}/Cargo.lock".write(f"""version = 4
+
+[[package]]
+name = "consumer"
+version = "0.1.0"
+dependencies = ["owned_crate"]
+
+[[package]]
+name = "owned_crate"
+version = "1.0.0"
+source = "{owned_crate.item.source}"
+checksum = "{owned_crate.item.checksum}"
+""")
+  let cargo = process.which("cargo")?
+  let cargo_home = test.temp_dir(ctx, name: "registry-empty-cargo-home")?
+  let vendor_config = f"source.vendored-sources.directory=\"{src}/vendor\""
+  let output = run.text CARGO_HOME=$cargo_home $cargo "metadata" "--offline" "--locked" "--format-version" "1" \
+    "--manifest-path" fp"{src}/Cargo.toml" "--config" "registries.mycrates.index=\"sparse+https://crates.17166969.xyz/current/registry/\"" \
+    "--config" "source.laputa-registry.registry=\"sparse+https://crates.17166969.xyz/current/registry/\"" \
+    "--config" "source.laputa-registry.replace-with=\"vendored-sources\"" "--config" $vendor_config
+  assert "owned_crate" in output
+}
+
+test test_owned_crate_download_verifies_checksum [fs, net, error] { |ctx|
+  let crate_file = demo_crate(ctx, "owned_download", "1.0.0")?
+  let other = demo_crate(ctx, "impostor", "1.0.0")?
+  let cache = test.temp_dir(ctx, name: "owned-download-cache")?
+  match sources.fill_source_cache_entry(cache, crate_file.item.checksum, f"file://{other.path}")? {
+    sources.Mismatch(_) => {}
+    else => test.fail("a mismatched archive was accepted")
+  }
+  assert ! sources.source_cache_entry(cache, crate_file.item.checksum).exists()?
+  match sources.fill_source_cache_entry(cache, crate_file.item.checksum, f"file://{crate_file.path}")? {
+    sources.Fetched(_) => {}
+    else => test.fail("the matching archive was not fetched")
+  }
+  assert hash.sha256(sources.source_cache_entry(cache, crate_file.item.checksum))?.hex() == crate_file.item.checksum
 }
 
 test test_sources_fetch_reads_the_cached_lockfile_for_its_crates [fs, process, env, error] { |ctx|

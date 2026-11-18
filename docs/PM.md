@@ -219,16 +219,21 @@ use its Rust distribution date and target standard-library checksums. `linux`,
 those declarations once when changing a shared upstream release.
 
 A `cargo-vendor` source names a Cargo.lock (a pinned URL or a recipe file) and
-a destination, `LOCK => vendor`. Its crates.io `[[package]]` records are a
-content-addressed crate set: each record's `checksum` is the sha256 crates.io
-serves `NAME-VERSION.crate` under, so the lockfile's own pin covers every
+a destination, `LOCK => vendor`. Its crates.io and owned registry `[[package]]`
+records are a content-addressed crate set: each record's `checksum` is the
+sha256 of its `.crate`, so the lockfile's own pin covers every
 crate and the artifact key needs nothing more. `pm sources fetch` caches the
 lockfile with the other URL sources, then reads it from the cache and fetches
-each `.crate` from the mycrates archive into the same `sha256/<hash>` layout. A
+each crates.io `.crate` from the mycrates archive and each owned registry crate
+from `https://crates-blobs.17166969.xyz/blobs/{checksum}.crate` into the same
+`sha256/<hash>` layout. The owned registry source must be exactly
+`sparse+https://crates.17166969.xyz/current/registry/`. A
 build resolves every crate like any URL source before staging anything, then
 extracts each into `DEST/NAME-VERSION/` with the `.cargo-checksum.json`
 cargo's directory sources need, so a recipe builds with `--offline --locked`
-and `source.crates-io.replace-with` naming a directory source at `DEST`.
+and `source.crates-io.replace-with` naming a directory source at `DEST`. Recipes
+using the owned registry must also configure its registry URL and replace it
+with the same directory source.
 Records without `source` (workspace and path packages) are skipped. Other
 sources are rejected unless a selected `cargo-git-workspace` source explicitly
 pins the matching GitHub repository and full commit archive with a sha256.

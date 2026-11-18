@@ -10,6 +10,8 @@ const crates_io_lock_sources = [
   "sparse+https://index.crates.io/",
 ]
 
+const laputa_registry_lock_source = "sparse+https://crates.17166969.xyz/current/registry/"
+
 const crate_name_pattern = rx"^[A-Za-z0-9_-]+$"
 const crate_version_pattern = rx"^[0-9A-Za-z.+-]+$"
 
@@ -208,8 +210,8 @@ export proc resolve_source(
   {path: local, kind: metadata.kind, name: local.name}
 }
 
-## One crates.io package a Cargo.lock pins, and the sha256 of its `.crate`.
-export type LockedCrate = {name: Str, version: Str, checksum: Str}
+## One registry package a Cargo.lock pins, its source, and the sha256 of its `.crate`.
+export type LockedCrate = {name: Str, version: Str, checksum: Str, source: Str}
 
 type LockRecord = {name: Str, version: Str, source: Str, checksum: Str}
 
@@ -268,7 +270,7 @@ pure lock_record_crates(lockfile: Path, record: LockRecord, git_sources: List[St
 
   return [] when record.source in git_sources
 
-  if record.source not in crates_io_lock_sources {
+  if record.source not in crates_io_lock_sources and record.source != laputa_registry_lock_source {
     return Err(
       types.PmError.PackageContract(f"{label} comes from {record.source}; only crates.io crates can be vendored"),
     )
@@ -284,10 +286,10 @@ pure lock_record_crates(lockfile: Path, record: LockRecord, git_sources: List[St
     )
   }
 
-  [{name: record.name, version: record.version, checksum: record.checksum}]
+  [{name: record.name, version: record.version, checksum: record.checksum, source: record.source}]
 }
 
-## Reads the crates.io packages a Cargo.lock pins, in file order. Its
+## Reads the supported registry packages a Cargo.lock pins, in file order. Its
 ## `[[package]]` records are flat `key = "value"` lines, so no TOML parser is
 ## needed.
 export proc cargo_lock_crates(lockfile: Path) [fs, error] -> Result[List[LockedCrate], Error] {
@@ -329,6 +331,9 @@ proc cargo_registry_crates(lockfile: Path, git_sources: List[Str]) -> Result[Lis
 
 ## The archived download of one locked crate.
 export pure crate_download_url(item: LockedCrate) -> Str {
+  if item.source == laputa_registry_lock_source {
+    return f"https://crates-blobs.17166969.xyz/blobs/{item.checksum}.crate"
+  }
   f"https://crates.17166969.xyz/blobs/{item.checksum}.crate"
 }
 
@@ -339,11 +344,13 @@ proc resolve_locked_crates(
   arch: Str,
 ) -> Result[List[ResolvedCrate]] {
   verify_source_checksum(resolved.path, checksum, resolved.kind)
-  var crates: List[ResolvedCrate] = [
-    {item, path: resolve_url_source(pkg.name, crate_download_url(item), item.checksum)?}
-    for item in cargo_registry_crates(resolved.path, cargo_git_lock_sources(selected_cargo_git_sources(pkg, arch))?)?
-  ]
-  crates
+  collect {
+    for item in cargo_registry_crates(resolved.path, cargo_git_lock_sources(selected_cargo_git_sources(pkg, arch))?)? {
+      let crate_path = resolve_url_source(pkg.name, crate_download_url(item), item.checksum)?
+      verify_source_checksum(crate_path, item.checksum, "file")
+      yield {item, path: crate_path}
+    }
+  }
 }
 
 # Cargo's directory sources require `.cargo-checksum.json` beside each crate.
@@ -356,7 +363,6 @@ proc stage_cargo_vendor(crates: List[ResolvedCrate], dest: Path) {
 
   for entry in crates {
     let dir = fp"{dest}/{entry.item.name}-{entry.item.version}"
-    # crates.io packs every crate under one `NAME-VERSION/` directory.
     archive.extract(entry.path, dir, .Tar, strip_components: 1, collision: .Replace)
     json.write(fp"{dir}/.cargo-checksum.json", {files: {}, package: entry.item.checksum})
   }
