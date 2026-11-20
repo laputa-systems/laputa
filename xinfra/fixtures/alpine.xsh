@@ -1,7 +1,6 @@
 ##! Disposable Alpine hosts behind a real OpenSSH server, one container each.
 ##! `up` writes an inventory and `down` removes exactly the containers `up`
-##! started. Containers are reached on their bridge address; nothing is
-##! published on the host network.
+##! started. Containers are reached through ports published on loopback.
 
 const image = "xinfra-fixture:alpine-3.22"
 const label = "xinfra-fixture"
@@ -41,7 +40,7 @@ cli main build() [process, error] {
 }
 
 ## Start COUNT hosts and write DIR/inventory.toml.
-cli main up(count: UInt = 2, dir: Path = p".work/fixtures") [fs, process, time, error] {
+cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, error] {
   guard count >= 1 and count <= 8 else {
     fail "count must be 1..8"
   }
@@ -69,26 +68,30 @@ cli main up(count: UInt = 2, dir: Path = p".work/fixtures") [fs, process, time, 
     let name = f"xinfra-fx-{run_id}-{index}"
     let container = docker_text(
       "run", "-d", "--rm", "--name", name, "--label", f"{label}={run_id}",
+      "-p", "127.0.0.1::22",
       "-v", f"{host_key.resolve()?}:/fixture/host_ed25519:ro",
       "-v", f"{client.resolve()?}.pub:/fixture/client.pub:ro",
       image,
     )?
     ids += [container]
     wait_for_sshd(container)?
-    let address = docker_text("inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container)?
+    let port = docker_text("inspect", "-f", "{{(index (index .NetworkSettings.Ports \"22/tcp\") 0).HostPort}}", container)?
     lines += [
       f"[hosts.fx-{index}]",
-      f"address = \"{address}\"",
+      "address = \"127.0.0.1\"",
+      f"port = {port}",
       f"host_key = \"{pin}\"",
       "",
       f"[hosts.fx-{index}-root]",
-      f"address = \"{address}\"",
+      "address = \"127.0.0.1\"",
+      f"port = {port}",
       "user = \"root\"",
       "privilege = \"root\"",
       f"host_key = \"{pin}\"",
       "",
       f"[hosts.fx-{index}-plain]",
-      f"address = \"{address}\"",
+      "address = \"127.0.0.1\"",
+      f"port = {port}",
       "user = \"plain\"",
       "privilege = \"doas\"",
       f"host_key = \"{pin}\"",

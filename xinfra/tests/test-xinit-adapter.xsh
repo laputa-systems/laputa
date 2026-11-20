@@ -60,6 +60,7 @@ pure statuses(result: report.Report, ids: List[Str]) -> List[Str] {
 }
 
 test an_xinit_service_starts_restarts_and_stops_through_the_control_plane { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   fixture(dir)?
   let trigger = fp"{dir}/trigger"

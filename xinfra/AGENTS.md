@@ -1,6 +1,6 @@
 # Agent Guide
 
-Vendored from laputa-systems/xsh-infra at e293bfd; make changes upstream, not here.
+xinfra lives in this repository; it was imported from laputa-systems/xsh-infra at e293bfd.
 
 xsh-infra is a small configuration-management tool written in XSH. It reconciles
 Alpine/Laputa-style hosts over XSH's native SSH client. Policy lives in XSH;

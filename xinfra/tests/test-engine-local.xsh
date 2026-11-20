@@ -28,6 +28,7 @@ proc site(dir: Path) [error] -> Result[List[model.Resource], Error] {
 }
 
 test the_first_apply_converges_and_the_second_changes_nothing { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let prepared = prepare(single("a", site(dir)?))?
   let first = engine.apply(prepared, settings(dir))
@@ -48,6 +49,7 @@ test the_first_apply_converges_and_the_second_changes_nothing { |ctx|
 }
 
 test plan_and_check_change_nothing_and_say_what_would_change { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let prepared = prepare(single("a", site(dir)?))?
   let planned = engine.survey(.Plan, prepared, settings(dir))
@@ -66,6 +68,7 @@ test plan_and_check_change_nothing_and_say_what_would_change { |ctx|
 }
 
 test deliberate_drift_is_detected_and_repaired { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let prepared = prepare(single("a", site(dir)?))?
   let _ = engine.apply(prepared, settings(dir))
@@ -84,6 +87,7 @@ test deliberate_drift_is_detected_and_repaired { |ctx|
 }
 
 test a_failing_validator_leaves_the_live_file_and_removes_the_staging_file { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let live = fp"{dir}/app.conf"
   live.write("good\n")
@@ -103,6 +107,7 @@ test a_failing_validator_leaves_the_live_file_and_removes_the_staging_file { |ct
 }
 
 test a_passing_validator_promotes_the_staged_file { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let live = fp"{dir}/app.conf"
   live.write("good\n")
@@ -113,6 +118,7 @@ test a_passing_validator_promotes_the_staged_file { |ctx|
 }
 
 test a_failure_blocks_dependents_and_later_resources_on_that_host { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let resources = [
     declare.file(id: "orphan", at: f"{dir}/missing/dir/file", text: "x")?,
@@ -134,6 +140,7 @@ test a_failure_blocks_dependents_and_later_resources_on_that_host { |ctx|
 }
 
 test a_type_conflict_is_refused_without_touching_the_path { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   fp"{dir}/thing".write("i am a file\n")
   let resources = [declare.directory(id: "thing", at: f"{dir}/thing")?]
@@ -145,6 +152,7 @@ test a_type_conflict_is_refused_without_touching_the_path { |ctx|
 }
 
 test one_failed_host_does_not_stop_the_healthy_ones { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let good = [declare.file(id: "motd", at: f"{dir}/good", text: "x")?]
   let bad = [declare.file(id: "motd", at: f"{dir}/missing/bad", text: "x")?]

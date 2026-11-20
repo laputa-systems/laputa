@@ -146,6 +146,7 @@ test workload_refuses_a_resource_kind_the_xsh_dialect_has_no_script_for {
 }
 
 test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let root = fp"{dir}/tree"
   root.mkdir()
@@ -185,6 +186,7 @@ test the_xsh_xinit_probe_reports_the_same_service_facts_as_the_posix_script { |c
 }
 
 test an_xsh_file_validation_failure_discards_the_stage { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let target = fp"{dir}/validated"
   let resources = [declare.file(id: "validated", at: f"{target}", text: "bad\n", validate: ["/bin/false", "{}"])?]
@@ -197,6 +199,7 @@ test an_xsh_file_validation_failure_discards_the_stage { |ctx|
 }
 
 test a_relative_lock_path_resolves_against_the_remote_cwd { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let connection = connect(testing.local_xsh_host())?
   cd (dir) {
@@ -234,6 +237,7 @@ proc actions(dir: Path) [fs] -> List[Str] {
 }
 
 test a_local_xsh_host_converges_file_directory_link_command_and_service_and_reruns_unchanged { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   xinit_fixture(dir)?
   let search = env.get("PATH")?

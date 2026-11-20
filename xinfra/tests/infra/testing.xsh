@@ -97,3 +97,10 @@ export proc remote_text(host: model.Host, script: Str, args: List[Str] = [], pri
 
   Ok(execution.stdout.utf8()?)
 }
+
+## Skip controller-target tests whose scripts require Linux facilities.
+export proc require_linux_target() [env, error] -> Result[Unit, Error] {
+  if system.uname()?.sysname != "Linux" {
+    test.skip("controller target requires Linux /proc and GNU stat and touch")
+  }
+}

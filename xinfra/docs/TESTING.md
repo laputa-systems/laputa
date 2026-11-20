@@ -24,13 +24,17 @@ xsh fixtures/alpine.xsh down
 ```
 
 Each container runs OpenSSH (Ed25519 host and client keys generated fresh per
-run), BusyBox, doas, OpenRC and `shadow`, and is reached on its Docker bridge
-address; nothing is published on the host network. The inventory defines, per
+run), BusyBox, doas, OpenRC and `shadow`, and is reached through a dynamically
+assigned loopback port. This supports Linux and native macOS controllers, where
+Docker bridge addresses are not routable. The inventory defines, per
 container, `fx-N` (login `deploy`, doas), `fx-N-root` (login root) and
 `fx-N-plain` (login `plain`, doas not permitted). `down` removes exactly the
 containers `up` recorded. The suites use `fx-1` for file work, `fx-2` for
 packages, accounts and services, and `fx-3` for two-process cancellation, so an
 apply being signalled does not race another suite's package or service work.
+
+On non-Linux controllers, controller-as-target tests skip when their scripts
+require Linux `/proc` or GNU `stat` and `touch`. The Alpine container tests still run against their Linux targets.
 
 ## Disposable Alpine VM
 

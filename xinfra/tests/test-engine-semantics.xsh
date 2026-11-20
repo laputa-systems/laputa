@@ -82,6 +82,7 @@ test the_job_bound_limits_how_many_hosts_run_at_once { |ctx|
 }
 
 test several_changed_files_coalesce_into_one_trigger { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let counter = fp"{dir}/runs"
   let resources = [
@@ -103,6 +104,7 @@ test several_changed_files_coalesce_into_one_trigger { |ctx|
 }
 
 test absent_resources_are_removed_and_never_recursively { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   fp"{dir}/file".write("x")
   fp"{dir}/empty".mkdir()
@@ -139,6 +141,7 @@ test a_command_that_outlives_its_timeout_has_an_unknown_outcome_and_is_not_retri
 }
 
 test secret_values_never_reach_a_report { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   env ({XINFRA_TEST_SECRET: "hunter2-secret"}) {
     let resources = [
@@ -174,6 +177,7 @@ test unset_secrets_and_missing_sources_are_refused_before_any_mutation { |ctx|
 }
 
 test hostile_paths_converge_like_any_other { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let odd = f"{dir}/it's a \"dir\"\nwith $(newline) -x"
   let resources = [
@@ -194,6 +198,7 @@ test hostile_paths_converge_like_any_other { |ctx|
 }
 
 test apply_recomputes_from_current_facts_not_from_the_plan { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let resources = [declare.file(id: "f", at: f"{dir}/f", text: "same\n")?]
   let prepared = prepare([on("h", resources)])?
@@ -206,6 +211,7 @@ test apply_recomputes_from_current_facts_not_from_the_plan { |ctx|
 }
 
 test a_plan_marks_resources_that_depend_on_a_planned_change_as_conditional { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let resources = [
     declare.directory(id: "d", at: f"{dir}/d")?,
@@ -227,6 +233,7 @@ test a_plan_marks_resources_that_depend_on_a_planned_change_as_conditional { |ct
 }
 
 test a_binary_source_file_is_replaced_atomically_and_streamed { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let source = fp"{dir}/source.bin"
   run dd if=/dev/urandom of=$source bs=1M count=20 status=none
@@ -240,6 +247,7 @@ test a_binary_source_file_is_replaced_atomically_and_streamed { |ctx|
 }
 
 test the_abort_policy_stops_every_host_after_a_failure { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let failing = [declare.file(id: "one", at: f"{dir}/nope/x", text: "x")?, declare.file(id: "two", at: f"{dir}/two-bad", text: "x")?]
   let fine = [declare.file(id: "one", at: f"{dir}/one-good", text: "x")?, declare.file(id: "two", at: f"{dir}/two-good", text: "x")?]

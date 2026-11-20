@@ -44,6 +44,7 @@ test an_operator_can_break_a_stale_lock_by_naming_its_token { |ctx|
 }
 
 test an_old_lock_is_never_taken_over { |ctx|
+  testing.require_linux_target()?
   let dir = test.temp_dir(ctx)?
   let lock_dir = f"{dir}/xinfra.lock"
   let connection = transport.connect(testing.local_host())?
