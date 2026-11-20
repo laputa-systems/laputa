@@ -98,8 +98,8 @@ seed rather than compiling another interpreter in the package world.
 
 ### Rebuilding and repinning build images
 
-The zero digests and package keys in `seed/images.lock` are placeholders until
-publication. For each architecture, prepare an XSH seed and an LLVM source
+Both architectures are published; the aarch64 layouts were built on an
+Apple Silicon Mac under Docker. For each architecture, prepare an XSH seed and an LLVM source
 context containing `sha256/<llvm-seed-digest>`, then run:
 
 ```bash
