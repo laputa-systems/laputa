@@ -1,6 +1,7 @@
 #!/bin/xsh
 use installer.host
 use installer.rootfs_size
+use system.qemu
 
 error InstallerQemuTestError = Failed(kind: Str, message: Str)
 
@@ -284,6 +285,7 @@ pure target_cmdline_default(arch: Str) -> Str {
 
 pure qemu_installer_args(
   arch: Str,
+  target: qemu.QemuTarget,
   qemu_name: Str,
   installer_kernel: Path,
   installer_cmdline: Str,
@@ -291,12 +293,12 @@ pure qemu_installer_args(
   target_image: Path,
   installer_log: Path,
 ) -> List[Str] {
-  let base = [qemu_name, "-M", qemu_machine(arch)].extend(qemu_accel_args(arch))
+  let base = if arch == "aarch64" { [qemu_name, "-M", target.machine] } else { [qemu_name, "-M", qemu_machine(arch)].extend(qemu_accel_args(arch)) }
 
   let with_devices = base.extend(
     [
       "-cpu",
-      qemu_cpu(arch),
+      if arch == "aarch64" { target.cpu } else { qemu_cpu(arch) },
       "-m",
       qemu_memory(arch),
       "-object",
@@ -327,6 +329,7 @@ pure qemu_installer_args(
 
 pure qemu_target_args(
   arch: Str,
+  target: qemu.QemuTarget,
   qemu_name: Str,
   installer_kernel: Path,
   target_cmdline: Str,
@@ -334,12 +337,12 @@ pure qemu_target_args(
   target_log: Path,
   port: Int,
 ) -> List[Str] {
-  let base = [qemu_name, "-M", qemu_machine(arch)].extend(qemu_accel_args(arch))
+  let base = if arch == "aarch64" { [qemu_name, "-M", target.machine] } else { [qemu_name, "-M", qemu_machine(arch)].extend(qemu_accel_args(arch)) }
 
   let with_devices = base.extend(
     [
       "-cpu",
-      qemu_cpu(arch),
+      if arch == "aarch64" { target.cpu } else { qemu_cpu(arch) },
       "-m",
       qemu_memory(arch),
       "-object",
@@ -475,6 +478,10 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     host.installer_env_value("QEMU_SYSTEM_AARCH64", "qemu-system-aarch64")
   }
 
+  let host_target = qemu.host_qemu_target()?
+  guard arch == host_target.arch else {
+    return Err(InstallerQemuTestError.Failed(kind: "arch", message: f"installer guest {arch} does not match host {host_target.arch}"))
+  }
   let qemu = command_path(qemu_name)?
   let ssh_client = host.installer_env_value("SSH", "ssh") |> command_path(_)?
   let ssh_keygen = host.installer_env_value("SSH_KEYGEN", "ssh-keygen") |> command_path(_)?
@@ -523,6 +530,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
     qemu,
     qemu_installer_args(
       arch,
+      host_target,
       qemu_name,
       installer_kernel,
       installer_cmdline,
@@ -553,7 +561,7 @@ proc main(...argv: List[Str]) [fs, process, env, time, error] {
 
   let target = spawn process.command_argv(
     qemu,
-    qemu_target_args(arch, qemu_name, installer_kernel, target_cmdline, target_image, target_log, target_ssh_port),
+    qemu_target_args(arch, host_target, qemu_name, installer_kernel, target_cmdline, target_image, target_log, target_ssh_port),
     cwd: root,
     env: {},
     stderr: p"/dev/null",
