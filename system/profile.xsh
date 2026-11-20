@@ -116,7 +116,7 @@ export proc load_system_profile(name: Str, profiles_root: Path) [fs, error] -> R
 export proc digest(value: types.SystemProfile) [error] -> Result[Str, Error] {
   validate_system_profile(value)
   let development = if value.development { "true" } else { "false" }
-  let body = f"""laputa-system-profile-1
+  let body = f"""laputa-system-profile-2
 name\t{value.name}
 development\t{development}
 roots\t{value.package_roots.join(",")}
@@ -133,6 +133,7 @@ proof-flag\t{value.proof.cmdline_flag}
 proof-ready\t{value.proof.ready_marker}
 proof-success\t{value.proof.success_marker}
 proof-failure\t{value.proof.failure_marker}
+proof-input-mode\t{types.proof_input_mode_text(value.proof.input_mode)}
 """
   bytes.from_text(body).sha256().hex()
 }

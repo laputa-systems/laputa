@@ -150,6 +150,7 @@ test test_profile_digest_is_deterministic [fs, error] {
   assert profile.digest(value)? == profile.digest(value)?
   assert profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?
   assert profile.digest(value)? != profile.digest({...value, qemu_gpu: types.Virtio2d})?
+  assert profile.digest(value)? != profile.digest({...value, proof: {...value.proof, input_mode: types.ProofPlain}})?
 }
 
 test test_profile_rejects_forbidden_packages_in_its_runtime_closure [fs, error] {

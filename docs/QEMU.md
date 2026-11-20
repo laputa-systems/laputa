@@ -95,6 +95,8 @@ to the retry path. The profile's `proof.input_mode` selects the keys:
 Shift, and a bare modifier press and expects `LAPUTA!` from the reader. If an input event loses its response, the supervisor reports an indeterminate
 outcome and does not retry. Both supported host platforms use `system/qmp.xsh`
 over `unix.connect_stream`; QMP control requires no Python process.
+The `laputa plan` profile digest includes this mode, so profile plan identities
+change when the selected host input behavior changes.
 
 The terminal reader prints and flushes its visual marker, records the injected
 input, then waits for another terminal read. The host captures and checks the

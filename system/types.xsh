@@ -54,6 +54,14 @@ export pure qemu_gpu_text(gpu: QemuGpu) -> Str {
   }
 }
 
+## Render the host input behavior selected by a profile's guest proof.
+export pure proof_input_mode_text(mode: ProofInputMode) -> Str {
+  match mode {
+    ProofPlain => "plain"
+    ProofModifiers => "modifiers"
+  }
+}
+
 ## Render a QEMU execution mode for diagnostics and persisted command records.
 export pure qemu_mode_text(mode: QemuMode) -> Str {
   match mode {
