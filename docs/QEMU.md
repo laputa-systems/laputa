@@ -21,6 +21,12 @@ then `virtio-gpu-gl-pci` as the render device. QEMU's `screendump` returns
 `no surface` for a GL scanout because those frames stay GL textures, so this
 split keeps both the guest's OpenGL 4.3 context and the host pixel proof.
 
+For aarch64, `qemu-maintained` is the profile proof target. The
+`qemu-tinyland-ghostty` graph includes x86_64-only Play. The
+`qemu-self-hosting` graph resolves on aarch64, but its guest proof asserts an
+x86_64 receipt and its 12 GiB memory request exceeds the macOS HVF target's
+32-bit address space with `highmem=off`; it is not an aarch64 proof.
+
 ## Host requirements
 
 - `qemu-system-<arch>` for the host's architecture on `PATH`, or named by

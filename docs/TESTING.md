@@ -60,7 +60,9 @@ POSIX deployment scripts; on Linux it runs Cargo offline in `xsh-test`.
 `make verify` is the full host proof from a clean build, with logs and a timing
 table under `.out/verify/`; reserve it for an explicit full verification run.
 
-The aarch64 world rebuild and boot proofs are unverified; see [TODO](../TODO.md).
+The aarch64 world builds; its guest proofs remain unverified. `qemu-maintained`
+is the aarch64 profile proof target. The Ghostty graph includes x86_64-only
+Play, and the self-hosting guest proof asserts x86_64; see [QEMU](QEMU.md).
 
 The standalone Linux x86_64 Docker authority check uses a local image with
 an existing `/bin` and `/usr/lib/xsh/core`, plus a native static XSH seed
