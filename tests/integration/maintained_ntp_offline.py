@@ -216,7 +216,9 @@ def run(args):
             argv[argv.index("-netdev") + 1] = "socket,id=net0,udp=127.0.0.1:9,localaddr=127.0.0.1:0"
             argv[argv.index("-serial") + 1] = f"file:{console}"
             argv[argv.index("-qmp") + 1] = f"unix:{qmp_path},server=on,wait=off"
-            argv[argv.index("-append") + 1] += " LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1"
+            append = argv.index("-append") + 1
+            argv[append] = argv[append].replace(" LAPUTA_MAINTAINED_PROOF_FLAG=1", "")
+            argv[append] += " LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1"
             argv += ["-chardev", f"socket,id=ctl,path={control},server=on,wait=off", "-device", "virtio-serial-pci", "-device", "virtserialport,chardev=ctl,name=laputa-ctl"]
             errlog = open(scratch / "offline.qemu.log", "wb")
             guest = subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=errlog, cwd=ROOT)
