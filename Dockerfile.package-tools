@@ -1,7 +1,6 @@
 # check=skip=InvalidDefaultArgInFrom
 # The offline package-tools image: the host-tools base plus the prebuilt LLVM
-# seed. seed/images.xsh builds it with `--network none` and tags it with a
-# content key; the profile builds use `--platform linux/arm64`.
+# seed. seed/images.xsh builds it with `--network none`; the profile builds use `--platform linux/arm64`.
 #
 # The image bakes no XSH, PM, or recipes. Containers mount the seed XSH at
 # /bin/{xsh,xshi,xsht} with its core applets at /usr/lib/xsh/core, and the
@@ -9,7 +8,7 @@
 # rebuilds this image.
 #
 # Inputs:
-#   HOST_TOOLS_IMAGE   the loaded laputa-host-tools tag
+#   HOST_TOOLS_IMAGE   the host-tools image
 #   context `seed`     .out/seed/<arch>, the local XSH seed
 #   context `sources`  a staged source cache holding sha256/<llvm archive digest>
 #   main context       the checkout (PM, the llvm-toolchain recipe, the helper)

@@ -152,6 +152,8 @@ proc image_fixture(ctx: TestContext) -> Result[Path] {
   fp"{root}/pm".mkdir()
   fp"{root}/packages/llvm-toolchain".mkdir()
   fp"{root}/seed/Dockerfile.host-tools".write("FROM alpine\n")
+  let digest = hash.sha256(fp"{root}/seed/Dockerfile.host-tools")?.hex()
+  fp"{root}/seed/images.lock".write(f"""{{"dockerfile_sha256":"{digest}","aarch64":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}""")
   fp"{root}/Dockerfile.package-tools".write("FROM base\n")
   fp"{root}/bootstrap-llvm-seed.xsh".write("seed helper\n")
   fp"{root}/packages/llvm-toolchain/PKGBUILD.xsh".write("llvm recipe\n")
@@ -164,7 +166,7 @@ test test_image_tags_are_content_keys_over_their_own_inputs [fs, error] { |ctx|
   let value = xsh_seed.xsh_seed_arch("aarch64")?
   let host = images.host_tools_tag(root, value)?
   let tools = images.package_tools_tag(root, value)?
-  assert host.starts_with("laputa-host-tools:aarch64-")
+  assert "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" in host
   assert tools.starts_with("laputa-package-tools:aarch64-")
   assert images.package_tools_tag(root, value)? == tools
 
@@ -176,8 +178,33 @@ test test_image_tags_are_content_keys_over_their_own_inputs [fs, error] { |ctx|
   assert images.package_tools_tag(root, value)? != tools
   assert images.host_tools_tag(root, value)? == host
 
-  fp"{root}/seed/Dockerfile.host-tools".write("FROM alpine\nRUN true\n")
+  let before_digest_change = images.package_tools_tag(root, value)?
+  let digest = hash.sha256(fp"{root}/seed/Dockerfile.host-tools")?.hex()
+  fp"{root}/seed/images.lock".write(f"""{{"dockerfile_sha256":"{digest}","aarch64":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}""")
   assert images.host_tools_tag(root, value)? != host
+  assert images.package_tools_tag(root, value)? != before_digest_change
+  fp"{root}/seed/Dockerfile.host-tools".write("FROM alpine\nRUN true\n")
+  match images.package_tools_tag(root, value) {
+    Ok(_) => test.fail("a stale image lock was accepted")
+    Err(problem) => {
+      assert "stale" in problem.message
+      assert "seed/images.xsh" in problem.message
+    }
+  }
+}
+
+test test_package_image_requires_the_locked_input_key [fs, error] { |ctx|
+  let root = image_fixture(ctx)?
+  let value = xsh_seed.xsh_seed_arch("aarch64")?
+  let key = images.package_tools_key(root, value)?
+  let digest = hash.sha256(fp"{root}/seed/Dockerfile.host-tools")?.hex()
+  fp"{root}/seed/images.lock".write(f"""{{"dockerfile_sha256":"{digest}","aarch64":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","package_key_aarch64":"{key}","package_digest_aarch64":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}}""")
+  assert "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" in images.package_tools_image(root, value)?
+  fp"{root}/Dockerfile.package-tools".write("FROM changed\n")
+  match images.package_tools_image(root, value) {
+    Ok(_) => test.fail("a package image with stale inputs was accepted")
+    Err(problem) => assert "stale image lock" in problem.message
+  }
 }
 
 test test_package_tools_requires_its_dockerfile [fs, error] { |ctx|

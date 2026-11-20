@@ -62,8 +62,8 @@ export PATH="$XSH_BIN_DIR:$PATH"
 Containers run the local XSH seed, never a published release. `make fetch`
 does the networked part once: every pinned source (the LLVM seed included)
 into `.cache/sources/sha256/`, XSH's crates into `.cache/cargo/`, XSH's
-`xsh-test` image, and the `laputa-host-tools` base (pinned Alpine plus apk
-packages), saved to `.cache/images/`.
+`xsh-test` image, and the published host-tools and package-tools images by
+the digests in `seed/images.lock`.
 
 Cargo uses the mycrates archive for crates.io packages and the native mycrates
 registry for selected dependencies. Publish newly locked upstream versions to
@@ -73,7 +73,7 @@ XSH's lockfile and its Cargo source configuration.
 Then, offline:
 
 ```bash
-make seed        # static musl xsh/xshi/xsht + core.tar.xz under .out/seed/<arch>/, then the image
+make seed        # static musl xsh/xshi/xsht + core.tar.xz under .out/seed/<arch>/
 make seed-asterinas-shell # opt-in xshi integration variant; the pinned backend builds its own seed
 make seed-smoke  # the seed runs, plans, and passes a PM subset in the image with --network none
 ```
@@ -90,11 +90,30 @@ reusing the cargo target `.out/xsh-target`, which `make host-xsh` shares.
 commit and dirty flag. The `laputa-package-tools` image adds only the LLVM seed
 from the source cache. Containers mount the seed at `/bin/{xsh,xshi,xsht}` and
 `/usr/lib/xsh/core`, so an XSH or PM change rebuilds no image. Image tags are
-content keys over each image's own inputs (`seed/images.xsh`).
+derived from the published host-tools digest and the package-tools inputs (`seed/images.xsh`).
 
 The LLVM seed stays prebuilt. Its pin belongs to
 `packages/llvm-toolchain/PKGBUILD.xsh`. The `xsh` recipe packages the local
 seed rather than compiling another interpreter in the package world.
+
+### Rebuilding and repinning build images
+
+The zero digests and package keys in `seed/images.lock` are placeholders until
+publication. For each architecture, prepare an XSH seed and an LLVM source
+context containing `sha256/<llvm-seed-digest>`, then run:
+
+```bash
+xsh seed/images.xsh -- build --arch ARCH --seed-root /absolute/path/to/seed --sources /absolute/path/to/sources
+```
+
+The command creates OCI layouts in `.work/images/ARCH/current/host-tools` and
+`.work/images/ARCH/current/package-tools`; it does not publish them. Publish both
+layouts to their respective repositories, record their published digests in
+`seed/images.lock`, and update `dockerfile_sha256` to the SHA-256 of
+`seed/Dockerfile.host-tools`. After recording the host digest, run
+`xsh seed/images.xsh -- key --arch ARCH` and record its output as
+`package_key_ARCH`. Repeat for both architectures. A changed Dockerfile or
+package input is rejected as a stale lock until rebuilt and repinned.
 
 ### Package build authority
 
@@ -109,7 +128,7 @@ World fetch and mirror publication run on the host.
 The trusted bootstrap closure includes the Docker daemon and Linux kernel,
 the complete package-tools image, the mounted XSH seed, and the checkout.
 The host-tools image contains Alpine packages installed by unpinned `apk`.
-Its saved image is the bootstrap input; rebuilding the Dockerfile can change
+Its published digest is the bootstrap input; rebuilding the Dockerfile can change
 those packages. The LLVM archive and the XSH seed are additional trusted
 prebuilt inputs.
 
@@ -169,8 +188,8 @@ git clone https://github.com/laputa-systems/laputa.git
 git clone https://github.com/laputa-systems/xsh.git    # beside laputa: ../xsh
 cd laputa
 make host-xsh        # networked once: xsh-test image, XSH crates; then static xsh/xshi/xsht in .out/host/<arch>/
-make fetch           # the networked step: every pinned source, the crates, the host-tools base image
-make seed            # offline: the XSH seed in .out/seed/<arch>/, then the package-tools image
+make fetch           # the networked step: pinned sources, crates, and published build images
+make seed            # offline: the XSH seed in .out/seed/<arch>/
 make mirror &        # http://127.0.0.1:3000, data in .out/mirror (the first run builds the mirror)
 make build           # offline: every package, in Docker with --network none
 make publish         # the same plan's artifacts into the local mirror
@@ -348,7 +367,7 @@ docker run --rm --network none --platform "$PLATFORM" \
   --mount type=bind,src="$PWD/.out/seed/$ARCH/core",dst=/usr/lib/xsh/core,readonly \
   --workdir /src/laputa \
   --env XSH_MODULE_PATH=/src/laputa \
-  "$(docker image ls --format '{{.Repository}}:{{.Tag}}' --filter "reference=laputa-package-tools:$ARCH-*" | head -n 1)" \
+  "$(xsh seed/images.xsh -- ref --arch "$ARCH")" \
   /bin/xsh /src/laputa/pm.xsh -- store verify --store /artifacts
 ```
 
@@ -368,7 +387,7 @@ docker run --rm --network none --platform "$PLATFORM" \
   --mount type=bind,src="$PWD/.out/seed/$ARCH/core",dst=/usr/lib/xsh/core,readonly \
   --workdir /src/laputa \
   --env XSH_MODULE_PATH=/src/laputa \
-  "$(docker image ls --format '{{.Repository}}:{{.Tag}}' --filter "reference=laputa-package-tools:$ARCH-*" | head -n 1)" \
+  "$(xsh seed/images.xsh -- ref --arch "$ARCH")" \
   /bin/xsh /src/laputa/pm.xsh -- root inspect /profile/current/generation.json
 ```
 
@@ -403,7 +422,7 @@ The unrecovered `refs/stash` object is `92dc314a6198cf00e3aec1f05d72537e81a3a6da
 | Path | Holds | Removed by |
 |---|---|---|
 | `.cache/sources/sha256/` | fetched upstream sources, by digest | `make distclean` |
-| `.cache/cargo/`, `.cache/images/` | XSH and mirror crates, the saved host-tools base image | `make distclean` |
+| `.cache/cargo/` | XSH and mirror crates | `make distclean` |
 | `.cache/asterinas/` | pinned Asterinas and XSH source caches | `make asterinas-clean` |
 | `.out/host/<arch>/` | host `xsh`/`xshi`/`xsht` and `laputa-mirror` (Linux) | `make clean` |
 | `.out/xsh-target/`, `.out/mirror-target/` | incremental cargo targets for the seed and host tools | `make clean` |
@@ -433,7 +452,7 @@ below carry behavior not stated elsewhere in this guide.
 | `make host-xsh` | static musl `xsh`/`xshi`/`xsht` for the host arch in `.out/host/<arch>/`, built in XSH's `xsh-test` image with plain Docker; shares the seed's cargo target |
 | `make check` | `xsht check` over the tree, plus XSH scripts without a `.xsh` name, found by their `#!/bin/xsh` shebang |
 | `make lint` | `xsht lint` over PM, system, installer, and xinit (report only; never `--fix`) |
-| `make fetch` | pinned sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the saved host-tools base |
+| `make fetch` | pinned sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the published build images |
 | `make fetch-mirror` | fetch the mirror's locked crates into the shared Cargo registry using the local `xsh-test` image |
 | `make seed-asterinas-shell` | opt-in xshi integration seed; the pinned Asterinas backend builds its own seed |
 | `make seed-smoke` | the seed in package-tools with `--network none`: offline plan plus a PM subset |

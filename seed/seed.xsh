@@ -6,8 +6,8 @@ use seed.xsh_seed
 pure seed_usage() -> Str {
   """usage: seed.xsh <fetch|build|smoke> --arch ARCH --xsh-root PATH [--jobs N] [SUITE...]
 
-  fetch   networked: the xsh-test image, XSH's crates, and the saved host-tools base
-  build   offline: the XSH seed under .out/seed/ARCH and the package-tools image
+  fetch   networked: the xsh-test image, XSH's crates, and the published build images
+  build   offline: the XSH seed under .out/seed/ARCH; require the package-tools image
           --asterinas-shell opts into xshi's Laputa Asterinas integration feature
   smoke   offline: run the package-tools image with the seed and prove it works;
           SUITE replaces the default PM test subset

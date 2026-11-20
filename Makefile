@@ -266,7 +266,7 @@ host-mirror:
 	mv -f "$(HOST_TOOLS_DIR)/laputa-mirror.tmp" "$(HOST_TOOLS_DIR)/laputa-mirror"
 
 # Offline: static musl xsh/xshi/xsht and core.tar.xz from XSH_ROOT under
-# .out/seed/$(ARCH), then the package-tools image. Incremental through the
+# .out/seed/$(ARCH), requiring the published package-tools image. Incremental through the
 # cargo target dir in .out/xsh-target.
 seed: need-host-xsh
 	$(SEED) build $(SEED_ARGS) --jobs $(CARGO_JOBS)
@@ -330,7 +330,7 @@ fetch-mirror: fetch-seed
 
 # The networked seed inputs: XSH's crates for XSH_ROOT's Cargo.lock in
 # .cache/cargo, the xsh-test image (XSH's Dockerfile.test), and the
-# host-tools base saved under .cache/images/.
+# published host-tools and package-tools images.
 fetch-seed: need-host-xsh
 	$(SEED) fetch $(SEED_ARGS)
 
