@@ -11,8 +11,11 @@ import time
 root = pathlib.Path(__file__).resolve().parents[2]
 scratch = root / ".work/tmp"
 scratch.mkdir(parents=True, exist_ok=True)
-env = dict(os.environ, XSH_MODULE_PATH=str(root), TMPDIR=str(scratch))
-binary = root / ".out/host/x86_64/xsh"
+arch = "aarch64" if os.uname().machine in ("arm64", "aarch64") else os.uname().machine
+xsh_root = pathlib.Path(os.environ.get("XSH_ROOT", root.parent / "xsh"))
+env = dict(os.environ, XSH_MODULE_PATH=f"{root}:{xsh_root / 'core'}", TMPDIR=str(scratch))
+default_binary = xsh_root / "target/debug/xsh" if sys.platform == "darwin" else root / f".out/host/{arch}/xsh"
+binary = pathlib.Path(os.environ.get("LAPUTA_XSH", default_binary))
 fixture = root / "tests/integration/fixtures/maintained-fallback.xsh"
 apply_fixture = root / "tests/integration/fixtures/maintained-state-apply.xsh"
 outputs = root / "target/laputa/qemu-maintained"
@@ -109,10 +112,22 @@ def ensure_state_image(ruleset="packaged", apply_args=(), trust_store=False):
     if trust_store:
         seed_trust_store(staging)
     run_xsh(str(apply_fixture), "--", str(staging), *apply_args)
-    subprocess.run(
-        ["unshare", "-Ur", "/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"],
-        check=True,
-    )
+    if sys.platform == "darwin":
+        image = run_xsh(str(root / "seed/images.xsh"), "--", "ref", "--arch", arch).strip()
+        subprocess.run([
+            "docker", "run", "--rm", "--network", "none", "-v", f"{root}:/laputa",
+            image, "/sbin/mkfs.ext4", "-q", "-F", "-d",
+            f"/laputa/{staging.relative_to(root)}", f"/laputa/{state_image.relative_to(root)}", "256M",
+        ], check=True)
+        subprocess.run([
+            "docker", "run", "--rm", "--network", "none", "-v", f"{root}:/laputa",
+            image, "chown", f"{os.getuid()}:{os.getgid()}", f"/laputa/{state_image.relative_to(root)}",
+        ], check=True)
+    else:
+        subprocess.run(
+            ["unshare", "-Ur", "/sbin/mkfs.ext4", "-q", "-F", "-d", str(staging), str(state_image), "256M"],
+            check=True,
+        )
     state_image.chmod(0o600)
     subprocess.run(["rm", "-rf", str(staging)], check=True)
 
