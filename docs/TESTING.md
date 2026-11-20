@@ -458,7 +458,7 @@ inconclusive. The catalog workload checks the actual x86_64 recipe inventory;
 execution and reuse. Neither proves a real build.
 
 The scenario workloads `tree-memory`, `artifact-sizes`, `world-plan`,
-`warm-rebuild`, and `root-compose` require Docker, Git,
+`warm-rebuild`, `root-compose`, and `mirror-publish` require Docker, Git,
 Bash, jaq, sha256sum and the x86_64 seed and package artifacts. Before they
 run, admission verifies that the seed manifest is clean, its XSH commit
 contains `XSH_COMMIT` in `infra/asterinas/inputs.lock`, and the four product
@@ -500,6 +500,36 @@ BENCH_SEED=/path/to/.out/seed/x86_64 BENCH_STORE=/path/to/.out/artifacts/x86_64 
   make bench XSH_ROOT=/path/to/xsh TIER=scenario WORKLOADS="world-plan warm-rebuild root-compose"
 ```
 
+`mirror-publish` publishes the baselayout and xsh plan to a fresh private
+loopback mirror for each round. It fetches the index, payloads, metadata and
+proofs and checks every plan artifact and payload against the store. It times
+the publish command, excluding server startup and verification. Set
+`BENCH_MIRROR` to the built mirror executable.
+
+`profile-ready` starts the existing x86_64 tinyland profile with KVM and virgl
+using the profile proof’s QEMU argument builder and times QEMU startup to the
+`LAPUTA_TINYLAND_GHOSTTY_PROOF_READY` serial marker, observed by polling the serial log every 10 ms. `BENCH_PROFILE_IMAGE`
+selects the built profile's `current` directory.
+Each round terminates QEMU and verifies that its process group is gone.
+`xinit-service-start` runs the production scanner in a disposable container
+using the locally built `xsh-test` image tagged with the first 16 hex digits of
+the XSH checkout’s `Dockerfile.test` SHA-256. It stops a notify service, then
+times a start request to the service’s notification. It requires a new running, ready service with the notifier's PID
+and checks scanner and container cleanup. It uses a private tmpfs and runs as
+root with only the CHOWN capability for the production control directory.
+
+These three workloads bracket each of five rounds with host readiness checks;
+their nanosecond metrics use the median and full range. For example:
+
+```sh
+BENCH_SEED=/path/to/.out/seed/x86_64 BENCH_STORE=/path/to/.out/artifacts/x86_64 \
+  BENCH_MIRROR=/path/to/.out/host/x86_64/laputa-mirror \
+  make bench XSH_ROOT=/path/to/xsh TIER=scenario WORKLOADS=mirror-publish
+BENCH_PROFILE_IMAGE=/path/to/target/laputa/qemu-tinyland-ghostty/current \
+  make bench XSH_ROOT=/path/to/xsh TIER=scenario WORKLOADS=profile-ready
+make bench XSH_ROOT=/path/to/xsh TIER=scenario WORKLOADS=xinit-service-start
+```
+
 `bench/anchors.tsv` is initially empty: no accepted limit has been captured.
 Each tab-separated line contains metric name, value, absolute tolerance, Laputa
 commit, host name, and UTC date. Size metrics use bytes; timing metric names end
@@ -528,10 +558,10 @@ is not an accepted representative benchmark with an output oracle.
 | --- | --- | --- |
 | Package build throughput and rebuild cost | `warm-rebuild` checks reuse of the baselayout and xsh closure with no builds | five-round elapsed median and spread; no accepted anchor or throughput benchmark |
 | Plan time | `world-plan` checks the complete package inventory and stable plan digest | five-round elapsed median and spread; no accepted anchor |
-| Mirror publish time | `make publish` publishes the selected plan | network byte counters and server/client traces; no timed checked benchmark |
+| Mirror publish time | `mirror-publish` verifies the published plan artifacts through a private mirror | five-round elapsed median and spread; no accepted anchor |
 | Image and package size | `artifact-sizes` checks seed and three package payloads and records image size | comparable bytes and identities; no accepted anchor; installer ISO excluded |
-| Boot to usable system | `make profile-test` checks the guest profile | QEMU/guest traces and serial timestamps; no bounded boot latency benchmark |
-| xinit service start | xinit supervision tests check readiness | guest process tracing and readiness timestamps; no latency benchmark |
+| Boot to usable system | `profile-ready` checks the profile proof readiness marker on the serial console | five-round elapsed median and spread; no accepted anchor |
+| xinit service start | `xinit-service-start` checks a supervised service notification and ready state | five-round elapsed median and spread; no accepted anchor |
 | PM install, remove, generation switch | `root-compose` checks the baselayout and xsh root inventory; PM and activation tests check other operations | five-round composition median and spread; no accepted anchor or latency benchmark for install, remove, and generation switch |
 | gluon configure/build | `gluon/tests/benchmarks/run.sh` exercises synthetic graphs and setup | CPU sampling and syscall counts; synthetic corpus, incomplete output checks and no accepted baseline |
 | Memory footprint | `tree-memory` checks an offline baselayout plan and reads the container cgroup peak | whole container tree, including cache; no accepted anchor |

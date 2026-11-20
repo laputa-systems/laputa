@@ -1,5 +1,7 @@
 set -eu
 repo=$PWD
+mkdir -p .work/tmp
+python3 tests/bench/scenario-test.py
 fixture="$repo/.work/tmp/bench-test-$$"
 child=
 cleanup() {

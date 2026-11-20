@@ -103,7 +103,7 @@ case $mode in
       if [[ -n $containers ]]; then echo "preflight: surviving benchmark container $containers"; failed=1; fi
     fi
     for name in "$@"; do
-      if [[ $name == tree-memory || $name == artifact-sizes || $name == world-plan || $name == package-build || $name == warm-rebuild || $name == root-compose ]]; then seed_check || failed=1; fi
+      if [[ $name == tree-memory || $name == artifact-sizes || $name == world-plan || $name == package-build || $name == warm-rebuild || $name == root-compose || $name == mirror-publish ]]; then seed_check || failed=1; fi
       if [[ $name == artifact-sizes ]]; then
         resolve_packages
         for key in "${packages[@]}"; do
@@ -130,7 +130,46 @@ case $mode in
     set -e
     name=$1; run_dir=$2; shift 2
     if [[ $name == tree-memory || $name == artifact-sizes || $name == world-plan || $name == warm-rebuild || $name == root-compose ]]; then resolve_image; fi
-    if [[ $name == tree-memory ]]; then
+    if [[ $name == mirror-publish || $name == profile-ready || $name == xinit-service-start ]]; then
+      journey=$(realpath "$run_dir")/$name-journey
+      mkdir -p "$journey"
+      if [[ $name == mirror-publish ]]; then
+        resolve_image
+        seed_abs=$(realpath "$seed")
+        store_abs=$(realpath "${BENCH_STORE:-.out/artifacts/x86_64}")
+        mkdir -p "$journey/repo/.out/seed/x86_64" "$journey/modules" "$journey/output"
+        for path in "$root"/*; do ln -s "/source/${path##*/}" "$journey/repo/${path##*/}"; done
+        tar -xJf "$seed/core.tar.xz" -C "$journey/modules"
+        docker run --rm --user "$(id -u):$(id -g)" --network none --label laputa.bench=mirror-plan --mount "type=bind,src=$root,dst=/source,readonly" --mount "type=bind,src=$journey/repo,dst=/repo,readonly" --mount "type=bind,src=$seed_abs,dst=/repo/.out/seed/x86_64,readonly" --mount "type=bind,src=$seed_abs,dst=/seed,readonly" --mount "type=bind,src=$journey/modules,dst=/modules,readonly" --mount "type=bind,src=$journey/output,dst=/output" --workdir /repo --env XSH_PM_OFFLINE=1 --env XSH_MODULE_PATH=/repo:/modules/core "$image" /seed/xsh /repo/pm.xsh -- repo plan --repo /repo --root baselayout --target x86_64-linux-musl --output /output/closure.json
+        printf 'baselayout\nxsh\n' > "$journey/expected"
+        plan_oracle "$journey/output/closure.json" "$journey/expected" >/dev/null
+        export BENCH_PLAN="$journey/output/closure.json" BENCH_STORE="$store_abs"
+        export BENCH_MIRROR="${BENCH_MIRROR:-.out/host/x86_64/laputa-mirror}"
+        BENCH_MIRROR=$(realpath "$BENCH_MIRROR")
+        export XSH_MODULE_PATH="$root:$xsh_root/core"
+        mode=publish
+      elif [[ $name == profile-ready ]]; then
+        export BENCH_PROFILE_IMAGE="${BENCH_PROFILE_IMAGE:-target/laputa/qemu-tinyland-ghostty/current}"
+        BENCH_PROFILE_IMAGE=$(realpath "$BENCH_PROFILE_IMAGE")
+        mode=boot
+      else
+        mode=service
+      fi
+      busy=0; samples=()
+      for round in 1 2 3 4 5; do
+        perf-gate-ready > "$journey/before-$round" 2>&1 || busy=1
+        status=0
+        sample=$(python3 bench/scenario.py "$mode" "$journey/round-$round") || status=$?
+        perf-gate-ready -1 > "$journey/after-$round" 2>&1 || busy=1
+        (( status == 0 )) || exit "$status"
+        [[ $sample =~ ^[0-9]+$ ]] || exit 1
+        samples+=("$sample")
+        echo "round=$round duration_ns=$sample oracle=passed"
+      done
+      mapfile -t sorted < <(printf '%s\n' "${samples[@]}" | sort -n)
+      spread=$((sorted[4]-sorted[0]))
+      printf 'metric\t%s-ns\t%s\t%s\t%s\n' "$name" "${sorted[2]}" "$spread" "$busy"
+    elif [[ $name == tree-memory ]]; then
       seed_abs=$(realpath "$seed")
       mkdir -p "$run_dir/container"
       docker run --rm --network none --mount "type=bind,src=$root,dst=/src/laputa,readonly" --mount "type=bind,src=$seed_abs,dst=/seed,readonly" --mount "type=bind,src=$seed_abs,dst=/.out/seed/x86_64,readonly" --mount "type=bind,src=$root/$run_dir/container,dst=/output" --workdir /src/laputa --env XSH_PM_OFFLINE=1 --env XSH_MODULE_PATH=/src/laputa:/output/modules/core --label laputa.bench=tree-memory "$image" /bin/sh -c 'mkdir -p /output/modules && tar -xJf /seed/core.tar.xz -C /output/modules && /seed/xsh /src/laputa/pm.xsh -- repo plan --repo /src/laputa --root baselayout --target x86_64-linux-musl --output /output/plan.json && test -s /output/plan.json && /bin/cat /sys/fs/cgroup/memory.peak' > "$run_dir/memory.raw" || exit 1
