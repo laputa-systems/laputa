@@ -382,7 +382,8 @@ proofs/<arch>/<name>/<name>-<ver>-<rel>-<artifact12>-<proof12>.json
 `<artifact12>` and `<proof12>` are the first twelve hex digits of the artifact
 and proof keys; the index row carries both in full. Metadata and proof also
 name the proof key because a proof-only change re-proves the same payload.
-Objects are uploaded with `If-None-Match: *` and never replaced; an existing
+Objects are uploaded with `If-None-Match: *`; the mirror applies this condition
+atomically at storage admission for both direct and chunked uploads. An existing
 object is accepted only when its bytes match, so a retried publication
 completes. `<arch>` and the index row's `arch` come from the plan target.
 

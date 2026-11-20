@@ -180,6 +180,7 @@ impl S3Bucket {
         key: &str,
         content_type: Option<&str>,
         payload: Payload,
+        create_only: bool,
     ) -> Result<Reply, String> {
         let (payload_hash, length) = match &payload {
             Payload::Bytes(bytes) => (sha256_hex(bytes), bytes.len() as u64),
@@ -197,6 +198,7 @@ impl S3Bucket {
             signed.push(("content-length", length_text.as_str()));
             signed.push(("content-type", content_type));
         }
+        if create_only { signed.push(("if-none-match", "*")); }
         signed.sort_by_key(|(name, _)| *name);
         let authorization = self.authorization(
             &CanonicalRequest {
@@ -219,6 +221,7 @@ impl S3Bucket {
             headers.push(("Content-Type", content_type));
         }
 
+        if create_only { headers.push(("If-None-Match", "*")); }
         let url = self.url(key);
         match payload {
             Payload::Bytes(bytes) => crate::http::send(method, &url, &headers, bytes),
@@ -310,7 +313,8 @@ impl FsStore {
         &self,
         key: &str,
         write: impl FnOnce(&mut File) -> io::Result<()>,
-    ) -> Result<(), String> {
+        create_only: bool,
+    ) -> Result<bool, String> {
         let path = self.path(key)?;
         let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
             return Err(format!("unsafe storage key {key:?}"));
@@ -329,11 +333,16 @@ impl FsStore {
                 write(&mut file)?;
                 file.sync_all()
             })
-            .and_then(|()| fs::rename(&temp, &path));
-        result.map_err(|e| {
-            let _ = fs::remove_file(&temp);
-            format!("write {}: {e}", path.display())
-        })
+            .and_then(|()| if create_only { fs::hard_link(&temp, &path) } else { fs::rename(&temp, &path) });
+        if create_only { let _ = fs::remove_file(&temp); }
+        match result {
+            Ok(()) => Ok(true),
+            Err(e) if create_only && e.kind() == io::ErrorKind::AlreadyExists => Ok(false),
+            Err(e) => {
+                let _ = fs::remove_file(&temp);
+                Err(format!("write {}: {e}", path.display()))
+            }
+        }
     }
 }
 
@@ -388,7 +397,7 @@ impl Storage {
             Self::Memory(map) => Ok(map.read().unwrap().get(key).map(|b| b.len() as u64)),
             Self::Fs(store) => Ok(store.open(key)?.map(|(_, length)| length)),
             Self::S3(bucket) => {
-                let reply = bucket.request("HEAD", key, None, Payload::Bytes(&[]))?;
+                let reply = bucket.request("HEAD", key, None, Payload::Bytes(&[]), false)?;
                 match reply.status {
                     404 => Ok(None),
                     status if (200..300).contains(&status) => reply
@@ -404,7 +413,7 @@ impl Storage {
     pub fn get(&self, key: &str) -> Result<Option<Vec<u8>>, String> {
         match self {
             Self::S3(bucket) => {
-                let reply = bucket.request("GET", key, None, Payload::Bytes(&[]))?;
+                let reply = bucket.request("GET", key, None, Payload::Bytes(&[]), false)?;
                 match reply.status {
                     200 => Ok(Some(reply.body)),
                     404 => Ok(None),
@@ -425,50 +434,43 @@ impl Storage {
     }
 
     pub fn put(&self, key: &str, body: Vec<u8>, content_type: &str) -> Result<(), String> {
+        self.put_conditional(key, body, content_type, false).map(|_| ())
+    }
+
+    pub fn put_conditional(&self, key: &str, body: Vec<u8>, content_type: &str, create_only: bool) -> Result<bool, String> {
         match self {
-            Self::S3(bucket) => stored(bucket.request(
-                "PUT",
-                key,
-                Some(content_type_or_default(content_type)),
-                Payload::Bytes(&body),
-            )?),
-            Self::Fs(store) => store.write_atomic(key, |file| io::Write::write_all(file, &body)),
+            Self::S3(bucket) => {
+                let reply = bucket.request("PUT", key, Some(content_type_or_default(content_type)), Payload::Bytes(&body), create_only)?;
+                if create_only && reply.status == 412 { Ok(false) } else { stored(reply).map(|_| true) }
+            }
+            Self::Fs(store) => store.write_atomic(key, |file| io::Write::write_all(file, &body), create_only),
             Self::Memory(map) => {
-                map.write().unwrap().insert(key.to_string(), body);
-                Ok(())
+                let mut map = map.write().unwrap();
+                if create_only && map.contains_key(key) { return Ok(false); }
+                map.insert(key.to_string(), body);
+                Ok(true)
+            }
+        }
+    }
+
+    pub fn put_file_conditional(&self, key: &str, path: &Path, content_type: &str, create_only: bool) -> Result<bool, String> {
+        match self {
+            Self::S3(bucket) => {
+                let file = File::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
+                let length = file.metadata().map_err(|e| format!("metadata {}: {e}", path.display()))?.len();
+                let reply = bucket.request("PUT", key, Some(content_type_or_default(content_type)), Payload::File { file, length, sha256: sha256_file_hex(path)? }, create_only)?;
+                if create_only && reply.status == 412 { Ok(false) } else { stored(reply).map(|_| true) }
+            }
+            Self::Fs(store) => store.write_atomic(key, |file| io::copy(&mut File::open(path)?, file).map(|_| ()), create_only),
+            Self::Memory(_) => {
+                let body = std::fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+                self.put_conditional(key, body, content_type, create_only)
             }
         }
     }
 
     pub fn put_file(&self, key: &str, path: &Path, content_type: &str) -> Result<(), String> {
-        match self {
-            Self::S3(bucket) => {
-                let file =
-                    File::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
-                let length = file
-                    .metadata()
-                    .map_err(|e| format!("metadata {}: {e}", path.display()))?
-                    .len();
-                stored(bucket.request(
-                    "PUT",
-                    key,
-                    Some(content_type_or_default(content_type)),
-                    Payload::File {
-                        file,
-                        length,
-                        sha256: sha256_file_hex(path)?,
-                    },
-                )?)
-            }
-            Self::Fs(store) => store.write_atomic(key, |file| {
-                io::copy(&mut File::open(path)?, file).map(|_| ())
-            }),
-            Self::Memory(_) => {
-                let body =
-                    std::fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
-                self.put(key, body, content_type)
-            }
-        }
+        self.put_file_conditional(key, path, content_type, false).map(|_| ())
     }
 
     /// Generate a presigned GET URL valid for `expires_secs` seconds.
@@ -497,6 +499,28 @@ mod tests {
     use std::net::TcpListener;
 
     use super::*;
+
+    #[test]
+    fn s3_conditional_put_signs_precondition_and_maps_conflict() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut byte = [0; 1];
+            while !request.ends_with(b"\r\n\r\n") {
+                stream.read_exact(&mut byte).unwrap();
+                request.push(byte[0]);
+            }
+            let request = String::from_utf8(request).unwrap().to_lowercase();
+            assert!(request.contains("if-none-match: *\r\n"));
+            assert!(request.contains("signedheaders=content-length;content-type;host;if-none-match;"));
+            stream.write_all(b"HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+        });
+        let storage = Storage::s3(&endpoint, "mirror", "AKID", "secret", "auto");
+        assert!(!storage.put_conditional("key", b"value".to_vec(), "", true).unwrap());
+        server.join().unwrap();
+    }
 
     fn aws_example_bucket() -> S3Bucket {
         S3Bucket {

@@ -290,20 +290,10 @@ fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppSt
             return Response::bad_request("signed index bytes do not match their digest name");
         }
     }
-    // `If-None-Match: *` publishes an immutable object only if it is absent.
-    if headers.get("if-none-match").is_some_and(|value| value.trim() == "*") {
-        match state.storage.object_size(&key) {
-            Ok(Some(_)) => return Response::json(412, r#"{"error":"object already exists"}"#),
-            Ok(None) => {}
-            Err(error) => {
-                tracing::error!("object check failed for {key}: {error}");
-                return Response::error("object check failed");
-            }
-        }
-    }
-
-    match state.storage.put(&key, body.to_vec(), content_type_for(&key)) {
-        Ok(()) => Response::json(201, r#"{"ok":true}"#),
+    let create_only = headers.get("if-none-match").is_some_and(|value| value.trim() == "*");
+    match state.storage.put_conditional(&key, body.to_vec(), content_type_for(&key), create_only) {
+        Ok(true) => Response::json(201, r#"{"ok":true}"#),
+        Ok(false) => Response::json(412, r#"{"error":"object already exists"}"#),
         Err(e) => {
             tracing::error!("object upload failed for {key}: {e}");
             Response::error("upload failed")
@@ -371,19 +361,7 @@ fn complete_chunked_upload(
     }
 
     let dir = state.upload_dir.join(upload_id);
-    if headers.get("if-none-match").is_some_and(|value| value.trim() == "*") {
-        match state.storage.object_size(&key) {
-            Ok(Some(_)) => {
-                let _ = std::fs::remove_dir_all(&dir);
-                return Response::json(412, r#"{"error":"object already exists"}"#);
-            }
-            Ok(None) => {}
-            Err(error) => {
-                tracing::error!("object check failed for {key}: {error}");
-                return Response::error("object check failed");
-            }
-        }
-    }
+    let create_only = headers.get("if-none-match").is_some_and(|value| value.trim() == "*");
     let assembled = dir.join("assembled-object");
     let out = match File::create(&assembled) {
         Ok(file) => file,
@@ -411,10 +389,14 @@ fn complete_chunked_upload(
     }
     drop(out);
 
-    match state.storage.put_file(&key, &assembled, content_type_for(&key)) {
-        Ok(()) => {
+    match state.storage.put_file_conditional(&key, &assembled, content_type_for(&key), create_only) {
+        Ok(true) => {
             let _ = std::fs::remove_dir_all(&dir);
             Response::json(201, r#"{"ok":true}"#)
+        }
+        Ok(false) => {
+            let _ = std::fs::remove_dir_all(&dir);
+            Response::json(412, r#"{"error":"object already exists"}"#)
         }
         Err(e) => {
             tracing::error!("chunked object upload failed for {key}: {e}");

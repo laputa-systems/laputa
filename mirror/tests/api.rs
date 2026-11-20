@@ -837,6 +837,48 @@ fn if_none_match_star_refuses_to_replace_an_existing_object() {
     assert_eq!(body_bytes(get(&state, &path)), b"third");
 }
 
+fn concurrent_immutable_uploads_have_one_winner(chunked: bool) {
+        let state = Arc::new(make_local_state());
+        let barrier = Arc::new(std::sync::Barrier::new(8));
+        let mut threads = Vec::new();
+        for n in 0..8 {
+            let state = state.clone();
+            let barrier = barrier.clone();
+            threads.push(std::thread::spawn(move || {
+                let bytes = vec![n as u8; 1024 * 1024];
+                let immutable = headers(&[("if-none-match", "*")]);
+                if chunked {
+                    let path = format!("/_uploads/up{n}/0");
+                    assert_eq!(packages::route("PUT", &path, &headers(&[]), &bytes, &state).status, 201);
+                }
+                barrier.wait();
+                let status = if chunked {
+                    let path = format!("/_uploads/up{n}/complete");
+                    let body = format!(r#"{{"rel":"{PACKAGE}","chunks":1}}"#);
+                    packages::route("POST", &path, &immutable, body.as_bytes(), &state).status
+                } else {
+                    packages::route("PUT", &format!("/{PACKAGE}"), &immutable, &bytes, &state).status
+                };
+                (status, bytes)
+            }));
+        }
+        let results: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        assert_eq!(results.iter().filter(|(s, _)| *s == 201).count(), 1, "chunked={chunked}");
+        assert_eq!(results.iter().filter(|(s, _)| *s == 412).count(), 7, "chunked={chunked}");
+        let winner = &results.iter().find(|(s, _)| *s == 201).unwrap().1;
+        assert_eq!(&body_bytes(get(&state, &format!("/{PACKAGE}"))), winner);
+}
+
+#[test]
+fn concurrent_direct_immutable_uploads_have_one_winner() {
+    concurrent_immutable_uploads_have_one_winner(false);
+}
+
+#[test]
+fn concurrent_chunked_immutable_uploads_have_one_winner() {
+    concurrent_immutable_uploads_have_one_winner(true);
+}
+
 #[test]
 fn index_rewrite_keeps_fields_the_mirror_does_not_interpret() {
     let state = make_local_state();
