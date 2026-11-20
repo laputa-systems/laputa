@@ -16,6 +16,8 @@ import shutil
 import sys
 import time
 import traceback
+import subprocess
+import json
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import dhcp_lifecycle as dl
@@ -31,6 +33,8 @@ STATE_SIZE = 256 * 1024 * 1024
 
 
 def reexec_in_user_net_namespace():
+    if sys.platform == "darwin":
+        return
     if os.environ.get("LAPUTA_NTP_OFFLINE_NETNS") == "1":
         return
     unshare = shutil.which("unshare")
@@ -52,13 +56,14 @@ def require_prerequisites(args):
         ("state formatter", ROOT / "packages/laputa-fs/files/mkfs.ext4.xsh"),
         ("agent fixture", AGENT_FIXTURE),
         ("apply fixture", APPLY_FIXTURE),
-        ("qemu-system-x86_64", pathlib.Path(shutil.which("qemu-system-x86_64") or "/nonexistent")),
-        ("kvm", pathlib.Path("/dev/kvm")),
     ):
         if not path.exists():
             missing.append(f"{name}: {path}")
-    if os.uname().machine != "x86_64":
-        missing.append(f"host architecture {os.uname().machine} is not x86_64")
+    if sys.platform != "darwin":
+        if not shutil.which("qemu-system-x86_64") or not pathlib.Path("/dev/kvm").exists():
+            missing.append("qemu-system-x86_64 and /dev/kvm are required")
+        if os.uname().machine != "x86_64":
+            missing.append(f"host architecture {os.uname().machine} is not x86_64")
     if missing:
         print("SKIP: missing prerequisites:\n  " + "\n  ".join(missing), file=sys.stderr)
         sys.exit(77)
@@ -194,12 +199,31 @@ def run(args):
     dl.log(f"scratch {scratch}")
     guest = errlog = qmp = agent = tap_fd = None
     try:
-        tap_fd = dl.create_tap(args, "otap0", "192.0.3.1")
+        if sys.platform != "darwin":
+            tap_fd = dl.create_tap(args, "otap0", "192.0.3.1")
         state = provision_state(args, scratch)
         console = scratch / "offline-console.log"
-        guest, errlog, control, qmp_path = dl.launch(args, scratch, "offline", state, tap_fd, console)
-        os.close(tap_fd)
-        tap_fd = None
+        if sys.platform == "darwin":
+            control = SCRATCH_ROOT / f"ntp{os.getpid()}c.sock"
+            qmp_path = SCRATCH_ROOT / f"ntp{os.getpid()}q.sock"
+            for path in (control, qmp_path):
+                path.unlink(missing_ok=True)
+            fixture = ROOT / "tests/integration/fixtures/maintained-fallback.xsh"
+            argv = json.loads(dl.run_xsh(args, fixture, "--", "argv-plain"))["argv"]
+            for index, value in enumerate(argv):
+                if value.startswith("if=none,id=state,"):
+                    argv[index] = f"if=none,id=state,format=raw,file={state}"
+            argv[argv.index("-netdev") + 1] = "socket,id=net0,udp=127.0.0.1:9,localaddr=127.0.0.1:0"
+            argv[argv.index("-serial") + 1] = f"file:{console}"
+            argv[argv.index("-qmp") + 1] = f"unix:{qmp_path},server=on,wait=off"
+            argv[argv.index("-append") + 1] += " LAPUTA_GENERATION_ID=current LAPUTA_BOOT_SERIAL=1"
+            argv += ["-chardev", f"socket,id=ctl,path={control},server=on,wait=off", "-device", "virtio-serial-pci", "-device", "virtserialport,chardev=ctl,name=laputa-ctl"]
+            errlog = open(scratch / "offline.qemu.log", "wb")
+            guest = subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=errlog, cwd=ROOT)
+        else:
+            guest, errlog, control, qmp_path = dl.launch(args, scratch, "offline", state, tap_fd, console)
+            os.close(tap_fd)
+            tap_fd = None
         qmp = dl.Qmp(qmp_path)
         dl.wait_console(console, "LAPUTA_DHCP_AGENT_READY", 420, bad=("LAPUTA_DHCP_AGENT_FAILED",))
         agent = dl.Agent(control)
@@ -235,8 +259,9 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Prove ntpd-rs readiness without an NTS route.")
-    parser.add_argument("--xsh", type=pathlib.Path, default=DEFAULT_XSH)
-    parser.add_argument("--core", type=pathlib.Path, default=DEFAULT_CORE)
+    xsh_root = pathlib.Path(os.environ.get("XSH_ROOT", ROOT.parent / "xsh"))
+    parser.add_argument("--xsh", type=pathlib.Path, default=xsh_root / "target/debug/xsh" if sys.platform == "darwin" else DEFAULT_XSH)
+    parser.add_argument("--core", type=pathlib.Path, default=xsh_root / "core" if sys.platform == "darwin" else DEFAULT_CORE)
     parser.add_argument("--bundle", type=pathlib.Path, default=DEFAULT_BUNDLE)
     parser.add_argument("--ip-tool", type=pathlib.Path)
     parser.add_argument("--window", type=int, default=120, help="seconds to hold readiness")
