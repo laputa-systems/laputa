@@ -592,9 +592,8 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   build_native_vdso(cc)
   PKGBUILD_shared.timing_done("prepare", prepare_start)
   PKGBUILD_shared.stop_after("prepare")
-  let config = kbuild.load_config(p".config")?
   let discover_start = PKGBUILD_shared.timing_start("discover")
-  let plan = kbuild.augment_missing_composites(p".", config, PKGBUILD_shared.cached_package_plan(srcarch)?, srcarch)?
+  let plan = kbuild.without_efi_libstub(PKGBUILD_shared.cached_package_plan(srcarch)?)
   PKGBUILD_shared.timing_done("discover", discover_start)
   PKGBUILD_shared.stop_after("discover")
   let plan_start = PKGBUILD_shared.timing_start("plan")

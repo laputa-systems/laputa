@@ -3501,6 +3501,16 @@ pure is_x86_efi_stub(obj: Path, library: Bool, triple: Str) -> Bool {
     path_key(object_dir(obj)) == "drivers/firmware/efi/libstub" and key.ends_with(".stub.o")
 }
 
+## Remove the EFI stub library from a plan whose final link builds, prefixes and archives it.
+export pure without_efi_libstub(plan: KbuildPlan) -> KbuildPlan {
+  let libstub = "drivers/firmware/efi/libstub"
+  {
+    ...plan,
+    objects: [obj for obj in plan.objects if path_key(object_dir(obj)) != libstub],
+    lib_objects: [obj for obj in plan.lib_objects if path_key(object_dir(obj)) != libstub],
+  }
+}
+
 pure efi_stub_base_object(obj: Path) -> Path {
   fp"{path_key(obj).replace(".stub.o", with: ".o")}"
 }
