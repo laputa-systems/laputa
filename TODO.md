@@ -44,14 +44,14 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Recommendation:** Qualify the remaining cases in disposable guests before enabling an authenticated production configuration. Never alter the host clock. Cold boot requires trustworthy RTC or operator-set time; preserve TLS and snapshot expiry verification.
 - **Fix with:** reference-parity
 - **Effort:** M
-### LAP-63 · P2 · Measure representative package and system journeys
+### LAP-63 · P2 · Capture timing anchors for the package and system journeys
 
 - **Area:** Performance
 - **Where:** `docs/TESTING.md` Benchmarks
-- **Problem:** Plan time, warm rebuild reuse and root composition now have checked, timed Scenario workloads (`world-plan`, `warm-rebuild`, `root-compose` in `bench/registry.xsh`), but no accepted timing anchor: every run on the shared build host so far is `inconclusive: host busy`. Mirror publish, boot to a usable system and xinit service start still lack a representative checked timing comparison.
-- **Recommendation:** Add checked timed workloads for mirror publish (bytes and artifacts verified), profile boot to a readiness marker, and xinit service start, following the same five-round readiness-bracketed pattern; then capture `-ns` anchors for all six on a quiet host with justified tolerances. Acceptance: each journey has a reproducible comparison and a quiet-host anchor, and reports inconclusive samples explicitly.
+- **Problem:** Every LAP-63 journey now has a checked, timed Scenario workload (`world-plan`, `warm-rebuild`, `root-compose`, `mirror-publish`, `profile-ready`, `xinit-service-start` in `bench/registry.xsh`), but none has an accepted `-ns` anchor: runs on the shared build host on 2026-11-20 reported `inconclusive: host busy` or `inconclusive: no anchor`.
+- **Recommendation:** On a quiet host, run the six workloads, choose justified tolerances from their observed spread, and capture `-ns` anchors with `bench/capture.sh`'s review procedure. Acceptance: each journey reports `within budget` against a committed anchor on a ready host.
 - **Fix with:** bench-pyramid, benchmark-checklist
-- **Effort:** L
+- **Effort:** S
 ### LAP-64 · P2 · Capture memory and artifact size anchors
 
 - **Area:** Performance
