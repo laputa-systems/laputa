@@ -35,7 +35,12 @@ uses the HVF target's high memory; its build proof remains unqualified there.
 On the same host, `python3 tests/integration/maintained_ntp.py` passed with
 QEMU user networking: the guest synchronized at stratum 2 with three NTS
 operators, restarted, then cut NTP and NTS egress. During the offline window
-the largest clock sample change and offset were both 1 ms.
+the largest clock sample change and offset were both 1 ms. The controlled
+clock-discipline guest (`tests/integration/ntp-clock-guest.sh`) passed its
+`behind`, `ahead`, `slew` (largest sample change 2 ms), `jump` and `nts`
+modes there too; on macOS it builds its fixture servers and formats its disks
+in package-tools. Its `pause`, `frequency`, `external-nts` and chrony modes
+have not run on aarch64.
 
 ## Host requirements
 
