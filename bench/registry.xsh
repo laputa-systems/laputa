@@ -9,6 +9,8 @@ export pure workloads(xsht: Str) -> List[Workload] {
     {name: "pm-catalog", tier: 1, area: "pm", purpose: "validate the real package catalog", cost: "estimated seconds", argv: [xsht.replace("/xsht", with: "/xsh"), "bench/catalog.xsh"], requires: [fp"{xsht.replace("/xsht", with: "/xsh")}", p"bench/catalog.xsh", p"packages"], tools: []},
     {name: "pm-check", tier: 1, area: "pm", purpose: "type-check production package manager", cost: "estimated seconds", argv: [xsht, "check", "pm"], requires: [fp"{xsht}", p"pm"], tools: []},
     {name: "make-graph", tier: 1, area: "build", purpose: "checked build graph execution and reuse", cost: "estimated seconds", argv: [xsht, "test", "test_pyramid_kernel_graph"], requires: [fp"{xsht}", p"packages/linux/tests/pyramid.xsh"], tools: []},
+    {name: "tree-memory", tier: 2, area: "memory", purpose: "measure container-tree peak for an offline package plan", cost: "estimated minutes", argv: ["bash", "bench/support.sh", "workload", "tree-memory"], requires: [p".out/seed/x86_64/manifest.json", p"bench/support.sh"], tools: ["docker", "bash", "jaq", "git", "sha256sum"]},
+    {name: "artifact-sizes", tier: 2, area: "size", purpose: "measure seed package and image bytes", cost: "estimated minutes", argv: ["bash", "bench/support.sh", "workload", "artifact-sizes"], requires: [p".out/seed/x86_64/manifest.json", p"bench/support.sh"], tools: ["docker", "bash", "jaq", "git", "sha256sum"]},
     {name: "world-plan", tier: 2, area: "pm", purpose: "plan the package world", cost: "estimated minutes", argv: ["make", "plan"], requires: [p"seed/world_cli.xsh", p".out/seed/x86_64/manifest.json"], tools: ["make", "docker"]},
     {name: "package-build", tier: 3, area: "build", purpose: "build baselayout and its closure", cost: "estimated hours", argv: ["make", "build", "PKGS=baselayout"], requires: [p"packages/baselayout/PKGBUILD.xsh", p".out/seed/x86_64/manifest.json"], tools: ["make", "docker"]},
     {name: "mirror-build", tier: 3, area: "mirror", purpose: "build the mirror", cost: "estimated minutes", argv: ["make", "mirror-build"], requires: [p"mirror/Cargo.lock"], tools: ["make", "cargo"]},
@@ -18,18 +20,18 @@ export pure workloads(xsht: Str) -> List[Workload] {
 }
 
 pure tier_value(tier: Str) -> Result[Int] {
-  if tier == "edit" { return Ok(0) }
-  if tier == "change" { return Ok(1) }
-  if tier == "scenario" { return Ok(2) }
-  if tier == "full" { return Ok(3) }
+  return Ok(0) when tier == "edit"
+  return Ok(1) when tier == "change"
+  return Ok(2) when tier == "scenario"
+  return Ok(3) when tier == "full"
   fail f"unknown tier {tier}"
 }
 
 ## Render a registered tier.
 export pure tier_name(tier: Int) -> Str {
-  if tier == 0 { return "edit" }
-  if tier == 1 { return "change" }
-  if tier == 2 { return "scenario" }
+  return "edit" when tier == 0
+  return "change" when tier == 1
+  return "scenario" when tier == 2
   "full"
 }
 
@@ -43,7 +45,7 @@ export pure select(all: List[Workload], tier: Str, names: List[Str], areas: List
   for area in areas {
     fail f"unknown area {area}" when area not in [item.area for item in all]
   }
-  let selected = [item for item in all if item.tier <= ceiling and (names.len() == 0 or item.name in names) and (areas.len() == 0 or item.area in areas) and !(item.name in skip)]
-  fail "empty workload selection" when selected.len() == 0
+  let selected = [item for item in all if item.tier <= ceiling and (names.is_empty() or item.name in names) and (areas.is_empty() or item.area in areas) and !(item.name in skip)]
+  fail "empty workload selection" when selected.is_empty()
   selected
 }
