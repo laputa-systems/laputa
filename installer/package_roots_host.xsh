@@ -1,5 +1,7 @@
 ##! Compose the installer's target, installer, and tools roots from the local mirror.
 use seed.world
+use seed.images
+use seed.xsh_seed
 
 error InstallerPackageHostError = Failed : InvalidData
 
@@ -26,6 +28,32 @@ pure tools_roots() -> List[Str] {
 
 proc compose(repo_url: Str, plan: Path, store: Path, output: Path, roots: List[Str]) {
   world.host_pm_compose(repo_url, input: plan, store:, runtime_roots: roots, output:)
+}
+
+proc plan_in_package_tools(root: Path, arch: Str, repo_url: Str, roots: List[Str], output: Path) {
+  let docker = images.docker_program()?
+  let target = xsh_seed.xsh_seed_arch(arch)?
+  let seed = xsh_seed.xsh_seed_require(root, arch)?
+  let image = images.ensure_package_tools(docker, root, target)?
+  let container_repo = repo_url.replace("http://127.0.0.1:", with: "http://host.docker.internal:").replace("http://localhost:", with: "http://host.docker.internal:")
+  let selection: List[Str] = collect {
+    for name in roots { yield @["--root", name] }
+  }
+  let argv = [
+    docker.display(), "run", "--rm", "--platform", target.docker_platform,
+    "--mount", f"type=bind,src={root},dst=/src/laputa,readonly",
+    @xsh_seed.xsh_seed_mount_argv(seed),
+    "--mount", f"type=bind,src={output.parent()},dst=/output",
+    "--workdir", "/src/laputa", "--env", "XSH_MODULE_PATH=/src/laputa",
+    "--env", f"XSH_PM_REPO={container_repo}", image,
+    "/bin/xsh", "/src/laputa/pm.xsh", "--", "repo", "plan",
+    "--repo", "/src/laputa", @selection, "--target", f"{arch}-linux-musl", "--output", f"/output/{output.name}",
+  ]
+  let status = process.run(process.command_argv(docker, argv, root))?
+  guard status.ok else { return Err(InstallerPackageHostError.Failed("package-tools installer plan failed")) }
+  let id = unix.id()?
+  let ownership = process.run(process.command_argv(docker, [docker.display(), "run", "--rm", "--network", "none", "--mount", f"type=bind,src={output.parent()},dst=/output", image, "chown", f"{id.uid}:{id.gid}", f"/output/{output.name}"], root))?
+  guard ownership.ok else { return Err(InstallerPackageHostError.Failed("installer plan ownership repair failed")) }
 }
 
 ## Import the installer's package closure for ARCH from the mirror at REPO_URL into PACKAGES, which must not exist yet, then compose ROOTS.
@@ -64,13 +92,17 @@ export proc prepare(
     }
   }
 
-  world.host_pm_plan(
-    repo_url,
-    repo_root: root,
-    roots: plan_roots,
-    target: f"{arch}-linux-musl",
-    output: plan,
-  )
+  if system.uname()?.sysname == "Darwin" {
+    plan_in_package_tools(root, arch, repo_url, plan_roots, plan)
+  } else {
+    world.host_pm_plan(
+      repo_url,
+      repo_root: root,
+      roots: plan_roots,
+      target: f"{arch}-linux-musl",
+      output: plan,
+    )
+  }
   world.require_mirror_plan(plan, repo_url)
   world.host_pm_build(repo_url, input: plan, store:, jobs:)
 
