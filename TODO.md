@@ -38,51 +38,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** bench-pyramid, benchmark-checklist
 - **Effort:** L (weeks)
 
-### LAP-67 · P2 · Prevent concurrent publishers from losing index updates
-
-- **Area:** Release publication
-- **Where:** `pm/repo.xsh:250`, `pm/repo.xsh:265`, `pm/repo.xsh:274`, `pm/remote.xsh:355`, `mirror/src/packages.rs:525`, `mirror/src/packages.rs:544`, `pm/repo.xsh:253`, `docs/PM.md:392`
-- **Problem:** Each publisher reads the complete index, merges locally, then unconditionally replaces it after uploading objects. The mirror mutex serializes individual writes but does not bind a write to the index version read by that publisher. If two publishers read the same index and publish different packages, both can report success while the last index drops the other's row; an offline signer can subsequently sign that incomplete working index. Immutable objects remain, but the dropped release is unavailable through the new signed index until republished.
-- **Recommendation:** Make index updates conditional on the version read, with a conflict and retry or equivalent serialization spanning read and write. Acceptance: two overlapping publishers of different packages either both appear in the final index or one receives a conflict; a retry preserves both rows.
-- **Fix with:** durable-state
-- **Effort:** M (days)
-
-### LAP-68 · P2 · Make immutable object admission atomic
-
-- **Area:** Mirror publication
-- **Where:** `mirror/src/packages.rs:293`, `mirror/src/packages.rs:305`, `mirror/src/packages.rs:374`, `mirror/src/packages.rs:414`, `mirror/src/s3.rs:427`, `mirror/src/s3.rs:443`, `mirror/src/lib.rs:47`, `pm/remote.xsh:92`
-- **Problem:** Direct and chunked uploads implement `If-None-Match: *` as a separate existence check and unconditional write. Two workers can both observe absence, then both write and receive 201; the latter replaces the first object. The file backend renames over the destination and S3 receives an unconditional PUT. The publisher accepts 201 without comparing bytes, so conflicting concurrent uploads can silently change an allegedly immutable package object and leave an index pointing to different bytes. Existing sequential checks (`mirror/tests/api.rs:830`) do not exercise this interleaving.
-- **Recommendation:** Make conditional creation one atomic storage operation for every backend and both upload paths; report a conflict to the loser. Acceptance: concurrent different-byte conditional uploads to the same absent key yield exactly one success, one conflict, and the winning bytes persist for both direct and chunked uploads.
-- **Fix with:** durable-state
-- **Effort:** M (days)
-
-### LAP-69 · P2 · Clean up a direct service start when readiness or status recording fails
-
-- **Area:** xinit service ownership
-- **Where:** `xinit/xinit.xsh:1254`, `xinit/xinit.xsh:1371`, `xinit/xinit.xsh:1399`, `xinit/xinit.xsh:1419`, `xinit/xinit.xsh:1429`, `xinit/xinit.xsh:1444`
-- **Problem:** A direct start spawns the service process group before loading and polling readiness and before reading its start time and writing its status. An error in any of those steps returns without stopping the new group or recording its PID. A subsequent start can launch a second instance, while the original is no longer controlled by its status record. This differs from scanner children, whose session is swept by PID 1 on scanner death (`xinit/xinit.xsh:191`, `xinit/xinit.xsh:616`).
-- **Recommendation:** Retain ownership of the spawned group until status is successfully recorded, and terminate and reap it on each intervening error. Acceptance: inject a readiness or status-write failure after spawn in direct-start mode and verify no service process survives and a later start produces exactly one instance.
-- **Fix with:** lifecycle-concurrency
-- **Effort:** M (days)
-
-### LAP-71 · P2 · Bound and expire unauthenticated authentication sessions
-
-- **Area:** mirror / availability
-- **Where:** `mirror/src/packages.rs:190`, `mirror/src/webauthn_handlers.rs:142`, `mirror/src/webauthn_handlers.rs:178`, `mirror/src/db.rs:327`, `mirror/src/db.rs:336`
-- **Problem:** Anyone who can reach the production mirror and knows an allowed username can repeatedly call authentication options; each successful request inserts a session and challenge into SQLite. The ten-minute expiry is only a read predicate, and the database code contains no session deletion. Repeated requests grow durable storage indefinitely, eventually exhausting the database filesystem and interrupting authentication or other services on that filesystem.
-- **Recommendation:** Bound outstanding unauthenticated challenges and reclaim expired sessions with their dependent records. Acceptance: repeated options requests cannot grow the session table without bound, and expired challenges are removed while valid challenges remain usable.
-- **Fix with:** security
-- **Effort:** M (days)
-
-### LAP-72 · P2 · Remove bearer tokens from completed authentication sessions
-
-- **Area:** mirror / credential storage
-- **Where:** `mirror/src/db.rs:141`, `mirror/src/db.rs:149`, `mirror/src/db.rs:155`, `mirror/src/db.rs:358`, `mirror/src/db.rs:366`, `mirror/src/webauthn_handlers.rs:124`, `mirror/src/webauthn_handlers.rs:273`
-- **Problem:** Registration stores the newly issued API bearer token in plaintext in the session row while also returning it directly to the browser; authentication does the same when issuing a replacement. It is cleared only if the optional polling endpoint consumes it, and expired rows are not deleted. A reader of the auth database or its backups can recover a still-valid upload credential even though the token table stores only hashes. The session ID expiry does not revoke the token.
-- **Recommendation:** Eliminate persistent plaintext token storage or implement a bounded, explicitly consumed handoff that cannot leave usable tokens in the database. Acceptance: after either registration or authentication, including abandoned polling and session expiry, the database and its normal persistent records contain no usable bearer token.
-- **Fix with:** security
-- **Effort:** M (days)
-
 ### LAP-73 · P2 · Bind the host-tools image identity to its package inputs
 
 - **Area:** Build and dependencies
@@ -109,15 +64,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Recommendation:** Exercise real projects with checked outputs and paired, readiness-qualified comparisons. Acceptance: incomplete work fails and a reproducible baseline detects regressions.
 - **Fix with:** refactor-benchmarks, benchmark-checklist
 - **Effort:** M (days)
-
-### LAP-77 · P3 · Include proof input mode in the profile identity
-
-- **Area:** Profile identity
-- **Where:** `system/types.xsh:15`, `system/profile.xsh:115`, `system/qemu.xsh:556`, `system/cli.xsh:122`, `tests/system/profile.xsh:148`
-- **Problem:** The profile digest claims to cover all semantic fields and is printed with `laputa plan`, but omits `proof.input_mode`. Two otherwise identical profiles with `ProofPlain` and `ProofModifiers` therefore print the same identity even though the QEMU proof injects different input. This makes the reported identity unable to distinguish different proof behavior; the existing digest test changes CPU and GPU only.
-- **Recommendation:** Include a stable representation of the input mode in the canonical digest and check that changing only that mode changes the digest. Acceptance: a focused profile test proves the two modes have different digests while repeated digesting of the same profile remains deterministic.
-- **Fix with:** single-source-of-truth
-- **Effort:** S (hours)
 
 ### LAP-66 · P3 · Qualify benchmark inputs and provenance
 
