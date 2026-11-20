@@ -457,11 +457,13 @@ inconclusive. The catalog workload checks the actual x86_64 recipe inventory;
 `pm-check` checks the PM source; `make-graph` exercises synthetic graph
 execution and reuse. Neither proves a real build.
 
-The scenario workloads `tree-memory` and `artifact-sizes` require Docker, Git,
-Bash, jaq, sha256sum and the x86_64 seed and package artifacts. Before either
-runs, admission verifies that the seed manifest is clean, its XSH commit
+The scenario workloads `tree-memory`, `artifact-sizes`, `world-plan`,
+`warm-rebuild`, and `root-compose` require Docker, Git,
+Bash, jaq, sha256sum and the x86_64 seed and package artifacts. Before they
+run, admission verifies that the seed manifest is clean, its XSH commit
 contains `XSH_COMMIT` in `infra/asterinas/inputs.lock`, and the four product
-hashes match. It checks selected package payload hashes as well. Missing or
+hashes match. `artifact-sizes` and the timed workloads check selected package payload hashes
+as well. Missing or
 stale inputs fail; `BENCH_SEED` can point at another seed. The driver reports
 live process groups recorded by earlier benchmark runs and Docker containers
 with the benchmark label before running anything. Inspect and stop those
@@ -483,12 +485,31 @@ not a compressed transfer size. The installer ISO is excluded because it is
 not built in this setup. Different package artifact keys or image IDs represent
 different inputs and must be compared deliberately.
 
+`world-plan` times an offline plan of every package and checks the complete
+recipe inventory and identical plan digest in all five rounds. `warm-rebuild`
+times PM's build of the already-built baselayout and xsh closure, checks both
+artifact payload hashes before starting, and requires two reused artifacts with
+no build starts. Its store is mounted read-only. `root-compose` composes that
+closure from the same verified store and checks the installed artifact inventory
+and nonempty receipt. Each round has its own readiness checks; any busy round
+makes the result inconclusive. The median duration and full range are reported
+in nanoseconds at 10 ms clock resolution, including container startup. For example:
+
+```sh
+BENCH_SEED=/path/to/.out/seed/x86_64 BENCH_STORE=/path/to/.out/artifacts/x86_64 \
+  make bench XSH_ROOT=/path/to/xsh TIER=scenario WORKLOADS="world-plan warm-rebuild root-compose"
+```
+
 `bench/anchors.tsv` is initially empty: no accepted limit has been captured.
-Each tab-separated line contains metric name, byte value, absolute tolerance in
-bytes, Laputa commit, host name, and UTC date. The limit is value plus
+Each tab-separated line contains metric name, value, absolute tolerance, Laputa
+commit, host name, and UTC date. Size metrics use bytes; timing metric names end
+in `-ns` and use nanoseconds. The limit is value plus
 tolerance, matched by metric and host. Results are `within budget`,
-`regression`, `inconclusive: no anchor`, or `inconclusive: host busy`; a busy
-host takes precedence. On a quiet host, after choosing a justified tolerance,
+`regression`, `inconclusive: no anchor`, `inconclusive: host busy`, or
+`inconclusive: spread`; a busy host takes precedence. For timed metrics the
+full range is the spread: median minus anchor minus spread must exceed the
+tolerance for a regression, while median minus anchor plus spread must be at
+most the tolerance for a pass. On a quiet host, after choosing a justified tolerance,
 capture candidates without overwriting the committed file:
 
 ```sh
@@ -505,13 +526,13 @@ is not an accepted representative benchmark with an output oracle.
 
 | Outcome | Workload and oracle | Attribution and gap |
 | --- | --- | --- |
-| Package build throughput and rebuild cost | `make verify` builds world and reruns; successful build and reuse are functional checks | `perf` on container processes and build logs; no controlled throughput benchmark or retained baseline |
-| Plan time | `pm-catalog` validates real recipe inventory; exact fixture plan is checked by `test_pyramid_pm_plan_exact_inventory` | `perf` on XSH; neither measures a complete production plan. A real plan needs seed inputs |
+| Package build throughput and rebuild cost | `warm-rebuild` checks reuse of the baselayout and xsh closure with no builds | five-round elapsed median and spread; no accepted anchor or throughput benchmark |
+| Plan time | `world-plan` checks the complete package inventory and stable plan digest | five-round elapsed median and spread; no accepted anchor |
 | Mirror publish time | `make publish` publishes the selected plan | network byte counters and server/client traces; no timed checked benchmark |
 | Image and package size | `artifact-sizes` checks seed and three package payloads and records image size | comparable bytes and identities; no accepted anchor; installer ISO excluded |
 | Boot to usable system | `make profile-test` checks the guest profile | QEMU/guest traces and serial timestamps; no bounded boot latency benchmark |
 | xinit service start | xinit supervision tests check readiness | guest process tracing and readiness timestamps; no latency benchmark |
-| PM install, remove, generation switch | PM and activation tests check resulting state | syscall and filesystem tracing; no latency benchmark |
+| PM install, remove, generation switch | `root-compose` checks the baselayout and xsh root inventory; PM and activation tests check other operations | five-round composition median and spread; no accepted anchor or latency benchmark for install, remove, and generation switch |
 | gluon configure/build | `gluon/tests/benchmarks/run.sh` exercises synthetic graphs and setup | CPU sampling and syscall counts; synthetic corpus, incomplete output checks and no accepted baseline |
 | Memory footprint | `tree-memory` checks an offline baselayout plan and reads the container cgroup peak | whole container tree, including cache; no accepted anchor |
 

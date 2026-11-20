@@ -14,6 +14,8 @@ test test_bench_selection [error] {
   assert registry.select(all, "edit", [], [], ["selection"], false) is Err(_)
   assert registry.select(all, "full", [], [], [], false) is Err(_)
   let scenario = registry.select(all, "scenario", ["world-plan"], [], [], false)?
+  let journeys = registry.select(all, "scenario", ["world-plan", "warm-rebuild", "root-compose"], [], [], false)?
+  assert [w.name for w in journeys] == ["world-plan", "warm-rebuild", "root-compose"]
   let full = registry.select(all, "full", [], [], [], true)?
   assert [w.name for w in scenario] == ["world-plan"]
   assert [w.name for w in full if w.tier == 3] == ["package-build", "mirror-build", "installer-size", "profile-boot"]

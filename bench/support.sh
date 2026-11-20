@@ -28,12 +28,37 @@ resolve_packages() {
 }
 products=(xsh xshi xsht core.tar.xz)
 verdict() {
-  local ready=$1 value=$2 anchor=$3 tolerance=$4
+  local ready=$1 value=$2 anchor=$3 tolerance=$4 spread=${5:-0}
   if [[ $ready != 0 ]]; then echo 'inconclusive: host busy'
   elif [[ $anchor == - ]]; then echo 'inconclusive: no anchor'
-  elif (( value <= anchor + tolerance )); then echo 'within budget'
-  else echo regression
+  elif (( value - anchor - spread > tolerance )); then echo regression
+  elif (( value - anchor + spread <= tolerance )); then echo 'within budget'
+  else echo 'inconclusive: spread'
   fi
+}
+uptime_ns() {
+  local elapsed idle whole fraction
+  read -r elapsed idle < /proc/uptime
+  whole=${elapsed%.*}; fraction=${elapsed#*.}
+  printf '%s\n' "$((10#$whole * 1000000000 + 10#$fraction * 10000000))"
+}
+plan_oracle() {
+  local plan=$1 expected=$2 reference=${3:--} digest
+  jaq -e --rawfile expected "$expected" '([.nodes[].name] | sort) == ($expected | split("\n") | map(select(. != "")) | sort) and (.nodes | length > 0)' "$plan" >/dev/null || return 1
+  digest=$(sha256sum "$plan"); digest=${digest%% *}
+  [[ $reference == - || $digest == "$reference" ]] || return 1
+  printf '%s\n' "$digest"
+}
+build_oracle() {
+  local plan=$1 log=$2 count
+  count=$(jaq -er '.nodes | length | select(. > 0)' "$plan") || return 1
+  ! rg -q '^repo build (start|done|FAILED) ' "$log" || return 1
+  [[ $(rg -c "^repo build [0-9a-f]+ $count artifacts$" "$log") == 1 ]] || return 1
+  printf 'reused=%s builds=0\n' "$count"
+}
+root_oracle() {
+  local plan=$1 receipt=$2
+  jaq -e --slurpfile plan "$plan" '([.artifacts[] | select(.payload) | .artifact_key] | sort) == ([$plan[0].nodes[].artifact_key] | sort) and ([.artifacts[].package_name] | sort) == ["baselayout", "xsh"] and (.entries | length > 0)' "$receipt" >/dev/null
 }
 seed_check() {
   local manifest=$seed/manifest.json commit dirty pin name expected actual failed=0
@@ -66,6 +91,9 @@ children_check() {
 }
 case $mode in
   verdict) verdict "$@" ;;
+  plan-oracle) plan_oracle "$@" ;;
+  build-oracle) build_oracle "$@" ;;
+  root-oracle) root_oracle "$@" ;;
   oracle) [[ $1 =~ ^[1-9][0-9]*$ ]] && jaq -e '[.nodes[] | select(.name == "baselayout")] | length > 0' "$2" >/dev/null ;;
   check)
     failed=0
@@ -75,7 +103,7 @@ case $mode in
       if [[ -n $containers ]]; then echo "preflight: surviving benchmark container $containers"; failed=1; fi
     fi
     for name in "$@"; do
-      if [[ $name == tree-memory || $name == artifact-sizes || $name == world-plan || $name == package-build ]]; then seed_check || failed=1; fi
+      if [[ $name == tree-memory || $name == artifact-sizes || $name == world-plan || $name == package-build || $name == warm-rebuild || $name == root-compose ]]; then seed_check || failed=1; fi
       if [[ $name == artifact-sizes ]]; then
         resolve_packages
         for key in "${packages[@]}"; do
@@ -101,7 +129,7 @@ case $mode in
   workload)
     set -e
     name=$1; run_dir=$2; shift 2
-    if [[ $name == tree-memory || $name == artifact-sizes ]]; then resolve_image; fi
+    if [[ $name == tree-memory || $name == artifact-sizes || $name == world-plan || $name == warm-rebuild || $name == root-compose ]]; then resolve_image; fi
     if [[ $name == tree-memory ]]; then
       seed_abs=$(realpath "$seed")
       mkdir -p "$run_dir/container"
@@ -112,6 +140,50 @@ case $mode in
       echo 'scope=container-cgroup oracle=nonempty-plan'
       sha256sum "$seed/xsh" "$seed/core.tar.xz" "$seed/manifest.json"
       docker image inspect --format 'image id={{.Id}} layers={{json .RootFS.Layers}}' "$image"
+    elif [[ $name == world-plan || $name == warm-rebuild || $name == root-compose ]]; then
+      seed_abs=$(realpath "$seed")
+      store=${BENCH_STORE:-.out/artifacts/x86_64}
+      store_abs=$(realpath "$store")
+      mkdir -p "$run_dir/$name-journey/repo/.out/seed/x86_64" "$run_dir/$name-journey/modules" "$run_dir/$name-journey/output"
+      journey=$(realpath "$run_dir/$name-journey")
+      for path in "$root"/*; do ln -s "/source/${path##*/}" "$journey/repo/${path##*/}"; done
+      tar -xJf "$seed/core.tar.xz" -C "$journey/modules"
+      docker_args=(run --rm --network none --label "laputa.bench=$name" --mount "type=bind,src=$root,dst=/source,readonly" --mount "type=bind,src=$journey/repo,dst=/repo,readonly" --mount "type=bind,src=$seed_abs,dst=/repo/.out/seed/x86_64,readonly" --mount "type=bind,src=$seed_abs,dst=/seed,readonly" --mount "type=bind,src=$store_abs,dst=/artifacts,readonly" --mount "type=bind,src=$journey/modules,dst=/modules,readonly" --mount "type=bind,src=$journey/output,dst=/output" --workdir /repo --env XSH_PM_OFFLINE=1 --env XSH_MODULE_PATH=/repo:/modules/core "$image" /seed/xsh /repo/pm.xsh --)
+      printf 'baselayout\nxsh\n' > "$journey/expected"
+      docker "${docker_args[@]}" repo plan --repo /repo --root baselayout --target x86_64-linux-musl --output /output/closure.json
+        plan_oracle "$journey/output/closure.json" "$journey/expected" >/dev/null
+        while read -r key; do
+          dir="$store_abs/v2/sha256/$key"
+          expected=$(jaq -er '.payload_sha256' "$dir/artifact.json")
+          actual=$(sha256sum "$dir/payload.tar.gz"); [[ ${actual%% *} == "$expected" ]]
+        done < <(jaq -r '.nodes[].artifact_key' "$journey/output/closure.json")
+      if [[ $name == world-plan ]]; then
+        for recipe in packages/*/PKGBUILD.xsh; do basename "${recipe%/PKGBUILD.xsh}"; done | sort > "$journey/expected"
+      fi
+      busy=0; reference=-; samples=()
+      for round in 1 2 3 4 5; do
+        perf-gate-ready > "$journey/before-$round" 2>&1 || busy=1
+        start=$(uptime_ns)
+        status=0
+        case $name in
+          world-plan) docker "${docker_args[@]}" repo plan --repo /repo --all --target x86_64-linux-musl --output "/output/plan-$round.json" > "$journey/round-$round.log" || status=$? ;;
+          warm-rebuild) docker "${docker_args[@]}" repo build /output/closure.json --store /artifacts --jobs 1 > "$journey/round-$round.log" || status=$? ;;
+          root-compose) docker "${docker_args[@]}" root compose /output/closure.json --store /artifacts --runtime-root baselayout --output "/output/root-$round" > "$journey/round-$round.log" || status=$? ;;
+        esac
+        end=$(uptime_ns)
+        perf-gate-ready -1 > "$journey/after-$round" 2>&1 || busy=1
+        (( status == 0 )) || exit "$status"
+        samples+=("$((end-start))")
+        case $name in
+          world-plan) reference=$(plan_oracle "$journey/output/plan-$round.json" "$journey/expected" "$reference") ;;
+          warm-rebuild) build_oracle "$journey/output/closure.json" "$journey/round-$round.log" ;;
+          root-compose) root_oracle "$journey/output/closure.json" "$journey/output/root-$round/var/lib/laputa/root.json" ;;
+        esac
+        echo "round=$round duration_ns=${samples[-1]} oracle=passed"
+      done
+      mapfile -t sorted < <(printf '%s\n' "${samples[@]}" | sort -n)
+      spread=$((sorted[4]-sorted[0]))
+      printf 'metric\t%s-ns\t%s\t%s\t%s\n' "$name" "${sorted[2]}" "$spread" "$busy"
     elif [[ $name == artifact-sizes ]]; then
       for name in "${products[@]}"; do printf 'metric\tseed-%s\t%s\n' "$name" "$(stat -c %s "$seed/$name")"; sha256sum "$seed/$name"; done
       resolve_packages
@@ -147,13 +219,15 @@ case $mode in
       ready=0; if [[ $before != 0 || $after != 0 ]]; then ready=75; fi
       echo "host readiness exit before=$before after=$after"
       cat "$log"
-      while IFS=$'\t' read -r marker key value; do
+      while IFS=$'\t' read -r marker key value spread round_busy; do
         [[ $marker == metric ]] || continue
+        spread=${spread:-0}; round_busy=${round_busy:-0}
+        metric_ready=$ready; if [[ $round_busy != 0 ]]; then metric_ready=75; fi
         anchor=-; tolerance=0; anchor_commit=-; anchor_host=-; anchor_date=-
         while IFS=$'\t' read -r akey avalue atolerance acommit ahost adate; do
           if [[ $akey == "$key" && $avalue =~ ^[0-9]+$ && $atolerance =~ ^[0-9]+$ && -n $acommit && $ahost == "$(uname -n)" && -n $adate ]]; then anchor=$avalue; tolerance=$atolerance; anchor_commit=$acommit; anchor_host=$ahost; anchor_date=$adate; fi
         done < bench/anchors.tsv
-        echo "verdict $key: $(verdict "$ready" "$value" "$anchor" "$tolerance") anchor=$anchor tolerance=$tolerance anchor_commit=$anchor_commit anchor_host=$anchor_host anchor_date=$anchor_date"
+        echo "verdict $key: $(verdict "$metric_ready" "$value" "$anchor" "$tolerance" "$spread") value=$value spread=$spread anchor=$anchor tolerance=$tolerance anchor_commit=$anchor_commit anchor_host=$anchor_host anchor_date=$anchor_date"
       done < "$log"
     done
     ;;

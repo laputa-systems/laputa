@@ -64,5 +64,8 @@ proc main(mode: Str, tier: Str, names: Str, areas: Str, skip: Str, full: Str, xs
   fail "benchmark evidence failed" when !evidence.ok
   print f"summary: {root}/summary.txt"
   for line in lines { print $line }
+  for line in fp"{root}/summary.txt".read_lines()? {
+    if line.starts_with("verdict ") { print $line }
+  }
   fail "benchmark workload failed" when failed
 }

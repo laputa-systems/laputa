@@ -21,6 +21,24 @@ support="$repo/bench/support.sh"
 [[ $(bash "$support" verdict 0 106 100 5) == regression ]]
 [[ $(bash "$support" verdict 0 106 - 0) == 'inconclusive: no anchor' ]]
 [[ $(bash "$support" verdict 75 106 100 5) == 'inconclusive: host busy' ]]
+[[ $(bash "$support" verdict 0 106 100 5 2) == 'inconclusive: spread' ]]
+[[ $(bash "$support" verdict 0 108 100 5 2) == regression ]]
+[[ $(bash "$support" verdict 0 103 100 5 2) == 'within budget' ]]
+printf 'baselayout\nxsh\n' > "$fixture/expected"
+printf '%s\n' '{"nodes":[{"name":"baselayout","artifact_key":"a"},{"name":"xsh","artifact_key":"b"}]}' > "$fixture/journey-plan"
+digest=$(bash "$support" plan-oracle "$fixture/journey-plan" "$fixture/expected")
+bash "$support" plan-oracle "$fixture/journey-plan" "$fixture/expected" "$digest" >/dev/null
+if bash "$support" plan-oracle "$fixture/journey-plan" "$fixture/expected" wrong >/dev/null; then exit 1; fi
+printf 'missing\n' >> "$fixture/expected"
+if bash "$support" plan-oracle "$fixture/journey-plan" "$fixture/expected" >/dev/null; then exit 1; fi
+printf 'repo build %064d 2 artifacts\n' 0 > "$fixture/build-log"
+bash "$support" build-oracle "$fixture/journey-plan" "$fixture/build-log"
+printf 'repo build start xsh\n' >> "$fixture/build-log"
+if bash "$support" build-oracle "$fixture/journey-plan" "$fixture/build-log"; then exit 1; fi
+printf '%s\n' '{"artifacts":[{"package_name":"baselayout","artifact_key":"a","payload":true},{"package_name":"xsh","artifact_key":"b","payload":true}],"entries":[{}]}' > "$fixture/receipt"
+bash "$support" root-oracle "$fixture/journey-plan" "$fixture/receipt"
+jaq '.artifacts |= .[0:1]' "$fixture/receipt" > "$fixture/missing-receipt"
+if bash "$support" root-oracle "$fixture/journey-plan" "$fixture/missing-receipt"; then exit 1; fi
 printf '%s\n' '{"nodes":[{"name":"baselayout"}]}' > "$fixture/plan"
 bash "$support" oracle 100 "$fixture/plan"
 if bash "$support" oracle 0 "$fixture/plan"; then exit 1; fi
