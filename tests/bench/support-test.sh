@@ -27,6 +27,17 @@ if bash "$support" oracle 0 "$fixture/plan"; then exit 1; fi
 printf '%s\n' '{"nodes":[]}' > "$fixture/plan"
 if bash "$support" oracle 100 "$fixture/plan"; then exit 1; fi
 bash "$support" check tree-memory
+for key in 6d1031be39c588dadaa6b439e9574a377493046badbc22059ee47a63f4be2990 3718aacf03dc9dd30bd9be56f4366aefa086c232240e51e42a570a6ea4b12b68 62b4ddbc45de99ee21f1fb655a6ac9fc2cf5b14c5c626a59471bcd98a986e31a; do
+  dir="$fixture/repo/.out/artifacts/x86_64/v2/sha256/$key"
+  mkdir -p "$dir"
+  printf '%s' "$key" > "$dir/payload.tar.gz"
+  hash=$(sha256sum "$dir/payload.tar.gz"); hash=${hash%% *}
+  jaq -n --arg hash "$hash" '{payload_sha256:$hash}' > "$dir/artifact.json"
+done
+bash "$support" check artifact-sizes
+printf changed >> "$dir/payload.tar.gz"
+if bash "$support" check artifact-sizes > "$fixture/package-stale"; then exit 1; fi
+rg -q 'stale package' "$fixture/package-stale"
 printf 'changed' >> "$fixture/seed/xsh"
 if bash "$support" check tree-memory > "$fixture/stale"; then exit 1; fi
 rg -q 'stale seed product xsh' "$fixture/stale"
