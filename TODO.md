@@ -93,12 +93,3 @@ qualification remains open; manual cross-build evidence is bounded in
   Leap seconds are done, consumer ntpd-rs `leap_update`. Kernel `63abb4552` runs Linux's leap state machine on `STA_INS` and `STA_DEL` through `ADJ_STATUS`: the leap falls at the next UTC day boundary, CLOCK_REALTIME repeats or skips that second, the TAI offset moves with it, and clearing the bit cancels a pending leap. The paired witness `time/leap_status` passes in `qualify.sh clock-abi --backend both`; `qualify.sh all --backend both` passes and the A0 native accounting loses no pass (1326 passed, 0 new failures).
   Clock steps are done. Kernel `6ed63d5c2` (pin `d27b665aa`) adds `settimeofday` and `CLOCK_TAI`, and re-evaluates absolute realtime and TAI timers of `clock_nanosleep`, POSIX timers and timerfd after a step through `clock_settime`, `settimeofday` or `adjtimex` `ADJ_SETOFFSET`, cancelling timerfds armed with `TFD_TIMER_CANCEL_ON_SET`, as Linux `clock_was_set` does. The paired witnesses `time/settimeofday_step` and `time/realtime_step` run in `qualify.sh clock-abi`, which passes on both backends.
 
-### LAP-65 · P3 · Capture the gluon libdrm benchmark anchor
-
-- **Area:** Performance
-- **Where:** upstream gluon `tests/benchmarks/libdrm.py`, `docs/benchmarks.md`
-- **Problem:** Laputa vendors gluon `ba818ba`, which includes the libdrm 2.4.134 real-project benchmark (pinned by SHA-256, built by the pinned reference meson/ninja and by gluon with matching outputs and command counts, readiness-bracketed, with anchor verdicts). Its anchor is not captured: the build host reported other users' load throughout 2026-11-20.
-- **Recommendation:** Capture the libdrm anchor upstream on a quiet host as `docs/benchmarks.md` describes. Acceptance: upstream records an anchor that a run on a ready host reports within budget.
-- **Fix with:** benchmark-checklist
-- **Effort:** S
-
