@@ -59,7 +59,7 @@ case $mode in
       if [[ -n $containers ]]; then echo "preflight: surviving benchmark container $containers"; failed=1; fi
     fi
     for name in "$@"; do
-      if [[ $name == tree-memory || $name == artifact-sizes ]]; then seed_check || failed=1; fi
+      if [[ $name == tree-memory || $name == artifact-sizes || $name == world-plan || $name == package-build ]]; then seed_check || failed=1; fi
       if [[ $name == artifact-sizes ]]; then
         for key in "${packages[@]}"; do
           dir=.out/artifacts/x86_64/v2/sha256/$key

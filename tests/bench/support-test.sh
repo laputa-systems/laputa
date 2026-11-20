@@ -41,6 +41,8 @@ rg -q 'stale package' "$fixture/package-stale"
 printf 'changed' >> "$fixture/seed/xsh"
 if bash "$support" check tree-memory > "$fixture/stale"; then exit 1; fi
 rg -q 'stale seed product xsh' "$fixture/stale"
+if bash "$support" check world-plan > "$fixture/world-stale"; then exit 1; fi
+rg -q 'stale seed product xsh' "$fixture/world-stale"
 printf 'xsh\n' > "$fixture/seed/xsh"
 jaq '.xsh_dirty = true' "$fixture/seed/manifest.json" > "$fixture/m"
 mv "$fixture/m" "$fixture/seed/manifest.json"
