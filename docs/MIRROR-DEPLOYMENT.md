@@ -26,6 +26,11 @@ working index. Clients use its ETag and retry HTTP 412 conflicts.
 Authentication admission removes sessions older than ten minutes and their
 registration authorities. At most 32 pending challenges per user and 1024
 overall are admitted; an options request at capacity receives HTTP 429.
+New CLI bearer tokens are handed to a poller once from process memory and
+are discarded when the ten-minute session expires. Restarting the mirror
+discards pending handoffs. On startup, the mirror clears legacy plaintext
+session tokens and revokes their corresponding bearer credentials; operators
+may need to issue replacement tokens for those sessions.
 
 ## Outbound TLS trust
 

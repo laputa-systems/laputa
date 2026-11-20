@@ -291,7 +291,9 @@ pub fn authenticate_verify(body: &[u8], state: &AuthState) -> Response {
         let token = if !db.has_any_token(&user_id).unwrap_or(false) {
             match db.create_token(&user_id, "cli", None) {
                 Ok(t) => {
-                    let _ = db.complete_session(&req.session_id, &t);
+                    if let Err(e) = db.complete_session(&req.session_id, &t) {
+                        return Response::error(&format!("db: {e}"));
+                    }
                     Some(t)
                 }
                 Err(e) => return Response::error(&format!("db: {e}")),

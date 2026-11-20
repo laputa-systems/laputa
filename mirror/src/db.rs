@@ -1,8 +1,68 @@
 use rusqlite::{Connection, Result, params};
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread::JoinHandle;
 use graviola::hashing::{Hash, Sha256};
 
 pub struct Db {
     conn: Connection,
+    handoffs: Handoffs,
+}
+
+struct HandoffState {
+    entries: HashMap<String, (String, Instant)>,
+    shutdown: bool,
+}
+
+struct Handoffs {
+    shared: Arc<(Mutex<HandoffState>, Condvar)>,
+    worker: Option<JoinHandle<()>>,
+}
+
+impl Handoffs {
+    fn new() -> Self {
+        let shared = Arc::new((Mutex::new(HandoffState { entries: HashMap::new(), shutdown: false }), Condvar::new()));
+        let owned = shared.clone();
+        let worker = std::thread::spawn(move || {
+            let (lock, changed) = &*owned;
+            let mut state = lock.lock().unwrap();
+            loop {
+                if state.shutdown { break; }
+                let now = Instant::now();
+                let previous = state.entries.len();
+                state.entries.retain(|_, (_, deadline)| *deadline > now);
+                if state.entries.len() != previous { changed.notify_all(); }
+                state = match state.entries.values().map(|(_, deadline)| *deadline).min() {
+                    Some(deadline) => changed.wait_timeout(state, deadline.saturating_duration_since(now)).unwrap().0,
+                    None => changed.wait(state).unwrap(),
+                };
+            }
+        });
+        Self { shared, worker: Some(worker) }
+    }
+
+    fn insert(&self, id: &str, token: &str, lifetime: Duration) {
+        let (lock, changed) = &*self.shared;
+        lock.lock().unwrap().entries.insert(id.to_string(), (token.to_string(), Instant::now() + lifetime));
+        changed.notify_one();
+    }
+
+    fn take(&self, id: &str) -> Option<String> {
+        let (lock, changed) = &*self.shared;
+        let entry = lock.lock().unwrap().entries.remove(id);
+        changed.notify_one();
+        entry.and_then(|(token, deadline)| (deadline > Instant::now()).then_some(token))
+    }
+}
+
+impl Drop for Handoffs {
+    fn drop(&mut self) {
+        let (lock, changed) = &*self.shared;
+        lock.lock().unwrap().shutdown = true;
+        changed.notify_one();
+        if let Some(worker) = self.worker.take() { worker.join().expect("handoff expiry worker"); }
+    }
 }
 
 pub struct Session {
@@ -106,7 +166,18 @@ impl Db {
         // Migrate existing tokens table; no-op if column already exists.
         let _ = conn.execute("ALTER TABLE tokens ADD COLUMN expires_at TEXT", []);
         let _ = conn.execute("ALTER TABLE browser_sessions ADD COLUMN authenticated_at TEXT", []);
-        Ok(Self { conn })
+        let tx = conn.unchecked_transaction()?;
+        let tokens: Vec<String> = {
+            let mut stmt = tx.prepare("SELECT token FROM sessions WHERE token IS NOT NULL")?;
+            let rows = stmt.query_map([], |row| row.get(0))?;
+            rows.collect::<Result<_>>()?
+        };
+        for token in tokens {
+            tx.execute("DELETE FROM tokens WHERE token_hash = ?1", params![sha256_hex(token.as_bytes())])?;
+        }
+        tx.execute("UPDATE sessions SET token = NULL WHERE token IS NOT NULL", [])?;
+        tx.commit()?;
+        Ok(Self { conn, handoffs: Handoffs::new() })
     }
 
     pub fn issue_enrollment(&self, username: &str) -> Result<String> {
@@ -188,9 +259,10 @@ impl Db {
         };
         let cookie = random_hex(32);
         tx.execute("INSERT INTO browser_sessions (id, user_id, session_hash) VALUES (?1, ?2, ?3)", params![random_hex(16), user_id, sha256_hex(cookie.as_bytes())])?;
-        tx.execute("UPDATE sessions SET status = 'completed', challenge = NULL, token = ?1 WHERE id = ?2", params![token, session_id])?;
+        tx.execute("UPDATE sessions SET status = 'completed', challenge = NULL, token = NULL WHERE id = ?1", params![session_id])?;
         tx.execute("DELETE FROM registration_authority WHERE session_id = ?1", params![session_id])?;
         tx.commit()?;
+        if let Some(ref token) = token { self.store_handoff(session_id, token)?; }
         Ok(Some((token, cookie)))
     }
 
@@ -398,32 +470,26 @@ impl Db {
         Ok(self.conn.execute("UPDATE sessions SET status = 'consumed', challenge = NULL WHERE id = ?1 AND user_id = ?2 AND status = 'pending' AND datetime('now') < datetime(created_at, '+10 minutes') AND NOT EXISTS(SELECT 1 FROM registration_authority WHERE session_id = ?1)", params![id, user_id])? == 1)
     }
 
-    pub fn complete_session(&self, id: &str, token: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE sessions SET token = ?1, status = 'completed' WHERE id = ?2",
-            params![token, id],
-        )?;
+    fn store_handoff(&self, id: &str, token: &str) -> Result<()> {
+        let remaining: i64 = self.conn.query_row("SELECT max(0, unixepoch(created_at, '+10 minutes') - unixepoch('now')) FROM sessions WHERE id = ?1", params![id], |row| row.get(0))?;
+        if remaining > 0 { self.handoffs.insert(id, token, Duration::from_secs(remaining as u64)); }
         Ok(())
+    }
+
+    pub fn complete_session(&self, id: &str, token: &str) -> Result<()> {
+        self.conn.execute("UPDATE sessions SET token = NULL, status = 'completed' WHERE id = ?1", params![id])?;
+        self.store_handoff(id, token)
     }
 
     /// Returns the token exactly once (for CLI polling), then clears it.
     pub fn consume_session_token(&self, id: &str) -> Result<Option<String>> {
-        let mut stmt = self
-            .conn
-            .prepare_cached("SELECT token FROM sessions WHERE id = ?1 AND status = 'completed'")?;
-        let mut rows = stmt.query(params![id])?;
-        match rows.next()? {
-            Some(row) => {
-                let token: Option<String> = row.get(0)?;
-                if token.is_some() {
-                    self.conn.execute(
-                        "UPDATE sessions SET token = NULL, status = 'consumed' WHERE id = ?1",
-                        params![id],
-                    )?;
-                }
-                Ok(token)
-            }
-            None => Ok(None),
+        let valid: bool = self.conn.query_row("SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?1 AND status = 'completed' AND datetime('now') < datetime(created_at, '+10 minutes'))", params![id], |r| r.get(0))?;
+        let token = self.handoffs.take(id);
+        if valid && token.is_some() {
+            self.conn.execute("UPDATE sessions SET status = 'consumed' WHERE id = ?1", params![id])?;
+            Ok(token)
+        } else {
+            Ok(None)
         }
     }
 
@@ -487,6 +553,80 @@ mod tests {
         let old_count: i64 = db.conn.query_row("SELECT count(*) FROM sessions WHERE id = ?1", params![expired], |r| r.get(0)).unwrap();
         let authority_count: i64 = db.conn.query_row("SELECT count(*) FROM registration_authority WHERE session_id = ?1", params![expired], |r| r.get(0)).unwrap();
         assert_eq!((old_count, authority_count), (0, 0));
+    }
+
+    #[test]
+    fn registration_token_is_never_stored_in_session() {
+        let (db, uid) = with_user();
+        let secret = db.issue_enrollment("testuser").unwrap();
+        let id = db.create_registration(&uid, "challenge", Some(&secret), None).unwrap().unwrap();
+        let token = db.finish_registration(&id, &uid, "key", "passkey").unwrap().unwrap().0.unwrap();
+        let stored: Option<String> = db.conn.query_row("SELECT token FROM sessions WHERE id = ?1", params![id], |r| r.get(0)).unwrap();
+        assert_eq!(stored, None);
+        assert_eq!(db.consume_session_token(&id).unwrap(), Some(token));
+        assert_eq!(db.consume_session_token(&id).unwrap(), None);
+    }
+
+    #[test]
+    fn authentication_token_is_not_persisted_and_expired_poll_fails() {
+        let (db, uid) = with_user();
+        let id = db.create_session(Some(&uid), "challenge").unwrap();
+        assert!(db.claim_authentication(&id, &uid).unwrap());
+        let token = db.create_token(&uid, "cli", None).unwrap();
+        db.complete_session(&id, &token).unwrap();
+        let stored: Option<String> = db.conn.query_row("SELECT token FROM sessions WHERE id = ?1", params![id], |r| r.get(0)).unwrap();
+        assert_eq!(stored, None);
+        db.conn.execute("UPDATE sessions SET created_at = '2020-01-01' WHERE id = ?1", params![id]).unwrap();
+        assert_eq!(db.consume_session_token(&id).unwrap(), None);
+    }
+
+    #[test]
+    fn handoff_expiry_worker_removes_abandoned_tokens() {
+        let db = open();
+        db.handoffs.insert("session", "secret", Duration::from_secs(600));
+        let (lock, changed) = &*db.handoffs.shared;
+        let mut state = lock.lock().unwrap();
+        state.entries.get_mut("session").unwrap().1 = Instant::now();
+        changed.notify_one();
+        let (state, timeout) = changed.wait_timeout_while(state, Duration::from_secs(2), |s| s.entries.contains_key("session")).unwrap();
+        assert!(!timeout.timed_out());
+        assert!(state.entries.is_empty());
+    }
+
+    #[test]
+    fn reopening_revokes_legacy_plaintext_session_tokens() {
+        let path = std::env::temp_dir().join(format!("laputa-legacy-{}.db", uuid::Uuid::new_v4()));
+        let filename = path.to_str().unwrap();
+        let db = Db::open(filename).unwrap();
+        db.create_user("uid", "testuser").unwrap();
+        let token = db.create_token("uid", "cli", None).unwrap();
+        db.conn.execute("INSERT INTO sessions (id, token, status) VALUES ('old', ?1, 'completed')", params![token]).unwrap();
+        drop(db);
+        let reopened = Db::open(filename).unwrap();
+        assert_eq!(reopened.verify_token(&token).unwrap(), None);
+        let stored: Option<String> = reopened.conn.query_row("SELECT token FROM sessions WHERE id = 'old'", [], |row| row.get(0)).unwrap();
+        assert_eq!(stored, None);
+        drop(reopened);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn abandoned_registration_handoff_never_reaches_database_or_wal() {
+        let path = std::env::temp_dir().join(format!("laputa-handoff-{}.db", uuid::Uuid::new_v4()));
+        let db = Db::open(path.to_str().unwrap()).unwrap();
+        db.create_user("uid", "testuser").unwrap();
+        let secret = db.issue_enrollment("testuser").unwrap();
+        let id = db.create_registration("uid", "challenge", Some(&secret), None).unwrap().unwrap();
+        let token = db.finish_registration(&id, "uid", "key", "passkey").unwrap().unwrap().0.unwrap();
+        for file in [path.clone(), path.with_extension("db-wal")] {
+            if let Ok(bytes) = std::fs::read(file) {
+                assert!(!bytes.windows(token.len()).any(|window| window == token.as_bytes()));
+            }
+        }
+        drop(db);
+        let bytes = std::fs::read(&path).unwrap();
+        assert!(!bytes.windows(token.len()).any(|window| window == token.as_bytes()));
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
