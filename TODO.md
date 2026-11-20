@@ -48,8 +48,8 @@ qualification remains open; manual cross-build evidence is bounded in
 
 - **Area:** Performance
 - **Where:** `docs/TESTING.md` Benchmarks
-- **Problem:** Package builds and rebuilds, plans, publishing, boot, service readiness and PM operations lack representative checked timing comparisons.
-- **Recommendation:** Define bounded workloads, completed-work oracles, paired baselines and readiness-qualified measurements. Acceptance: each journey has a reproducible comparison and reports inconclusive samples explicitly.
+- **Problem:** Plan time, warm rebuild reuse and root composition now have checked, timed Scenario workloads (`world-plan`, `warm-rebuild`, `root-compose` in `bench/registry.xsh`), but no accepted timing anchor: every run on the shared build host so far is `inconclusive: host busy`. Mirror publish, boot to a usable system and xinit service start still lack a representative checked timing comparison.
+- **Recommendation:** Add checked timed workloads for mirror publish (bytes and artifacts verified), profile boot to a readiness marker, and xinit service start, following the same five-round readiness-bracketed pattern; then capture `-ns` anchors for all six on a quiet host with justified tolerances. Acceptance: each journey has a reproducible comparison and a quiet-host anchor, and reports inconclusive samples explicitly.
 - **Fix with:** bench-pyramid, benchmark-checklist
 - **Effort:** L
 ### LAP-64 · P2 · Capture memory and artifact size anchors
