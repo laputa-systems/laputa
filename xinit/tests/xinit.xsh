@@ -2671,3 +2671,68 @@ assert sweep_session(leader.pid)?.is_empty()
   let result = test.run_xsh(ctx, source, [], [], {XINIT_RUN_DIR: root.display()}, name: "session-sweep.xsh")?
   assert result.success, result.stderr
 }
+
+test test_direct_start_cleans_group_when_readiness_errors [fs, process, time, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "direct-ready-error")?
+  let services = fp"{root}/services"
+  services.mkdir()
+  let marker = fp"{root}/worker-pid"
+  let gate = fp"{root}/gate"
+  let worker = fp"{root}/worker.xsh"
+  worker.write("""Path(args[0]).write(f"{process.current_pid()?}")
+while true { time.sleep(100ms) }
+""")
+  fp"{services}/demo.xsh".write(f"""##! Readiness failure fixture.
+
+## Service declaration.
+export let service = {{
+  name: "demo",
+  command: process.command_argv(Path({json.encode(ctx.xsh_bin.display())?}), ["xsh", Path({json.encode(worker.display())?}), Path({json.encode(marker.display())?})]),
+  logging: "off",
+  stop_timeout_ms: 200,
+}}
+
+## Readiness hook.
+export proc ready() [fs, process, env, time, error] -> Result[Bool, Error] {{
+  let marker = Path({json.encode(marker.display())?})
+  var tries = 0
+  while ! marker.exists()? and tries < 300 {{
+    time.sleep(10ms)
+    tries += 1
+  }}
+  assert marker.exists()?
+  let _ = Path({json.encode(gate.display())?}).read_text()?
+  true
+}}
+""")
+  let source = xinit_policy_source()? + """
+let marker = Path(args[0])
+let gate = Path(args[1])
+var groups: List[Int] = []
+defer {
+  if marker.exists()? { groups += [marker.read_text()?.parse_int()?] }
+  let _ = unix.shutdown_process_groups(groups, 0ms, 1s)?
+}
+let failed = start_one_service("demo")
+assert failed is Err(_), "readiness must fail after spawn"
+if let Err(failure) = failed { assert marker.exists()?, f"service never spawned: {failure.message}" }
+let first = marker.read_text()?.parse_int()?
+groups += [first]
+assert process.kill_group(first, "0") is Err(_), "failed start left its process group alive"
+marker.remove()
+gate.write("ready")
+let restarted = start_one_service("demo")?
+groups += [restarted.pid]
+assert restarted.pid > 0 and restarted.pid != first
+assert marker.read_text()?.parse_int()? == restarted.pid
+let again = start_one_service("demo")?
+assert again.pid == restarted.pid, "restart created a second instance"
+assert process.kill_group(first, "0") is Err(_), "original process group survived restart"
+print "direct-start-cleanup-ok"
+"""
+  let result = test.run_xsh(ctx, source, [], [marker.display(), gate.display()], {
+    XINIT_SERVICE_DIR: services.display(), XINIT_RUN_DIR: fp"{root}/run".display(), XINIT_LOG_ROOT: fp"{root}/logs".display(),
+  }, name: "direct-ready-error.xsh")?
+  assert result.success, result.stderr
+  assert result.stdout == "direct-start-cleanup-ok\n"
+}

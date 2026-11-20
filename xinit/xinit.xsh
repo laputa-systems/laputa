@@ -1330,6 +1330,31 @@ proc reload_unit(service: Service, pid: Int) {
   }
 }
 
+proc cleanup_failed_start(service: Service, pid: Int, failure: Error) {
+  if pid > 0 {
+    match unix.shutdown_process_groups([pid], time.millis(service.stop_timeout_ms), 100ms) {
+      Ok(cleanup) => {
+        if ! cleanup.remaining.is_empty() {
+          return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"{service.name}: {failure.message}; retained process group {pid}"))
+        }
+      }
+      Err(cleanup_failure) => {
+        return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"{service.name}: {failure.message}; cleanup failed: {cleanup_failure.message}"))
+      }
+    }
+  }
+}
+
+proc spawned_readiness(service: Service, pid: Int) -> Result[Bool] {
+  match wait_ready(service) {
+    Ok(ready) => ready
+    Err(failure) => {
+      cleanup_failed_start(service, pid, failure)?
+      return Err(failure)
+    }
+  }
+}
+
 proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[SpawnResult] {
   let cgroup_path = if service.cpu_max > 0 and fake_pids() and env_value("XSH_CGROUP_ROOT", "") == "" {
     f"dry-run:/xinit/{service.name}"
@@ -1369,7 +1394,7 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
 
   if service.log == "none" {
     let child = unix.spawn_process_group(service.command, notify: use_notify)?
-    let ready = if use_notify or defer_ready { false } else { wait_ready(service)? }
+    let ready = if use_notify or defer_ready { false } else { spawned_readiness(service, child.pid)? }
 
     return {
       status: {
@@ -1397,7 +1422,7 @@ proc spawn_service(service: Service, restarts: Int, notify: Bool) -> Result[Spaw
 
   maybe_rotate_log(service.name, service.log_max_size, service.log_keep)
   let child = unix.spawn_process_group_log(service.command, path_value, notify: use_notify)?
-  let ready = if use_notify or defer_ready { false } else { wait_ready(service)? }
+  let ready = if use_notify or defer_ready { false } else { spawned_readiness(service, child.pid)? }
 
   {
     status: {
@@ -1426,23 +1451,33 @@ proc start_one_service(name: Str) -> Result[SavedStatus] {
   let spawned = spawn_service(service, current.restarts, false)?
   let base = spawned.status
 
-  let start_time_ms = if base.pid > 0 { pid_start_time(base.pid)? } else { 0 }
+  let recorded = try {
+    let start_time_ms = if base.pid > 0 { pid_start_time(base.pid)? } else { 0 }
 
-  let status: SavedStatus = SavedStatus(
-    name: base.name,
-    desired: base.desired,
-    state: base.state,
-    pid: base.pid,
-    supervisor_pid: base.supervisor_pid,
-    log: base.log,
-    restarts: base.restarts,
-    ready: base.ready,
-    cgroup_path: base.cgroup_path,
-    start_time_ms:,
-  )
+    let status: SavedStatus = SavedStatus(
+      name: base.name,
+      desired: base.desired,
+      state: base.state,
+      pid: base.pid,
+      supervisor_pid: base.supervisor_pid,
+      log: base.log,
+      restarts: base.restarts,
+      ready: base.ready,
+      cgroup_path: base.cgroup_path,
+      start_time_ms:,
+    )
 
-  write_status(status)
-  status
+    write_status(status)
+    status
+  }
+
+  match recorded {
+    Ok(status) => status
+    Err(failure) => {
+      cleanup_failed_start(service, base.pid, failure)?
+      return Err(failure)
+    }
+  }
 }
 
 proc scanner_active() -> Result[Bool] {
