@@ -7,6 +7,8 @@ xsh=$(realpath "${2:?host xsh}")
 seed=$(realpath "${3:?seed directory}")
 artifacts=$(realpath "${4:?artifact store}")
 image=${5:?package-tools image}
+arch=$(uname -m)
+case "$arch" in arm64) arch=aarch64 ;; aarch64|x86_64) ;; *) printf "unsupported architecture: %s\n" "$arch" >&2; exit 2 ;; esac
 case "$mode" in behind|ahead|slew|jump|pause|nts|external-nts|frequency|chrony-behind|chrony-ahead|chrony-slew) ;; *) exit 2 ;; esac
 if test "$mode" = external-nts; then
   endpoint=${6:?external NTS hostname or hostname:port}
@@ -24,8 +26,8 @@ output="$snapshot/.work/output"
 input="$snapshot/.work/input-root"
 mkdir -p "$snapshot" "$output" "$input/inputs" "$snapshot/.out/seed" "$snapshot/.out/artifacts" "$snapshot/.out/cache/linux-kbuild"
 git -C "$repo" archive HEAD | tar -xf - -C "$snapshot"
-cp -a --reflink=auto "$seed" "$snapshot/.out/seed/x86_64"
-cp -a --reflink=auto "$artifacts" "$snapshot/.out/artifacts/x86_64"
+cp -a --reflink=auto "$seed" "$snapshot/.out/seed/$arch"
+cp -a --reflink=auto "$artifacts" "$snapshot/.out/artifacts/$arch"
 python3 - "$snapshot/profiles/qemu-self-hosting.xsh" <<'PY'
 from pathlib import Path
 import sys
@@ -38,12 +40,29 @@ path.write_text(text.replace('qemu_memory: "12G"', 'qemu_memory: "4G"'))
 PY
 mkdir -p "$snapshot/.work/tmp"
 TMPDIR="$snapshot/.work/tmp" XSH_MODULE_PATH="$snapshot" XSH_HOST="$xsh" "$xsh" "$snapshot/seed/self_hosting_profile.xsh" -- \
-  "$snapshot" "$snapshot/.out/artifacts/x86_64" "$output" "$image"
+  "$snapshot" "$snapshot/.out/artifacts/$arch" "$output" "$image" "$arch"
+if test "$(uname -s)" = Darwin; then
+  cargo_artifact=$(python3 - "$artifacts" <<'PYART'
+import json, pathlib, sys
+receipts = [p for p in pathlib.Path(sys.argv[1]).glob("v2/sha256/*/artifact.json") if json.loads(p.read_text())["package_name"] == "cargo"]
+if len(receipts) != 1:
+    raise SystemExit(f"expected one cargo artifact, found {len(receipts)}")
+print(receipts[0].parent / "payload.tar.gz")
+PYART
+  )
+  mkdir -p "$work/tools" "$work/cargo"
+  tar -xzf "$cargo_artifact" -C "$work/tools"
+  cp -R "$repo/.cache/cargo/." "$work/cargo/"
+  docker run --rm --network none -v "$work:/work" -e PATH=/work/tools/usr/bin:/usr/bin:/bin -e LD_LIBRARY_PATH=/work/tools/usr/lib "$image" \
+    rustc --target "$arch-unknown-linux-musl" -C linker=cc -C target-feature=+crt-static \
+    /work/repository/tests/integration/fixtures/ntp-clock-server.rs -o /work/repository/.work/input-root/inputs/ntp-clock-server
+else
 channel=$(jaq --from toml -r '.toolchain.channel' "$snapshot/ntpd-rs/rust-toolchain.toml")
 rustc=$(rustup which rustc --toolchain "$channel")
 TMPDIR="$snapshot/.work/tmp" kache "$rustc" --target x86_64-unknown-linux-musl \
   -C linker=mold -C linker-flavor=ld \
   "$snapshot/tests/integration/fixtures/ntp-clock-server.rs" -o "$input/inputs/ntp-clock-server"
+fi
 cp "$snapshot/tests/integration/fixtures/ntp-clock-guest.xsh" "$input/inputs/entry.xsh"
 if test "$mode" = external-nts; then
   printf '%s\n' "$endpoint" > "$input/inputs/nts-endpoint"
@@ -62,10 +81,16 @@ if test "$mode" = chrony-behind || test "$mode" = chrony-ahead || test "$mode" =
   cp "$snapshot/tests/integration/fixtures/chrony-oracle-launch.xsh" "$input/inputs/chrony-launch.xsh"
 fi
 if test "$mode" = nts; then
+  if test "$(uname -s)" = Darwin; then
+    docker run --rm --network none -v "$work:/work" -e PATH=/work/tools/usr/bin:/usr/bin:/bin -e LD_LIBRARY_PATH=/work/tools/usr/lib -e CARGO_HOME=/work/cargo -e CARGO_TARGET_DIR=/work/nts-target -e RUSTFLAGS="-C linker=cc -C target-feature=+crt-static" "$image" \
+      cargo build --locked --offline -j 2 --target "$arch-unknown-linux-musl" --manifest-path /work/repository/tests/integration/fixtures/nts-clock-server/Cargo.toml
+    cp "$work/nts-target/$arch-unknown-linux-musl/debug/nts-clock-server" "$input/inputs/nts-clock-server"
+  else
   TMPDIR="$snapshot/.work/tmp" CARGO_TARGET_DIR="$work/nts-target" RUSTC_WRAPPER=kache \
     RUSTFLAGS='-C linker=mold -C linker-flavor=ld' cargo "+$channel" build --locked --offline -j 2 \
     --target x86_64-unknown-linux-musl --manifest-path "$snapshot/tests/integration/fixtures/nts-clock-server/Cargo.toml"
   cp "$work/nts-target/x86_64-unknown-linux-musl/debug/nts-clock-server" "$input/inputs/nts-clock-server"
+  fi
   cp "$snapshot/ntpd-rs/ntp-proto/test-keys/"{testca.pem,end.fullchain.pem,end.key} "$input/inputs/"
   touch "$input/inputs/nts-mode"
 fi
@@ -73,10 +98,16 @@ if test "$mode" = jump; then touch "$input/inputs/jump-mode"; fi
 if test "$mode" = slew || test "$mode" = chrony-slew; then touch "$input/inputs/slew-mode"; fi
 if test "$mode" = ahead || test "$mode" = chrony-ahead; then touch "$input/inputs/ahead-mode"; fi
 if test "$mode" = pause; then touch "$input/inputs/pause-mode"; fi
+if test "$(uname -s)" = Darwin; then
+  docker run --rm --network none -v "$work:/work" "$image" /sbin/mkfs.ext4 -q -F -d /work/repository/.work/input-root /work/repository/.work/output/inputs.ext4 128M
+  docker run --rm --network none -v "$work:/work" "$image" /sbin/mkfs.ext4 -q -F /work/repository/.work/output/output.ext4 64M
+  docker run --rm --network none -v "$work:/work" "$image" chown -R "$(id -u):$(id -g)" /work
+else
 truncate -s 128M "$output/inputs.ext4"
 truncate -s 64M "$output/output.ext4"
 /sbin/mkfs.ext4 -q -F -d "$input" "$output/inputs.ext4"
 /sbin/mkfs.ext4 -q -F "$output/output.ext4"
+fi
 XSH_MODULE_PATH="$snapshot" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
   "$snapshot" "$output" "$repo/.work/ntp-$$.sock" "$mode"
 if test "$mode" = frequency; then

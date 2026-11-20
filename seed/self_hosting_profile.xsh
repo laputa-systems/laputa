@@ -5,8 +5,8 @@ use system.build
 use system.docker
 use system.profile
 
-proc main(repository: Path, artifacts: Path, output: Path, image: Str) [fs, process, env, error] -> Result[Unit, Error] {
-  let arch = xsh_seed.xsh_seed_arch("x86_64")?
+proc main(repository: Path, artifacts: Path, output: Path, image: Str, architecture: Str = "x86_64") [fs, process, env, error] -> Result[Unit, Error] {
+  let arch = xsh_seed.xsh_seed_arch(architecture)?
   let identity = unix.id()?
   world.world_kbuild_cache(repository).mkdir()?
   let config: docker.DockerConfig = {

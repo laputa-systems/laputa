@@ -48,10 +48,12 @@ proc main(root: Path) [fs, process, env, time, io, error] {
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   let flags = p"/proc/cpuinfo".read_text()?
-  for feature in ["aes", "pclmulqdq", "bmi1", "adx", "avx", "avx2"] {
+  let arm = "AArch64" in flags or "Features" in flags
+  let features = if arm { ["fp", "asimd", "aes", "pmull", "sha1", "sha2"] } else { ["aes", "pclmulqdq", "bmi1", "adx", "avx", "avx2"] }
+  for feature in features {
     var found = false
     for line in flags.lines() {
-      if line.starts_with("flags") and feature in line.split(" ") {
+      if (line.starts_with("flags") or line.starts_with("Features")) and feature in line.split(" ") {
         found = true
       }
     }
