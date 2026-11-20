@@ -20,3 +20,8 @@ test test_bench_selection [error] {
   assert registry.select(all, "change", ["world-plan"], [], [], false) is Err(_)
   assert [registry.tier_name(n) for n in [0, 1, 2, 3]] == ["edit", "change", "scenario", "full"]
 }
+
+test test_bench_measurement_contracts [process, error] {
+  let result = process.run(process.command_argv("bash", ["bash", "tests/bench/support-test.sh"]))?
+  assert result.ok
+}

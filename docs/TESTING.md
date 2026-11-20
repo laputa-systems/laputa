@@ -449,17 +449,56 @@ Unknown names and empty selections fail. Exclusions are printed. Full requires
 
 The driver needs verification XSH and XSHT binaries, the checkout fixtures,
 64 MiB free space and `perf-gate-ready`. Override `XSH_ROOT`, `BENCH_XSH_ROOT`,
-`BENCH_XSH`, and `BENCH_XSHT` for a different checkout or binary. Edit takes
-seconds; change is estimated at seconds to a minute. Each run writes logs and
-`summary.txt` under `.work/bench/`, including elapsed wall time, exit status,
-exclusions and host readiness. A busy host makes timing inconclusive. A single
-sample has no baseline or budget and completion is not a performance verdict.
-The catalog workload loads all actual x86_64 recipes and checks that baselayout
-is present. The `pm-check` workload type-checks the production PM source. The graph workload checks synthetic kernel graph inventories and
-execution, including no-op and incremental reuse. Neither proves a real build.
-The binaries are not checked for freshness; rebuild them when source changed.
-These workloads do not launch persistent services; an interrupted child may
-still require manual inspection before another run.
+`BENCH_XSH`, and `BENCH_XSHT` for a different checkout or binary. Each run
+writes logs and `summary.txt` under `.work/bench/`, including the checkout
+commit and dirty state, XSH checkout HEAD, binary hashes, host identity, and
+readiness output before and after each workload. A busy host makes a comparison
+inconclusive. The catalog workload checks the actual x86_64 recipe inventory;
+`pm-check` checks the PM source; `make-graph` exercises synthetic graph
+execution and reuse. Neither proves a real build.
+
+The scenario workloads `tree-memory` and `artifact-sizes` require Docker, Git,
+Bash, jaq, sha256sum and the x86_64 seed and package artifacts. Before either
+runs, admission verifies that the seed manifest is clean, its XSH commit
+contains `XSH_COMMIT` in `infra/asterinas/inputs.lock`, and the four product
+hashes match. It checks selected package payload hashes as well. Missing or
+stale inputs fail; `BENCH_SEED` can point at another seed. The driver reports
+live process groups recorded by earlier benchmark runs and Docker containers
+with the benchmark label before running anything. Inspect and stop those
+processes or containers before retrying. The verification binaries' hashes and
+XSH HEAD are recorded, but their source freshness is not established by the
+seed check.
+
+`tree-memory` runs an offline baselayout package plan in the pinned
+`laputa-package-tools:x86_64-f9f80dd0840f482b` image. It extracts the hashed
+seed core archive inside the container and requires a plan containing
+baselayout before reading `memory.peak`. The value is the container cgroup's
+peak in bytes: it includes the shell, extraction, plan process tree and
+charged cache, but excludes the Docker daemon. `artifact-sizes` reports file
+lengths and SHA-256 for the four seed products and the compressed payloads of
+the selected baselayout, musl and linux-headers artifacts. It verifies each
+payload against its artifact manifest. Docker image `Size` is the image's
+uncompressed virtual size, with image ID and layer diff IDs recorded; it is
+not a compressed transfer size. The installer ISO is excluded because it is
+not built in this setup. Different package artifact keys or image IDs represent
+different inputs and must be compared deliberately.
+
+`bench/anchors.tsv` is initially empty: no accepted limit has been captured.
+Each tab-separated line contains metric name, byte value, absolute tolerance in
+bytes, Laputa commit, host name, and UTC date. The limit is value plus
+tolerance, matched by metric and host. Results are `within budget`,
+`regression`, `inconclusive: no anchor`, or `inconclusive: host busy`; a busy
+host takes precedence. On a quiet host, after choosing a justified tolerance,
+capture candidates without overwriting the committed file:
+
+```sh
+XSH_ROOT=/path/to/xsh ANCHOR_TOLERANCE_BYTES=10485760 bash bench/capture.sh > .work/tmp/anchors.tsv
+```
+
+The command requires a clean checkout and quiet readiness checks before,
+during, and after the two workloads. Review the measurements, inputs,
+tolerance, host and date before replacing `bench/anchors.tsv` and committing
+anchors. The example tolerance is illustrative, not an accepted budget.
 
 The audit maps paid outcomes to available evidence. A gap means that evidence
 is not an accepted representative benchmark with an output oracle.
@@ -469,12 +508,12 @@ is not an accepted representative benchmark with an output oracle.
 | Package build throughput and rebuild cost | `make verify` builds world and reruns; successful build and reuse are functional checks | `perf` on container processes and build logs; no controlled throughput benchmark or retained baseline |
 | Plan time | `pm-catalog` validates real recipe inventory; exact fixture plan is checked by `test_pyramid_pm_plan_exact_inventory` | `perf` on XSH; neither measures a complete production plan. A real plan needs seed inputs |
 | Mirror publish time | `make publish` publishes the selected plan | network byte counters and server/client traces; no timed checked benchmark |
-| Image and package size | `installer/rootfs_size.xsh` calculates image capacity; package manifests describe installed files | `du` and manifest bytes; no comparable artifact-size budget |
+| Image and package size | `artifact-sizes` checks seed and three package payloads and records image size | comparable bytes and identities; no accepted anchor; installer ISO excluded |
 | Boot to usable system | `make profile-test` checks the guest profile | QEMU/guest traces and serial timestamps; no bounded boot latency benchmark |
 | xinit service start | xinit supervision tests check readiness | guest process tracing and readiness timestamps; no latency benchmark |
 | PM install, remove, generation switch | PM and activation tests check resulting state | syscall and filesystem tracing; no latency benchmark |
 | gluon configure/build | `gluon/tests/benchmarks/run.sh` exercises synthetic graphs and setup | CPU sampling and syscall counts; synthetic corpus, incomplete output checks and no accepted baseline |
-| Memory footprint | no workload-tree peak measurement | cgroup memory peak and heap profiler; no representative workload or budget |
+| Memory footprint | `tree-memory` checks an offline baselayout plan and reads the container cgroup peak | whole container tree, including cache; no accepted anchor |
 
 `make verify` records elapsed seconds, not a regression gate. The gluon script
 uses three samples for setup, skips some command failures and has no established
@@ -487,5 +526,5 @@ instrumentation as well as QEMU host attribution. Timing needs matched inputs,
 cache and concurrency, interleaved baseline runs, and readiness checks before
 and after each measurement. No stale performance threshold was identified in
 these harnesses; missing budgets are gaps rather than passes. The highest risks
-are missing representative end-to-end comparisons and memory scope, followed
-by weak gluon oracles and incomplete run provenance and preflight.
+are missing representative end-to-end comparisons and accepted anchors, followed
+by weak gluon oracles.

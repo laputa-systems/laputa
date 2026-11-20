@@ -26,14 +26,15 @@ proc main(mode: Str, tier: Str, names: Str, areas: Str, skip: Str, full: Str, xs
   }
   for item in selected {
     for requirement in item.requires {
-      if !requirement.exists()? { fail f"preflight: missing {requirement}; restore or prepare the input, or set XSH_ROOT= to the checkout with built verification binaries; affected: {item.name}; nothing ran" }
+      guard requirement.exists() else { fail f"preflight: missing {requirement}; restore or prepare the input, or set XSH_ROOT= to the checkout with built verification binaries; affected: {item.name}; nothing ran" }
     }
     for tool in item.tools {
       if process.which(tool) is Err(_) { fail f"preflight: missing tool {tool}; install or configure it; affected: {item.name}; nothing ran" }
     }
   }
   if process.which("perf-gate-ready") is Err(_) { fail f"preflight: missing perf-gate-ready; install the host gate; affected: {selected_names.join(", ")}; nothing ran" }
-  print "warning: host binary freshness is not verified; rebuild after XSH source changes"
+  let admission = process.run(process.command_argv("bash", ["bash", "bench/support.sh", "check", @selected_names]))?
+  fail "preflight failed; nothing ran" when !admission.ok
   let space = fs.statvfs(p".")?
   fail f"preflight: less than 64 MiB free; free disk space; affected: {selected_names.join(", ")}; nothing ran" when space.blocks_available * space.fragment_size < 67108864
   let ready = process.run(process.command_argv("perf-gate-ready", ["perf-gate-ready"], stdout: p"/dev/null", stderr: p"/dev/null"))?
@@ -47,17 +48,20 @@ proc main(mode: Str, tier: Str, names: Str, areas: Str, skip: Str, full: Str, xs
   }
   var failed = false
   for item in selected {
-    let before = process.run(process.command_argv("perf-gate-ready", ["perf-gate-ready"], stdout: p"/dev/null", stderr: p"/dev/null"))?
+    let before = process.run(process.command_argv("perf-gate-ready", ["perf-gate-ready"], stdout: fp"{root}/{item.name}.before.ready", stderr: fp"{root}/{item.name}.before.ready", stderr_append: true))?
     let start = time.monotonic()?
     let argv = [arg.replace("@OUTPUT@", with: f"{root}/plan.json") for arg in item.argv]
-    let result = process.run(process.command_argv(fp"{argv[0]}", argv, p".", env: {XSH_PM_REPO: ""}, stdout: fp"{root}/{item.name}.log", stderr: fp"{root}/{item.name}.log", stdout_append: true, stderr_append: true))?
+    let result = process.run(process.command_argv("bash", ["bash", "bench/support.sh", "execute", root, item.name, @argv], p".", env: {XSH_PM_REPO: ""}, stdout: fp"{root}/{item.name}.log", stderr: fp"{root}/{item.name}.log", stdout_append: true, stderr_append: true))?
     let elapsed = (time.monotonic()? - start) / 1000000
-    let after = process.run(process.command_argv("perf-gate-ready", ["perf-gate-ready", "-1"], stdout: p"/dev/null", stderr: p"/dev/null"))?
+    let after = process.run(process.command_argv("perf-gate-ready", ["perf-gate-ready", "-1"], stdout: fp"{root}/{item.name}.after.ready", stderr: fp"{root}/{item.name}.after.ready", stderr_append: true))?
+    fp"{root}/{item.name}.ready-status".write_lines([f"{before.shell_code()?} {after.shell_code()?}"])
     let validity = if before.ok and after.ok { "observational; no comparison" } else { "inconclusive: host busy" }
     lines += [f"{item.name}: exit={result.shell_code()?} duration_ms={elapsed} timing={validity}"]
     if !result.ok { failed = true }
   }
   fp"{root}/summary.txt".write_lines(lines)
+  let evidence = process.run(process.command_argv("bash", ["bash", "bench/support.sh", "report", root], stdout: fp"{root}/summary.txt", stderr: fp"{root}/summary.txt", stdout_append: true, stderr_append: true))?
+  fail "benchmark evidence failed" when !evidence.ok
   print f"summary: {root}/summary.txt"
   for line in lines { print $line }
   fail "benchmark workload failed" when failed
