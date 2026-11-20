@@ -38,15 +38,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** bench-pyramid, benchmark-checklist
 - **Effort:** L (weeks)
 
-### LAP-73 · P2 · Publish the aarch64 host-tools and package-tools images
-
-- **Area:** Build and dependencies
-- **Where:** `seed/images.lock`, `seed/images.xsh`, `docs/DEVELOPMENT.md`
-- **Problem:** x86_64 host-tools and package-tools images are published to `oci.17166969.xyz` and pulled by digest, with the Dockerfile hash recorded so an edited Dockerfile fails as a stale lock. The aarch64 entries in `seed/images.lock` are still zero placeholders, so aarch64 builders cannot obtain a pinned image.
-- **Recommendation:** Build the aarch64 layouts on the m1-max host with `xsh seed/images.xsh -- build --arch aarch64 ...`, publish them with `stuff publish oci --layout ... --repository laputa-host-tools|laputa-package-tools --tag aarch64`, and record their digests and package key. Acceptance: `xsh seed/images.xsh -- ref --arch aarch64` resolves and both digests pull anonymously.
-- **Fix with:** single-source-of-truth
-- **Effort:** S (hours)
-
 ### LAP-64 · P2 · Measure workload memory and artifact sizes
 
 - **Area:** Performance
