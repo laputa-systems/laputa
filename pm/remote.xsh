@@ -177,6 +177,8 @@ proc try_load_remote_index_from_repo(repo: Str, out: Path) -> Result[List[types.
   })?
 
   if response.status == 404 {
+    out.mkdir()
+    util.remote_index_cache_path(out).write("[]")
     let empty = []
     return empty
   }
@@ -359,7 +361,8 @@ export proc write_remote_index_to_repo(
   out: Path,
   index: List[types.RemotePackage],
   token: Str,
-) [fs, net, error] {
+  expected: Str,
+) [fs, net, error] -> Result[Bool, Error] {
   write_remote_index_cache(out, index)
 
   if util.is_file_url(repo) {
@@ -368,10 +371,22 @@ export proc write_remote_index_to_repo(
     atomically replace dest as temporary {
       util.remote_index_cache_path(out).copy(to: temporary, overwrite: true)
     }
-    return
+    return true
   }
 
-  upload_repo_file(repo, p"index.json", util.remote_index_cache_path(out), token, work)
+  let response = net.upload({
+    method: "PUT",
+    url: util.repo_url_for(repo, p"index.json")?,
+    source: util.remote_index_cache_path(out),
+    headers: remote_auth_headers(token).push({name: "If-Match", value: f"\"{expected}\""}),
+    pool: "pm",
+    fail_status: false,
+  })?
+  return false when response.status == 412
+  if response.status < 200 or response.status >= 300 {
+    return Err(types.PmError.RemoteUpload(f"failed to upload index: HTTP {response.status}"))
+  }
+  true
 }
 
 ## Exported PM declaration `upsert_remote_package`.

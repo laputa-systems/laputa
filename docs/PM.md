@@ -403,6 +403,11 @@ new system bundle key. Rows published before content-addressed names point at
 legacy `<name>-<ver>-<rel>` objects; they stay readable, and republishing the
 artifact moves the row to content-addressed names.
 
+Network publishers read the working index and send its ETag in `If-Match` on
+the index write. The mirror requires this condition and returns HTTP 412 if
+the index changed; PM rereads and merges again, up to five attempts. File
+repository publishers hold `.index.lock` across the read, merge and write.
+
 ### Snapshot authentication
 
 `index.json` stays the publishers' mutable working index, but production

@@ -271,7 +271,7 @@ fn put(path: &str, headers: &HashMap<String, String>, body: &[u8], state: &AppSt
     }
 
     if path == "/index.json" {
-        return put_index(body, state);
+        return put_index(headers, body, state);
     }
 
     if let Some(object) = SnapshotObject::at(path) {
@@ -501,10 +501,13 @@ fn get_index(state: &AppState) -> Response {
     response
         .extra_headers
         .push(("Cache-Control", "no-store".to_string()));
+    if let Body::Bytes(bytes) = &response.body {
+        response.extra_headers.push(("ETag", format!("\"{}\"", db::sha256_hex(bytes))));
+    }
     response
 }
 
-fn put_index(body: &[u8], state: &AppState) -> Response {
+fn put_index(headers: &HashMap<String, String>, body: &[u8], state: &AppState) -> Response {
     let mut index: Vec<RemotePackage> = match serde_json::from_slice(body) {
         Ok(index) => index,
         Err(_) => return Response::bad_request("invalid index json"),
@@ -524,6 +527,13 @@ fn put_index(body: &[u8], state: &AppState) -> Response {
     };
 
     let _index_guard = state.index_lock.lock().unwrap();
+    let Some(expected) = headers.get("if-match") else {
+        return Response::json(428, r#"{"error":"index precondition required"}"#);
+    };
+    let current = serde_json::to_vec_pretty(&*state.index.read().unwrap()).unwrap();
+    if expected != &format!("\"{}\"", db::sha256_hex(&current)) {
+        return Response::json(412, r#"{"error":"index changed"}"#);
+    }
     if let Err(e) = state.storage.put("index.json", bytes, "application/json") {
         tracing::error!("index upload failed: {e}");
         return Response::error("index upload failed");

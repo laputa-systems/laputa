@@ -181,7 +181,13 @@ fn sample_index() -> Vec<packages::RemotePackage> {
 
 fn put_index(state: &AppState, index: &[packages::RemotePackage]) -> packages::Response {
     let body = serde_json::to_vec(index).unwrap();
-    packages::route("PUT", "/index.json", &auth_headers(), &body, state)
+    let mut headers = auth_headers();
+    headers.insert("if-match".into(), index_etag(state));
+    packages::route("PUT", "/index.json", &headers, &body, state)
+}
+
+fn index_etag(state: &AppState) -> String {
+    get(state, "/index.json").extra_headers.into_iter().find(|(name, _)| *name == "ETag").unwrap().1
 }
 
 #[test]
@@ -223,10 +229,8 @@ fn public_reads_return_index_and_objects() {
 
     let resp = packages::route("GET", "/index.json", &headers(&[]), b"", &state);
     assert_eq!(resp.status, 200);
-    assert_eq!(
-        resp.extra_headers,
-        vec![("Cache-Control", "no-store".to_string())]
-    );
+    assert!(resp.extra_headers.contains(&("Cache-Control", "no-store".to_string())));
+    assert!(resp.extra_headers.contains(&("ETag", index_etag(&state))));
     let idx = body_json(&resp);
     assert_eq!(idx[0]["name"], "zlib");
     assert_eq!(idx[0]["mkdeps_target"], serde_json::json!(["llvm-toolchain"]));
@@ -484,7 +488,7 @@ fn create_token_returns_usable_api_token() {
     let resp = packages::route(
         "PUT",
         "/index.json",
-        &headers(&[("authorization", &format!("Bearer {token}"))]),
+        &headers(&[("authorization", &format!("Bearer {token}")), ("if-match", &index_etag(&state))]),
         serde_json::to_vec(&sample_index()).unwrap().as_slice(),
         &state,
     );
@@ -616,7 +620,7 @@ fn local_mode_accepts_unauthenticated_writes_and_streams_reads() {
         assert_eq!(std::fs::read(state.tmp.path().join("data").join(path)).unwrap(), body);
     }
     let index = serde_json::to_vec(&sample_index()).unwrap();
-    let resp = packages::route("PUT", "/index.json", &no_auth, &index, &state);
+    let resp = packages::route("PUT", "/index.json", &headers(&[("if-match", &index_etag(&state))]), &index, &state);
     assert_eq!(resp.status, 201);
 
     let resp = get(&state, &format!("/{PACKAGE}"));
@@ -633,10 +637,8 @@ fn local_mode_accepts_unauthenticated_writes_and_streams_reads() {
     assert_eq!(get(&state, "/packages/aarch64/zlib/zlib-9-9.tar.gz").status, 404);
 
     let resp = get(&state, "/index.json");
-    assert_eq!(
-        resp.extra_headers,
-        vec![("Cache-Control", "no-store".to_string())]
-    );
+    assert!(resp.extra_headers.contains(&("Cache-Control", "no-store".to_string())));
+    assert!(resp.extra_headers.contains(&("ETag", index_etag(&state))));
     assert_eq!(body_json(&resp)[0]["name"], "zlib");
 
     // The index is persisted to the data dir, where the next start reloads it.
@@ -880,12 +882,51 @@ fn concurrent_chunked_immutable_uploads_have_one_winner() {
 }
 
 #[test]
+fn concurrent_index_publishers_retry_after_conflict() {
+    let state = Arc::new(make_local_state());
+    assert_eq!(packages::route("PUT", "/index.json", &headers(&[]), b"[]", &state).status, 428);
+    let initial = get(&state, "/index.json");
+    let etag = initial.extra_headers.iter().find(|(name, _)| *name == "ETag").expect("index ETag").1.clone();
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let mut threads = Vec::new();
+    for name in ["alpha", "beta"] {
+        let state = state.clone();
+        let barrier = barrier.clone();
+        let etag = etag.clone();
+        threads.push(std::thread::spawn(move || {
+            let mut row = sample_index()[0].clone();
+            row.name = name.into();
+            row.metapackage = true;
+            row.tarball.clear();
+            row.sha256.clear();
+            row.size = 0;
+            row.metadata.clear();
+            row.proof.clear();
+            let body = serde_json::to_vec(&vec![row]).unwrap();
+            barrier.wait();
+            packages::route("PUT", "/index.json", &headers(&[("if-match", &etag)]), &body, &state).status
+        }));
+    }
+    let mut statuses: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+    statuses.sort();
+    assert_eq!(statuses, [201, 412]);
+    let current = get(&state, "/index.json");
+    let next_etag = current.extra_headers.iter().find(|(name, _)| *name == "ETag").unwrap().1.clone();
+    let mut rows: Vec<packages::RemotePackage> = serde_json::from_slice(&body_bytes(current)).unwrap();
+    let mut second = rows[0].clone();
+    second.name = if second.name == "alpha" { "beta" } else { "alpha" }.into();
+    rows.push(second);
+    assert_eq!(packages::route("PUT", "/index.json", &headers(&[("if-match", &next_etag)]), &serde_json::to_vec(&rows).unwrap(), &state).status, 201);
+    assert_eq!(body_json(&get(&state, "/index.json")).as_array().unwrap().len(), 2);
+}
+
+#[test]
 fn index_rewrite_keeps_fields_the_mirror_does_not_interpret() {
     let state = make_local_state();
     let mut index = serde_json::to_value(sample_index()).unwrap();
     index[0]["recipe_sha256"] = serde_json::json!("abc123");
     let body = serde_json::to_vec(&index).unwrap();
-    assert_eq!(packages::route("PUT", "/index.json", &headers(&[]), &body, &state).status, 201);
+    assert_eq!(packages::route("PUT", "/index.json", &headers(&[("if-match", &index_etag(&state))]), &body, &state).status, 201);
     let stored = body_json(&get(&state, "/index.json"));
     assert_eq!(stored[0]["recipe_sha256"], "abc123");
     assert_eq!(stored[0]["artifact_key"], ARTIFACT_KEY);

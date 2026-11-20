@@ -903,3 +903,32 @@ test test_local_mirror_publication_needs_no_token_and_sends_none [fs, net, env, 
     assert [header.name for header in headers if header.name == "Authorization"] == []
   }
 }
+
+test test_publish_retries_index_conflicts_with_a_bound [fs, net, env, time, error] { |ctx|
+  let value = publish_plan(ctx, "publish-conflict-retry-repo")?
+  let store_root = test.temp_dir(ctx, name: "publish-conflict-retry-store")?
+  stage_plan_artifacts(ctx, value, store_root)
+  let snapshot = repo.snapshot(value, store_root)?
+  let work = test.temp_dir(ctx, name: "publish-conflict-retry-work")?
+  let remote = "http://127.0.0.1:3000"
+  let index_url = f"{remote}/index.json"
+  let missing: NetResponse = {status: 404, reason: "Not Found", bytes: 0, headers: [], url: index_url, effective_url: index_url, redirect_count: 0, body: b""}
+  let response_headers: List[NetHeader] = []
+  let conflict = {status: 412, reason: "Precondition Failed", bytes: 0, headers: response_headers, url: index_url, effective_url: index_url, redirect_count: 0}
+  let created = {status: 201, reason: "Created", bytes: 0, headers: response_headers, url: remote, effective_url: remote, redirect_count: 0}
+  test.mock(ctx, "net.request", {url: index_url}, Ok(missing), 5)
+  test.mock(ctx, "net.upload", {url: index_url}, Ok(conflict), 5)
+  test.mock(ctx, "net.upload", {method: "PUT"}, Ok(created), snapshot.packages.len() * 3)
+  match repo.publish(snapshot, remote, "", work) {
+    Ok(_) => test.fail("publication succeeded despite repeated index conflicts")
+    Err(problem) => assert "five publication attempts" in problem.message
+  }
+  let reads = test.calls(ctx, "net.request")
+  assert reads.len() == 5
+  let writes = [call for call in test.calls(ctx, "net.upload") if call.args.get("url")?.require(Str)? == index_url]
+  assert writes.len() == 5
+  for write in writes {
+    let headers = write.args.get("headers")?.require(List[NetHeader])?
+    assert [header.value for header in headers if header.name == "If-Match"] == [f"\"{bytes.from_text("[]").sha256().hex()}\""]
+  }
+}

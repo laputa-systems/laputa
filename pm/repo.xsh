@@ -227,6 +227,18 @@ export proc publish(
     )
   }
 
+  if util.is_file_url(remote_repo) {
+    let lock_path = util.repo_file_path(remote_repo, p".index.lock")?
+    lock_path.parent.mkdir()
+    let lock = fs.lock(lock_path)?
+    defer fs.unlock(lock)?
+    repo_publish_locked(repo_snapshot, remote_repo, token, work, arch)
+    return
+  }
+  repo_publish_locked(repo_snapshot, remote_repo, token, work, arch)
+}
+
+proc repo_publish_locked(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: Str, work: Path, arch: Str) [fs, net, env, time, error] {
   work.mkdir()
   let stages: List[RepoPublishStage] = collect {
     for publication in repo_snapshot.packages {
@@ -247,33 +259,27 @@ export proc publish(
     }
   }
 
-  var index = remote.load_remote_index_from_repo(remote_repo, fp"{work}/index")?
-  let pending: List[RepoPublishStage] = collect {
-    for stage in stages {
-      let merged = repo_merge_publication(index, stage.entry)?
-      index = merged.index
-
-      if merged.already_published {
-        print ${stage.entry.arch} ${stage.entry.name} util.version_id(stage.entry.ver, stage.entry.rel) \
-          "already-published"
-      } else {
-        yield stage
-      }
-    }
-  }
-
-  for stage in pending {
+  for stage in stages {
     if ! stage.entry.metapackage {
       repo_publish_immutable_object(remote_repo, fp"{stage.entry.tarball}", stage.publication.payload, token, work)
     }
-
     repo_publish_immutable_object(remote_repo, fp"{stage.entry.metadata}", stage.metadata, token, work)
     repo_publish_immutable_object(remote_repo, fp"{stage.entry.proof}", stage.publication.proof, token, work)
   }
 
-  if ! pending.is_empty() {
-    remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token)
+  for _ in [0, 1, 2, 3, 4] {
+    var index = remote.load_remote_index_from_repo(remote_repo, fp"{work}/index")?
+    let expected = if util.is_file_url(remote_repo) { "" } else { hash.sha256(util.remote_index_cache_path(fp"{work}/index"))?.hex() }
+    var changed = false
+    for stage in stages {
+      let merged = repo_merge_publication(index, stage.entry)?
+      index = merged.index
+      if ! merged.already_published { changed = true }
+    }
+    return unless changed
+    if remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token, expected)? { return }
   }
+  return Err(types.PmError.RemoteUpload("index changed during five publication attempts"))
 }
 
 ## Publishes an offline-signed repository snapshot. The snapshot files are

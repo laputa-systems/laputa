@@ -20,6 +20,9 @@ connections to Cloudflare and forwards the public hostname to the local mirror.
 The deployment installs immutable releases under `/opt/laputa-mirror/releases/`
 and switches the `/opt/laputa-mirror/current` symlink to activate one. Database
 and upload state stay under `/var/lib/laputa-mirror/`.
+Run one mirror process for a bucket: index preconditions are serialized by
+that process, so multiple independent mirror processes must not write the same
+working index. Clients use its ETag and retry HTTP 412 conflicts.
 
 ## Outbound TLS trust
 
