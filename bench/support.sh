@@ -1,15 +1,31 @@
 set -u
 mode=$1
 shift
-image=laputa-package-tools:x86_64-f9f80dd0840f482b
+resolve_image() {
+  image=$("${BENCH_XSH:?}" seed/images.xsh -- ref --arch x86_64) || { echo "preflight: cannot resolve the pinned package-tools image"; exit 1; }
+}
 seed=${BENCH_SEED:-.out/seed/x86_64}
 xsh_root=${BENCH_XSH_ROOT:?}
 root=$(pwd -P)
-packages=(
-  6d1031be39c588dadaa6b439e9574a377493046badbc22059ee47a63f4be2990
-  3718aacf03dc9dd30bd9be56f4366aefa086c232240e51e42a570a6ea4b12b68
-  62b4ddbc45de99ee21f1fb655a6ac9fc2cf5b14c5c626a59471bcd98a986e31a
-)
+package_names=(baselayout musl linux-headers)
+package_key() {
+  local name=$1 best= best_time=0 file id time
+  for file in .out/artifacts/x86_64/v2/sha256/*/artifact.json; do
+    id=$(jaq -r '.package_id' "$file") || continue
+    [[ $id =~ ^$name-[0-9] ]] || continue
+    time=$(stat -c %Y "$file")
+    if (( time > best_time )); then best=${file%/artifact.json}; best=${best##*/}; best_time=$time; fi
+  done
+  [[ -n $best ]] && printf '%s\n' "$best"
+}
+resolve_packages() {
+  local name key
+  packages=()
+  for name in "${package_names[@]}"; do
+    key=$(package_key "$name") || { echo "preflight: no built artifact for package $name"; exit 1; }
+    packages+=("$key")
+  done
+}
 products=(xsh xshi xsht core.tar.xz)
 verdict() {
   local ready=$1 value=$2 anchor=$3 tolerance=$4
@@ -61,6 +77,7 @@ case $mode in
     for name in "$@"; do
       if [[ $name == tree-memory || $name == artifact-sizes || $name == world-plan || $name == package-build ]]; then seed_check || failed=1; fi
       if [[ $name == artifact-sizes ]]; then
+        resolve_packages
         for key in "${packages[@]}"; do
           dir=.out/artifacts/x86_64/v2/sha256/$key
           expected=$(jaq -er '.payload_sha256' "$dir/artifact.json") || { echo "preflight: missing package manifest $key"; failed=1; continue; }
@@ -84,6 +101,7 @@ case $mode in
   workload)
     set -e
     name=$1; run_dir=$2; shift 2
+    if [[ $name == tree-memory || $name == artifact-sizes ]]; then resolve_image; fi
     if [[ $name == tree-memory ]]; then
       seed_abs=$(realpath "$seed")
       mkdir -p "$run_dir/container"
@@ -96,13 +114,15 @@ case $mode in
       docker image inspect --format 'image id={{.Id}} layers={{json .RootFS.Layers}}' "$image"
     elif [[ $name == artifact-sizes ]]; then
       for name in "${products[@]}"; do printf 'metric\tseed-%s\t%s\n' "$name" "$(stat -c %s "$seed/$name")"; sha256sum "$seed/$name"; done
+      resolve_packages
       for key in "${packages[@]}"; do
         dir=.out/artifacts/x86_64/v2/sha256/$key
-        jaq -r '.package_id' "$dir/artifact.json" || exit 1
+        id=$(jaq -r '.package_id' "$dir/artifact.json") || exit 1
+        echo "package $id key=$key"
         expected=$(jaq -er '.payload_sha256' "$dir/artifact.json") || exit 1
         actual=$(sha256sum "$dir/payload.tar.gz") || exit 1
         [[ ${actual%% *} == "$expected" ]] || exit 1
-        printf 'metric\tpackage-%s\t%s\n' "$key" "$(stat -c %s "$dir/payload.tar.gz")"; printf '%s\n' "$actual"
+        printf 'metric\tpackage-%s\t%s\n' "${id%%-[0-9]*}" "$(stat -c %s "$dir/payload.tar.gz")"; printf '%s\n' "$actual"
       done
       docker image inspect --format 'image id={{.Id}} layers={{json .RootFS.Layers}}' "$image" || exit 1
       printf 'metric\tpackage-tools-image\t%s\n' "$(docker image inspect --format '{{.Size}}' "$image")"
