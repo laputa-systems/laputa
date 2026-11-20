@@ -2,6 +2,7 @@
 use seed.world
 use seed.images
 use seed.xsh_seed
+use pm.util as pm_util
 
 error InstallerPackageHostError = Failed : InvalidData
 
@@ -35,7 +36,10 @@ proc plan_in_package_tools(root: Path, arch: Str, repo_url: Str, roots: List[Str
   let target = xsh_seed.xsh_seed_arch(arch)?
   let seed = xsh_seed.xsh_seed_require(root, arch)?
   let image = images.ensure_package_tools(docker, root, target)?
-  let container_repo = repo_url.replace("http://127.0.0.1:", with: "http://host.docker.internal:").replace("http://localhost:", with: "http://host.docker.internal:")
+  let mirror = fp"{output.parent()}/mirror"
+  mirror.mkdir()
+  let failure = pm_util.download_file(pm_util.repo_url_for(repo_url, p"index.json")?, fp"{mirror}/index.json")?
+  guard failure == "" else { return Err(InstallerPackageHostError.Failed(failure)) }
   let selection: List[Str] = collect {
     for name in roots { yield @["--root", name] }
   }
@@ -44,8 +48,8 @@ proc plan_in_package_tools(root: Path, arch: Str, repo_url: Str, roots: List[Str
     "--mount", f"type=bind,src={root},dst=/src/laputa,readonly",
     @xsh_seed.xsh_seed_mount_argv(seed),
     "--mount", f"type=bind,src={output.parent()},dst=/output",
-    "--workdir", "/src/laputa", "--env", "XSH_MODULE_PATH=/src/laputa",
-    "--env", f"XSH_PM_REPO={container_repo}", image,
+    "--workdir", "/src/laputa", "--network", "none", "--env", "XSH_MODULE_PATH=/src/laputa",
+    "--env", "XSH_PM_REPO=file:///output/mirror", image,
     "/bin/xsh", "/src/laputa/pm.xsh", "--", "repo", "plan",
     "--repo", "/src/laputa", @selection, "--target", f"{arch}-linux-musl", "--output", f"/output/{output.name}",
   ]
@@ -92,7 +96,7 @@ export proc prepare(
     }
   }
 
-  if system.uname()?.sysname == "Darwin" {
+  if system.uname()?.sysname == "Darwin" and pm_util.is_local_repo_url(repo_url) and ! pm_util.is_file_url(repo_url) {
     plan_in_package_tools(root, arch, repo_url, plan_roots, plan)
   } else {
     world.host_pm_plan(
