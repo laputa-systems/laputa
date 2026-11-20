@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 67
+Next: 78
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -29,7 +29,7 @@ accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
 
-### LAP-63 · P1 · Measure representative package and system journeys
+### LAP-63 · P2 · Measure representative package and system journeys
 
 - **Area:** Performance
 - **Where:** `docs/TESTING.md` Benchmarks
@@ -37,6 +37,69 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Recommendation:** Define bounded workloads, completed-work oracles, paired baselines and readiness-qualified measurements. Acceptance: each journey has a reproducible comparison and reports inconclusive samples explicitly.
 - **Fix with:** bench-pyramid, benchmark-checklist
 - **Effort:** L (weeks)
+
+### LAP-67 · P2 · Prevent concurrent publishers from losing index updates
+
+- **Area:** Release publication
+- **Where:** `pm/repo.xsh:250`, `pm/repo.xsh:265`, `pm/repo.xsh:274`, `pm/remote.xsh:355`, `mirror/src/packages.rs:525`, `mirror/src/packages.rs:544`, `pm/repo.xsh:253`, `docs/PM.md:392`
+- **Problem:** Each publisher reads the complete index, merges locally, then unconditionally replaces it after uploading objects. The mirror mutex serializes individual writes but does not bind a write to the index version read by that publisher. If two publishers read the same index and publish different packages, both can report success while the last index drops the other's row; an offline signer can subsequently sign that incomplete working index. Immutable objects remain, but the dropped release is unavailable through the new signed index until republished.
+- **Recommendation:** Make index updates conditional on the version read, with a conflict and retry or equivalent serialization spanning read and write. Acceptance: two overlapping publishers of different packages either both appear in the final index or one receives a conflict; a retry preserves both rows.
+- **Fix with:** durable-state
+- **Effort:** M (days)
+
+### LAP-68 · P2 · Make immutable object admission atomic
+
+- **Area:** Mirror publication
+- **Where:** `mirror/src/packages.rs:293`, `mirror/src/packages.rs:305`, `mirror/src/packages.rs:374`, `mirror/src/packages.rs:414`, `mirror/src/s3.rs:427`, `mirror/src/s3.rs:443`, `mirror/src/lib.rs:47`, `pm/remote.xsh:92`
+- **Problem:** Direct and chunked uploads implement `If-None-Match: *` as a separate existence check and unconditional write. Two workers can both observe absence, then both write and receive 201; the latter replaces the first object. The file backend renames over the destination and S3 receives an unconditional PUT. The publisher accepts 201 without comparing bytes, so conflicting concurrent uploads can silently change an allegedly immutable package object and leave an index pointing to different bytes. Existing sequential checks (`mirror/tests/api.rs:830`) do not exercise this interleaving.
+- **Recommendation:** Make conditional creation one atomic storage operation for every backend and both upload paths; report a conflict to the loser. Acceptance: concurrent different-byte conditional uploads to the same absent key yield exactly one success, one conflict, and the winning bytes persist for both direct and chunked uploads.
+- **Fix with:** durable-state
+- **Effort:** M (days)
+
+### LAP-69 · P2 · Clean up a direct service start when readiness or status recording fails
+
+- **Area:** xinit service ownership
+- **Where:** `xinit/xinit.xsh:1254`, `xinit/xinit.xsh:1371`, `xinit/xinit.xsh:1399`, `xinit/xinit.xsh:1419`, `xinit/xinit.xsh:1429`, `xinit/xinit.xsh:1444`
+- **Problem:** A direct start spawns the service process group before loading and polling readiness and before reading its start time and writing its status. An error in any of those steps returns without stopping the new group or recording its PID. A subsequent start can launch a second instance, while the original is no longer controlled by its status record. This differs from scanner children, whose session is swept by PID 1 on scanner death (`xinit/xinit.xsh:191`, `xinit/xinit.xsh:616`).
+- **Recommendation:** Retain ownership of the spawned group until status is successfully recorded, and terminate and reap it on each intervening error. Acceptance: inject a readiness or status-write failure after spawn in direct-start mode and verify no service process survives and a later start produces exactly one instance.
+- **Fix with:** lifecycle-concurrency
+- **Effort:** M (days)
+
+### LAP-70 · P2 · Verify Meson wrap source and patch hashes before extraction
+
+- **Area:** gluon / supply-chain security
+- **Where:** `gluon/crates/meson/src/builtins/functions.rs:3178`, `gluon/crates/meson/src/wrap.rs:111`, `gluon/crates/meson/src/wrap.rs:131`, `gluon/crates/meson/src/wrap.rs:175`, `gluon/crates/meson/src/wrap.rs:235`
+- **Problem:** A subproject without a pre-extracted build file automatically invokes wrap download. The file-wrap path downloads or copies an archive and extracts it without checking the wrap's `source_hash`; patch archives likewise bypass `patch_hash`. An attacker controlling a source server, a network path to an HTTP source, or a poisoned cache can supply different build inputs despite a pinned wrap hash, potentially executing attacker-controlled build instructions and contaminating artifacts. gluon hard-codes wrap_mode to "default" (gluon/crates/meson/src/builtins/functions.rs:4032) and no Laputa recipe ships a .wrap file, so reaching a download depends on upstream tarballs that bundle wraps and on build network access, which is unproven.
+- **Recommendation:** Require and verify the declared hashes for source and patch archives before extracting either downloaded or cached bytes, and fail closed on mismatch. Acceptance: a subproject wrap with a mismatched source or patch hash fails before extraction and a valid pinned archive succeeds.
+- **Fix with:** security
+- **Effort:** M (days)
+
+### LAP-71 · P2 · Bound and expire unauthenticated authentication sessions
+
+- **Area:** mirror / availability
+- **Where:** `mirror/src/packages.rs:190`, `mirror/src/webauthn_handlers.rs:142`, `mirror/src/webauthn_handlers.rs:178`, `mirror/src/db.rs:327`, `mirror/src/db.rs:336`
+- **Problem:** Anyone who can reach the production mirror and knows an allowed username can repeatedly call authentication options; each successful request inserts a session and challenge into SQLite. The ten-minute expiry is only a read predicate, and the database code contains no session deletion. Repeated requests grow durable storage indefinitely, eventually exhausting the database filesystem and interrupting authentication or other services on that filesystem.
+- **Recommendation:** Bound outstanding unauthenticated challenges and reclaim expired sessions with their dependent records. Acceptance: repeated options requests cannot grow the session table without bound, and expired challenges are removed while valid challenges remain usable.
+- **Fix with:** security
+- **Effort:** M (days)
+
+### LAP-72 · P2 · Remove bearer tokens from completed authentication sessions
+
+- **Area:** mirror / credential storage
+- **Where:** `mirror/src/db.rs:141`, `mirror/src/db.rs:149`, `mirror/src/db.rs:155`, `mirror/src/db.rs:358`, `mirror/src/db.rs:366`, `mirror/src/webauthn_handlers.rs:124`, `mirror/src/webauthn_handlers.rs:273`
+- **Problem:** Registration stores the newly issued API bearer token in plaintext in the session row while also returning it directly to the browser; authentication does the same when issuing a replacement. It is cleared only if the optional polling endpoint consumes it, and expired rows are not deleted. A reader of the auth database or its backups can recover a still-valid upload credential even though the token table stores only hashes. The session ID expiry does not revoke the token.
+- **Recommendation:** Eliminate persistent plaintext token storage or implement a bounded, explicitly consumed handoff that cannot leave usable tokens in the database. Acceptance: after either registration or authentication, including abandoned polling and session expiry, the database and its normal persistent records contain no usable bearer token.
+- **Fix with:** security
+- **Effort:** M (days)
+
+### LAP-73 · P2 · Bind the host-tools image identity to its package inputs
+
+- **Area:** Build and dependencies
+- **Where:** `seed/Dockerfile.host-tools:1`, `seed/Dockerfile.host-tools:10`, `seed/images.xsh:62`, `seed/images.xsh:100`, `seed/images.xsh:159`, `docs/DEVELOPMENT.md:109`
+- **Problem:** The Alpine base is pinned, but `apk add` resolves unpinned packages from a live repository. The host-tools key hashes only the Dockerfile and platform, and the package-tools key uses that tag, so independent clean fetches at different times can produce different toolchains under the same identities. The saved local image stabilizes one cache but does not identify or distribute its bytes to another builder. That can change package outputs under the same build identity and cause immutable publication to reject a differing payload (`docs/PM.md:398`).
+- **Recommendation:** Pin or distribute the complete host-tools image as a verifiable input and bind downstream identity to its actual content. Acceptance: two clean builders obtain the same verified host-tools image identity from the same declared inputs, and a changed host-tools image changes the package-tools identity.
+- **Fix with:** single-source-of-truth
+- **Effort:** M (days)
 
 ### LAP-64 · P2 · Measure workload memory and artifact sizes
 
@@ -55,6 +118,42 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Recommendation:** Exercise real projects with checked outputs and paired, readiness-qualified comparisons. Acceptance: incomplete work fails and a reproducible baseline detects regressions.
 - **Fix with:** refactor-benchmarks, benchmark-checklist
 - **Effort:** M (days)
+
+### LAP-74 · P3 · Fail package parity when the reference cannot run
+
+- **Area:** gluon Laputa package parity
+- **Where:** `gluon/tests/laputa/run.sh:31`, `gluon/tests/laputa/run.sh:43`, `gluon/tests/laputa/run.sh:52`, `gluon/tests/laputa/run.sh:62`, `gluon/tests/laputa/run.sh:67`
+- **Problem:** A reference setup, build, or install failure is printed as SKIP without changing the overall status. If reference dependencies or tools are unavailable for every selected package, the command can exit zero having compared no installed tree. The package list includes the Mesa and Wayland consumers this check is intended to qualify.
+- **Recommendation:** Treat an unavailable reference as an unsuccessful qualification, including when other packages pass, and report the affected package and stage. Acceptance: forcing reference setup to fail for a selected package produces a nonzero overall exit; a matching pair of successful installs still passes.
+- **Fix with:** test-audit
+- **Effort:** S (hours)
+
+### LAP-75 · P3 · Require successful positive fixtures in differential parity
+
+- **Area:** gluon differential tests
+- **Where:** `gluon/tests/differential/run.sh:111`, `gluon/tests/differential/run.sh:124`, `gluon/tests/differential/run.sh:140`, `gluon/tests/differential/run.sh:284`, `gluon/tests/differential/fixtures/meson/trivial/meson.build:1`
+- **Problem:** The harness declares matching nonzero setup or build exits a pass, including for positive fixtures such as the trivial executable. A missing compiler or a shared environmental failure can therefore make both implementations fail before their outputs are compared while the parity gate reports success. The same early return applies to Ninja fixtures.
+- **Recommendation:** Distinguish explicitly expected failures from positive fixtures and require successful reference and candidate execution for the latter. Acceptance: a controlled failure of both compilers makes a positive fixture and the overall harness fail, while a named negative fixture still verifies its expected error.
+- **Fix with:** test-audit
+- **Effort:** M (days)
+
+### LAP-76 · P3 · Check the actual no-op rebuild work
+
+- **Area:** gluon differential tests
+- **Where:** `gluon/tests/differential/run.sh:210`, `gluon/tests/differential/run.sh:218`, `gluon/tests/differential/run.sh:295`, `gluon/docs/testing.md:3`
+- **Problem:** The Meson comparison runs both no-op builds but then counts edges in the original `build.log` and `cand_build.log` again, not the no-op logs. The Ninja comparison checks only exit codes. A candidate that rebuilds every edge on every invocation can pass, despite the documented no-op behavior contract and the cost to every incremental build.
+- **Recommendation:** Compare the actual no-op work and outputs at both boundaries. Acceptance: a candidate that reruns a successful edge on the second invocation fails its fixture, while a true no-op passes.
+- **Fix with:** test-audit
+- **Effort:** S (hours)
+
+### LAP-77 · P3 · Include proof input mode in the profile identity
+
+- **Area:** Profile identity
+- **Where:** `system/types.xsh:15`, `system/profile.xsh:115`, `system/qemu.xsh:556`, `system/cli.xsh:122`, `tests/system/profile.xsh:148`
+- **Problem:** The profile digest claims to cover all semantic fields and is printed with `laputa plan`, but omits `proof.input_mode`. Two otherwise identical profiles with `ProofPlain` and `ProofModifiers` therefore print the same identity even though the QEMU proof injects different input. This makes the reported identity unable to distinguish different proof behavior; the existing digest test changes CPU and GPU only.
+- **Recommendation:** Include a stable representation of the input mode in the canonical digest and check that changing only that mode changes the digest. Acceptance: a focused profile test proves the two modes have different digests while repeated digesting of the same profile remains deterministic.
+- **Fix with:** single-source-of-truth
+- **Effort:** S (hours)
 
 ### LAP-66 · P3 · Qualify benchmark inputs and provenance
 
