@@ -533,7 +533,11 @@ BENCH_PROFILE_IMAGE=/path/to/target/laputa/qemu-tinyland-ghostty/current \
 make bench XSH_ROOT=/path/to/xsh TIER=scenario WORKLOADS=xinit-service-start
 ```
 
-`bench/anchors.tsv` is initially empty: no accepted limit has been captured.
+`bench/anchors.tsv` holds the accepted anchors, captured on `threadripper` at
+`b09bb6c6` on 2026-11-20 with every round's readiness checks quiet. Timed
+tolerances are twice the largest full range seen across two quiet runs plus
+the drift between their medians; byte metrics allow 5% (at least 4096 bytes)
+and `tree-memory` 20 MB, about 1.6 times its spread across three runs.
 Each tab-separated line contains metric name, value, absolute tolerance, Laputa
 commit, host name, and UTC date. Size metrics use bytes; timing metric names end
 in `-ns` and use nanoseconds. The limit is value plus
