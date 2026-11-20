@@ -96,7 +96,8 @@ export proc prepare(
     }
   }
 
-  if system.uname()?.sysname == "Darwin" and pm_util.is_local_repo_url(repo_url) and ! pm_util.is_file_url(repo_url) {
+  let key_file = (env.get("XSH_PM_REPO_KEY_FILE") ?? "").trim()
+  if system.uname()?.sysname == "Darwin" and pm_util.is_local_repo_url(repo_url) and ! pm_util.is_file_url(repo_url) and key_file == "" {
     plan_in_package_tools(root, arch, repo_url, plan_roots, plan)
   } else {
     world.host_pm_plan(
