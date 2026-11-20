@@ -50,7 +50,6 @@ impl Scope {
     }
 }
 
-#[allow(dead_code)]
 pub fn parse(src: &str) -> Result<State, String> {
     let mut state = State::default();
     let mut scope = Scope::top_level();
@@ -326,8 +325,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Reads the value of a `name = value` line up to (but not including)
-    /// the terminating newline. Handles `$\n` line continuations and
-    /// trims trailing whitespace.
+    /// the terminating newline. Handles `$\n` line continuations. Trailing
+    /// whitespace is part of the value (upstream ninja concatenates a
+    /// trailing space into expansions; CMake's launcher idiom relies on it).
     fn read_value(&mut self) -> String {
         self.skip_spaces();
         let mut out = String::new();
@@ -344,10 +344,6 @@ impl<'a> Parser<'a> {
             }
             out.push(c);
             self.pos += 1;
-        }
-        // Trim trailing spaces but preserve internal spacing.
-        while out.ends_with(' ') || out.ends_with('\t') {
-            out.pop();
         }
         out
     }
@@ -771,6 +767,18 @@ pub fn expand<F: Fn(&str) -> Option<String>>(s: &str, lookup: &F) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trailing_whitespace_in_bindings_is_preserved() {
+        let src = "rule cxx\n  command = ${LAUNCHER}/usr/bin/c++ -c in.c -o out.o\nbuild out.o: cxx in.c\n  LAUNCHER = /opt/kache \n";
+        let state = parse(src).unwrap();
+        let edge = &state.edges[0];
+        assert_eq!(edge.bindings["LAUNCHER"], "/opt/kache ");
+        assert_eq!(
+            crate::build::expand_in_edge_pub(&state, edge, &state.rules["cxx"].bindings["command"]),
+            "/opt/kache /usr/bin/c++ -c in.c -o out.o"
+        );
+    }
 
     #[test]
     fn build_bindings_are_evaluated_when_parsed() {

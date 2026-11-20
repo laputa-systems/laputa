@@ -1,1 +1,3 @@
-int x; int main() { return 0; }
+extern int x;
+
+int main(void) { return x != 1; }

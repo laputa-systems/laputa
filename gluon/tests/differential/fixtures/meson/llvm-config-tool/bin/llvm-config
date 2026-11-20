@@ -4,6 +4,15 @@ link=shared
 system=
 libs=
 out=
+platform=$(uname -s)
+
+link_symbol() {
+  case "$platform" in
+    Darwin) printf '%s' "-Wl,-alias,_main,_$1" ;;
+    *) printf '%s' "-Wl,--defsym,$1=0" ;;
+  esac
+}
+
 for arg in "$@"; do
   case $arg in
     --version) out="$out 23.1.5" ;;
@@ -19,13 +28,13 @@ for arg in "$@"; do
     --libs) libs=1 ;;
     --libfiles) out="$out $here/lib/libLLVM.a" ;;
     --*) exit 1 ;;
-    *) out="$out -Wl,--defsym,llvm_module_$arg=0" ;;
+    *) out="$out $(link_symbol "llvm_module_$arg")" ;;
   esac
 done
 if [ -n "$libs" ]; then
-  out="$out -Wl,--defsym,llvm_link_$link=0"
+  out="$out $(link_symbol "llvm_link_$link")"
 fi
 if [ -n "$system" ]; then
-  out="$out -Wl,--defsym,llvm_system_libs=0"
+  out="$out $(link_symbol llvm_system_libs)"
 fi
 echo $out

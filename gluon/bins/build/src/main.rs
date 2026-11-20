@@ -2,6 +2,13 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 && (args[1] == "-h" || args[1] == "--help") {
+        println!("usage: gluon-build [meson|ninja] [args...] | --version\n\nOptions:\n  -h, --help  Show help\n  --version   Print version\n");
+        print!("{}", meson::help::reference("gluon-build meson", meson::help::Page::Embedded));
+        print!("{}", ninja::help::reference("gluon-build ninja", ninja::help::Page::Embedded));
+        print!("\n{}", meson::help::FOOTER);
+        return ExitCode::SUCCESS;
+    }
     if args.len() >= 2 && args[1] == "--version" {
         println!("{}", meson::VERSION);
         return ExitCode::SUCCESS;

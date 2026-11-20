@@ -126,6 +126,12 @@ impl Chunk {
     }
 }
 
+impl Default for Chunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Compiler {
     pub chunk: Chunk,
     loop_breaks: Vec<Vec<usize>>,
@@ -428,5 +434,11 @@ impl Compiler {
             }
         }
         Ok(())
+    }
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
     }
 }

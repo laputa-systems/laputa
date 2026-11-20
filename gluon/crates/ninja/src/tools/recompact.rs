@@ -4,7 +4,7 @@
 
 use crate::build::log::{self, BuildLog};
 
-pub fn run() -> Result<u8, String> {
+pub(super) fn run() -> Result<u8, String> {
     let log_path = ".ninja_log";
     let log: BuildLog = log::load(log_path);
     if log.too_old {

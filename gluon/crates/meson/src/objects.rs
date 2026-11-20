@@ -302,6 +302,12 @@ impl ConfigData {
     }
 }
 
+impl Default for ConfigData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct EnvData {
     pub values: Rc<RefCell<Vec<(String, EnvOp)>>>,
@@ -352,6 +358,12 @@ impl EnvData {
             }
         }
         map
+    }
+}
+
+impl Default for EnvData {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -496,6 +508,12 @@ impl SourceSetData {
         Self {
             rules: Rc::new(RefCell::new(Vec::new())),
         }
+    }
+}
+
+impl Default for SourceSetData {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

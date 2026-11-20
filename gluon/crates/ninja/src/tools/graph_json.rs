@@ -15,11 +15,12 @@
 //! and their transitive dependencies are emitted — essential at CMake scale
 //! (tens of thousands of edges) when only one target's subtree is wanted.
 
+use crate::build::is_generator;
 use crate::graph::{Edge, State};
 use crate::manifest::expand;
 use std::collections::HashSet;
 
-pub fn run(state: &State, args: &[String]) -> Result<u8, String> {
+pub(super) fn run(state: &State, args: &[String]) -> Result<u8, String> {
     let targets: Vec<&String> = args.iter().filter(|s| !s.starts_with('-')).collect();
 
     // Select edge indices to emit: all, or the transitive subtree of `targets`.
@@ -92,12 +93,10 @@ fn emit_edge(state: &State, edge: &Edge, out: &mut String) {
     let rspfile = lookup(state, edge, rule, "rspfile", true);
     let rspfile_content = lookup(state, edge, rule, "rspfile_content", true);
     let pool = lookup(state, edge, rule, "pool", false);
-    let restat = lookup(state, edge, rule, "restat", false)
+    let restat = lookup(state, edge, rule, cli_command_restat!(), false)
         .map(|v| truthy(&v))
         .unwrap_or(false);
-    let generator = lookup(state, edge, rule, "generator", false)
-        .map(|v| truthy(&v))
-        .unwrap_or(false);
+    let generator = is_generator(state, edge);
 
     out.push_str("    {\n");
     out.push_str(&format!(
@@ -107,7 +106,7 @@ fn emit_edge(state: &State, edge: &Edge, out: &mut String) {
     out.push_str(&format!("      \"phony\": {phony},\n"));
     arr(out, "outputs", &edge.outputs);
     arr(out, "implicit_outputs", &edge.implicit_outputs);
-    arr(out, "inputs", &edge.inputs);
+    arr(out, cli_command_inputs!(), &edge.inputs);
     arr(out, "implicit_inputs", &edge.implicit_inputs);
     arr(out, "order_only_inputs", &edge.order_only_inputs);
     strfield(out, "command", &command);

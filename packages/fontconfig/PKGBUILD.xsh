@@ -127,7 +127,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     stage_generated()
     run $ninja "-C" "build" f"-j{jobs}" "libfontconfig.so.1.17.0"
     env ({DESTDIR: dest}) {
-      run $meson "install" "-C" "build"
+      run $meson "install" "-C" "build" "--no-rebuild"
     }
   }?
   fp"{dest}/etc/fonts".remove(missing_ok: false)

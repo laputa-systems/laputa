@@ -13,7 +13,7 @@ const JSON_PRETTY: SerializerConfig =
 pub struct NinjaBackend {
     pub source_root: String,
     pub build_root: String,
-    pub meson_command: String,
+    pub meson_command: Vec<String>,
     pub install_aliases: bool,
     pub toolchain: Toolchain,
 }
@@ -23,6 +23,7 @@ pub struct Toolchain {
     pub c: Vec<String>,
     pub cpp: Vec<String>,
     pub archiver: Vec<String>,
+    pub archiver_args: String,
 }
 
 impl Default for Toolchain {
@@ -31,6 +32,7 @@ impl Default for Toolchain {
             c: vec!["cc".to_string()],
             cpp: vec!["c++".to_string()],
             archiver: vec!["ar".to_string()],
+            archiver_args: "csr".to_string(),
         }
     }
 }
@@ -40,14 +42,14 @@ impl NinjaBackend {
         Self {
             source_root: source_root.to_string(),
             build_root: build_root.to_string(),
-            meson_command: "meson".to_string(),
+            meson_command: vec!["meson".to_string()],
             install_aliases: false,
             toolchain: Toolchain::default(),
         }
     }
 
-    pub fn with_meson_command(mut self, meson_command: &str) -> Self {
-        self.meson_command = meson_command.to_string();
+    pub fn with_meson_command(mut self, meson_command: &[String]) -> Self {
+        self.meson_command = meson_command.to_vec();
         self
     }
 
@@ -92,10 +94,7 @@ impl NinjaBackend {
             self.write_custom_target(&mut out, ct)?;
         }
 
-        // Configure files
-        for cf in &build_data.configure_files {
-            self.write_configure_file(&mut out, cf)?;
-        }
+        self.write_configure_file_regeneration(&mut out, build_data);
 
         // Aliases
         self.write_aliases(&mut out, build_data)?;
@@ -273,9 +272,10 @@ impl NinjaBackend {
         writeln!(out, "rule STATIC_LINKER").unwrap();
         writeln!(
             out,
-            "  command = {} --internal static-link $out -- {} csrD $out $in",
-            quote_argument(&self.meson_command),
-            shell_escape_command(&self.toolchain.archiver)
+            "  command = {} --internal static-link $out -- {} {} $out $in",
+            shell_escape_command(&self.meson_command).replace('$', "$$"),
+            shell_escape_command(&self.toolchain.archiver),
+            self.toolchain.archiver_args
         )
         .unwrap();
         writeln!(out, "  description = Linking static target $out").unwrap();
@@ -301,8 +301,10 @@ impl NinjaBackend {
         writeln!(out, "rule REGENERATE_BUILD").unwrap();
         writeln!(
             out,
-            "  command = meson setup --reconfigure {} {}",
-            self.source_root, self.build_root
+            "  command = {} setup --reconfigure {} {}",
+            shell_escape_command(&self.meson_command).replace('$', "$$"),
+            quote_argument(&self.build_root).replace('$', "$$"),
+            quote_argument(&self.source_root).replace('$', "$$")
         )
         .unwrap();
         writeln!(out, "  description = Regenerating build files.").unwrap();
@@ -377,7 +379,7 @@ impl NinjaBackend {
             } else {
                 format!("{}/{}/{}", self.source_root, target.subdir, source)
             };
-            let obj_src = self.object_source_name(genout.as_deref().unwrap_or(source));
+            let obj_src = self.object_source_name(genout.unwrap_or(source));
             let Some(obj_path) = self.target_object_path(target, source) else {
                 continue;
             };
@@ -696,11 +698,8 @@ impl NinjaBackend {
         let wrapped = !env_keys.is_empty() || ct.capture || ct.feed;
         let mut argv: Vec<String> = Vec::new();
         if wrapped {
-            argv.extend([
-                self.meson_command.clone(),
-                "--internal".to_string(),
-                "exe".to_string(),
-            ]);
+            argv.extend(self.meson_command.iter().cloned());
+            argv.extend(["--internal".to_string(), "exe".to_string()]);
             if ct.capture {
                 let output = outputs
                     .first()
@@ -719,7 +718,7 @@ impl NinjaBackend {
             argv.push("--".to_string());
         }
         argv.extend(command_parts.iter().cloned());
-        let command_line = shell_escape_command(&argv);
+        let command_line = shell_escape_command(&argv).replace('$', "$$");
         writeln!(out, "  COMMAND = {}", command_line).unwrap();
         writeln!(out, "  DESC = Generating {}", ct.name).unwrap();
         if let Some(ref depfile) = ct.depfile {
@@ -851,35 +850,32 @@ impl NinjaBackend {
         order_only
     }
 
-    fn write_configure_file(&self, out: &mut String, cf: &ConfigureFile) -> Result<(), String> {
-        let target_dir = if cf.subdir.is_empty() {
-            String::new()
-        } else {
-            format!("{}/", cf.subdir)
-        };
-        // Generation at configure time: when command is empty (configuration or
-        // copy mode), the output already exists in the build dir from setup;
-        // emitting a cp edge would clobber substituted values with the template.
-        if cf.command.is_empty() {
-            return Ok(());
+    fn write_configure_file_regeneration(&self, out: &mut String, build_data: &BuildData) {
+        let mut inputs = Vec::new();
+        for cf in &build_data.configure_files {
+            if cf.command.is_empty() {
+                continue;
+            }
+            if let Some(input) = &cf.input {
+                let path = if Path::new(input).is_absolute() {
+                    input.clone()
+                } else if cf.subdir.is_empty() {
+                    format!("{}/{}", self.source_root, input)
+                } else {
+                    format!("{}/{}/{}", self.source_root, cf.subdir, input)
+                };
+                if !inputs.contains(&path) {
+                    inputs.push(path);
+                }
+            }
         }
-        let output_path = format!("{}{}", target_dir, cf.output);
-
-        // Configuration file generation is done at configure time, not build time.
-        // We generate a build edge that copies/generates the file.
-        if let Some(ref input) = cf.input {
-            let input_path = if cf.subdir.is_empty() {
-                format!("{}/{}", self.source_root, input)
-            } else {
-                format!("{}/{}/{}", self.source_root, cf.subdir, input)
-            };
-            writeln!(out, "build {}: CUSTOM_COMMAND {}", output_path, input_path).unwrap();
-            writeln!(out, "  COMMAND = cp {} {}", input_path, output_path).unwrap();
-            writeln!(out, "  DESC = Generating {}", cf.output).unwrap();
+        if !inputs.is_empty() {
+            let inputs = inputs.iter().map(|path| {
+                path.replace('$', "$$").replace(' ', "$ ").replace(':', "$:")
+            }).collect::<Vec<_>>().join(" ");
+            writeln!(out, "build build.ninja: REGENERATE_BUILD {}", inputs).unwrap();
             writeln!(out).unwrap();
         }
-
-        Ok(())
     }
 
     fn write_aliases(&self, out: &mut String, build_data: &BuildData) -> Result<(), String> {
@@ -925,6 +921,8 @@ impl NinjaBackend {
     }
 
     fn write_install_target(&self, out: &mut String, _build_data: &BuildData) -> Result<(), String> {
+        writeln!(out, "build PHONY: phony").unwrap();
+        writeln!(out).unwrap();
         writeln!(out, "build install: phony meson-internal__install").unwrap();
         writeln!(out).unwrap();
         writeln!(out, "build meson-internal__install: CUSTOM_COMMAND PHONY | all").unwrap();
@@ -932,11 +930,7 @@ impl NinjaBackend {
         writeln!(
             out,
             "  COMMAND = {}",
-            shell_escape_command(&[
-                self.meson_command.clone(),
-                "install".to_string(),
-                "--no-rebuild".to_string(),
-            ])
+            shell_escape_command(&[self.meson_command.as_slice(), &["install".to_string(), "--no-rebuild".to_string()]].concat()).replace('$', "$$")
         )
         .unwrap();
         writeln!(out, "  pool = console").unwrap();
@@ -1202,7 +1196,7 @@ impl NinjaBackend {
                 continue;
             }
             let key = dep.link_args.join("\u{1f}");
-            if seen.iter().any(|existing| *existing == key) {
+            if seen.contains(&key) {
                 continue;
             }
             seen.push(key);
@@ -1220,11 +1214,21 @@ impl NinjaBackend {
         let options = &build_data.options;
         let language_key = if language == "c++" { "cpp" } else { language };
         let mut link_args = Vec::new();
-        link_args.push("-Wl,--as-needed".to_string());
-        if target.target_type == TargetType::SharedModule {
-            link_args.push("-Wl,--allow-shlib-undefined".to_string());
+        if cfg!(target_os = "macos") {
+            if matches!(
+                target.target_type,
+                TargetType::SharedLibrary | TargetType::SharedModule
+            ) {
+                link_args.push("-Wl,-dead_strip_dylibs".to_string());
+                link_args.push("-Wl,-headerpad_max_install_names".to_string());
+            }
         } else {
-            link_args.push("-Wl,--no-undefined".to_string());
+            link_args.push("-Wl,--as-needed".to_string());
+            if target.target_type == TargetType::SharedModule {
+                link_args.push("-Wl,--allow-shlib-undefined".to_string());
+            } else {
+                link_args.push("-Wl,--no-undefined".to_string());
+            }
         }
 
         match target.target_type {
@@ -1287,9 +1291,15 @@ impl NinjaBackend {
             .filter_map(Self::object_target_path)
             .collect();
         if !whole_archives.is_empty() {
-            link_args.push("-Wl,--whole-archive".to_string());
-            link_args.extend(whole_archives);
-            link_args.push("-Wl,--no-whole-archive".to_string());
+            if cfg!(target_os = "macos") {
+                for archive in whole_archives {
+                    link_args.push(format!("-Wl,-force_load,{archive}"));
+                }
+            } else {
+                link_args.push("-Wl,--whole-archive".to_string());
+                link_args.extend(whole_archives);
+                link_args.push("-Wl,--no-whole-archive".to_string());
+            }
         }
 
         if let Some(per_language) = build_data.project_link_args.get(&target.project_name) {
@@ -1598,6 +1608,9 @@ fn absolute_library_inputs(args: &[String]) -> Vec<String> {
 }
 
 fn group_libraries(args: Vec<String>) -> Vec<String> {
+    if cfg!(target_os = "macos") {
+        return args;
+    }
     let is_library = |argument: &str| {
         if argument.starts_with("-Wl,") {
             return argument.starts_with("-Wl,-l");

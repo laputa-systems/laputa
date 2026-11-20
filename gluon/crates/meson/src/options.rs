@@ -4,7 +4,7 @@ use crate::objects::{FeatureState, Object};
 /// cross/native files, and version comparison.
 use std::collections::HashMap;
 
-const BUILTIN_OPTION_KEYS: &[&str] = &[
+pub(crate) const BUILTIN_OPTION_KEYS: &[&str] = &[
     "prefix",
     "bindir",
     "datadir",
@@ -55,8 +55,10 @@ const BUILTIN_OPTION_KEYS: &[&str] = &[
     "build.cmake_prefix_path",
 ];
 
+pub(crate) const WARNING_LEVEL_ALIAS: &str = "warnlevel";
+
 pub fn builtin_option_key(flag: &str) -> Option<String> {
-    let key = if flag == "warnlevel" {
+    let key = if flag == WARNING_LEVEL_ALIAS {
         "warning_level".to_string()
     } else {
         flag.replace('-', "_")
@@ -68,7 +70,7 @@ pub fn builtin_option_key(flag: &str) -> Option<String> {
     }
 }
 
-fn builtin_option_kind(key: &str) -> &'static str {
+pub(crate) fn builtin_option_kind(key: &str) -> &'static str {
     match key {
         "debug" | "errorlogs" | "prefer_static" | "stdsplit" | "strip" | "werror" | "vsenv"
         | "os2_emxomf" | "pkgconfig.relocatable" | "python.allow_limited_api" => "bool",
@@ -173,10 +175,8 @@ pub fn buildtype_dependents(buildtype: &str) -> Option<(&'static str, bool)> {
 }
 
 pub fn effective_optimization(options: &HashMap<String, Object>) -> String {
-    if let Some(value) = options.get("optimization") {
-        if let Object::String(s) = value {
-            return s.clone();
-        }
+    if let Some(Object::String(s)) = options.get("optimization") {
+        return s.clone();
     }
     if let Some(Object::String(buildtype)) = options.get("buildtype") {
         if let Some((optimization, _)) = buildtype_dependents(buildtype) {
@@ -726,6 +726,56 @@ pub fn parse_machine_file(path: &str) -> HashMap<String, HashMap<String, String>
     }
 
     sections
+}
+
+
+pub(crate) fn builtin_default(name: &str, values: &HashMap<String, Object>) -> Result<Object, String> {
+    match name {
+        "prefix" | "bindir" | "libdir" | "libexecdir" | "includedir" | "datadir" | "mandir"
+        | "infodir" | "localedir" | "sysconfdir" | "localstatedir" | "sharedstatedir"
+        | "sbindir" | "licensedir" => Ok(Object::String(builtin_string(
+            values,
+            name,
+        ))),
+        "buildtype" => Ok(Object::String("debug".to_string())),
+        "debug" => Ok(Object::Bool(effective_debug(values))),
+        "optimization" => Ok(Object::String(effective_optimization(
+            values,
+        ))),
+        "warning_level" => Ok(Object::String("1".to_string())),
+        "werror" => Ok(Object::Bool(false)),
+        "default_library" => Ok(Object::String("shared".to_string())),
+        "b_staticpic" => Ok(Object::Bool(true)),
+        "b_pie" => Ok(Object::Bool(false)),
+        "b_lto" => Ok(Object::Bool(false)),
+        "b_pch" => Ok(Object::Bool(true)),
+        "b_sanitize" => Ok(Object::String("none".to_string())),
+        "b_coverage" => Ok(Object::Bool(false)),
+        "b_pgo" => Ok(Object::String("off".to_string())),
+        "b_ndebug" => Ok(Object::String("false".to_string())),
+        "strip" => Ok(Object::Bool(false)),
+        "unity" => Ok(Object::String("off".to_string())),
+        "unity_size" => Ok(Object::Int(4)),
+        "layout" => Ok(Object::String("mirror".to_string())),
+        "wrap_mode" => Ok(Object::String("default".to_string())),
+        "pkg_config_path" => Ok(Object::Array(Vec::new())),
+        "cmake_prefix_path" => Ok(Object::Array(Vec::new())),
+        "auto_features" => Ok(Object::Feature(FeatureState::Auto)),
+        "backend" => Ok(Object::String("ninja".to_string())),
+        "install_umask" => Ok(Object::String("0022".to_string())),
+        "stdsplit" => Ok(Object::Bool(true)),
+        "errorlogs" => Ok(Object::Bool(true)),
+        "c_args" | "cpp_args" | "c_link_args" | "cpp_link_args" | "rust_args" | "objc_args"
+        | "objcpp_args" => Ok(Object::Array(Vec::new())),
+        "c_std" | "cpp_std" => Ok(Object::String("none".to_string())),
+        "cpp_eh" => Ok(Object::String("default".to_string())),
+        "cpp_rtti" => Ok(Object::Bool(true)),
+        "prefer_static" => Ok(Object::Bool(false)),
+        "b_lundef" => Ok(Object::Bool(true)),
+        "b_asneeded" => Ok(Object::Bool(true)),
+        "b_colorout" => Ok(Object::String("always".to_string())),
+        _ => Err(format!("Tried to access unknown option '{}'", name)),
+    }
 }
 
 #[cfg(test)]

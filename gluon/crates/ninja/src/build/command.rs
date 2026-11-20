@@ -315,19 +315,19 @@ mod tests {
         let command = format!("cd {} && cd sub && /bin/pwd", dir.display());
         let out = output(&command, ShellPolicy::Forbid).unwrap();
         assert!(out.status.success());
-        assert_eq!(String::from_utf8(out.stdout).unwrap().trim(), dir.join("sub").to_string_lossy());
-        let out = output("/bin/false && /bin/echo unreached", ShellPolicy::Forbid).unwrap();
+        assert_eq!(String::from_utf8(out.stdout).unwrap().trim(), dir.join("sub").canonicalize().unwrap().to_string_lossy());
+        let out = output("false && /bin/echo unreached", ShellPolicy::Forbid).unwrap();
         assert!(!out.status.success());
         assert!(out.stdout.is_empty());
-        let out = output(&format!("cd {}/missing && /bin/true", dir.display()), ShellPolicy::Forbid).unwrap();
+        let out = output(&format!("cd {}/missing && true", dir.display()), ShellPolicy::Forbid).unwrap();
         assert!(!out.status.success());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
     fn a_forbidden_shell_refuses_shell_syntax() {
-        assert!(output("/bin/true", ShellPolicy::Forbid).unwrap().status.success());
-        assert!(output("/bin/true | /bin/true", ShellPolicy::Allow).unwrap().status.success());
-        assert!(output("/bin/true | /bin/true", ShellPolicy::Forbid).unwrap_err().contains("GLUON_SHELL=forbid"));
+        assert!(output("true", ShellPolicy::Forbid).unwrap().status.success());
+        assert!(output("true | true", ShellPolicy::Allow).unwrap().status.success());
+        assert!(output("true | true", ShellPolicy::Forbid).unwrap_err().contains("GLUON_SHELL=forbid"));
     }
 }

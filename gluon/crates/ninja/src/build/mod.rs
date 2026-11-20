@@ -12,4 +12,6 @@ pub mod plan;
 mod runner;
 
 pub use expand::expand_in_edge as expand_in_edge_pub;
+pub(crate) use expand::is_generator;
+pub(crate) use runner::run_selection;
 pub use runner::{RunReport, run, run_targets};

@@ -10,8 +10,11 @@ state = { path = "../state" }
 libc = "0.2.185"
 
 [dev-dependencies]
-rustybench = { version = "0.1" }
+rustybench = { version = "0.5" }
 
 [[bench]]
 name = "ninja"
 harness = false
+
+[lints]
+workspace = true

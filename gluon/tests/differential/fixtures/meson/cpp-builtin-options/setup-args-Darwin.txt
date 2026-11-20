@@ -1,0 +1,1 @@
+-Dcpp_link_args=-Wl,-alias,_main,_linked_marker

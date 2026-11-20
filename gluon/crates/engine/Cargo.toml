@@ -7,8 +7,11 @@ license = "Apache-2.0"
 [dev-dependencies]
 ninja = { path = "../ninja" }
 meson = { path = "../meson" }
-rustybench = { version = "0.1" }
+rustybench = { version = "0.5" }
 
 [[bench]]
 name = "engine"
 harness = false
+
+[lints]
+workspace = true

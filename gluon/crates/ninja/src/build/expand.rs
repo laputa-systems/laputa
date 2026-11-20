@@ -44,7 +44,7 @@ pub fn expand_in_edge(state: &State, edge: &Edge, value: &str) -> String {
 /// The value of `key` as Ninja evaluates it for this edge: a build-statement
 /// binding was already evaluated when the manifest was parsed, and a rule
 /// binding is expanded in the edge's scope.
-pub fn edge_binding(state: &State, edge: &Edge, rule: &crate::graph::Rule, key: &str) -> Option<String> {
+pub(super) fn edge_binding(state: &State, edge: &Edge, rule: &crate::graph::Rule, key: &str) -> Option<String> {
     if let Some(value) = edge.bindings.get(key) {
         return Some(value.clone());
     }
@@ -53,11 +53,20 @@ pub fn edge_binding(state: &State, edge: &Edge, rule: &crate::graph::Rule, key: 
 
 /// Look up `key` in `edge.bindings` first, falling back to `rule.bindings`.
 /// Returns the raw (unexpanded) value.
-pub fn lookup_either(edge: &Edge, rule: &crate::graph::Rule, key: &str) -> Option<String> {
+pub(super) fn lookup_either(edge: &Edge, rule: &crate::graph::Rule, key: &str) -> Option<String> {
     edge.bindings
         .get(key)
         .or_else(|| rule.bindings.get(key))
         .cloned()
+}
+
+pub(crate) fn is_generator(state: &State, edge: &Edge) -> bool {
+    state
+        .rules
+        .get(&edge.rule)
+        .and_then(|rule| edge_binding(state, edge, rule, "generator"))
+        .or_else(|| state.bindings.get("generator").cloned())
+        .is_some_and(|value| !value.is_empty())
 }
 
 #[cfg(test)]

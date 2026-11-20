@@ -1,0 +1,18 @@
+rule metadata
+  command = cp $in $out
+rule generate
+  command = touch primary generated
+rule consume
+  command = test -f generated && touch $out
+rule independent
+  command = touch $out
+build first.dd: metadata first-source.dd
+build last.dd: metadata last-source.dd
+build primary: generate || first.dd
+  dyndep = first.dd
+build output: consume | generated || first.dd
+  dyndep = first.dd
+build separate: independent || last.dd
+  dyndep = last.dd
+build metadata: phony first.dd last.dd
+default output separate

@@ -45,7 +45,6 @@ pub struct DepsRecord {
 /// the loader rebuilds this map from the on-disk file at startup.
 pub struct DepsLog {
     pub records: HashMap<String, DepsRecord>,
-    #[allow(dead_code)]
     pub needs_recompaction: bool,
     /// Path the writer should append to. Lazily opened on first record.
     path: String,
@@ -245,7 +244,6 @@ impl DepsLog {
     /// Drop the writer handle. Mirrors reference ninja's API; Rust runs
     /// this on `Drop` anyway, but explicit `close()` reads naturally
     /// at call sites.
-    #[allow(dead_code)]
     pub fn close(&mut self) {
         self.file = None;
     }
@@ -253,7 +251,6 @@ impl DepsLog {
     /// Read `path`, then rewrite it from scratch via the writer. The
     /// rewrite uses a `.tmp` file so a crash mid-recompact can't
     /// corrupt the original.
-    #[allow(dead_code)]
     pub fn recompact(path: &str) -> std::io::Result<()> {
         let log = Self::load(path);
         let tmp = format!("{path}.tmp");

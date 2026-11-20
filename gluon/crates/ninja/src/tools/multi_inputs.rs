@@ -14,7 +14,7 @@ struct Args {
     targets: Vec<String>,
 }
 
-pub fn run(state: &State, args: &[String]) -> Result<u8, String> {
+pub(super) fn run(state: &State, args: &[String]) -> Result<u8, String> {
     let parsed = parse_args(args)?;
     let delim = parsed.delim.as_deref().unwrap_or("\t");
     let term = if parsed.print0 { '\0' } else { '\n' };
@@ -45,8 +45,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     while i < args.len() {
         let s = args[i].as_str();
         match s {
-            "--print0" => a.print0 = true,
-            "-d" => {
+            cli_long_print0!() => a.print0 = true,
+            cli_short_d!() => {
                 i += 1;
                 a.delim = Some(
                     args.get(i)
@@ -54,11 +54,21 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
                         .ok_or_else(|| "-d needs an argument".to_string())?,
                 );
             }
-            s2 if s2.starts_with("-d") => a.delim = Some(s2[2..].to_string()),
+            s2 if s2.starts_with(cli_short_d!()) => a.delim = Some(s2[2..].to_string()),
             s2 if s2.starts_with('-') => return Err(format!("multi-inputs: unknown flag {s2}")),
             _ => a.targets.push(args[i].clone()),
         }
         i += 1;
     }
     Ok(a)
+}
+
+#[cfg(test)]
+mod help_example_test {
+    #[test]
+    fn example_reaches_tool_parser() {
+        let args = crate::help::example_args("multi-inputs");
+        let parsed = super::parse_args(&args).unwrap();
+        assert_eq!(parsed.targets, ["app"]);
+    }
 }

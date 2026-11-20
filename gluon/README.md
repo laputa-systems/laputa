@@ -14,18 +14,15 @@ test contract — see [docs/testing.md](docs/testing.md).
 ## Get it
 
 Published as GitHub prereleases: tags `release-<commit-sha>`, with
-`gluon-aarch64-apple-darwin.zip` and `gluon-x86_64-unknown-linux-musl.zip`
-plus `SHA256SUMS`. Verify with:
+`gluon-aarch64-apple-darwin.tar.xz`, `gluon-aarch64-unknown-linux-musl.tar.xz`, and
+`gluon-x86_64-unknown-linux-musl.tar.xz` plus `SHA256SUMS`. Verify with:
 
 ```sh
 tag=$(gh release list --repo laputa-systems/gluon --limit 1 --json tagName -q '.[0].tagName')
-gh release download "$tag" --repo laputa-systems/gluon --pattern 'gluon-aarch64-apple-darwin.zip'
+gh release download "$tag" --repo laputa-systems/gluon --pattern 'gluon-aarch64-apple-darwin.tar.xz'
 gh release download "$tag" --repo laputa-systems/gluon --pattern 'SHA256SUMS'
-grep -F 'gluon-aarch64-apple-darwin.zip' SHA256SUMS | shasum -a 256 -c -
+grep -F 'gluon-aarch64-apple-darwin.tar.xz' SHA256SUMS | shasum -a 256 -c -
 ```
-
-Consumer installers: from `~/usr`, run `sh sync tools gluon`; from
-`~/d/view`, run `make toolchain`. Building from source is `cargo build --profile dist --locked`.
 
 ## Run
 
@@ -39,9 +36,17 @@ Consumer installers: from `~/usr`, run `sh sync tools gluon`; from
 The `dist` profile is the release profile used by CI and releases
 (fat LTO, one codegen unit, stripped).
 
+For build trees generated before Gluon declared the `PHONY` install
+dependency, rerun `meson setup --reconfigure builddir srcdir` with the
+original setup options before running `ninja install`.
+
 ## License
 
 `crates/meson` is MIT or Apache-2.0 (Oxidized Meson MIT; Meson Apache-2.0 —
 see its `NOTICE` and license texts). `crates/ninja` is Apache-2.0
 (Oxidized Ninja Apache-2.0; Ninja Apache-2.0 — see its `NOTICE`).
 Muon was used as a behavioral specification only; no GPL code is included.
+
+The built `meson`, `ninja`, and `gluon-build` commands provide offline
+references with `--help` (or `-h`), including command and tool examples.
+Use `meson COMMAND --help` or `ninja -t TOOL --help` for a focused page.

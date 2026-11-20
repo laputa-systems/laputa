@@ -1,0 +1,6 @@
+rule generate
+  command = touch $out
+build missing.dd: phony
+build output: generate || missing.dd
+  dyndep = missing.dd
+default output

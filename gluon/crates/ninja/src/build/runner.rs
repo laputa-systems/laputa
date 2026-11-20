@@ -14,14 +14,16 @@
 use super::depfile;
 use super::deps_log::DepsLog;
 use super::dyndep;
-use super::expand::{edge_binding, expand_in_edge, lookup_either};
+use super::expand::{edge_binding, expand_in_edge, is_generator, lookup_either};
 use super::jobserver::{self, Slot};
 use super::log;
-use super::plan::{build_plan, resolve_targets};
+use super::plan::{build_plan, build_plan_with_producers, resolve_targets};
 use crate::cli::Options;
 use crate::graph::{Edge, State};
 use crate::status::{Mode, Status};
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::io::ErrorKind;
 use std::sync::mpsc;
 use std::thread;
 use std::time::SystemTime;
@@ -48,6 +50,19 @@ pub fn run_targets(
     targets_override: Option<&[String]>,
     announce_no_work: bool,
 ) -> Result<RunReport, String> {
+    let (code, work) = run_selection(state, opts, targets_override, announce_no_work)?;
+    Ok(RunReport {
+        code,
+        ran: work && !opts.dry_run,
+    })
+}
+
+pub(crate) fn run_selection(
+    state: &State,
+    opts: &Options,
+    targets_override: Option<&[String]>,
+    announce_no_work: bool,
+) -> Result<(u8, bool), String> {
     let targets = match targets_override {
         Some(t) => t.to_vec(),
         None => resolve_targets(state, opts),
@@ -56,10 +71,7 @@ pub fn run_targets(
         if !opts.quiet && announce_no_work {
             println!("ninja: no work to do.");
         }
-        return Ok(RunReport {
-            code: 0,
-            ran: false,
-        });
+        return Ok((0, false));
     }
     // Surface unknown explicit targets the way ninja does — an error to
     // stdout, exit 1. Source files (no producer) are accepted only when
@@ -73,51 +85,212 @@ pub fn run_targets(
             });
             if !known {
                 println!("ninja: error: unknown target '{t}'");
-                return Ok(RunReport { code: 1, ran: false });
+                return Ok((1, false));
             }
         }
     }
 
-    let plan = build_plan(state, &targets)?;
+    let BuildPlan {
+        order: plan,
+        producers,
+    } = validate_plan(state, &targets)?;
     if plan.is_empty() {
         if !opts.quiet && announce_no_work {
             println!("ninja: no work to do.");
         }
-        return Ok(RunReport {
-            code: 0,
-            ran: false,
-        });
+        return Ok((0, false));
     }
 
     let real_count = plan.iter().filter(|&&i| !state.edges[i].is_phony()).count();
-    if opts.dry_run {
-        let mode = Mode::detect();
-        let _ = mode;
-        let mut n = 0usize;
-        let total = real_count;
-        for &edge_idx in &plan {
-            let edge = &state.edges[edge_idx];
-            if edge.is_phony() {
-                continue;
-            }
-            n += 1;
-            if !opts.quiet {
-                println!("[{n}/{total}] command");
-            }
-        }
-        if n == 0 && !opts.quiet {
-            println!("ninja: no work to do.");
-        }
-        return Ok(RunReport { code: 0, ran: false });
-    }
     let mode = Mode::detect();
     let mut status = Status::new(mode, opts.quiet, opts.verbose, real_count);
-    let (result, ran) = schedule(state, opts, &plan, &mut status, announce_no_work)?;
-    if result == 0 && real_count == 0 && !opts.quiet {
-        // All edges in the plan turned out to be phony — preserve the
-        // legacy "no work to do" message.
+    schedule(
+        state,
+        opts,
+        &plan,
+        &producers,
+        &mut status,
+        announce_no_work,
+    )
+}
+
+struct BuildPlan<'a> {
+    order: Vec<usize>,
+    producers: Cow<'a, HashMap<String, usize>>,
+}
+
+fn validate_plan<'a>(state: &'a State, targets: &[String]) -> Result<BuildPlan<'a>, String> {
+    let mut plan = build_plan(state, targets)?;
+    let mut producers = Cow::Borrowed(&state.producers);
+    let mut existing_sources = HashSet::new();
+    let mut inspected_dyndeps = HashSet::new();
+    let mut previous_logs = None;
+    loop {
+        let consumed = plan.iter().flat_map(|&index| {
+            let edge = &state.edges[index];
+            edge.inputs
+                .iter()
+                .chain(&edge.implicit_inputs)
+                .chain(&edge.order_only_inputs)
+                .chain(&edge.dyndep)
+                .map(move |input| (input.as_str(), edge.outputs.first()))
+        });
+        let requested = targets.iter().map(|target| (target.as_str(), None));
+        let mut missing = None;
+        for (input, owner) in requested.chain(consumed) {
+            if producers.contains_key(input) || existing_sources.contains(input) {
+                continue;
+            }
+            match std::fs::metadata(input) {
+                Ok(_) => {
+                    existing_sources.insert(input);
+                }
+                Err(error)
+                    if matches!(error.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) =>
+                {
+                    missing = Some((input, owner));
+                    break;
+                }
+                Err(error) => return Err(format!("error: stat '{input}': {error}")),
+            }
+        }
+        let Some((input, owner)) = missing else {
+            return Ok(BuildPlan { order: plan, producers });
+        };
+
+        let previous_count = producers.len();
+        for path in plan
+            .iter()
+            .filter_map(|&index| state.edges[index].dyndep.as_deref())
+        {
+            if !inspected_dyndeps.insert(path) || !std::path::Path::new(path).is_file() {
+                continue;
+            }
+            if state.producers.contains_key(path) {
+                let (build_log, deps_log) = previous_logs
+                    .get_or_insert_with(|| (log::load(".ninja_log"), DepsLog::load(".ninja_deps")));
+                if !producer_is_ready(state, path, build_log, deps_log, &mut HashSet::new())? {
+                    continue;
+                }
+            }
+            let dyndep = read_dyndep(path)?;
+            let mut inspected_edges = HashSet::new();
+            for output in dyndep.entries.keys() {
+                let Some(&index) = state.producers.get(output) else {
+                    continue;
+                };
+                let edge = &state.edges[index];
+                if edge.dyndep.as_deref() == Some(path)
+                    && inspected_edges.insert(index)
+                    && let Some(entry) = dyndep.entry_for(&edge.outputs)
+                {
+                    for implicit in &entry.implicit_outputs {
+                        if producers.to_mut().insert(implicit.clone(), index).is_some() {
+                            return Err(format!("multiple rules generate {implicit}"));
+                        }
+                    }
+                }
+            }
+        }
+        if producers.len() == previous_count {
+            let context = owner.map_or_else(String::new, |out| format!(", needed by '{out}',"));
+            return Err(format!("error: '{input}'{context} missing and no known rule to make it"));
+        }
+        plan = build_plan_with_producers(state, targets, &producers)?;
     }
-    Ok(RunReport { code: result, ran })
+}
+
+fn producer_is_ready(
+    state: &State,
+    path: &str,
+    build_log: &log::BuildLog,
+    deps_log: &DepsLog,
+    checking: &mut HashSet<String>,
+) -> Result<bool, String> {
+    if !checking.insert(path.to_string()) {
+        return Err(format!("dependency cycle through '{path}'"));
+    }
+    let plan = build_plan(state, &[path.to_string()])?;
+    let mut phony_mtimes = HashMap::new();
+    let mut dirty = HashMap::new();
+    for index in plan {
+        let mut edge = Cow::Borrowed(&state.edges[index]);
+        if let Some(path) = edge.dyndep.as_deref() {
+            if !std::path::Path::new(path).is_file() {
+                return Ok(false);
+            }
+            let file = read_dyndep(path)?;
+            if let Some(entry) = file.entry_for(&edge.outputs) {
+                for input in &entry.implicit_inputs {
+                    let producer = if state.producers.contains_key(input) {
+                        Some(input)
+                    } else {
+                        file.entries.iter().find_map(|(output, declaration)| {
+                            let &index = state.producers.get(output)?;
+                            (state.edges[index].dyndep.as_deref() == Some(path)
+                                && declaration.implicit_outputs.contains(input))
+                            .then_some(output)
+                        })
+                    };
+                    if let Some(producer) = producer
+                        && !producer_is_ready(state, producer, build_log, deps_log, checking)?
+                    {
+                        return Ok(false);
+                    }
+                }
+                let edge = edge.to_mut();
+                edge.implicit_inputs.extend_from_slice(&entry.implicit_inputs);
+                edge.implicit_outputs.extend_from_slice(&entry.implicit_outputs);
+                if entry.restat {
+                    edge.bindings.insert("restat".to_string(), "1".to_string());
+                }
+            }
+        }
+        if edge
+            .inputs
+            .iter()
+            .chain(&edge.implicit_inputs)
+            .chain(&edge.order_only_inputs)
+            .any(|input| !state.producers.contains_key(input) && mtime_of(input).is_none())
+        {
+            return Ok(false);
+        }
+        if edge.is_phony() {
+            let mtime = newest_input_mtime(&edge, &phony_mtimes);
+            for output in edge.outputs.iter().chain(&edge.implicit_outputs) {
+                phony_mtimes.insert(output.clone(), mtime);
+                if edge.inputs.is_empty() && edge.implicit_inputs.is_empty() {
+                    dirty.insert(output.clone(), true);
+                }
+            }
+            continue;
+        }
+        let Some(rule) = state.rules.get(&edge.rule) else {
+            return Ok(false);
+        };
+        let command = rule.bindings.get("command").map(String::as_str).unwrap_or("");
+        let hash = log::hash_command(&expand_in_edge(state, &edge, command));
+        if !is_generator(state, &edge)
+            && edge.outputs.iter().chain(&edge.implicit_outputs).any(|output| {
+                !build_log.entries.get(output).is_some_and(|entry| entry.command_hash == hash)
+            })
+        {
+            return Ok(false);
+        }
+        mark_depfile_dirty(state, &edge, deps_log, &mut dirty);
+        if edge_needs_run(
+            state,
+            &edge,
+            &dirty,
+            &phony_mtimes,
+            build_log,
+            rule_has_restat(state, &edge),
+        ) {
+            return Ok(false);
+        }
+    }
+    checking.remove(path);
+    Ok(true)
 }
 
 /// Dependency-driven scheduler. Walks the topologically-ordered plan and
@@ -127,6 +300,7 @@ fn schedule(
     state: &State,
     opts: &Options,
     plan: &[usize],
+    planned_producers: &HashMap<String, usize>,
     status: &mut Status,
     announce_no_work: bool,
 ) -> Result<(u8, bool), String> {
@@ -137,7 +311,7 @@ fn schedule(
     // user did *not* pass `-j N` explicitly — `-j N` always wins,
     // matching reference ninja. A pipe-mode jobserver is rejected
     // with a friendly stderr warning and we fall back to local `-j`.
-    let mut jobserver_client = if opts.jobs.is_none() {
+    let mut jobserver_client = if !opts.dry_run && opts.jobs.is_none() {
         match jobserver::detect_from_env() {
             Ok(c) => c,
             Err(msg) => {
@@ -160,10 +334,9 @@ fn schedule(
     // first; explicit slots are written back to the FIFO on release.
     let mut held_slots: Vec<Option<Slot>> = (0..plan.len()).map(|_| None).collect();
 
-    // Map edge index → its dependencies (inputs that have a producer in
-    // the plan). We use this to detect when an edge becomes ready.
     let in_plan: HashSet<usize> = plan.iter().copied().collect();
-    let mut deps: Vec<Vec<usize>> = vec![Vec::new(); plan.len()];
+    let mut dependents = vec![Vec::new(); plan.len()];
+    let mut remaining = vec![0; plan.len()];
     let mut idx_in_plan = std::collections::HashMap::with_capacity(plan.len());
     for (slot, &edge_idx) in plan.iter().enumerate() {
         idx_in_plan.insert(edge_idx, slot);
@@ -179,21 +352,22 @@ fn schedule(
             .chain(&edge.order_only_inputs)
             .chain(dyndep_iter)
         {
-            if let Some(&prod) = state.producers.get(inp)
+            if let Some(&prod) = planned_producers.get(inp)
                 && in_plan.contains(&prod)
                 && let Some(&dep_slot) = idx_in_plan.get(&prod)
                 && seen_dep.insert(dep_slot)
             {
-                deps[slot].push(dep_slot);
+                dependents[dep_slot].push(slot);
+                remaining[slot] += 1;
             }
         }
     }
 
-    let mut remaining: Vec<usize> = (0..plan.len()).map(|s| deps[s].len()).collect();
     let mut done = vec![false; plan.len()];
     let mut started = vec![false; plan.len()];
+    let mut blocked = vec![false; plan.len()];
     let mut in_flight = 0usize;
-    let (tx, rx) = mpsc::channel::<EdgeOutcome>();
+    let (tx, rx) = mpsc::channel::<(EdgeOutcome, SystemTime)>();
     // We treat any non-zero exit as a "failure" and stop launching new
     // edges once `failure_count` reaches the user's `-k N` threshold.
     // The first failure code is preserved as the process exit status.
@@ -210,6 +384,8 @@ fn schedule(
     // every edge in the plan was skipped (clean / phony) we still owe
     // the user the canonical "ninja: no work to do." message.
     let mut any_real_work = false;
+    let mut preview = Vec::new();
+    let mut preview_failure = None;
     // Per-edge mutable copies so dyndep merges (extra outputs/inputs)
     // can land on the right edge before dispatch.
     let mut edges: Vec<Edge> = state.edges.to_vec();
@@ -230,7 +406,7 @@ fn schedule(
     // still triggers a rebuild today, then keep a writer open to append
     // fresh entries as edges complete.
     let prev_log = log::load(".ninja_log");
-    let mut log_writer = log::Writer::new(".ninja_log");
+    let mut log_writer = (!opts.dry_run).then(|| log::Writer::new(".ninja_log"));
     // Cross-invocation depfile cache. After a successful gcc/msvc edge
     // we store its discovered headers here and unlink the depfile, so
     // the next ninja invocation can answer "is this output stale?"
@@ -240,7 +416,6 @@ fn schedule(
     // Per-edge expanded command (used for both hashing and dispatch). We
     // compute it up front so we can both seed cross-invocation dirtiness
     // and avoid re-expanding the same command at completion time.
-    let mut commands: Vec<String> = vec![String::new(); plan.len()];
     let mut command_hashes: Vec<u64> = vec![0; plan.len()];
     for (slot, &edge_idx) in plan.iter().enumerate() {
         let edge = &edges[edge_idx];
@@ -257,32 +432,16 @@ fn schedule(
             .unwrap_or("");
         let cmd = expand_in_edge(state, edge, raw);
         command_hashes[slot] = log::hash_command(&cmd);
-        commands[slot] = cmd;
     }
 
     // Initial node dirtiness — kept deliberately minimal:
-    //   - source files (no in-edge) referenced as inputs: dirty iff the
-    //     file is missing on disk;
     //   - phony outputs whose edge has no inputs ('.FORCE'-style nodes)
     //     are always dirty;
     //   - everything else starts clean and the dispatch-time
     //      check (combined with each completed edge's
     //     dirty-output update) decides whether downstream work fires.
     let mut dirty: HashMap<String, bool> = HashMap::new();
-    for edge in &edges {
-        for inp in edge
-            .inputs
-            .iter()
-            .chain(&edge.implicit_inputs)
-            .chain(&edge.order_only_inputs)
-        {
-            if !producers.contains_key(inp) {
-                dirty
-                    .entry(inp.clone())
-                    .or_insert_with(|| !std::path::Path::new(inp).exists());
-            }
-        }
-    }
+    let mut phony_mtimes = HashMap::new();
     for &edge_idx in plan.iter() {
         let edge = &edges[edge_idx];
         if edge.is_phony() && edge.inputs.is_empty() && edge.implicit_inputs.is_empty() {
@@ -292,109 +451,25 @@ fn schedule(
         }
     }
 
-    // Depfile-driven dirtiness. For each edge that declares
-    // `depfile = ...`, read the file gcc/clang dropped on the previous
-    // run and compare the output mtime against every listed
-    // prerequisite. If any prereq is newer (or has been deleted) the
-    // output is marked dirty so the dispatch-time `edge_needs_run`
-    // check fires the rebuild. Missing depfiles are silently ignored
-    // — that's the cold-build path where the edge is dirty anyway
-    // because its output doesn't exist yet.
     for &edge_idx in plan.iter() {
-        let edge = &edges[edge_idx];
-        let Some(rule) = state.rules.get(&edge.rule) else {
-            continue;
-        };
-        let Some(depfile_path) = edge_binding(state, edge, rule, "depfile") else {
-            continue;
-        };
-        if depfile_path.is_empty() {
-            continue;
-        }
-        // Two sources of recorded prerequisites:
-        //   1. the depfile that the previous run dropped on disk, if it
-        //      still exists (the cold path on freshly-checked-out trees);
-        //   2. `.ninja_deps`, which is what `deps = gcc|msvc` populates
-        //      after consuming and unlinking the depfile.
-        // We prefer the on-disk depfile when present (it's what the
-        // compiler just wrote), but fall back to the cached deps log
-        // when the depfile has been consumed — that's what makes
-        // incremental rebuilds work after a `deps = gcc` rule fires.
-        let depfile_text = std::fs::read_to_string(&depfile_path).ok();
-        let parsed = depfile_text.as_deref().map(depfile::parse);
-        let uses_deps_cache = matches!(
-            lookup_either(edge, rule, "deps").as_deref(),
-            Some("gcc") | Some("msvc")
-        );
-        for out in edge.outputs.iter().chain(&edge.implicit_outputs) {
-            let deps_from_depfile = parsed
-                .as_ref()
-                .and_then(|p| p.targets.get(out))
-                .map(|v| v.as_slice());
-            let deps_from_log = if deps_from_depfile.is_none() && uses_deps_cache {
-                deps_log.records.get(out).map(|r| r.deps.as_slice())
-            } else {
-                None
-            };
-            let Some(deps) = deps_from_depfile.or(deps_from_log) else {
-                continue;
-            };
-            let out_mtime = mtime_of(out);
-            let mut out_is_dirty = false;
-            for dep in deps {
-                match mtime_of(dep) {
-                    None => {
-                        // A previously-tracked header was removed —
-                        // force a rebuild so the next compile fails
-                        // loudly (or picks up a moved header).
-                        out_is_dirty = true;
-                        break;
-                    }
-                    Some(dep_mtime) => match out_mtime {
-                        Some(out_m) if dep_mtime <= out_m => {}
-                        _ => {
-                            out_is_dirty = true;
-                            break;
-                        }
-                    },
-                }
-            }
-            if out_is_dirty {
-                dirty.insert(out.clone(), true);
-            }
-        }
+        mark_depfile_dirty(state, &edges[edge_idx], &deps_log, &mut dirty);
     }
 
-    // Build-log-driven dirtiness. For every real edge:
-    //   - if no log entry exists for an output but the file does, treat
-    //     it as dirty (foreign artifact / first run after upgrade);
-    //   - if the recorded command hash differs from the freshly-computed
-    //     one the output is dirty (the rule changed);
-    //   - if the recorded mtime differs from what's on disk now the
-    //     output was modified outside ninja and must be regenerated.
-    // Missing files are already covered by the standard
-    // `edge_needs_run` check.
+    // Compare output times at dispatch, after the dyndep file has supplied
+    // any restat binding and additional inputs for the edge.
     for (slot, &edge_idx) in plan.iter().enumerate() {
         let edge = &edges[edge_idx];
-        if edge.is_phony() {
+        if edge.is_phony() || is_generator(state, edge) {
             continue;
         }
         let new_hash = command_hashes[slot];
         for out in edge.outputs.iter().chain(&edge.implicit_outputs) {
-            let on_disk = mtime_of(out);
-            if on_disk.is_none() {
-                continue; // missing -> handled by edge_needs_run
-            }
-            match prev_log.entries.get(out) {
-                None => {
-                    dirty.insert(out.clone(), true);
-                }
-                Some(entry) => {
-                    let current_ns = log::mtime_to_ns(on_disk);
-                    if entry.command_hash != new_hash || entry.mtime_ns != current_ns {
-                        dirty.insert(out.clone(), true);
-                    }
-                }
+            if !prev_log
+                .entries
+                .get(out)
+                .is_some_and(|entry| entry.command_hash == new_hash)
+            {
+                dirty.insert(out.clone(), true);
             }
         }
     }
@@ -405,15 +480,24 @@ fn schedule(
         // — let in-flight jobs drain so their output is preserved.
         let stop_dispatching =
             failure_count >= failure_limit || interrupted || dyndep_failure.is_some();
+        let mut dyndep_producer_completed_inline = false;
         if !stop_dispatching {
             // Eagerly merge every loadable dyndep file before deciding
             // which edges to dispatch. Loading them up-front means a
             // "multiple rules generate X" collision is detected as
             // soon as the producing files exist on disk, and *before*
             // either consumer commits to running.
-            for &edge_idx in plan.iter() {
+            for (slot, &edge_idx) in plan.iter().enumerate() {
+                if blocked[slot] {
+                    continue;
+                }
                 if let Some(dd_path) = edges[edge_idx].dyndep.clone()
                     && !dyndep_loaded.contains(&edge_idx)
+                    && state
+                        .producers
+                        .get(&dd_path)
+                        .and_then(|producer| idx_in_plan.get(producer))
+                        .is_none_or(|&slot| done[slot])
                     && std::path::Path::new(&dd_path).exists()
                 {
                     match merge_dyndep(
@@ -436,31 +520,48 @@ fn schedule(
             if dyndep_failure.is_some() {
                 continue;
             }
-            // To reliably detect dyndep collisions, defer dispatching
-            // any consumer of a dyndep file until *every* dyndep-producing
-            // edge in this plan has finished — otherwise we can race a
-            // consumer ahead of the second producer's completion and miss
-            // the "multiple rules generate X" check.
+            // Detect dyndep collisions before dispatching ordinary consumers.
+            // A producer with its own dyndep must be able to run once that
+            // dependency is ready.
             let pending_dyndep_producers: HashSet<usize> = edges
                 .iter()
                 .filter_map(|e| e.dyndep.as_deref())
                 .filter_map(|p| state.producers.get(p))
                 .copied()
                 .filter(|prod| {
-                    in_plan.contains(prod) && idx_in_plan.get(prod).is_some_and(|s| !done[*s])
+                    in_plan.contains(prod)
+                        && idx_in_plan.get(prod).is_some_and(|s| !done[*s] && !blocked[*s])
                 })
                 .collect();
 
             for slot in 0..plan.len() {
-                if started[slot] || remaining[slot] > 0 {
+                if started[slot] || blocked[slot] || remaining[slot] > 0 {
                     continue;
                 }
                 if in_flight >= jobs {
                     break;
                 }
                 let edge_idx = plan[slot];
-                if edges[edge_idx].dyndep.is_some() && !pending_dyndep_producers.is_empty() {
-                    continue;
+                if let Some(path) = &edges[edge_idx].dyndep {
+                    let waiting_for_metadata = state
+                        .producers
+                        .get(path)
+                        .is_some_and(|producer| pending_dyndep_producers.contains(producer));
+                    if waiting_for_metadata
+                        || (!pending_dyndep_producers.is_empty()
+                            && !pending_dyndep_producers.contains(&edge_idx))
+                    {
+                        continue;
+                    }
+                    if !dyndep_loaded.contains(&edge_idx) {
+                        if opts.dry_run {
+                            preview_failure.get_or_insert_with(|| (preview.len(), path.clone()));
+                        } else {
+                            dyndep_failure =
+                                Some(format!("error: loading '{path}': dyndep file is missing"));
+                            break;
+                        }
+                    }
                 }
                 // Pool capacity check. Only real (non-phony) edges
                 // count against a pool — phonies don't spawn work.
@@ -494,29 +595,38 @@ fn schedule(
                 }
                 let edge = edges[edge_idx].clone();
                 if edge.is_phony() {
+                    let newest_input = newest_input_mtime(&edge, &phony_mtimes);
+                    let input_dirty = edge
+                        .inputs
+                        .iter()
+                        .chain(&edge.implicit_inputs)
+                        .any(|input| dirty.get(input) == Some(&true));
+                    for output in edge.outputs.iter().chain(&edge.implicit_outputs) {
+                        phony_mtimes.insert(output.clone(), newest_input);
+                        if input_dirty {
+                            dirty.insert(output.clone(), true);
+                        }
+                    }
                     // Phony "completes" instantly; mark done inline so we
                     // can dispatch its dependents on this same loop turn.
                     started[slot] = true;
-                    done[slot] = true;
-                    for s2 in 0..plan.len() {
-                        if deps[s2].contains(&slot) && !done[s2] {
-                            remaining[s2] = remaining[s2].saturating_sub(1);
-                        }
-                    }
+                    dyndep_producer_completed_inline |= pending_dyndep_producers.contains(&edge_idx);
+                    complete_slot(slot, &dependents, &mut done, &mut remaining);
                     continue;
                 }
-                let needs = edge_needs_run(&edge, &dirty);
-                if !needs {
+                let restat = rule_has_restat(state, &edge);
+                let needs = edge_needs_run(state, &edge, &dirty, &phony_mtimes, &prev_log, restat);
+                if !needs || opts.dry_run {
+                    if needs {
+                        let (_, shown) = describe_command(state, &edge, opts)?;
+                        preview.push(shown);
+                    }
                     started[slot] = true;
                     for o in edge.outputs.iter().chain(&edge.implicit_outputs) {
-                        dirty.insert(o.clone(), false);
+                        dirty.insert(o.clone(), needs);
                     }
-                    done[slot] = true;
-                    for s2 in 0..plan.len() {
-                        if deps[s2].contains(&slot) && !done[s2] {
-                            remaining[s2] = remaining[s2].saturating_sub(1);
-                        }
-                    }
+                    dyndep_producer_completed_inline |= pending_dyndep_producers.contains(&edge_idx);
+                    complete_slot(slot, &dependents, &mut done, &mut remaining);
                     continue;
                 }
                 let acquired_slot = if let Some(c) = jobserver_client.as_mut() {
@@ -549,21 +659,18 @@ fn schedule(
                 } else {
                     Vec::new()
                 };
-                let restat = rule_has_restat(state, &edge);
-                let mtimes_before: Vec<Option<SystemTime>> = if restat {
-                    edge.outputs
-                        .iter()
-                        .chain(&edge.implicit_outputs)
-                        .map(|o| mtime_of(o))
-                        .collect()
-                } else {
-                    Vec::new()
-                };
-                let outputs_owned: Vec<String> = edge
+                let outputs = edge
                     .outputs
                     .iter()
                     .chain(&edge.implicit_outputs)
-                    .cloned()
+                    .map(|path| OutputBeforeRun {
+                        path: path.clone(),
+                        mtime: if restat {
+                            BeforeMtime::Observed(mtime_of(path))
+                        } else {
+                            BeforeMtime::Unobserved
+                        },
+                    })
                     .collect();
                 if is_console_now {
                     status.build_started_console(&prepared.shown);
@@ -571,11 +678,20 @@ fn schedule(
                     status.build_started(&prepared.shown);
                 }
                 let tx = tx.clone();
-                let prepared_outputs = outputs_owned.clone();
-                let prepared_mtimes = mtimes_before.clone();
-                let restat_flag = restat;
-                let explain_owned = explain_lines.clone();
                 let cmd_hash = command_hashes[slot];
+                let send_outcome = move |run_command: fn(&Prepared) -> OutcomeKind| {
+                    let command_started = SystemTime::now();
+                    let kind = run_command(&prepared);
+                    let outcome = EdgeOutcome {
+                        slot,
+                        shown: prepared.shown,
+                        kind,
+                        explain: explain_lines,
+                        outputs,
+                        command_hash: cmd_hash,
+                    };
+                    let _ = tx.send((outcome, command_started));
+                };
                 if is_console_now {
                     // Console-pool edges run synchronously on the main
                     // thread with inherited stdio so the child can
@@ -587,29 +703,18 @@ fn schedule(
                     // reap path handles bookkeeping (dirtiness,
                     // .ninja_log, deps_log, pool/jobserver release).
                     status.lock_console();
-                    let mut outcome = execute_console(slot, prepared);
-                    outcome.explain = explain_owned;
-                    outcome.restat = restat_flag;
-                    outcome.outputs_for_restat = prepared_outputs;
-                    outcome.mtimes_before = prepared_mtimes;
-                    outcome.command_hash = cmd_hash;
-                    let _ = tx.send(outcome);
+                    send_outcome(execute_console);
                 } else {
-                    thread::spawn(move || {
-                        let mut outcome = execute(slot, prepared);
-                        outcome.explain = explain_owned;
-                        outcome.restat = restat_flag;
-                        outcome.outputs_for_restat = prepared_outputs;
-                        outcome.mtimes_before = prepared_mtimes;
-                        outcome.command_hash = cmd_hash;
-                        let _ = tx.send(outcome);
-                    });
+                    thread::spawn(move || send_outcome(execute));
                 }
             }
         }
 
         if in_flight == 0 {
             let unstarted = started.iter().any(|s| !*s);
+            if unstarted && dyndep_producer_completed_inline {
+                continue;
+            }
             if unstarted && held_slots.iter().any(|s| s.is_some()) {
                 if let Some(c) = jobserver_client.as_mut() {
                     for held in &mut held_slots {
@@ -642,11 +747,10 @@ fn schedule(
         // simultaneously. Edges that finish in a different batch
         // i.e. distinct rx.recv() blocks still appear in completion
         // order, preserving the interleaving asserted by test_issue_1418.
-        batch.sort_by_key(|o| o.slot);
-        for outcome in batch {
+        batch.sort_by_key(|(outcome, _)| outcome.slot);
+        for (outcome, command_started) in batch {
             in_flight -= 1;
             let slot = outcome.slot;
-            done[slot] = true;
             // Release the pool slot this edge held, if any.
             if let Some(name) = pool_for_edge(state, &edges[plan[slot]])
                 && !edges[plan[slot]].is_phony()
@@ -662,32 +766,13 @@ fn schedule(
             {
                 c.release(slot_token);
             }
-            for s2 in 0..plan.len() {
-                if deps[s2].contains(&slot) && !done[s2] {
-                    remaining[s2] = remaining[s2].saturating_sub(1);
-                }
-            }
             // Update dirty status for the outputs based on restat.
-            if outcome.restat {
-                let after: Vec<Option<SystemTime>> = outcome
-                    .outputs_for_restat
-                    .iter()
-                    .map(|o| mtime_of(o))
-                    .collect();
-                let unchanged = !outcome.outputs_for_restat.is_empty()
-                    && after.len() == outcome.mtimes_before.len()
-                    && after
-                        .iter()
-                        .zip(outcome.mtimes_before.iter())
-                        .all(|(a, b)| a == b && a.is_some());
-                let new_dirty = !unchanged;
-                for o in &outcome.outputs_for_restat {
-                    dirty.insert(o.clone(), new_dirty);
-                }
-            } else {
-                for o in &outcome.outputs_for_restat {
-                    dirty.insert(o.clone(), true);
-                }
+            let outputs_dirty = outcome.outputs.iter().any(|output| match output.mtime {
+                BeforeMtime::Observed(Some(before)) => mtime_of(&output.path) != Some(before),
+                BeforeMtime::Observed(None) | BeforeMtime::Unobserved => true,
+            });
+            for output in &outcome.outputs {
+                dirty.insert(output.path.clone(), outputs_dirty);
             }
             // Print any captured explain lines just before the
             // corresponding `[N/T]` status line. Doing it here keeps the
@@ -700,26 +785,32 @@ fn schedule(
                 is_console_edge(state, &edges[plan[slot]]) && !edges[plan[slot]].is_phony();
             match outcome.kind {
                 OutcomeKind::Ok { combined } => {
+                    complete_slot(slot, &dependents, &mut done, &mut remaining);
                     if edge_was_console {
                         status.build_finished_console(&outcome.shown);
                     } else {
                         status.build_finished(&outcome.shown, &combined);
                     }
-                    // Persist the latest command hash + observed output
-                    // mtimes so the next ninja invocation can detect
-                    // command changes and outside-of-ninja edits.
-                    let now_ms = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_millis() as u64)
-                        .unwrap_or(0);
-                    for out in &outcome.outputs_for_restat {
+                    let started_ns = log::mtime_to_ns(Some(command_started));
+                    let finished_ns = log::mtime_to_ns(Some(SystemTime::now()));
+                    for output in &outcome.outputs {
+                        let out = &output.path;
+                        let observed = mtime_of(out);
+                        let observed_ns = log::mtime_to_ns(observed);
+                        let recorded_ns = match output.mtime {
+                            BeforeMtime::Observed(before) if before == observed => started_ns,
+                            BeforeMtime::Observed(_) => started_ns.max(observed_ns),
+                            BeforeMtime::Unobserved => observed_ns,
+                        };
                         let entry = log::LogEntry {
-                            start_ms: now_ms,
-                            end_ms: now_ms,
-                            mtime_ns: log::mtime_to_ns(mtime_of(out)),
+                            start_ms: (started_ns / 1_000_000) as u64,
+                            end_ms: (finished_ns / 1_000_000) as u64,
+                            mtime_ns: recorded_ns,
                             command_hash: outcome.command_hash,
                         };
-                        log_writer.record(std::slice::from_ref(out), &entry);
+                        if let Some(writer) = &mut log_writer {
+                            writer.record(std::slice::from_ref(out), &entry);
+                        }
                     }
                     // For `deps = gcc|msvc` edges: parse the freshly
                     // dropped depfile, persist the discovered headers
@@ -734,8 +825,7 @@ fn schedule(
                         let depfile = edge_binding(state, edge_ref, rule, "depfile");
                         if matches!(deps_kind.as_deref(), Some("gcc") | Some("msvc"))
                             && let Some(df_path) = depfile
-                        {
-                            if !df_path.is_empty()
+                            && !df_path.is_empty()
                                 && let Ok(text) = std::fs::read_to_string(&df_path)
                             {
                                 let parsed = depfile::parse(&text);
@@ -748,10 +838,19 @@ fn schedule(
                                 }
                                 let _ = std::fs::remove_file(&df_path);
                             }
-                        }
                     }
                 }
                 OutcomeKind::Failed { code, combined } => {
+                    // A failed edge never releases its dependents. Mark the
+                    // subtree as blocked as well, so blocked dyndep producers
+                    // do not prevent independent metadata from being loaded.
+                    let mut pending = vec![slot];
+                    while let Some(failed) = pending.pop() {
+                        if !blocked[failed] {
+                            blocked[failed] = true;
+                            pending.extend(&dependents[failed]);
+                        }
+                    }
                     if edge_was_console {
                         // The child wrote any failure detail directly
                         // to the terminal; we still emit the
@@ -779,6 +878,22 @@ fn schedule(
         }
     }
 
+    if opts.dry_run {
+        let mut status = Status::new(Mode::detect(), opts.quiet, opts.verbose, preview.len());
+        let (visible, missing) = match &preview_failure {
+            Some((visible, path)) => (*visible, Some(path)),
+            None => (preview.len(), None),
+        };
+        for shown in &preview[..visible] {
+            status.build_finished(shown, &[]);
+        }
+        status.finish();
+        if let Some(path) = missing {
+            println!("ninja: build stopped: loading '{path}': No such file or directory.");
+            return Ok((1, visible != 0));
+        }
+        any_real_work = visible != 0;
+    }
     status.finish();
     if interrupted {
         println!("ninja: build stopped: interrupted by user.");
@@ -803,25 +918,123 @@ fn schedule(
     Ok((0, any_real_work))
 }
 
+fn complete_slot(slot: usize, dependents: &[Vec<usize>], done: &mut [bool], remaining: &mut [usize]) {
+    done[slot] = true;
+    for &dependent in &dependents[slot] {
+        if !done[dependent] {
+            remaining[dependent] -= 1;
+        }
+    }
+}
+
 /// Decide whether the edge still needs to run *right now*. An edge
 /// needs to run if any of its outputs is missing on disk, any of its
 /// outputs has been flagged dirty, or any of its inputs is currently
 /// flagged dirty.
-fn edge_needs_run(edge: &Edge, dirty: &HashMap<String, bool>) -> bool {
-    for o in edge.outputs.iter().chain(&edge.implicit_outputs) {
-        if !std::path::Path::new(o).exists() {
-            return true;
-        }
-        if *dirty.get(o.as_str()).unwrap_or(&false) {
-            return true;
-        }
+fn edge_needs_run(
+    state: &State,
+    edge: &Edge,
+    dirty: &HashMap<String, bool>,
+    phony_mtimes: &HashMap<String, Option<SystemTime>>,
+    previous_log: &log::BuildLog,
+    restat: bool,
+) -> bool {
+    if edge
+        .inputs
+        .iter()
+        .chain(&edge.implicit_inputs)
+        .any(|input| dirty.get(input) == Some(&true))
+    {
+        return true;
     }
-    for i in edge.inputs.iter().chain(&edge.implicit_inputs) {
-        if *dirty.get(i.as_str()).unwrap_or(&false) {
+    let mut newest_input = None;
+    let check_observed_mtime = !restat && !is_generator(state, edge);
+    for o in edge.outputs.iter().chain(&edge.implicit_outputs) {
+        if dirty.get(o) == Some(&true) {
+            return true;
+        }
+        let Some(observed) = mtime_of(o) else {
+            return true;
+        };
+        let observed_ns = log::mtime_to_ns(Some(observed));
+        let entry = previous_log.entries.get(o);
+        if check_observed_mtime && entry.is_some_and(|entry| entry.mtime_ns != observed_ns) {
+            return true;
+        }
+        let output_mtime = if restat {
+            entry.map_or(observed_ns, |entry| entry.mtime_ns)
+        } else {
+            observed_ns
+        };
+        let input_mtime = *newest_input
+            .get_or_insert_with(|| log::mtime_to_ns(newest_input_mtime(edge, phony_mtimes)));
+        if output_mtime < input_mtime {
             return true;
         }
     }
     false
+}
+
+fn newest_input_mtime(
+    edge: &Edge,
+    phony_mtimes: &HashMap<String, Option<SystemTime>>,
+) -> Option<SystemTime> {
+    edge.inputs
+        .iter()
+        .chain(&edge.implicit_inputs)
+        .filter_map(|input| match phony_mtimes.get(input) {
+            Some(mtime) => *mtime,
+            None => mtime_of(input),
+        })
+        .max()
+}
+
+fn mark_depfile_dirty(
+    state: &State,
+    edge: &Edge,
+    deps_log: &DepsLog,
+    dirty: &mut HashMap<String, bool>,
+) {
+    let Some(rule) = state.rules.get(&edge.rule) else {
+        return;
+    };
+    let uses_deps_cache = matches!(
+        lookup_either(edge, rule, "deps").as_deref(),
+        Some("gcc") | Some("msvc")
+    );
+    let Some(path) = edge_binding(state, edge, rule, "depfile").filter(|path| !path.is_empty()) else {
+        return;
+    };
+    if uses_deps_cache
+        && let Some(out) = edge.outputs.first()
+        && !deps_log.records.contains_key(out)
+    {
+        dirty.insert(out.clone(), true);
+    }
+    let text = std::fs::read_to_string(path).ok();
+    let parsed = text.as_deref().map(depfile::parse);
+    for out in edge.outputs.iter().chain(&edge.implicit_outputs) {
+        let deps = parsed
+            .as_ref()
+            .and_then(|depfile| depfile.targets.get(out))
+            .map(Vec::as_slice)
+            .or_else(|| {
+                if uses_deps_cache {
+                    deps_log.records.get(out).map(|record| record.deps.as_slice())
+                } else {
+                    None
+                }
+            });
+        if let Some(deps) = deps {
+            let output_mtime = mtime_of(out);
+            if deps.iter().any(|dep| match (mtime_of(dep), output_mtime) {
+                (Some(input), Some(output)) => input > output,
+                _ => true,
+            }) {
+                dirty.insert(out.clone(), true);
+            }
+        }
+    }
 }
 
 fn rule_has_restat(state: &State, edge: &Edge) -> bool {
@@ -878,23 +1091,13 @@ fn merge_dyndep(
     cache: &mut HashMap<String, dyndep::DyndepFile>,
 ) -> Result<(), String> {
     if !cache.contains_key(path) {
-        let src =
-            std::fs::read_to_string(path).map_err(|e| format!("loading dyndep '{path}': {e}"))?;
-        let parsed = dyndep::parse(&src).map_err(|e| format!("dyndep '{path}': {e}"))?;
-        cache.insert(path.to_string(), parsed);
+        cache.insert(path.to_string(), read_dyndep(path)?);
     }
     let ddf = &cache[path];
-    // Find the entry keyed by any of the edge's explicit outputs.
     let edge = &mut edges[idx];
-    let key = edge
-        .outputs
-        .iter()
-        .find(|o| ddf.entries.contains_key(o.as_str()))
-        .cloned();
-    let Some(key) = key else {
+    let Some(entry) = ddf.entry_for(&edge.outputs) else {
         return Ok(());
     };
-    let entry = &ddf.entries[&key];
     for new_out in &entry.implicit_outputs {
         if producers.contains_key(new_out) {
             return Err(format!("multiple rules generate {new_out}"));
@@ -911,6 +1114,12 @@ fn merge_dyndep(
     Ok(())
 }
 
+fn read_dyndep(path: &str) -> Result<dyndep::DyndepFile, String> {
+    let source =
+        std::fs::read_to_string(path).map_err(|e| format!("loading dyndep '{path}': {e}"))?;
+    dyndep::parse(&source).map_err(|e| format!("dyndep '{path}': {e}"))
+}
+
 /// Everything needed to run an edge in a worker thread, pre-resolved on
 /// the main thread so the worker does no graph access.
 struct Prepared {
@@ -921,7 +1130,7 @@ struct Prepared {
     rspfile: Option<(String, String)>,
 }
 
-fn prepare(state: &State, edge: &Edge, opts: &Options) -> Result<Prepared, String> {
+fn describe_command(state: &State, edge: &Edge, opts: &Options) -> Result<(String, String), String> {
     let rule = state
         .rules
         .get(&edge.rule)
@@ -945,18 +1154,22 @@ fn prepare(state: &State, edge: &Edge, opts: &Options) -> Result<Prepared, Strin
     } else {
         description
     };
+    Ok((command, shown))
+}
 
+fn prepare(state: &State, edge: &Edge, opts: &Options) -> Result<Prepared, String> {
+    let (command, shown) = describe_command(state, edge, opts)?;
+    let rule = &state.rules[&edge.rule];
     // Output and depfile parent dirs are created up-front so commands can
     // assume the output directory exists. Matches
     // `test_depfile_directory_creation`.
     for out in edge.outputs.iter().chain(&edge.implicit_outputs) {
         ensure_parent_dir(out);
     }
-    if let Some(path) = edge_binding(state, edge, rule, "depfile") {
-        if !path.is_empty() {
+    if let Some(path) = edge_binding(state, edge, rule, "depfile")
+        && !path.is_empty() {
             ensure_parent_dir(&path);
         }
-    }
 
     let rspfile = edge_binding(state, edge, rule, "rspfile")
         .filter(|s| !s.is_empty())
@@ -975,14 +1188,22 @@ fn prepare(state: &State, edge: &Edge, opts: &Options) -> Result<Prepared, Strin
     })
 }
 
+enum BeforeMtime {
+    Unobserved,
+    Observed(Option<SystemTime>),
+}
+
+struct OutputBeforeRun {
+    path: String,
+    mtime: BeforeMtime,
+}
+
 struct EdgeOutcome {
     slot: usize,
     shown: String,
     kind: OutcomeKind,
     explain: Vec<String>,
-    restat: bool,
-    outputs_for_restat: Vec<String>,
-    mtimes_before: Vec<Option<SystemTime>>,
+    outputs: Vec<OutputBeforeRun>,
     /// Hash of the command we ran for this edge. Carried into the
     /// completion handler so it can be appended to `.ninja_log`.
     command_hash: u64,
@@ -998,20 +1219,11 @@ enum OutcomeKind {
 /// Worker-side: write the rspfile, spawn the command, capture output,
 /// remove the rspfile. Decides whether the exit code maps to Ok, Failed,
 /// or Interrupted (SIGINT).
-fn execute(slot: usize, p: Prepared) -> EdgeOutcome {
+fn execute(p: &Prepared) -> OutcomeKind {
     if let Some((path, content)) = &p.rspfile {
         ensure_parent_dir(path);
         if let Err(e) = std::fs::write(path, content) {
-            return EdgeOutcome {
-                slot,
-                shown: p.shown,
-                kind: OutcomeKind::SpawnError(format!("rspfile '{path}': {e}")),
-                explain: Vec::new(),
-                restat: false,
-                outputs_for_restat: Vec::new(),
-                mtimes_before: Vec::new(),
-                command_hash: 0,
-            };
+            return OutcomeKind::SpawnError(format!("rspfile '{path}': {e}"));
         }
     }
 
@@ -1023,48 +1235,19 @@ fn execute(slot: usize, p: Prepared) -> EdgeOutcome {
 
     let output = match result {
         Ok(o) => o,
-        Err(e) => {
-            return EdgeOutcome {
-                slot,
-                shown: p.shown,
-                kind: OutcomeKind::SpawnError(format!("failed to spawn: {e}")),
-                explain: Vec::new(),
-                restat: false,
-                outputs_for_restat: Vec::new(),
-                mtimes_before: Vec::new(),
-                command_hash: 0,
-            };
-        }
+        Err(e) => return OutcomeKind::SpawnError(format!("failed to spawn: {e}")),
     };
 
     let mut combined = output.stdout;
     combined.extend_from_slice(&output.stderr);
 
     if output.status.success() {
-        return EdgeOutcome {
-            slot,
-            shown: p.shown,
-            kind: OutcomeKind::Ok { combined },
-            explain: Vec::new(),
-            restat: false,
-            outputs_for_restat: Vec::new(),
-            mtimes_before: Vec::new(),
-            command_hash: 0,
-        };
+        return OutcomeKind::Ok { combined };
     }
 
     let raw = output.status.code().unwrap_or(-1);
     if raw == 130 {
-        return EdgeOutcome {
-            slot,
-            shown: p.shown,
-            kind: OutcomeKind::Interrupted,
-            explain: Vec::new(),
-            restat: false,
-            outputs_for_restat: Vec::new(),
-            mtimes_before: Vec::new(),
-            command_hash: 0,
-        };
+        return OutcomeKind::Interrupted;
     }
     let code: u8 = if !(0..=255).contains(&raw) {
         1
@@ -1076,41 +1259,20 @@ fn execute(slot: usize, p: Prepared) -> EdgeOutcome {
     let header = format!("FAILED: [code={raw}] {} \n{}\n", p.outputs, p.command);
     let mut buf = header.into_bytes();
     buf.extend_from_slice(&combined);
-    EdgeOutcome {
-        slot,
-        shown: p.shown,
-        kind: OutcomeKind::Failed {
-            code,
-            combined: buf,
-        },
-        explain: Vec::new(),
-        command_hash: 0,
-        restat: false,
-        outputs_for_restat: Vec::new(),
-        mtimes_before: Vec::new(),
-    }
+    OutcomeKind::Failed { code, combined: buf }
 }
 
 /// Console-pool variant of `execute`: spawns the subprocess with
 /// stdin/stdout/stderr inherited from ninja so the child owns the
-/// terminal. Returns an `EdgeOutcome` with empty `combined` on success
+/// terminal. Returns an `OutcomeKind` with empty `combined` on success
 /// (the child's output went straight to the terminal); failures still
 /// carry a synthetic `FAILED: [code=N] outputs\ncommand\n` header so
 /// the eventual reap path can replay it after the console unlocks.
-fn execute_console(slot: usize, p: Prepared) -> EdgeOutcome {
+fn execute_console(p: &Prepared) -> OutcomeKind {
     if let Some((path, content)) = &p.rspfile {
         ensure_parent_dir(path);
         if let Err(e) = std::fs::write(path, content) {
-            return EdgeOutcome {
-                slot,
-                shown: p.shown,
-                kind: OutcomeKind::SpawnError(format!("rspfile '{path}': {e}")),
-                explain: Vec::new(),
-                restat: false,
-                outputs_for_restat: Vec::new(),
-                mtimes_before: Vec::new(),
-                command_hash: 0,
-            };
+            return OutcomeKind::SpawnError(format!("rspfile '{path}': {e}"));
         }
     }
 
@@ -1122,47 +1284,18 @@ fn execute_console(slot: usize, p: Prepared) -> EdgeOutcome {
 
     let status = match result {
         Ok(s) => s,
-        Err(e) => {
-            return EdgeOutcome {
-                slot,
-                shown: p.shown,
-                kind: OutcomeKind::SpawnError(format!("failed to spawn: {e}")),
-                explain: Vec::new(),
-                restat: false,
-                outputs_for_restat: Vec::new(),
-                mtimes_before: Vec::new(),
-                command_hash: 0,
-            };
-        }
+        Err(e) => return OutcomeKind::SpawnError(format!("failed to spawn: {e}")),
     };
 
     if status.success() {
-        return EdgeOutcome {
-            slot,
-            shown: p.shown,
-            kind: OutcomeKind::Ok {
-                combined: Vec::new(),
-            },
-            explain: Vec::new(),
-            restat: false,
-            outputs_for_restat: Vec::new(),
-            mtimes_before: Vec::new(),
-            command_hash: 0,
+        return OutcomeKind::Ok {
+            combined: Vec::new(),
         };
     }
 
     let raw = status.code().unwrap_or(-1);
     if raw == 130 {
-        return EdgeOutcome {
-            slot,
-            shown: p.shown,
-            kind: OutcomeKind::Interrupted,
-            explain: Vec::new(),
-            restat: false,
-            outputs_for_restat: Vec::new(),
-            mtimes_before: Vec::new(),
-            command_hash: 0,
-        };
+        return OutcomeKind::Interrupted;
     }
     let code: u8 = if !(0..=255).contains(&raw) {
         1
@@ -1170,18 +1303,9 @@ fn execute_console(slot: usize, p: Prepared) -> EdgeOutcome {
         raw as u8
     };
     let header = format!("FAILED: [code={raw}] {} \n{}\n", p.outputs, p.command);
-    EdgeOutcome {
-        slot,
-        shown: p.shown,
-        kind: OutcomeKind::Failed {
-            code,
-            combined: header.into_bytes(),
-        },
-        explain: Vec::new(),
-        command_hash: 0,
-        restat: false,
-        outputs_for_restat: Vec::new(),
-        mtimes_before: Vec::new(),
+    OutcomeKind::Failed {
+        code,
+        combined: header.into_bytes(),
     }
 }
 

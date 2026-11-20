@@ -1,0 +1,9 @@
+rule generate
+  command = touch primary generated
+rule consume
+  command = test -f generated && touch $out
+build primary: generate || deps.dd
+  dyndep = deps.dd
+build output: consume | generated || deps.dd
+  dyndep = deps.dd
+default output

@@ -734,10 +734,8 @@ fn shell_quote(value: &str) -> String {
 }
 
 fn introspect_command() -> String {
-    let executable = std::env::current_exe()
-        .map(|path| path.to_string_lossy().to_string())
-        .unwrap_or_else(|_| "meson".to_string());
-    format!("{} introspect", shell_quote(&executable))
+    let invocation = crate::cli::meson_invocation();
+    format!("{} introspect", invocation.iter().map(|arg| shell_quote(arg)).collect::<Vec<_>>().join(" "))
 }
 
 fn script_environment(source_root: &str, build_root: &str) -> Vec<(&'static str, String)> {
@@ -984,10 +982,7 @@ fn origin_relative(from: &str, to: &str) -> String {
     {
         common += 1;
     }
-    let mut relative: Vec<&str> = Vec::new();
-    for _ in common..from_parts.len() {
-        relative.push("..");
-    }
+    let mut relative: Vec<&str> = vec![".."; from_parts.len() - common];
     relative.extend_from_slice(&to_parts[common..]);
     if relative.is_empty() {
         "$ORIGIN/".to_string()

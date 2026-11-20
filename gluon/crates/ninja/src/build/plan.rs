@@ -6,7 +6,7 @@
 
 use crate::cli::Options;
 use crate::graph::State;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Pick which targets to build:
 ///   1. explicit CLI targets, if any
@@ -45,11 +45,19 @@ pub fn resolve_targets(state: &State, opts: &Options) -> Vec<String> {
 /// edge indices; phony edges are kept (the runner skips dispatch for
 /// them) so accounting and dependency wiring stay consistent.
 pub fn build_plan(state: &State, targets: &[String]) -> Result<Vec<usize>, String> {
+    build_plan_with_producers(state, targets, &state.producers)
+}
+
+pub(super) fn build_plan_with_producers(
+    state: &State,
+    targets: &[String],
+    producers: &HashMap<String, usize>,
+) -> Result<Vec<usize>, String> {
     let mut order = Vec::new();
     let mut seen = HashSet::new();
     let mut on_stack = HashSet::new();
     for t in targets {
-        visit(state, t, &mut order, &mut seen, &mut on_stack)?;
+        visit(state, t, producers, &mut order, &mut seen, &mut on_stack)?;
     }
     Ok(order)
 }
@@ -57,11 +65,12 @@ pub fn build_plan(state: &State, targets: &[String]) -> Result<Vec<usize>, Strin
 fn visit(
     state: &State,
     target: &str,
+    producers: &HashMap<String, usize>,
     order: &mut Vec<usize>,
     seen: &mut HashSet<usize>,
     on_stack: &mut HashSet<usize>,
 ) -> Result<(), String> {
-    let Some(&idx) = state.producers.get(target) else {
+    let Some(&idx) = producers.get(target) else {
         return Ok(()); // source file
     };
     if on_stack.contains(&idx) {
@@ -78,12 +87,12 @@ fn visit(
         .chain(&edge.implicit_inputs)
         .chain(&edge.order_only_inputs)
     {
-        visit(state, inp, order, seen, on_stack)?;
+        visit(state, inp, producers, order, seen, on_stack)?;
     }
     // The dyndep file (if any) must be produced before this edge runs,
     // so include its producer in the plan as a real dependency.
     if let Some(dd) = &edge.dyndep {
-        visit(state, dd, order, seen, on_stack)?;
+        visit(state, dd, producers, order, seen, on_stack)?;
     }
     on_stack.remove(&idx);
     order.push(idx);

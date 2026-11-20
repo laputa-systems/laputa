@@ -162,10 +162,11 @@ package-tools builds retain the authority described above.
 ### Meson and Ninja build commands
 
 Laputa builds Meson and Ninja graphs with gluon, the Rust Meson front end and
-Ninja executor. `gluon/` is vendored from laputa-systems/gluon at `95bdcf5`
+Ninja executor. `gluon/` is vendored from laputa-systems/gluon at `ba818ba`
 and packaged as `gluon` (`usr/bin/meson`, `usr/bin/ninja`). Only its Laputa
 harness under `gluon/tests/laputa/` lives here; every other change goes
-upstream, not in-tree. A recipe configures with `meson setup`, builds with
+upstream, not in-tree. The copy omits upstream's `.github/`, `.gitignore` and
+`.cargo/`; Laputa's root Cargo config resolves the same crate mirror. A recipe configures with `meson setup`, builds with
 `ninja -C build`, and installs with `meson install -C build`. gluon's Ninja
 runs a command that parses as plain words directly and sends anything else to
 `sh -c`; with `GLUON_SHELL=forbid` such an edge fails instead, which is how the

@@ -25,7 +25,7 @@ reverses.
   against `~/d/play`: libplacebo 7.387.0 + Metal patch, SPIRV-Cross
   vulkan-sdk 1.4.363.0, and the player crates link against them with
   `CARGO_TARGET_DIR` under `.work/tmp`. Play is CMake-less (no `cmake` in
-  `scripts/build-deps.sh`); Vulkan-Headers/Loader and shaderc come via
+  its dependency build script); Vulkan-Headers/Loader and shaderc come via
   bottles; SPIRV-Cross and libplacebo build via Meson. No CMake front end.
 - **OD-5 Pushing.** Verified commits on `main` are pushed to `origin`
   (`git@github.com:laputa-systems/gluon`) as they land. Never force-push. Red
@@ -41,8 +41,7 @@ reverses.
   informational; its divergences are logged, never gating. The pin file is
   `tests/upstream/PINS` (reference versions, import SHAs, Docker image,
   libplacebo hash). Every reference update needs differential tests first.
-  Rust toolchain is `nightly-2026-11-09` via `rust-toolchain.toml` (also in
-  `tests/upstream/PINS`).
+  `rust-toolchain.toml` pins the workspace Rust toolchain.
 - **P-4 Dependency gate.** New crates must show build-time, binary-size, and
   startup deltas and be the smallest viable option; no
   `-C target-cpu=native` in portable artifacts. The `meson` crate's
@@ -59,4 +58,4 @@ reverses.
   release workflows build (`.github/workflows/ci.yml`,
   `.github/workflows/release.yml`). Releases are workflow-dispatch only,
   tagged `release-<commit-sha>` with `--prerelease --verify-tag`, and ship
-  `gluon-<target>.zip` archives plus `SHA256SUMS`.
+  `gluon-<target>.tar.xz` archives plus `SHA256SUMS`.

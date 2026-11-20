@@ -7,9 +7,9 @@ use std::process::{Command, Stdio};
 /// stays a plain argument list instead of shell syntax.
 pub fn run(args: &[String]) -> i32 {
     let result = match args.split_first() {
-        Some((name, rest)) if name == "exe" => exe(rest),
-        Some((name, rest)) if name == "copy" => copy(rest),
-        Some((name, rest)) if name == "static-link" => static_link(rest),
+        Some((name, rest)) if name == cli_command_exe!() => exe(rest),
+        Some((name, rest)) if name == cli_command_copy!() => copy(rest),
+        Some((name, rest)) if name == cli_command_static_link!() => static_link(rest),
         Some((name, _)) => Err(format!("unknown internal command '{name}'")),
         None => Err("meson --internal requires a command".to_string()),
     };
@@ -41,9 +41,9 @@ pub fn parse_exe(args: &[String]) -> Result<ExeRequest, String> {
                 request.argv = args[index + 1..].to_vec();
                 break;
             }
-            "--capture" => request.capture = Some(value()?),
-            "--feed" => request.feed = Some(value()?),
-            "--env" => {
+            cli_long_capture!() => request.capture = Some(value()?),
+            cli_long_feed!() => request.feed = Some(value()?),
+            cli_long_env!() => {
                 let pair = value()?;
                 let (key, val) = pair.split_once('=').ok_or_else(|| format!("--env needs KEY=VALUE, got '{pair}'"))?;
                 request.env.push((key.to_string(), val.to_string()));
@@ -141,7 +141,7 @@ mod tests {
         assert_eq!(std::fs::read_to_string(path("captured.txt")).unwrap(), "fed\n");
 
         std::fs::write(path("lib.a"), "stale").unwrap();
-        assert_eq!(run(&words(&["static-link", &path("lib.a"), "--", "/bin/true"])), 0);
+        assert_eq!(run(&words(&["static-link", &path("lib.a"), "--", "true"])), 0);
         assert!(!Path::new(&path("lib.a")).exists());
 
         std::fs::remove_dir_all(&dir).unwrap();

@@ -43,7 +43,7 @@ pub enum IterState {
 }
 
 impl IterState {
-    pub fn next(&mut self) -> Option<Vec<Object>> {
+    pub fn advance(&mut self) -> Option<Vec<Object>> {
         match self {
             IterState::Array(arr, idx) => {
                 if *idx < arr.len() {
@@ -468,10 +468,7 @@ fn glob_match(pattern: &str, text: &str) -> bool {
         }
     }
     // If pattern doesn't end with *, text must end exactly
-    if !pattern.ends_with('*') && pos != text.len() {
-        return false;
-    }
-    true
+    !(!pattern.ends_with('*') && pos != text.len())
 }
 
 impl VM {
@@ -968,7 +965,7 @@ impl VM {
                 let end_target = *end_target;
                 let varnames = varnames.clone();
                 let iter = self.iter_stack.last_mut().ok_or("No iterator")?;
-                match iter.next() {
+                match iter.advance() {
                     Some(values) => {
                         for (i, name) in varnames.iter().enumerate() {
                             if i < values.len() {
@@ -1300,6 +1297,12 @@ impl VM {
             }
         }
         Vec::new()
+    }
+}
+
+impl Default for VM {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

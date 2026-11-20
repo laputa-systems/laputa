@@ -39,8 +39,9 @@ pub const CURRENT_VERSION: u32 = 6;
 pub struct LogEntry {
     pub start_ms: u64,
     pub end_ms: u64,
-    /// Output mtime in nanoseconds since the Unix epoch. `0` means
-    /// "unknown" (e.g. the file was already gone when we recorded).
+    /// Nanoseconds since the Unix epoch. Ordinary entries record output
+    /// mtime. Restat entries can record the successful command's start
+    /// time. `0` means unknown.
     pub mtime_ns: u128,
     pub command_hash: u64,
 }

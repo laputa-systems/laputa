@@ -14,7 +14,7 @@ const USAGE: &str = "usage: ninja -t compdb [-hx] target [targets]\n\nopti\
 ons:\n  -h     display this help message\n  -x     expand @rspfile style \
 response file invocations\n";
 
-pub fn run(state: &State, args: &[String]) -> Result<u8, String> {
+pub(super) fn run(state: &State, args: &[String]) -> Result<u8, String> {
     // Filter out tool-specific flags. Targets are positional args that
     // don't start with '-'.
     let targets: Vec<&String> = args.iter().filter(|s| !s.starts_with('-')).collect();

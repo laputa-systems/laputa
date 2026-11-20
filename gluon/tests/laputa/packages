@@ -4,7 +4,6 @@ libdrm -Damdgpu=disabled -Dcairo-tests=disabled -Ddefault_library=shared -Detnav
 libva -Ddefault_library=shared -Ddisable_drm=false -Ddriverdir=/usr/lib/dri -Denable_docs=false -Dwith_glx=no -Dwith_wayland=yes -Dwith_win32=no -Dwith_x11=no 
 libxkbcommon -Ddefault_library=shared -Denable-bash-completion=false -Denable-docs=false -Denable-tools=false -Denable-wayland=false -Denable-x11=false -Denable-xkbregistry=false -Dxkb-config-root=/usr/share/X11/xkb -Dxkb-config-unversioned-extensions-path=/usr/share/xkeyboard-config.d -Dxkb-config-versioned-extensions-path=/usr/share/xkeyboard-config-2.d 
 linux-pam -Daudit=disabled -Ddocs=disabled -Deconf=disabled -Delogind=disabled -Dexamples=false -Di18n=disabled -Dlogind=disabled -Dnis=disabled -Dopenssl=disabled -Dpam_lastlog=disabled -Dpam_unix=enabled -Dpam_userdb=disabled -Dpwaccess=disabled -Dsbindir=/usr/bin -Dselinux=disabled -Dvendordir= -Dxtests=false 
-seatd-rs -Ddefault_library=shared -Dexamples=disabled -Dlibseat-builtin=disabled -Dlibseat-logind=disabled -Dlibseat-seatd=enabled -Dman-pages=disabled -Dserver=disabled -Dwerror=false 
 wayland-dev -Ddefault_library=shared -Ddocumentation=false -Ddtd_validation=false -Dtests=false 
 wayland-protocols -Dtests=false 
 wl-clipboard -Ddefault_library=static -Dfishcompletiondir=no -Dprotocols=enabled -Dzshcompletiondir=no 

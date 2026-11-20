@@ -2,7 +2,7 @@
 use crate::objects::*;
 use crate::options;
 use crate::vm::*;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 const DIRECTORY_OPTIONS: &[&str] = &[
@@ -58,7 +58,7 @@ struct DependenciesHelper<'a> {
     priv_libs: Vec<LibEntry>,
     priv_reqs: Vec<String>,
     cflags: Vec<String>,
-    version_reqs: BTreeMap<String, BTreeSet<String>>,
+    version_reqs: HashMap<String, Vec<String>>,
     link_whole: Vec<String>,
 }
 
@@ -75,7 +75,7 @@ impl<'a> DependenciesHelper<'a> {
             priv_libs: Vec::new(),
             priv_reqs: Vec::new(),
             cflags: Vec::new(),
-            version_reqs: BTreeMap::new(),
+            version_reqs: HashMap::new(),
             link_whole: Vec::new(),
         }
     }
@@ -122,8 +122,10 @@ impl<'a> DependenciesHelper<'a> {
         }
         let entry = self.version_reqs.entry(name.to_string()).or_default();
         for req in reqs {
-            if !req.is_empty() {
-                entry.insert(req.clone());
+            if !req.is_empty()
+                && let Err(position) = entry.binary_search(req)
+            {
+                entry.insert(position, req.clone());
             }
         }
     }
@@ -337,7 +339,7 @@ impl<'a> DependenciesHelper<'a> {
     }
 }
 
-fn flatten<'b>(objects: &'b [Object]) -> Vec<&'b Object> {
+fn flatten(objects: &[Object]) -> Vec<&Object> {
     fn collect<'b>(object: &'b Object, out: &mut Vec<&'b Object>) {
         match object {
             Object::Array(items) => {
@@ -707,10 +709,7 @@ fn pkgconfig_generate(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Ob
         .iter()
         .map(|value| value.to_string_value())
         .collect();
-    let variables = match parse_variables(VM::get_arg_value(args, "variables")) {
-        Ok(variables) => variables,
-        Err(e) => return Err(e),
-    };
+    let variables = parse_variables(VM::get_arg_value(args, "variables"))?;
 
     let mut libraries = argument_objects(args, "libraries");
     if let Some(target) = &mainlib {
@@ -779,7 +778,7 @@ fn pkgconfig_generate(vm: &mut VM, _obj: &Object, args: &[CallArg]) -> Result<Ob
         prefix_option.clone()
     };
 
-    let mut referenced: BTreeSet<&'static str> = BTreeSet::new();
+    let mut referenced: HashSet<&'static str> = HashSet::new();
     if !dataonly {
         referenced.insert("prefix");
         referenced.insert("includedir");

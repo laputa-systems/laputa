@@ -1,2 +1,4 @@
 rule cc
   command = cc -c $in -o $out
+
+build a.o: cc a.c

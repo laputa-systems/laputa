@@ -110,10 +110,10 @@ fn special_dependency(vm: &VM, name: &str, method: &str) -> Option<Object> {
             if wants_system {
                 if let Some(c) = &compiler {
                     if crate::compilers::check_header(c, "dlfcn.h") {
-                        if let Some(lib) = crate::compilers::find_library(c, "dl", &[]) {
-                            if let Object::Dependency(d) = lib {
-                                return Some(dependency(d.compile_args, d.link_args));
-                            }
+                        if let Some(Object::Dependency(d)) =
+                            crate::compilers::find_library(c, "dl", &[])
+                        {
+                            return Some(dependency(d.compile_args, d.link_args));
                         }
                     }
                 }

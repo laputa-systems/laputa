@@ -8,23 +8,20 @@
 //!     their producing edge plus the entire dependency subtree.
 //!   - For each cleaned edge, also remove its `depfile` and `rspfile`
 //!     when present (gcc-deps style or response-file rules).
-//!   - `-g` (clean generator outputs) is parsed but currently a no-op
-//!     since we don't track the `generator = 1` rule binding for
-//!     each edge yet — every edge is treated as non-generator.
+//!   - `-g` allows cleaning generator outputs.
 //!   - Print `Cleaning... N files.` exactly like upstream so callers
 //!     can grep for the line.
 //!
 //! Files that don't exist on disk are silently skipped — that's the
 //! "already clean" path.
 
-use crate::build::expand_in_edge_pub;
+use crate::build::{expand_in_edge_pub, is_generator};
 use crate::graph::State;
 use std::collections::HashSet;
 
 #[derive(Default)]
 struct Args {
-    /// Clean files marked as ninja generator output. Currently a
-    /// no-op — see module doc.
+    /// Clean files marked as Ninja generator output.
     generator: bool,
     /// Treat positional arguments as rule names instead of paths.
     by_rule: bool,
@@ -35,8 +32,8 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     let mut out = Args::default();
     for a in args {
         match a.as_str() {
-            "-g" => out.generator = true,
-            "-r" => out.by_rule = true,
+            cli_short_g!() => out.generator = true,
+            cli_short_r!() => out.by_rule = true,
             s if s.starts_with('-') => return Err(format!("clean: unknown flag {s}")),
             s => out.targets.push(s.to_string()),
         }
@@ -44,7 +41,7 @@ fn parse_args(args: &[String]) -> Result<Args, String> {
     Ok(out)
 }
 
-pub fn run(state: &State, args: &[String]) -> Result<u8, String> {
+pub(super) fn run(state: &State, args: &[String]) -> Result<u8, String> {
     let parsed = parse_args(args)?;
 
     // Collect the edge index set we're going to clean.
@@ -135,25 +132,6 @@ fn try_remove(path: &str) -> bool {
     }
 }
 
-/// True if `edge` is a generator edge — i.e. the rule it points at
-/// has `generator = 1`. Edge-level overrides win over the rule
-/// definition, matching ninja’s standard layered binding lookup.
-fn is_generator(state: &State, edge: &crate::graph::Edge) -> bool {
-    let from_edge = edge
-        .bindings
-        .get("generator")
-        .map(|v| matches!(v.as_str(), "1" | "true"));
-    if let Some(b) = from_edge {
-        return b;
-    }
-    state
-        .rules
-        .get(&edge.rule)
-        .and_then(|r| r.bindings.get("generator"))
-        .map(|v| matches!(v.as_str(), "1" | "true"))
-        .unwrap_or(false)
-}
-
 fn collect_subtree(state: &State, target: &str, edge_set: &mut HashSet<usize>) {
     let Some(&idx) = state.producers.get(target) else {
         return;
@@ -169,5 +147,15 @@ fn collect_subtree(state: &State, target: &str, edge_set: &mut HashSet<usize>) {
         .chain(&edge.order_only_inputs)
     {
         collect_subtree(state, inp, edge_set);
+    }
+}
+
+#[cfg(test)]
+mod help_example_test {
+    #[test]
+    fn example_reaches_tool_parser() {
+        let args = crate::help::example_args("clean");
+        let parsed = super::parse_args(&args).unwrap();
+        assert_eq!(parsed.targets, ["app"]);
     }
 }

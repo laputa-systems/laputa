@@ -586,7 +586,7 @@ pub fn find_library(compiler: &CompilerData, name: &str, dirs: &[String]) -> Opt
     // itself and returns its path instead of a -l flag.
     if !dirs.is_empty() {
         let mut patterns = Vec::new();
-        if cfg!(target_os = "darwin") {
+        if cfg!(target_os = "macos") {
             patterns.extend(["lib{}.dylib", "lib{}.so", "{}.dylib", "{}.so"]);
         } else {
             patterns.extend(["lib{}.so", "{}.so"]);

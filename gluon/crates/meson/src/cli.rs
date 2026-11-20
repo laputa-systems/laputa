@@ -31,7 +31,7 @@ enum CliCommand {
     Devenv(DevenvArgs),
     Env2mfile,
     Format(FormatArgs),
-    Help,
+    Help(Option<String>),
     Version,
     Internal(Vec<String>),
     Error(i32, String),
@@ -123,6 +123,28 @@ struct FormatArgs {
 }
 
 impl Cli {
+    #[cfg(test)]
+    pub(crate) fn example_matches(&self, path: &str) -> bool {
+        match (&self.command, path) {
+            (CliCommand::Help(None), cli_command_help!()) | (CliCommand::Version, cli_command_version!()) => true,
+            (CliCommand::Setup(a), cli_command_setup!()) => a.build_dir == "builddir",
+            (CliCommand::Configure(a), cli_command_configure!()) => a.build_dir == "builddir" && a.options == [("debug".into(), "true".into())],
+            (CliCommand::Compile(a), cli_command_compile!()) => a.build_dir == "builddir",
+            (CliCommand::Test(a), cli_command_test!()) => a.build_dir == "builddir",
+            (CliCommand::Install(a), cli_command_install!()) => a.build_dir == "builddir" && a.destdir.as_deref() == Some("staging"),
+            (CliCommand::Introspect(a), cli_command_introspect!()) => a.build_dir == "builddir" && a.what == ["targets"],
+            (CliCommand::Init(a), cli_command_init!()) => a.name.as_deref() == Some("hello"),
+            (CliCommand::Dist(a), cli_command_dist!()) => a.build_dir == "builddir",
+            (CliCommand::Wrap(a), p) => p == cli_command_wrap!() && a.subcommand == cli_command_list!() || p.strip_prefix("wrap ") == Some(a.subcommand.as_str()) && (!matches!(a.subcommand.as_str(), cli_command_install!() | cli_command_info!() | cli_command_search!()) || a.name.as_deref() == Some("zlib")),
+            (CliCommand::Subprojects(a), p) => p == cli_command_subprojects!() && a.subcommand == cli_command_list!() || p.strip_prefix("subprojects ") == Some(a.subcommand.as_str()),
+            (CliCommand::Rewrite, cli_command_rewrite!()) | (CliCommand::Env2mfile, cli_command_env2mfile!()) => true,
+            (CliCommand::Devenv(a), cli_command_devenv!()) => a.build_dir == "builddir" && a.command == ["echo", "hello"],
+            (CliCommand::Format(a), cli_command_format!()) => a.files == ["meson.build"],
+            (CliCommand::Internal(a), p) => p.strip_prefix("--internal ") == a.first().map(String::as_str) && a.len() > 2,
+            _ => false,
+        }
+    }
+
     pub fn parse_args() -> Self {
         Self::parse_args_from(std::env::args().collect())
     }
@@ -131,7 +153,7 @@ impl Cli {
 
         if args.len() < 2 {
             return Cli {
-                command: CliCommand::Help,
+                command: CliCommand::Help(None),
             };
         }
 
@@ -139,30 +161,32 @@ impl Cli {
         let rest = &args[2..];
 
         let command = match cmd.as_str() {
-            "setup" | "configure" if cmd == "setup" => Self::parse_setup(rest),
-            "configure" => Self::parse_configure(rest),
-            "compile" | "build" => Self::parse_compile(rest),
-            "test" => Self::parse_test(rest),
-            "install" => Self::parse_install(rest),
-            "introspect" => Self::parse_introspect(rest),
-            "init" => Self::parse_init(rest),
-            "dist" => Self::parse_dist(rest),
-            "wrap" => Self::parse_wrap(rest),
-            "subprojects" => Self::parse_subprojects(rest),
-            "rewrite" => CliCommand::Rewrite,
-            "devenv" => Self::parse_devenv(rest),
-            "env2mfile" => CliCommand::Env2mfile,
-            "format" | "fmt" => Self::parse_format(rest),
-            "--version" | "version" => CliCommand::Version,
-            "--internal" => CliCommand::Internal(rest.to_vec()),
-            "help" | "--help" | "-h" => CliCommand::Help,
+            cli_command_setup!() | cli_command_configure!() if cmd == cli_command_setup!() => Self::parse_setup(rest),
+            cli_command_configure!() => Self::parse_configure(rest),
+            cli_command_compile!() | cli_command_build!() => Self::parse_compile(rest),
+            cli_command_test!() => Self::parse_test(rest),
+            cli_command_install!() => Self::parse_install(rest),
+            cli_command_introspect!() => Self::parse_introspect(rest),
+            cli_command_init!() => Self::parse_init(rest),
+            cli_command_dist!() => Self::parse_dist(rest),
+            cli_command_wrap!() => Self::parse_nested_help(rest, cli_command_wrap!()).unwrap_or_else(|| Self::parse_wrap(rest)),
+            cli_command_subprojects!() => Self::parse_nested_help(rest, cli_command_subprojects!()).unwrap_or_else(|| Self::parse_subprojects(rest)),
+            cli_command_rewrite!() if rest.first().is_some_and(|s| s == cli_short_h!() || s == cli_long_help!()) => CliCommand::Help(Some(cli_command_rewrite!().into())),
+            cli_command_rewrite!() => CliCommand::Rewrite,
+            cli_command_devenv!() => Self::parse_devenv(rest),
+            cli_command_env2mfile!() if rest.first().is_some_and(|s| s == cli_short_h!() || s == cli_long_help!()) => CliCommand::Help(Some(cli_command_env2mfile!().into())),
+            cli_command_env2mfile!() => CliCommand::Env2mfile,
+            cli_command_format!() | cli_command_fmt!() => Self::parse_format(rest),
+            cli_long_version!() | cli_command_version!() => CliCommand::Version,
+            cli_long_internal!() => Self::parse_internal_help(rest).unwrap_or_else(|| CliCommand::Internal(rest.to_vec())),
+            cli_command_help!() | cli_long_help!() | cli_short_h!() => CliCommand::Help(None),
             // If first arg is a directory, treat as setup
             _ if Path::new(cmd).is_dir() || !cmd.starts_with('-') => {
                 let mut all_args = vec![cmd.clone()];
                 all_args.extend(rest.iter().cloned());
                 Self::parse_setup(&all_args)
             }
-            _ => CliCommand::Help,
+            _ => CliCommand::Help(None),
         };
 
         Cli { command }
@@ -179,28 +203,29 @@ impl Cli {
 
         while i < args.len() {
             let arg = &args[i];
-            if arg.starts_with("-D") {
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_setup!().into())); }
+            if arg.starts_with(cli_short_D!()) {
                 let opt = &arg[2..];
                 if let Some(eq) = opt.find('=') {
                     cli_options.push((opt[..eq].to_string(), opt[eq + 1..].to_string()));
                 }
-            } else if arg == "--cross-file" {
+            } else if arg == cli_long_cross_file!() {
                 i += 1;
                 if i < args.len() {
                     cross_file = Some(args[i].clone());
                 }
             } else if let Some(value) = arg.strip_prefix("--cross-file=") {
                 cross_file = Some(value.to_string());
-            } else if arg == "--native-file" {
+            } else if arg == cli_long_native_file!() {
                 i += 1;
                 if i < args.len() {
                     native_file = Some(args[i].clone());
                 }
             } else if let Some(value) = arg.strip_prefix("--native-file=") {
                 native_file = Some(value.to_string());
-            } else if arg == "--reconfigure" {
+            } else if arg == cli_long_reconfigure!() {
                 reconfigure = true;
-            } else if arg == "--wipe" {
+            } else if arg == cli_long_wipe!() {
                 wipe = true;
             } else if arg.starts_with("--") {
                 match parse_builtin_cli_option(args, &mut i) {
@@ -254,7 +279,8 @@ impl Cli {
 
         while i < args.len() {
             let arg = &args[i];
-            if arg.starts_with("-D") {
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_configure!().into())); }
+            if arg.starts_with(cli_short_D!()) {
                 let opt = &arg[2..];
                 if let Some(eq) = opt.find('=') {
                     cli_options.push((opt[..eq].to_string(), opt[eq + 1..].to_string()));
@@ -286,25 +312,26 @@ impl Cli {
 
         while i < args.len() {
             let arg = &args[i];
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_compile!().into())); }
             match arg.as_str() {
-                "-j" | "--jobs" => {
+                cli_short_j!() | cli_long_jobs!() => {
                     i += 1;
                     if i < args.len() {
                         jobs = args[i].parse().ok();
                     }
                 }
-                "-v" | "--verbose" => verbose = true,
-                "--clean" => clean = true,
-                "-C" => {
+                cli_short_v!() | cli_long_verbose!() => verbose = true,
+                cli_long_clean!() => clean = true,
+                cli_short_C!() => {
                     i += 1;
                     if i < args.len() {
                         build_dir = args[i].clone();
                     }
                 }
-                _ if arg.starts_with("-j") => {
+                _ if arg.starts_with(cli_short_j!()) => {
                     jobs = arg[2..].parse().ok();
                 }
-                _ if arg.starts_with("-C") => {
+                _ if arg.starts_with(cli_short_C!()) => {
                     build_dir = arg[2..].to_string();
                 }
                 _ => targets.push(arg.clone()),
@@ -338,34 +365,35 @@ impl Cli {
 
         while i < args.len() {
             let arg = &args[i];
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_test!().into())); }
             match arg.as_str() {
-                "-v" | "--verbose" => verbose = true,
-                "--no-rebuild" => no_rebuild = true,
-                "--suite" => {
+                cli_short_v!() | cli_long_verbose!() => verbose = true,
+                cli_long_no_rebuild!() => no_rebuild = true,
+                cli_long_suite!() => {
                     i += 1;
                     if i < args.len() {
                         suite = Some(args[i].clone());
                     }
                 }
-                "-t" | "--timeout-multiplier" => {
+                cli_short_t!() | cli_long_timeout_multiplier!() => {
                     i += 1;
                     if i < args.len() {
                         timeout_multiplier = args[i].parse().unwrap_or(1.0);
                     }
                 }
-                "-j" | "--num-processes" => {
+                cli_short_j!() | cli_long_num_processes!() => {
                     i += 1;
                     if i < args.len() {
                         num_processes = args[i].parse().ok();
                     }
                 }
-                "--repeat" => {
+                cli_long_repeat!() => {
                     i += 1;
                     if i < args.len() {
                         repeat = args[i].parse().unwrap_or(1);
                     }
                 }
-                "-C" => {
+                cli_short_C!() => {
                     i += 1;
                     if i < args.len() {
                         build_dir = args[i].clone();
@@ -400,8 +428,9 @@ impl Cli {
 
         while i < args.len() {
             let arg = &args[i];
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_install!().into())); }
             match arg.as_str() {
-                "--destdir" => {
+                cli_long_destdir!() => {
                     i += 1;
                     if i < args.len() {
                         destdir = Some(args[i].clone());
@@ -410,23 +439,23 @@ impl Cli {
                 _ if arg.starts_with("--destdir=") => {
                     destdir = Some(arg["--destdir=".len()..].to_string());
                 }
-                "--skip-subprojects" => skip_subprojects = true,
-                "--tags" => {
+                cli_long_skip_subprojects!() => skip_subprojects = true,
+                cli_long_tags!() => {
                     i += 1;
                     if i < args.len() {
                         tags = args[i].split(',').map(String::from).collect();
                     }
                 }
-                "--strip" => strip = true,
-                "--no-rebuild" => no_rebuild = true,
-                "-q" | "--quiet" => quiet = true,
-                "-C" => {
+                cli_long_strip!() => strip = true,
+                cli_long_no_rebuild!() => no_rebuild = true,
+                cli_short_q!() | cli_long_quiet!() => quiet = true,
+                cli_short_C!() => {
                     i += 1;
                     if i < args.len() {
                         build_dir = args[i].clone();
                     }
                 }
-                _ if arg.starts_with("-C") => build_dir = arg[2..].to_string(),
+                _ if arg.starts_with(cli_short_C!()) => build_dir = arg[2..].to_string(),
                 _ => build_dir = arg.clone(),
             }
             i += 1;
@@ -451,15 +480,16 @@ impl Cli {
 
         while i < args.len() {
             let arg = &args[i];
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_introspect!().into())); }
             match arg.as_str() {
-                "--all" | "-a" => all = true,
-                "--targets" => what.push("targets".to_string()),
-                "--tests" => what.push("tests".to_string()),
-                "--dependencies" => what.push("dependencies".to_string()),
-                "--buildoptions" => what.push("buildoptions".to_string()),
-                "--projectinfo" => what.push("projectinfo".to_string()),
-                "--installed" => what.push("installed".to_string()),
-                "--benchmarks" => what.push("benchmarks".to_string()),
+                cli_long_all!() | cli_short_a!() => all = true,
+                cli_long_targets!() => what.push("targets".to_string()),
+                cli_long_tests!() => what.push("tests".to_string()),
+                cli_long_dependencies!() => what.push("dependencies".to_string()),
+                cli_long_buildoptions!() => what.push("buildoptions".to_string()),
+                cli_long_projectinfo!() => what.push("projectinfo".to_string()),
+                cli_long_installed!() => what.push("installed".to_string()),
+                cli_long_benchmarks!() => what.push("benchmarks".to_string()),
                 _ => build_dir = arg.clone(),
             }
             i += 1;
@@ -482,32 +512,33 @@ impl Cli {
 
         while i < args.len() {
             let arg = &args[i];
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_init!().into())); }
             match arg.as_str() {
-                "-n" | "--name" => {
+                cli_short_n!() | cli_long_name!() => {
                     i += 1;
                     if i < args.len() {
                         name = Some(args[i].clone());
                     }
                 }
-                "-l" | "--language" => {
+                cli_short_l!() | cli_long_language!() => {
                     i += 1;
                     if i < args.len() {
                         language = args[i].clone();
                     }
                 }
-                "--type" => {
+                cli_long_type!() => {
                     i += 1;
                     if i < args.len() {
                         project_type = args[i].clone();
                     }
                 }
-                "-b" | "--builddir" => {
+                cli_short_b!() | cli_long_builddir!() => {
                     i += 1;
                     if i < args.len() {
                         build_dir = Some(args[i].clone());
                     }
                 }
-                "--version" => {
+                cli_long_version!() => {
                     i += 1;
                     if i < args.len() {
                         version = args[i].clone();
@@ -540,16 +571,17 @@ impl Cli {
 
         while i < args.len() {
             let arg = &args[i];
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_dist!().into())); }
             match arg.as_str() {
-                "--formats" => {
+                cli_long_formats!() => {
                     i += 1;
                     if i < args.len() {
                         formats = args[i].split(',').map(String::from).collect();
                     }
                 }
-                "--include-subprojects" => include_subprojects = true,
-                "--no-tests" => no_tests = true,
-                "-C" => {
+                cli_long_include_subprojects!() => include_subprojects = true,
+                cli_long_no_tests!() => no_tests = true,
+                cli_short_C!() => {
                     i += 1;
                     if i < args.len() {
                         build_dir = args[i].clone();
@@ -568,14 +600,34 @@ impl Cli {
         })
     }
 
+    fn parse_nested_help(args: &[String], parent: &str) -> Option<CliCommand> {
+        let position = args.iter().position(|s| s == cli_short_h!() || s == cli_long_help!())?;
+        let path = if position > 0 { format!("{} {}", parent, args[0]) } else { parent.to_owned() };
+        Some(CliCommand::Help(Some(path)))
+    }
+
+    fn parse_internal_help(args: &[String]) -> Option<CliCommand> {
+        let name = args.first()?;
+        if name == cli_short_h!() || name == cli_long_help!() { return Some(CliCommand::Help(Some(cli_long_internal!().into()))); }
+        let mut i = 1;
+        while i < args.len() {
+            let arg = args[i].as_str();
+            if arg == "--" { break; }
+            if arg == cli_short_h!() || arg == cli_long_help!() { return Some(CliCommand::Help(Some(format!("--internal {name}")))); }
+            if name == cli_command_exe!() && matches!(arg, cli_long_capture!() | cli_long_feed!() | cli_long_env!()) { i += 1; }
+            i += 1;
+        }
+        None
+    }
+
     fn parse_wrap(args: &[String]) -> CliCommand {
-        let subcommand = args.first().cloned().unwrap_or_else(|| "list".to_string());
+        let subcommand = args.first().cloned().unwrap_or_else(|| cli_command_list!().to_string());
         let name = args.get(1).cloned();
         CliCommand::Wrap(WrapArgs { subcommand, name })
     }
 
     fn parse_subprojects(args: &[String]) -> CliCommand {
-        let subcommand = args.first().cloned().unwrap_or_else(|| "list".to_string());
+        let subcommand = args.first().cloned().unwrap_or_else(|| cli_command_list!().to_string());
         CliCommand::Subprojects(SubprojectsArgs { subcommand })
     }
 
@@ -584,12 +636,17 @@ impl Cli {
         let mut command = Vec::new();
         let mut after_dash = false;
 
+        let mut directory_value = false;
         for arg in args {
+            if !after_dash && !directory_value && (arg == cli_short_h!() || arg == cli_long_help!()) {
+                return CliCommand::Help(Some(cli_command_devenv!().into()));
+            }
+            directory_value = !after_dash && arg == cli_short_C!();
             if after_dash {
                 command.push(arg.clone());
             } else if arg == "--" {
                 after_dash = true;
-            } else if arg == "-C" {
+            } else if arg == cli_short_C!() {
                 // next arg is build dir
             } else {
                 build_dir = arg.clone();
@@ -605,9 +662,10 @@ impl Cli {
         let mut recursive = false;
 
         for arg in args {
+            if arg == cli_short_h!() || arg == cli_long_help!() { return CliCommand::Help(Some(cli_command_format!().into())); }
             match arg.as_str() {
-                "-i" | "--inplace" => inplace = true,
-                "-r" | "--recursive" => recursive = true,
+                cli_short_i!() | cli_long_inplace!() => inplace = true,
+                cli_short_r!() | cli_long_recursive!() => recursive = true,
                 _ => files.push(arg.clone()),
             }
         }
@@ -646,8 +704,8 @@ impl Cli {
                 0
             }
             CliCommand::Internal(args) => crate::internal::run(args),
-            CliCommand::Help => {
-                self.print_help();
+            CliCommand::Help(selection) => {
+                print!("{}", crate::help::reference("meson", selection.as_deref().map_or(crate::help::Page::Primary, crate::help::Page::Command)));
                 0
             }
             CliCommand::Error(code, message) => {
@@ -658,6 +716,9 @@ impl Cli {
     }
 
     fn cmd_setup(&self, args: &SetupArgs) -> i32 {
+        if args.reconfigure && Path::new(&args.build_dir).join("meson-private/cmd_line.txt").exists() {
+            return self.reconfigure(&args.build_dir, &args.options, args.cross_file.as_deref(), args.native_file.as_deref());
+        }
         let source_dir = std::fs::canonicalize(&args.source_dir)
             .unwrap_or_else(|_| PathBuf::from(&args.source_dir));
         let source_dir = source_dir.to_string_lossy().to_string();
@@ -881,9 +942,7 @@ impl Cli {
             eprintln!("ERROR writing install plan: {}", e);
             return 1;
         }
-        let meson_command = std::env::current_exe()
-            .map(|path| path.to_string_lossy().to_string())
-            .unwrap_or_else(|_| "meson".to_string());
+        let meson_command = meson_invocation();
         let backend = NinjaBackend::new(&source_dir, &build_dir)
             .with_meson_command(&meson_command)
             .with_install_aliases()
@@ -925,6 +984,12 @@ impl Cli {
             "source_dir": source_dir.clone(),
             "build_dir": build_dir.clone(),
             "options": args.options.iter().map(|(k, v)| format!("{}={}", k, v)).collect::<Vec<_>>(),
+            "cross_file": args.cross_file.as_ref().map(|path| std::fs::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path)).to_string_lossy().into_owned()).unwrap_or_default(),
+            "native_file": args.native_file.as_ref().map(|path| {
+                let path = Path::new(path);
+                let path = if path.is_absolute() { path.to_path_buf() } else { Path::new(&source_dir).join(path) };
+                std::fs::canonicalize(&path).unwrap_or(path).to_string_lossy().into_owned()
+            }).unwrap_or_default(),
         });
         let _ = std::fs::write(
             format!("{}/meson-private/cmd_line.txt", build_dir),
@@ -971,10 +1036,14 @@ impl Cli {
     }
 
     fn cmd_configure(&self, args: &ConfigureArgs) -> i32 {
+        self.reconfigure(&args.build_dir, &args.options, None, None)
+    }
+
+    fn reconfigure(&self, build_dir: &str, options: &[(String, String)], cross_file: Option<&str>, native_file: Option<&str>) -> i32 {
         // Re-read the saved command line and re-run setup with new options
-        let cmd_file = format!("{}/meson-private/cmd_line.txt", args.build_dir);
+        let cmd_file = format!("{}/meson-private/cmd_line.txt", build_dir);
         if !Path::new(&cmd_file).exists() {
-            eprintln!("Not a configured build directory: {}", args.build_dir);
+            eprintln!("Not a configured build directory: {}", build_dir);
             return 1;
         }
 
@@ -996,15 +1065,15 @@ impl Cli {
         }
 
         // New options override
-        all_options.extend(args.options.clone());
+        all_options.extend_from_slice(options);
 
         self.cmd_setup(&SetupArgs {
             source_dir,
-            build_dir: args.build_dir.clone(),
+            build_dir: build_dir.to_string(),
             options: all_options,
-            cross_file: None,
-            native_file: None,
-            reconfigure: true,
+            cross_file: cross_file.or_else(|| saved["cross_file"].as_str().filter(|path| !path.is_empty())).map(str::to_owned),
+            native_file: native_file.or_else(|| saved["native_file"].as_str().filter(|path| !path.is_empty())).map(str::to_owned),
+            reconfigure: false,
             wipe: false,
         })
     }
@@ -1015,13 +1084,13 @@ impl Cli {
         cmd.current_dir(&args.build_dir);
 
         if let Some(jobs) = args.jobs {
-            cmd.arg("-j").arg(jobs.to_string());
+            cmd.arg(cli_short_j!()).arg(jobs.to_string());
         }
         if args.verbose {
-            cmd.arg("-v");
+            cmd.arg(cli_short_v!());
         }
         if args.clean {
-            cmd.arg("-t").arg("clean");
+            cmd.arg(cli_short_t!()).arg("clean");
         }
 
         for target in &args.targets {
@@ -1083,9 +1152,9 @@ impl Cli {
         // For now, just report that tests should be run with ninja test
         let mut cmd = Command::new(which_ninja());
         cmd.current_dir(&args.build_dir);
-        cmd.arg("test");
+        cmd.arg(cli_command_test!());
         if args.verbose {
-            cmd.arg("-v");
+            cmd.arg(cli_short_v!());
         }
 
         match cmd.status() {
@@ -1251,7 +1320,7 @@ impl Cli {
         cmd.arg("archive")
             .arg("--format=tar.gz")
             .arg("--prefix=dist/")
-            .arg("-o")
+            .arg(cli_short_o!())
             .arg(format!("{}/meson-dist/project.tar.gz", args.build_dir))
             .arg("HEAD")
             .current_dir(&args.build_dir);
@@ -1273,11 +1342,11 @@ impl Cli {
 
     fn cmd_wrap(&self, args: &WrapArgs) -> i32 {
         match args.subcommand.as_str() {
-            "list" => {
+            cli_command_list!() => {
                 eprintln!("Available wraps can be found at https://wrapdb.mesonbuild.com/");
                 0
             }
-            "install" => {
+            cli_command_install!() => {
                 if let Some(ref name) = args.name {
                     eprintln!("Installing wrap: {}", name);
                     // Download from wrapdb
@@ -1287,11 +1356,11 @@ impl Cli {
                     1
                 }
             }
-            "update" => {
+            cli_command_update!() => {
                 eprintln!("Updating wraps...");
                 0
             }
-            "info" => {
+            cli_command_info!() => {
                 if let Some(ref name) = args.name {
                     eprintln!("Info for wrap: {}", name);
                     0
@@ -1300,7 +1369,7 @@ impl Cli {
                     1
                 }
             }
-            "search" => {
+            cli_command_search!() => {
                 if let Some(ref name) = args.name {
                     eprintln!("Searching for: {}", name);
                     0
@@ -1309,7 +1378,7 @@ impl Cli {
                     1
                 }
             }
-            "status" => {
+            cli_command_status!() => {
                 eprintln!("Wrap status: all up to date");
                 0
             }
@@ -1322,31 +1391,31 @@ impl Cli {
 
     fn cmd_subprojects(&self, args: &SubprojectsArgs) -> i32 {
         match args.subcommand.as_str() {
-            "list" => {
+            cli_command_list!() => {
                 eprintln!("Listing subprojects...");
                 0
             }
-            "download" => {
+            cli_command_download!() => {
                 eprintln!("Downloading subprojects...");
                 0
             }
-            "update" => {
+            cli_command_update!() => {
                 eprintln!("Updating subprojects...");
                 0
             }
-            "purge" => {
+            cli_command_purge!() => {
                 eprintln!("Purging subprojects...");
                 0
             }
-            "checkout" => {
+            cli_command_checkout!() => {
                 eprintln!("Checking out subprojects...");
                 0
             }
-            "foreach" => {
+            cli_command_foreach!() => {
                 eprintln!("Running command in subprojects...");
                 0
             }
-            "packagefiles" => {
+            cli_command_packagefiles!() => {
                 eprintln!("Managing package files...");
                 0
             }
@@ -1420,117 +1489,6 @@ impl Cli {
         0
     }
 
-    fn print_help(&self) {
-        println!("usage: meson <command> [options]");
-        println!();
-        println!("Commands:");
-        println!("  setup       Configure the project");
-        println!("  configure   Change project options");
-        println!("  compile     Build the project");
-        println!("  test        Run tests");
-        println!("  install     Install the project");
-        println!("  introspect  Introspect project");
-        println!("  init        Create a new project");
-        println!("  dist        Generate release archive");
-        println!("  wrap        Manage wrap dependencies");
-        println!("  subprojects Manage subprojects");
-        println!("  devenv      Run commands in dev environment");
-        println!("  format      Format meson.build files");
-        println!("  rewrite     Modify project definition");
-        println!("  env2mfile   Convert env to machine file");
-        println!("  --version   Print version");
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn test_cli(build_dir: &str, no_rebuild: bool) -> Cli {
-        let mut args = vec![
-            "meson".to_string(),
-            "test".to_string(),
-            "-C".to_string(),
-            build_dir.to_string(),
-        ];
-        if no_rebuild {
-            args.push("--no-rebuild".to_string());
-        }
-        Cli::parse_args_from(args)
-    }
-
-    fn temp_build(label: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "meson-test-status-{label}-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
-    }
-
-    #[test]
-    fn missing_test_list_fails() {
-        let dir = temp_build("missing");
-        let code = test_cli(dir.to_str().unwrap(), true).run();
-        assert_ne!(code, 0);
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn unreadable_test_list_fails() {
-        let dir = temp_build("badjson");
-        std::fs::create_dir_all(dir.join("meson-info")).unwrap();
-        std::fs::write(dir.join("meson-info/intro-tests.json"), "{").unwrap();
-        let code = test_cli(dir.to_str().unwrap(), true).run();
-        assert_ne!(code, 0);
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn empty_test_list_succeeds() {
-        let dir = temp_build("empty");
-        std::fs::create_dir_all(dir.join("meson-info")).unwrap();
-        std::fs::write(dir.join("meson-info/intro-tests.json"), "[]").unwrap();
-        let code = test_cli(dir.to_str().unwrap(), true).run();
-        assert_eq!(code, 0);
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn prereq_build_failure_fails_the_test_command() {
-        let dir = temp_build("prereq");
-        let code = test_cli(dir.to_str().unwrap(), false).run();
-        assert_ne!(code, 0);
-        std::fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn ninja_spawn_failure_fails() {
-        if std::env::var_os("GLUON_EMPTY_PATH_CHILD").is_none() {
-            let status = std::process::Command::new(std::env::current_exe().unwrap())
-                .args([
-                    "--exact",
-                    "cli::tests::ninja_spawn_failure_fails",
-                    "--test-threads=1",
-                ])
-                .env("GLUON_EMPTY_PATH_CHILD", "1")
-                .env("PATH", "")
-                .status()
-                .unwrap();
-            assert!(status.success(), "the empty-PATH child run failed");
-            return;
-        }
-        let dir = temp_build("spawn");
-        std::fs::create_dir_all(dir.join("meson-info")).unwrap();
-        std::fs::write(dir.join("meson-info/intro-tests.json"), "[{\"name\":\"t\"}]").unwrap();
-        let code = test_cli(dir.to_str().unwrap(), true).run();
-        assert_ne!(code, 0);
-        std::fs::remove_dir_all(&dir).ok();
-    }
 }
 
 fn parse_builtin_cli_option(
@@ -1574,7 +1532,7 @@ fn find_meson_files(dir: &str, files: &mut Vec<String>) {
             let path = entry.path();
             if path.is_dir() {
                 let name = path.file_name().unwrap_or_default().to_string_lossy();
-                if !name.starts_with('.') && name != "builddir" && name != "build" {
+                if !name.starts_with('.') && name != "builddir" && name != cli_command_build!() {
                     find_meson_files(&path.to_string_lossy(), files);
                 }
             } else if let Some(name) = path.file_name() {
@@ -1628,11 +1586,15 @@ fn format_meson_source(source: &str) -> String {
     result
 }
 
-pub fn meson_program() -> String {
-    std::env::current_exe()
-        .expect("the running meson has an executable path")
-        .to_string_lossy()
-        .into_owned()
+pub(crate) fn meson_invocation() -> Vec<String> {
+    let program = std::env::current_exe()
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "meson".to_string());
+    let mut invocation = vec![program];
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("meson")) {
+        invocation.push("meson".to_string());
+    }
+    invocation
 }
 
 pub fn split_command(value: &str) -> Vec<String> {
@@ -1707,5 +1669,156 @@ fn toolchain(vm: &crate::vm::VM) -> crate::backend::Toolchain {
     {
         toolchain.archiver = archiver;
     }
+    toolchain.archiver_args = archiver_args(&toolchain.archiver);
     toolchain
+}
+
+/// Meson's `ArLinker`: deterministic archives (`D`) only when `ar -h` lists `[D]`; Apple's `ar`
+/// has no `D` and rejects it.
+fn archiver_args(archiver: &[String]) -> String {
+    let Some((program, args)) = archiver.split_first() else {
+        return "csr".to_string();
+    };
+    let help = Command::new(program)
+        .args(args)
+        .arg(cli_short_h!())
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output();
+    match help {
+        Ok(output) if String::from_utf8_lossy(&output.stdout).contains("[D]") => "csrD".to_string(),
+        _ => "csr".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_cli(build_dir: &str, no_rebuild: bool) -> Cli {
+        let mut args = vec![
+            "meson".to_string(),
+            "test".to_string(),
+            "-C".to_string(),
+            build_dir.to_string(),
+        ];
+        if no_rebuild {
+            args.push("--no-rebuild".to_string());
+        }
+        Cli::parse_args_from(args)
+    }
+
+    fn temp_build(label: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "meson-test-status-{label}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn archiver_args_add_d_only_when_the_archiver_lists_it() {
+        let dir = temp_build("archiver");
+        let script = |name: &str, body: &str| {
+            let path = dir.join(name);
+            std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+            let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+            std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
+            std::fs::set_permissions(&path, permissions).unwrap();
+            vec![path.to_string_lossy().into_owned()]
+        };
+        let gnu = script("gnu-ar", "echo ' commands: d m p q r s t x'; echo ' modifiers: [D] - use zero for timestamps'");
+        let apple = script("apple-ar", "echo 'usage:  ar -d [-TLsv] archive file ...' >&2; exit 1");
+        assert_eq!(archiver_args(&gnu), "csrD");
+        assert_eq!(archiver_args(&apple), "csr");
+        assert_eq!(archiver_args(&[dir.join("missing").to_string_lossy().into_owned()]), "csr");
+    }
+
+    #[test]
+    fn missing_test_list_fails() {
+        let dir = temp_build("missing");
+        let code = test_cli(dir.to_str().unwrap(), true).run();
+        assert_ne!(code, 0);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn unreadable_test_list_fails() {
+        let dir = temp_build("badjson");
+        std::fs::create_dir_all(dir.join("meson-info")).unwrap();
+        std::fs::write(dir.join("meson-info/intro-tests.json"), "{").unwrap();
+        let code = test_cli(dir.to_str().unwrap(), true).run();
+        assert_ne!(code, 0);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn empty_test_list_succeeds() {
+        let dir = temp_build("empty");
+        std::fs::create_dir_all(dir.join("meson-info")).unwrap();
+        std::fs::write(dir.join("meson-info/intro-tests.json"), "[]").unwrap();
+        let code = test_cli(dir.to_str().unwrap(), true).run();
+        assert_eq!(code, 0);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn prereq_build_failure_fails_the_test_command() {
+        let dir = temp_build("prereq");
+        let code = test_cli(dir.to_str().unwrap(), false).run();
+        assert_ne!(code, 0);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn ninja_spawn_failure_fails() {
+        if std::env::var_os("GLUON_EMPTY_PATH_CHILD").is_none() {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "cli::tests::ninja_spawn_failure_fails",
+                    "--test-threads=1",
+                ])
+                .env("GLUON_EMPTY_PATH_CHILD", "1")
+                .env("PATH", "")
+                .status()
+                .unwrap();
+            assert!(status.success(), "the empty-PATH child run failed");
+            return;
+        }
+        let dir = temp_build("spawn");
+        std::fs::create_dir_all(dir.join("meson-info")).unwrap();
+        std::fs::write(dir.join("meson-info/intro-tests.json"), "[{\"name\":\"t\"}]").unwrap();
+        let code = test_cli(dir.to_str().unwrap(), true).run();
+        assert_ne!(code, 0);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}
+
+#[cfg(test)]
+mod help_value_tests {
+    use super::{Cli, CliCommand};
+
+    fn parse(args: &[&str]) -> CliCommand {
+        Cli::parse_args_from(args.iter().map(|s| s.to_string()).collect()).command
+    }
+
+    #[test]
+    fn help_tokens_consumed_as_values_remain_values() {
+        assert!(matches!(parse(&["meson", "setup", "--cross-file", "--help"]), CliCommand::Setup(a) if a.cross_file.as_deref() == Some("--help")));
+        assert!(matches!(parse(&["meson", "configure", "--prefix", "-h"]), CliCommand::Configure(a) if a.options == [("prefix".into(), "-h".into())]));
+        assert!(matches!(parse(&["meson", "compile", "-C", "--help"]), CliCommand::Compile(a) if a.build_dir == "--help"));
+        assert!(matches!(parse(&["meson", "test", "--suite", "-h"]), CliCommand::Test(a) if a.suite.as_deref() == Some("-h")));
+        assert!(matches!(parse(&["meson", "install", "--destdir", "--help"]), CliCommand::Install(a) if a.destdir.as_deref() == Some("--help")));
+        assert!(matches!(parse(&["meson", "init", "--name", "--help"]), CliCommand::Init(a) if a.name.as_deref() == Some("--help")));
+        assert!(matches!(parse(&["meson", "dist", "--formats", "-h"]), CliCommand::Dist(a) if a.formats == ["-h"]));
+        assert!(matches!(parse(&["meson", "devenv", "-C", "--help"]), CliCommand::Devenv(a) if a.build_dir == "--help"));
+        assert!(matches!(parse(&["meson", "--internal", "exe", "--capture", "--help", "--", "echo"]), CliCommand::Internal(a) if a[2] == "--help"));
+        assert!(matches!(parse(&["meson", "--internal", "exe", "--", "echo", "--help"]), CliCommand::Internal(_)));
+    }
 }
