@@ -84,9 +84,9 @@ poll-interval-limits = { min = 1, max = 1 }
 minimum-agreeing-sources = 1
 """)?
   let server_path = fp"{root}/inputs/ntp-clock-server"
-  let raw_output = run.text $server_path "--raw"
-  let raw_origin = raw_output.trim().parse_int_decimal()?
-  let original = time.now()
+  let sample = (run.text $server_path "--sample").trim().split(" ")
+  let original = sample[0].parse_int_decimal()?
+  let raw_origin = sample[1].parse_int_decimal()?
   let origin = now_ms()?
   var groups: List[Int] = []
   var completed = false
@@ -162,10 +162,11 @@ minimum-agreeing-sources = 1
   var previous_delta = -80
   var largest_change = 0
   while now_ms()? < deadline {
-    let raw_now_output = run.text $server_path "--raw"
-    let raw_now = raw_now_output.trim().parse_int_decimal()?
+    let clock_sample = (run.text $server_path "--sample").trim().split(" ")
+    let realtime = clock_sample[0].parse_int_decimal()?
+    let raw_now = clock_sample[1].parse_int_decimal()?
     let expected = original + raw_now - raw_origin
-    let delta = time.now() - expected
+    let delta = realtime - expected
     let current_stratum = stratum()?
     let change = if delta > previous_delta { delta - previous_delta } else { previous_delta - delta }
     if change > largest_change { largest_change = change }

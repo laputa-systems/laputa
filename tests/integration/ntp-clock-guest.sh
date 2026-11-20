@@ -83,7 +83,7 @@ if test "$mode" = chrony-behind || test "$mode" = chrony-ahead || test "$mode" =
 fi
 if test "$mode" = nts; then
   if test "$(uname -s)" = Darwin; then
-    docker run --rm --network none -v "$work:/work" -v "$seed/xsh:/bin/xsh:ro" -v "$seed/core:/usr/lib/xsh/core:ro" -e PATH=/work/tools/usr/bin:/usr/bin:/bin -e LD_LIBRARY_PATH=/work/tools/usr/lib -e CARGO_HOME=/work/cargo -e CARGO_TARGET_DIR=/work/nts-target -e RUSTFLAGS="-C linker=cc -C target-feature=+crt-static" "$image" \
+    docker run --rm --network none -v "$work:/work" -v "$seed/xsh:/bin/xsh:ro" -v "$seed/core:/usr/lib/xsh/core:ro" -e PATH=/work/tools/usr/bin:/usr/bin:/bin -e LD_LIBRARY_PATH=/work/tools/usr/lib -e CARGO_HOME=/work/cargo -e CARGO_TARGET_DIR=/work/nts-target -w /work/repository -e RUSTFLAGS="-C linker=cc -C target-feature=+crt-static" "$image" \
       cargo build --locked --offline -j 2 --target "$arch-unknown-linux-musl" --manifest-path /work/repository/tests/integration/fixtures/nts-clock-server/Cargo.toml
     cp "$work/nts-target/$arch-unknown-linux-musl/debug/nts-clock-server" "$input/inputs/nts-clock-server"
   else

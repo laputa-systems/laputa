@@ -10,13 +10,17 @@ unsafe extern "C" {
     fn clock_gettime(clock: i32, value: *mut Timespec) -> i32;
 }
 
-fn raw_ms() -> io::Result<u64> {
+fn clock_ms(clock: i32) -> io::Result<u64> {
     let mut value = Timespec { seconds: 0, nanoseconds: 0 };
     // SAFETY: value points to writable timespec storage for the duration of this call.
-    if unsafe { clock_gettime(4, &mut value) } != 0 {
+    if unsafe { clock_gettime(clock, &mut value) } != 0 {
         return Err(io::Error::last_os_error());
     }
     Ok(value.seconds as u64 * 1000 + value.nanoseconds as u64 / 1_000_000)
+}
+
+fn raw_ms() -> io::Result<u64> {
+    clock_ms(4)
 }
 
 fn timestamp(base_ms: u64, origin_raw_ms: u64, rate_ppm: i64) -> io::Result<[u8; 8]> {
@@ -33,6 +37,17 @@ fn timestamp(base_ms: u64, origin_raw_ms: u64, rate_ppm: i64) -> io::Result<[u8;
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = env::args().skip(1);
     let first = args.next().ok_or("missing base time")?;
+    if first == "--sample" {
+        loop {
+            let before = raw_ms()?;
+            let realtime = clock_ms(0)?;
+            let after = raw_ms()?;
+            if after - before <= 5 {
+                println!("{} {}", realtime, before + (after - before) / 2);
+                return Ok(());
+            }
+        }
+    }
     if first == "--raw" {
         println!("{}", raw_ms()?);
         return Ok(());
