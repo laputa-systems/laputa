@@ -38,14 +38,14 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** bench-pyramid, benchmark-checklist
 - **Effort:** L (weeks)
 
-### LAP-73 · P2 · Bind the host-tools image identity to its package inputs
+### LAP-73 · P2 · Publish the aarch64 host-tools and package-tools images
 
 - **Area:** Build and dependencies
-- **Where:** `seed/Dockerfile.host-tools:1`, `seed/Dockerfile.host-tools:10`, `seed/images.xsh:62`, `seed/images.xsh:100`, `seed/images.xsh:159`, `docs/DEVELOPMENT.md:109`
-- **Problem:** The Alpine base is pinned, but `apk add` resolves unpinned packages from a live repository. The host-tools key hashes only the Dockerfile and platform, and the package-tools key uses that tag, so independent clean fetches at different times can produce different toolchains under the same identities. The saved local image stabilizes one cache but does not identify or distribute its bytes to another builder. That can change package outputs under the same build identity and cause immutable publication to reject a differing payload (`docs/PM.md:398`).
-- **Recommendation:** Pin or distribute the complete host-tools image as a verifiable input and bind downstream identity to its actual content. Acceptance: two clean builders obtain the same verified host-tools image identity from the same declared inputs, and a changed host-tools image changes the package-tools identity.
+- **Where:** `seed/images.lock`, `seed/images.xsh`, `docs/DEVELOPMENT.md`
+- **Problem:** x86_64 host-tools and package-tools images are published to `oci.17166969.xyz` and pulled by digest, with the Dockerfile hash recorded so an edited Dockerfile fails as a stale lock. The aarch64 entries in `seed/images.lock` are still zero placeholders, so aarch64 builders cannot obtain a pinned image.
+- **Recommendation:** Build the aarch64 layouts on the m1-max host with `xsh seed/images.xsh -- build --arch aarch64 ...`, publish them with `stuff publish oci --layout ... --repository laputa-host-tools|laputa-package-tools --tag aarch64`, and record their digests and package key. Acceptance: `xsh seed/images.xsh -- ref --arch aarch64` resolves and both digests pull anonymously.
 - **Fix with:** single-source-of-truth
-- **Effort:** M (days)
+- **Effort:** S (hours)
 
 ### LAP-64 · P2 · Measure workload memory and artifact sizes
 
