@@ -32,6 +32,11 @@ package-tools and give the offline guest a socket link with no peer instead of a
 tap. The `qemu-self-hosting` graph resolves on aarch64 and its 12 GiB request
 uses the HVF target's high memory; its build proof remains unqualified there.
 
+On the same host, `python3 tests/integration/maintained_ntp.py` passed with
+QEMU user networking: the guest synchronized at stratum 2 with three NTS
+operators, restarted, then cut NTP and NTS egress. During the offline window
+the largest clock sample change and offset were both 1 ms.
+
 ## Host requirements
 
 - `qemu-system-<arch>` for the host's architecture on `PATH`, or named by
