@@ -23,6 +23,9 @@ and upload state stay under `/var/lib/laputa-mirror/`.
 Run one mirror process for a bucket: index preconditions are serialized by
 that process, so multiple independent mirror processes must not write the same
 working index. Clients use its ETag and retry HTTP 412 conflicts.
+Authentication admission removes sessions older than ten minutes and their
+registration authorities. At most 32 pending challenges per user and 1024
+overall are admitted; an options request at capacity receives HTTP 429.
 
 ## Outbound TLS trust
 

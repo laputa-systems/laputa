@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use webauthn_minimal::{AuthChallenge, RegChallenge, RegistrationMode, StoredCredential};
 
 use crate::AuthState;
+use crate::db;
 use crate::packages::{Response, session_cookie};
 
 static AUTH_HTML: &str = include_str!("../static/auth.html");
@@ -57,6 +58,7 @@ pub fn register_options(body: &[u8], headers: &HashMap<String, String>, state: &
     let session_id = {
         let db = state.db.lock().unwrap();
         match db.create_registration(&user_id, &challenge_json, req.authorization.as_deref(), session_cookie(headers).as_deref()) {
+            Err(db::SessionAdmissionError::Full) => return Response::json(429, r#"{"error":"too many pending sessions"}"#),
             Ok(Some(id)) => id,
             Ok(None) => return Response::json(403, r#"{"error":"enrollment authority required"}"#),
             Err(e) => return Response::error(&format!("db: {e}")),
@@ -182,6 +184,7 @@ pub fn authenticate_options(body: &[u8], state: &AuthState) -> Response {
         let db = state.db.lock().unwrap();
         match db.create_session(Some(&user_id), &challenge_json) {
             Ok(id) => id,
+            Err(db::SessionAdmissionError::Full) => return Response::json(429, r#"{"error":"too many pending sessions"}"#),
             Err(e) => return Response::error(&format!("db: {e}")),
         }
     };

@@ -20,6 +20,37 @@ pub struct TokenRecord {
     pub expires_at: Option<String>,
 }
 
+#[derive(Debug)]
+pub enum SessionAdmissionError {
+    Full,
+    Database(rusqlite::Error),
+}
+
+impl From<rusqlite::Error> for SessionAdmissionError {
+    fn from(error: rusqlite::Error) -> Self { Self::Database(error) }
+}
+
+impl std::fmt::Display for SessionAdmissionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Full => f.write_str("too many pending sessions"),
+            Self::Database(error) => error.fmt(f),
+        }
+    }
+}
+
+fn prune_sessions(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM registration_authority WHERE session_id IN (SELECT id FROM sessions WHERE datetime('now') >= datetime(created_at, '+10 minutes'))", [])?;
+    conn.execute("DELETE FROM sessions WHERE datetime('now') >= datetime(created_at, '+10 minutes')", [])?;
+    Ok(())
+}
+
+fn session_capacity(conn: &Connection, user_id: Option<&str>) -> Result<bool> {
+    let total: i64 = conn.query_row("SELECT count(*) FROM sessions WHERE status = 'pending'", [], |r| r.get(0))?;
+    let user: i64 = conn.query_row("SELECT count(*) FROM sessions WHERE status = 'pending' AND user_id IS ?1", params![user_id], |r| r.get(0))?;
+    Ok(total < 1024 && user < 32)
+}
+
 impl Db {
     pub fn open(path: &str) -> Result<Self> {
         let conn = Connection::open(path)?;
@@ -117,7 +148,7 @@ impl Db {
         Ok(cookie)
     }
 
-    pub fn create_registration(&self, user_id: &str, challenge: &str, authorization: Option<&str>, cookie: Option<&str>) -> Result<Option<String>> {
+    pub fn create_registration(&self, user_id: &str, challenge: &str, authorization: Option<&str>, cookie: Option<&str>) -> std::result::Result<Option<String>, SessionAdmissionError> {
         let has_keys = !self.load_passkeys(user_id)?.is_empty();
         let (kind, verifier) = if has_keys {
             let Some(cookie) = cookie else { return Ok(None) };
@@ -131,6 +162,11 @@ impl Db {
             ("bootstrap", verifier)
         };
         let tx = self.conn.unchecked_transaction()?;
+        prune_sessions(&tx)?;
+        if !session_capacity(&tx, Some(user_id))? {
+            tx.commit()?;
+            return Err(SessionAdmissionError::Full);
+        }
         let id = random_hex(32);
         tx.execute("INSERT INTO sessions (id, user_id, challenge) VALUES (?1, ?2, ?3)", params![id, user_id, challenge])?;
         tx.execute("INSERT INTO registration_authority (session_id, kind, verifier) VALUES (?1, ?2, ?3)", params![id, kind, verifier])?;
@@ -324,12 +360,19 @@ impl Db {
     }
 
     /// Creates a session pre-loaded with challenge JSON. Returns session ID.
-    pub fn create_session(&self, user_id: Option<&str>, challenge: &str) -> Result<String> {
+    pub fn create_session(&self, user_id: Option<&str>, challenge: &str) -> std::result::Result<String, SessionAdmissionError> {
+        let tx = self.conn.unchecked_transaction()?;
+        prune_sessions(&tx)?;
+        if !session_capacity(&tx, user_id)? {
+            tx.commit()?;
+            return Err(SessionAdmissionError::Full);
+        }
         let id = random_hex(32);
-        self.conn.execute(
+        tx.execute(
             "INSERT INTO sessions (id, user_id, challenge) VALUES (?1, ?2, ?3)",
             params![id, user_id, challenge],
         )?;
+        tx.commit()?;
         Ok(id)
     }
 
@@ -427,6 +470,23 @@ mod tests {
         let db = open();
         db.create_user("uid", "testuser").expect("create_user");
         (db, "uid".to_string())
+    }
+
+    #[test]
+    fn pending_sessions_are_bounded_and_expired_challenges_are_reclaimed() {
+        let (db, uid) = with_user();
+        let secret = db.issue_enrollment("testuser").unwrap();
+        let expired = db.create_registration(&uid, "old", Some(&secret), None).unwrap().unwrap();
+        db.conn.execute("UPDATE sessions SET created_at = '2020-01-01' WHERE id = ?1", params![expired]).unwrap();
+        let valid = db.create_session(Some(&uid), "valid").unwrap();
+        for _ in 1..32 {
+            db.create_session(Some(&uid), "challenge").unwrap();
+        }
+        assert!(db.create_session(Some(&uid), "overflow").is_err());
+        assert!(db.get_session(&valid).unwrap().is_some());
+        let old_count: i64 = db.conn.query_row("SELECT count(*) FROM sessions WHERE id = ?1", params![expired], |r| r.get(0)).unwrap();
+        let authority_count: i64 = db.conn.query_row("SELECT count(*) FROM registration_authority WHERE session_id = ?1", params![expired], |r| r.get(0)).unwrap();
+        assert_eq!((old_count, authority_count), (0, 0));
     }
 
     #[test]
