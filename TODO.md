@@ -38,15 +38,14 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** bench-pyramid, benchmark-checklist
 - **Effort:** L (weeks)
 
-### LAP-64 · P2 · Measure workload memory and artifact sizes
+### LAP-64 · P2 · Capture memory and artifact size anchors
 
 - **Area:** Performance
-- **Where:** `docs/TESTING.md` Benchmarks
-- **Problem:** No scoped workload-tree peak memory or comparable package and image size budgets exist.
-- **Recommendation:** Measure representative tree memory and artifact bytes with defined accounting and baselines. Acceptance: reports identify scope, inputs and accepted limits for each selected workload.
+- **Where:** `bench/anchors.tsv`, `bench/capture.sh`, `docs/TESTING.md` Benchmarks
+- **Problem:** `make bench TIER=scenario WORKLOADS='tree-memory artifact-sizes'` measures the package-tools container's cgroup `memory.peak` for an offline `baselayout` plan, and the bytes of the seed products, the newest `baselayout`, `musl` and `linux-headers` artifacts and the package-tools image. Each result records commit, dirty state, artifact hashes and host readiness, and reports within budget, regression or inconclusive. `bench/anchors.tsv` is empty: on 2026-11-20 the shared host was busy, so every verdict is `inconclusive: no anchor`. The installer ISO is excluded until it is built.
+- **Recommendation:** On a quiet host, run `bench/capture.sh` as docs/TESTING.md describes and commit the anchors with their provenance. Acceptance: both workloads report within budget against committed anchors on a ready host.
 - **Fix with:** bench-pyramid
-- **Effort:** M (days)
-
+- **Effort:** S (hours)
 ### LAP-65 · P2 · Strengthen gluon benchmark oracles
 
 - **Area:** Performance
@@ -54,15 +53,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Problem:** The corpus is synthetic, tolerates failed commands and does not bracket each measurement with readiness checks or compare an accepted anchor.
 - **Recommendation:** Exercise real projects with checked outputs and paired, readiness-qualified comparisons. Acceptance: incomplete work fails and a reproducible baseline detects regressions.
 - **Fix with:** refactor-benchmarks, benchmark-checklist
-- **Effort:** M (days)
-
-### LAP-66 · P3 · Qualify benchmark inputs and provenance
-
-- **Area:** Performance
-- **Where:** `bench/bench.xsh`
-- **Problem:** The bounded entrypoint does not verify binary freshness, leftover processes or record all artifact and host identities.
-- **Recommendation:** Add workload-specific admission and reproducibility evidence without hiding missing inputs. Acceptance: stale inputs and surviving children are reported before execution and results identify the tested artifacts and host conditions.
-- **Fix with:** bench-pyramid
 - **Effort:** M (days)
 
 ### LAP-6 · P2 · Verify shared bootstrap changes on aarch64
