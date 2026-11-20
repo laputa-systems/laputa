@@ -21,13 +21,14 @@ git -C "$repo" check-ignore -q .work/
 mkdir -p "$repo/.work/tmp"
 work=$(mktemp -d "$repo/.work/tmp/ntp-guest.XXXXXXXX")
 trap 'printf "guest evidence: %s\n" "$work"' EXIT
+if test "$(uname -s)" = Linux; then COPY_REFLINK=--reflink=auto; else COPY_REFLINK=; fi
 snapshot="$work/repository"
 output="$snapshot/.work/output"
 input="$snapshot/.work/input-root"
 mkdir -p "$snapshot" "$output" "$input/inputs" "$snapshot/.out/seed" "$snapshot/.out/artifacts" "$snapshot/.out/cache/linux-kbuild"
 git -C "$repo" archive HEAD | tar -xf - -C "$snapshot"
-cp -a --reflink=auto "$seed" "$snapshot/.out/seed/$arch"
-cp -a --reflink=auto "$artifacts" "$snapshot/.out/artifacts/$arch"
+cp -a ${COPY_REFLINK:+"$COPY_REFLINK"} "$seed" "$snapshot/.out/seed/$arch"
+cp -a ${COPY_REFLINK:+"$COPY_REFLINK"} "$artifacts" "$snapshot/.out/artifacts/$arch"
 python3 - "$snapshot/profiles/qemu-self-hosting.xsh" <<'PY'
 from pathlib import Path
 import sys
@@ -39,7 +40,7 @@ text = text.replace(old, '["baselayout", "xsh", "laputa-pm", "xinit", "ntpd-rs",
 path.write_text(text.replace('qemu_memory: "12G"', 'qemu_memory: "4G"'))
 PY
 mkdir -p "$snapshot/.work/tmp"
-TMPDIR="$snapshot/.work/tmp" XSH_MODULE_PATH="$snapshot" XSH_HOST="$xsh" "$xsh" "$snapshot/seed/self_hosting_profile.xsh" -- \
+TMPDIR="$snapshot/.work/tmp" XSH_MODULE_PATH="$snapshot${XSH_ROOT:+:$XSH_ROOT/core}" XSH_HOST="$xsh" "$xsh" "$snapshot/seed/self_hosting_profile.xsh" -- \
   "$snapshot" "$snapshot/.out/artifacts/$arch" "$output" "$image" "$arch"
 if test "$(uname -s)" = Darwin; then
   cargo_artifact=$(python3 - "$artifacts" <<'PYART'
@@ -108,10 +109,10 @@ truncate -s 64M "$output/output.ext4"
 /sbin/mkfs.ext4 -q -F -d "$input" "$output/inputs.ext4"
 /sbin/mkfs.ext4 -q -F "$output/output.ext4"
 fi
-XSH_MODULE_PATH="$snapshot" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
+XSH_MODULE_PATH="$snapshot${XSH_ROOT:+:$XSH_ROOT/core}" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
   "$snapshot" "$output" "$repo/.work/ntp-$$.sock" "$mode"
 if test "$mode" = frequency; then
   cp "$output/console.log" "$output/frequency-first-boot.log"
-  XSH_MODULE_PATH="$snapshot" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
+  XSH_MODULE_PATH="$snapshot${XSH_ROOT:+:$XSH_ROOT/core}" "$xsh" "$snapshot/tests/integration/ntp-clock-boot.xsh" -- \
     "$snapshot" "$output" "$repo/.work/ntp-$$.sock" "$mode"
 fi
