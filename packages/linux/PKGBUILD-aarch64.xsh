@@ -592,8 +592,9 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
   build_native_vdso(cc)
   PKGBUILD_shared.timing_done("prepare", prepare_start)
   PKGBUILD_shared.stop_after("prepare")
+  let config = kbuild.load_config(p".config")?
   let discover_start = PKGBUILD_shared.timing_start("discover")
-  let plan = PKGBUILD_shared.cached_package_plan(srcarch)?
+  let plan = kbuild.augment_missing_composites(p".", config, PKGBUILD_shared.cached_package_plan(srcarch)?, srcarch)?
   PKGBUILD_shared.timing_done("discover", discover_start)
   PKGBUILD_shared.stop_after("discover")
   let plan_start = PKGBUILD_shared.timing_start("plan")
@@ -635,36 +636,26 @@ export proc build_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process, env, t
 
   PKGBUILD_shared.timing_done("plan", plan_start)
   PKGBUILD_shared.stop_after("plan")
+  PKGBUILD_shared.require_complete_archive_plan(archive_plan, srcarch)
+  let jobs_count = PKGBUILD_shared.build_jobs()?
+  var archives = []
+  let archive_report = p".xsh-kbuild-archive-plan.json"
+  let root_archive = p".xsh-kbuild/built-in.a"
+  let reuse_archives = (e"XSH_LINUX_KBUILD_REUSE_ARCHIVES" ?? "") == "1"
+  let compile_start = PKGBUILD_shared.timing_start("compile")
 
-  if archive_plan.generated_objects.is_empty() and archive_plan.missing_sources.is_empty() {
-    let jobs_count = PKGBUILD_shared.build_jobs()?
-    var archives = []
-    let archive_report = p".xsh-kbuild-archive-plan.json"
-    let root_archive = p".xsh-kbuild/built-in.a"
-    let reuse_archives = (e"XSH_LINUX_KBUILD_REUSE_ARCHIVES" ?? "") == "1"
-    let compile_start = PKGBUILD_shared.timing_start("compile")
-
-    if reuse_archives and root_archive.exists() and archive_report.exists() and (e"XSH_LINUX_KBUILD_FORCE_ARCHIVES" ?? "") != "1" {
-      print "xsh-kbuild-archives" "reuse" archive_plan.archives.len() "archives"
-      archives = archive_plan.archives
-    } else {
-      archives = kbuild.run_builtin_archive_plan(archive_plan, jobs_count)?
-    }
-
-    PKGBUILD_shared.timing_done("compile", compile_start)
-    PKGBUILD_shared.stop_after("compile")
-    let link_start = PKGBUILD_shared.timing_start("link")
-    kbuild.build_scratch_arm64_final(cc, native_kbuild_cflags(), [], native_kbuild_includes(), jobs_count)
-    PKGBUILD_shared.timing_done("link", link_start)
-    PKGBUILD_shared.stop_after("link")
-    print "linux-native-kbuild-complete" archives.len() "archives" "linked" "arch/arm64/boot/Image"
-    return
+  if reuse_archives and root_archive.exists() and archive_report.exists() and (e"XSH_LINUX_KBUILD_FORCE_ARCHIVES" ?? "") != "1" {
+    print "xsh-kbuild-archives" "reuse" archive_plan.archives.len() "archives"
+    archives = archive_plan.archives
+  } else {
+    archives = kbuild.run_builtin_archive_plan(archive_plan, jobs_count)?
   }
 
-  return Err(
-    kbuild.ScriptError.Failed(
-      kind: "linux-native-kbuild-compile-incomplete",
-      message: f"native scratch Kbuild generated config/syscall headers, discovered {plan.dirs.len()} dirs and {plan.objects.len()} objects, constructed {archive_plan.tasks.len()} object/archive tasks for archive_plan.archives.len() archives, found {archive_plan.generated_objects.len()} generated objects and {archive_plan.missing_sources.len()} objects without direct sources; next step is generated object handling and task execution",
-    ),
-  )
+  PKGBUILD_shared.timing_done("compile", compile_start)
+  PKGBUILD_shared.stop_after("compile")
+  let link_start = PKGBUILD_shared.timing_start("link")
+  kbuild.build_scratch_arm64_final(cc, native_kbuild_cflags(), [], native_kbuild_includes(), jobs_count)
+  PKGBUILD_shared.timing_done("link", link_start)
+  PKGBUILD_shared.stop_after("link")
+  print "linux-native-kbuild-complete" archives.len() "archives" "linked" "arch/arm64/boot/Image"
 }

@@ -557,24 +557,28 @@ export proc require_valid_archive_plan(archive_plan: kbuild.BuiltinArchivePlan) 
   }
 }
 
-## Exported declaration `require_complete_x86_archive_plan`.
-export proc require_complete_x86_archive_plan(archive_plan: kbuild.BuiltinArchivePlan) [error] {
+## Exported declaration `require_complete_archive_plan`.
+export proc require_complete_archive_plan(archive_plan: kbuild.BuiltinArchivePlan, srcarch: Str) [error] {
   require_valid_archive_plan(archive_plan)
 
   if ! archive_plan.generated_objects.is_empty() {
+    let names = [obj.display() for obj in archive_plan.generated_objects].join(" ")
+
     return Err(
       kbuild.ScriptError.Failed(
         kind: "linux-native-kbuild-generated-incomplete",
-        message: f"x86 full package build still has {archive_plan.generated_objects.len()} generated object(s); generate or exclude them before linking",
+        message: f"{srcarch} package build still has {archive_plan.generated_objects.len()} generated object(s); generate or exclude them before linking: {names}",
       ),
     )
   }
 
   if ! archive_plan.missing_sources.is_empty() {
+    let names = [obj.display() for obj in archive_plan.missing_sources].join(" ")
+
     return Err(
       kbuild.ScriptError.Failed(
         kind: "linux-native-kbuild-missing-sources",
-        message: f"x86 full package build still has {archive_plan.missing_sources.len()} selected object(s) without direct sources; restore/generate/exclude them before linking",
+        message: f"{srcarch} package build still has {archive_plan.missing_sources.len()} selected object(s) without direct sources; restore, generate or exclude them before linking: {names}",
       ),
     )
   }

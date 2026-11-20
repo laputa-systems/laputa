@@ -760,7 +760,7 @@ export proc build_x86_64_scratch(cc: Path, srcarch: Str, ver: Str) [fs, process,
   }
 
   PKGBUILD_shared.timing_done("plan", plan_start)
-  PKGBUILD_shared.require_complete_x86_archive_plan(archive_plan)
+  PKGBUILD_shared.require_complete_archive_plan(archive_plan, srcarch)
   PKGBUILD_shared.stop_after("plan")
   let jobs_count = PKGBUILD_shared.build_jobs()?
   var archives = []
