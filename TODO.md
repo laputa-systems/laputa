@@ -75,17 +75,15 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** M (days)
 
-### LAP-17 · P3 · Enable aarch64 perf events
+### LAP-17 · P3 · Check aarch64 perf event recording in a guest
 
-- **Area:** Build
-- **Where:** `packages/linux/files/config/aarch64/base-aarch64.fragment:233`
-- **Problem:** The aarch64 kernel disables PERF_EVENTS while Laputa packages perf, leaving event recording unavailable.
-- **Recommendation:** Enable perf events and check recording on a native aarch64 guest.
-- **Deferred:** aarch64 qualification is deferred pending a macOS aarch64 host via Docker; no Linux aarch64 hardware is available. Retain this finding, but exclude it from active backlog runs until the owner reopens it.
-- **Blocked:** Native aarch64 guest qualification is unavailable in this campaign; unblock with a macOS aarch64 host via Docker.
-- **Fix with:** none
+- **Area:** Kernel
+- **Where:** `packages/linux/files/config/aarch64/base-aarch64.fragment`
+- **Problem:** The aarch64 kernel now enables PERF_EVENTS with the symbols upstream `olddefconfig` resolves for it (HW_PERF_EVENTS, ARM_PMU, ARM_PMUV3, ARM64_BRBE and the rest), and `packages/linux/check_config.xsh` reports no drift for either architecture. Recording has not been observed on an aarch64 guest.
+- **Recommendation:** Boot the aarch64 profile on a native aarch64 KVM host and record a `perf` sample. Acceptance: `perf record` and `perf report` show samples from a workload in the guest.
+- **Blocked:** Needs an aarch64 Linux host with KVM (owner ruling 2026-11-20: aarch64 builds run on the m1-max Mac; guest proofs need such a host).
+- **Fix with:** reference-parity
 - **Effort:** S (hours)
-
 ### LAP-20 · P3 · Fork the Rust toolchain build to retire gnu-stubs
 
 - **Area:** Dependencies
