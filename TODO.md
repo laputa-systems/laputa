@@ -65,15 +65,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** lifecycle-concurrency
 - **Effort:** M (days)
 
-### LAP-70 · P2 · Verify Meson wrap source and patch hashes before extraction
-
-- **Area:** gluon / supply-chain security
-- **Where:** `gluon/crates/meson/src/builtins/functions.rs:3178`, `gluon/crates/meson/src/wrap.rs:111`, `gluon/crates/meson/src/wrap.rs:131`, `gluon/crates/meson/src/wrap.rs:175`, `gluon/crates/meson/src/wrap.rs:235`
-- **Problem:** A subproject without a pre-extracted build file automatically invokes wrap download. The file-wrap path downloads or copies an archive and extracts it without checking the wrap's `source_hash`; patch archives likewise bypass `patch_hash`. An attacker controlling a source server, a network path to an HTTP source, or a poisoned cache can supply different build inputs despite a pinned wrap hash, potentially executing attacker-controlled build instructions and contaminating artifacts. gluon hard-codes wrap_mode to "default" (gluon/crates/meson/src/builtins/functions.rs:4032) and no Laputa recipe ships a .wrap file, so reaching a download depends on upstream tarballs that bundle wraps and on build network access, which is unproven.
-- **Recommendation:** Require and verify the declared hashes for source and patch archives before extracting either downloaded or cached bytes, and fail closed on mismatch. Acceptance: a subproject wrap with a mismatched source or patch hash fails before extraction and a valid pinned archive succeeds.
-- **Fix with:** security
-- **Effort:** M (days)
-
 ### LAP-71 · P2 · Bound and expire unauthenticated authentication sessions
 
 - **Area:** mirror / availability
@@ -118,33 +109,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Recommendation:** Exercise real projects with checked outputs and paired, readiness-qualified comparisons. Acceptance: incomplete work fails and a reproducible baseline detects regressions.
 - **Fix with:** refactor-benchmarks, benchmark-checklist
 - **Effort:** M (days)
-
-### LAP-74 · P3 · Fail package parity when the reference cannot run
-
-- **Area:** gluon Laputa package parity
-- **Where:** `gluon/tests/laputa/run.sh:31`, `gluon/tests/laputa/run.sh:43`, `gluon/tests/laputa/run.sh:52`, `gluon/tests/laputa/run.sh:62`, `gluon/tests/laputa/run.sh:67`
-- **Problem:** A reference setup, build, or install failure is printed as SKIP without changing the overall status. If reference dependencies or tools are unavailable for every selected package, the command can exit zero having compared no installed tree. The package list includes the Mesa and Wayland consumers this check is intended to qualify.
-- **Recommendation:** Treat an unavailable reference as an unsuccessful qualification, including when other packages pass, and report the affected package and stage. Acceptance: forcing reference setup to fail for a selected package produces a nonzero overall exit; a matching pair of successful installs still passes.
-- **Fix with:** test-audit
-- **Effort:** S (hours)
-
-### LAP-75 · P3 · Require successful positive fixtures in differential parity
-
-- **Area:** gluon differential tests
-- **Where:** `gluon/tests/differential/run.sh:111`, `gluon/tests/differential/run.sh:124`, `gluon/tests/differential/run.sh:140`, `gluon/tests/differential/run.sh:284`, `gluon/tests/differential/fixtures/meson/trivial/meson.build:1`
-- **Problem:** The harness declares matching nonzero setup or build exits a pass, including for positive fixtures such as the trivial executable. A missing compiler or a shared environmental failure can therefore make both implementations fail before their outputs are compared while the parity gate reports success. The same early return applies to Ninja fixtures.
-- **Recommendation:** Distinguish explicitly expected failures from positive fixtures and require successful reference and candidate execution for the latter. Acceptance: a controlled failure of both compilers makes a positive fixture and the overall harness fail, while a named negative fixture still verifies its expected error.
-- **Fix with:** test-audit
-- **Effort:** M (days)
-
-### LAP-76 · P3 · Check the actual no-op rebuild work
-
-- **Area:** gluon differential tests
-- **Where:** `gluon/tests/differential/run.sh:210`, `gluon/tests/differential/run.sh:218`, `gluon/tests/differential/run.sh:295`, `gluon/docs/testing.md:3`
-- **Problem:** The Meson comparison runs both no-op builds but then counts edges in the original `build.log` and `cand_build.log` again, not the no-op logs. The Ninja comparison checks only exit codes. A candidate that rebuilds every edge on every invocation can pass, despite the documented no-op behavior contract and the cost to every incremental build.
-- **Recommendation:** Compare the actual no-op work and outputs at both boundaries. Acceptance: a candidate that reruns a successful edge on the second invocation fails its fixture, while a true no-op passes.
-- **Fix with:** test-audit
-- **Effort:** S (hours)
 
 ### LAP-77 · P3 · Include proof input mode in the profile identity
 
