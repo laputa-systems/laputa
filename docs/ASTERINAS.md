@@ -131,6 +131,16 @@ obligations.
   moves the TAI offset as Linux does. `ntpd-rs` converges from positive and
   negative offsets, frequency error, pause and resume, and a jump, and its
   `leap_update` accepts the leap status it reports.
+  Unsupported, because no packaged consumer needs them: `ADJ_OFFSET`,
+  `ADJ_TICK` and the `adjtime` offset modes, and setting `STA_PLL`, `STA_FLL`
+  or `STA_FREQHOLD`, all fail with `EINVAL`; transmit timestamps without
+  `SOF_TIMESTAMPING_OPT_TSONLY` and hardware timestamps are absent (`ntpd-rs`
+  clears those status bits and always requests `OPT_TSONLY`). While a
+  frequency correction is active the vDSO falls back to the system call.
+  Firecracker exposes no RTC, so a cold boot needs operator-set time, and
+  Linux's rejection of steps over 1000 s is not modelled. Each becomes work
+  when a consumer needs it, with a witness paired against Linux in
+  `qualify.sh clock-abi`.
 - IPv4 state: netlink addresses, routes, rules, and route-netlink
   notifications, and the packaged `dhcpc` across acquire, renewal,
   reconfigure, NAK, restart, and carrier loss against a scripted server.
