@@ -15,7 +15,7 @@
     {"package": "musl", "language": "C", "retention": "retained-exception", "role": "libc and dynamic loader"},
     {"package": "play", "language": "Rust+C/C++", "retention": "prebuilt-release", "role": "player; statically incorporates the components listed under its binary"},
     {"package": "rust-fontconfig", "language": "Rust", "retention": "rust", "role": "shared font discovery behind a C ABI"},
-    {"package": "seatd-rs", "language": "Rust+C", "retention": "replacement-candidate", "role": "Rust seatd daemon; libseat.so.1 is the upstream C client"},
+    {"package": "seatd-rs", "language": "Rust", "retention": "rust", "role": "Rust seatd daemon; tinyland speaks the seatd protocol itself, so no libseat client ships"},
     {"package": "tinyland", "language": "Rust", "retention": "rust", "role": "compositor"},
     {"package": "doas-rs", "language": "Rust", "retention": "rust", "role": "privilege escalation"},
     {"package": "mdevd-rs", "language": "Rust", "retention": "rust", "role": "device manager"},
@@ -104,7 +104,7 @@
     {
       "package": "tinyland",
       "path": "usr/bin/tinyland",
-      "needed": ["libseat.so.1", "libc.so"],
+      "needed": ["libc.so"],
       "runpath": "",
       "components": [
         {"name": "LLVM libunwind in Rust std", "language": "C++", "version": "Rust 1.99 target runtime", "origin": "the musl target's self-contained libunwind", "markers": ["libunwind: unsupported .eh_frame_hdr version"]}
@@ -113,17 +113,6 @@
       "unknown": [
         {"subject": "runtime-loaded libwayland-server.so", "evidence": "the string is wayland-backend types::server InitError Display, which compiles in whichever backend is selected. This build selects only the rs backend: the binary imports no dlopen or dlsym, has no libwayland-server.so.0 string, and carries none of the sys backend C entry points (wl_display_create, wl_global_create, wl_display_run), so the string is unreachable. cargo tree -e features shows wayland-backend default plus wayland-sys default only", "settle": "A guest run without wayland-libs-server is the remaining behavioural witness; the ELF already proves the path is not linked", "settled": true},
         {"subject": "object compiled by clang version 23.1.5", "evidence": ".comment names clang 23.1.0-rc2 from the musl crt and libc objects and clang 23.1.5 from crtbeginS.o, which the llvm-toolchain package ships at usr/lib/crtbeginS.o and usr/lib/llvm23/lib/clang/23/lib/linux/crtbeginS.o; rustc 1.99.0 supplies the Rust objects. The object is clang own CRT begin file, not a package source file", "settle": "Compare .comment of usr/lib/crtbeginS.o in the llvm-toolchain artifact with the tinyland .comment", "settled": true}
-      ]
-    },
-    {
-      "package": "seatd-rs",
-      "path": "usr/lib/libseat.so.1",
-      "needed": ["libc.so"],
-      "runpath": "",
-      "components": [],
-      "absent": ["mimalloc"],
-      "unknown": [
-        {"subject": "libseat client source language and backends", "evidence": "libseat.so.1 is C compiled by clang 23.1.5 and linked with LLD 23.1.5, cut from the C seatd release the recipe pins at SHA-256 302564d5. It exports the 11 upstream libseat_* entry points and dlopens no backend, so the only backend is the seatd socket client that the Rust daemon serves", "settle": "Read packages/seatd-rs/PKGBUILD.xsh and the built object .comment; the seatd-only client replacement is the first LAP-51 priority", "settled": true}
       ]
     },
     {

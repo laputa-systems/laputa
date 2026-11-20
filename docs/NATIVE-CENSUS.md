@@ -7,10 +7,13 @@ accounts for both for the Tinyland and Ghostty profile
 [LAP-51](rfc/LAP-51-c-free-userspace.md). FFmpeg, codecs, musl, Linux, Mesa
 drivers, crabc, and allocators are retained and are counted, not replaced.
 
-The measurements below describe the recorded artifacts before the independent
-Tinyland workspace migration. Current recipes use its native Rust seat client
-and no longer install the C libseat client from the Rust daemon package. Rerun
-the census on the newly built root before claiming updated sizes or closure.
+The byte measurements below describe the artifacts recorded at `d4601fa`,
+before the independent Tinyland workspace migration. On 2026-11-20 the census
+was rerun on a root rebuilt at Laputa `997567b8` (gluon `ba818ba`) and passes:
+`native census verified: 7 binaries; 0 attributions open`. On that root
+tinyland uses its native Rust seat client, needs only `libc.so`, and the C
+`libseat.so.1` client no longer ships. Re-measure before quoting the sizes for
+a later root.
 
 ## Run it
 
@@ -41,15 +44,8 @@ unrelated doas-rs source. Download it and store it under its SHA-256 in
 The measured root was composed from the plan at `d4601fa`, where every planned
 artifact is in `.out/artifacts/x86_64`. Re-running the sequence at a later
 revision first needs `make build` to fill the store for the packages whose
-recipes changed. In this environment that build stops at `vulkan-headers`:
-CMake's C++ compiler test fails with `ld.lld: error: unable to find library
--lc++` and `-lc++abi` from the composed build root's `/usr/bin/c++` wrapper. I
-did not resolve which staged input omits them — `llvm-toolchain` does ship
-`usr/lib/llvm23/lib/libc++.a` and `libc++abi.a`, and the wrapper passes
-`-L …/usr/lib/llvm23/lib` — so this is an unresolved build-environment
-blocker, not a census finding. Every package that does not need a C++ link
-builds, and the census above is unaffected because it reads the composed root,
-not the recipes.
+recipes changed; at `997567b8` the whole closure, including the C++ packages,
+builds on x86_64.
 
 `census` reads `qualification/native-census/components.json`. For each listed
 binary it checks that the exact `DT_NEEDED` set, `RUNPATH`, and every provider
@@ -128,7 +124,7 @@ is native code a Rust replacement could plausibly remove.
 | `libxkbcommon` | C | replacement-candidate | Ghostty keyboard translation |
 | `mesa` | C/C++ | retained-exception | EGL, virgl, lavapipe, static LLVM |
 | `musl` | C | retained-exception | libc and loader |
-| `seatd-rs` | Rust and C | replacement-candidate | Rust daemon, C `libseat.so.1` client |
+| `seatd-rs` | Rust | rust | Rust daemon; tinyland speaks its protocol, so no C client ships |
 | `vulkan-loader` | C++ | retained | `libvulkan.so.1` |
 | `wayland-libs-client` | C | replacement-candidate | Wayland client library |
 | `zlib` | C | replacement-candidate | `libz.so.1` for Play |
@@ -296,8 +292,8 @@ to llvm-toolchain's libc++ and libunwind. That is 56% of the 80,492,448-byte
 linked image and 64% of the 69,526,696-byte stripped file, and it closes the
 byte-share attribution.
 
-**tinyland.** It needs `libseat.so.1` (seatd-rs) and `libc.so` (musl) and has
-no `RUNPATH`. Its only static native code observed is the LLVM libunwind
+**tinyland.** It needs only `libc.so` (musl) and has no `RUNPATH`; at `d4601fa`
+it also needed `libseat.so.1`. Its only static native code observed is the LLVM libunwind
 in Rust's musl runtime plus clang's CRT. The `could not load
 libwayland-server.so` string is wayland-backend's `types::server` `Display`
 impl, which compiles in whichever backend is selected. This build selects only
@@ -310,11 +306,9 @@ The clang 23.1.5 object in `.comment` is `usr/lib/crtbeginS.o` from the
 23.1.0-rc2; rustc 1.99.0 supplies the Rust objects).
 
 **seatd, mdevd, doas.** Each has no `RUNPATH`. seatd and mdevd need only
-`libc.so`; doas needs `libcrypt.so` as well, both from musl. `libseat.so.1`
-(25,120 bytes) is the upstream C client: clang 23.1.5 and LLD 23.1.5, cut from
-the seatd release the recipe pins at SHA-256 `302564d5`, exporting the 11
-upstream `libseat_*` entry points and dlopening no backend. It is C, and the
-Rust daemon serves the socket it talks to.
+`libc.so`; doas needs `libcrypt.so` as well, both from musl. At `d4601fa`
+seatd-rs also shipped `libseat.so.1` (25,120 bytes), the upstream C client cut
+from the pinned seatd release; it is gone from the current root.
 
 **xsh and xsht.** These pre-built seed binaries have no `DT_NEEDED` entries. They
 incorporate mimalloc (`libmimalloc-sys 0.1.49`), zstd 1.5.7 (`zstd-sys
@@ -363,7 +357,10 @@ this document replaces nothing.
 
 **Candidates, in the order LAP-51 prioritizes them.**
 
-1. The seatd client (`libseat.so.1`; sole consumer tinyland). Oracle: the C
+1. The seatd client (`libseat.so.1`; sole consumer tinyland). Its closure
+   target holds since the Tinyland workspace migration: tinyland's `DT_NEEDED`
+   is `libc.so` alone and `libseat.so.1` has left the root. The differential
+   gates below were not run for that migration. Oracle: the C
    client against the Rust seatd daemon. Correctness covers open seat, open
    and close device, disable acknowledgement, session switch, and device-FD
    ownership. Failure covers daemon disconnect, denied open, `EINTR`, and FD
