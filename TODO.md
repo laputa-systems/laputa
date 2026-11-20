@@ -57,14 +57,11 @@ qualification remains open; manual cross-build evidence is bounded in
 ### LAP-6 · P2 · Verify shared bootstrap changes on aarch64
 
 - **Area:** Tests
-- **Where:** `docs/TESTING.md:45`
-- **Problem:** The completed x86_64 bootstrap changed shared PM, musl, headers, installer, and profile paths without a full aarch64 world rebuild or boot proof. aarch64 parity is unproven.
-- **Recommendation:** Run the clean world build and both installer and profile proofs on a native aarch64 host. Fix failures before claiming parity.
-- **Deferred:** aarch64 qualification is deferred pending a macOS aarch64 host via Docker; no Linux aarch64 hardware is available. Retain this finding, but exclude it from active backlog runs until the owner reopens it.
-- **Blocked:** This campaign has an x86_64 host; the required native aarch64 build and guest proof remain unavailable. Unblock with a macOS aarch64 host via Docker.
-- **Fix with:** reference-parity
+- **Where:** `docs/TESTING.md:45`, `packages/libcap/proof.xsh:95`
+- **Problem:** The completed x86_64 bootstrap changed shared PM, musl, headers, installer, and profile paths without a full aarch64 world rebuild or boot proof. On 2026-11-20 the clean aarch64 world build ran on m1-max (OrbStack, linux/arm64, 4 KiB pages) against the published aarch64 images: all 931 sources fetched, 30 packages built, then `libcap-2.78-1` failed its package proof. `proof.xsh:95` runs `libcap.so.2.78` through the musl loader, and on aarch64 the loader-started library dies with SIGBUS (signal 7). Alpine 3.22's own `libcap2` 2.78 reproduces it: `/lib/ld-musl-aarch64.so.1 /usr/lib/libcap.so.2` exits 135 with "Bus error", while executing `/usr/lib/libcap.so.2` directly prints the banner and exits 0. The rest of the world is unbuilt.
+- **Recommendation:** Find whether the fault is libcap's execable entry or musl's loader on aarch64 (a minimal executable shared object started through `ld-musl-aarch64.so.1` separates them), fix it upstream or in the recipe, or make the proof start the library the way a user does, then rerun `make build ARCH=aarch64` to completion and fix later failures. Guest installer and profile proofs need an aarch64 KVM host. Acceptance: the aarch64 world builds clean; boot proofs stay on the Needs-environment list.
+- **Fix with:** root-cause
 - **Effort:** M (days)
-
 ### LAP-16 · P3 · Exercise sound and wireless device support
 
 - **Deferred:** Wireless and physical-device enablement are out of scope. Any separately selected virtio-audio proof must remain VM-only and must not enable physical drivers or firmware as a side effect. This item is not permission to widen hardware scope.
