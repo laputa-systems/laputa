@@ -5,7 +5,12 @@ use pm.types as pm_types
 proc run_guest_proof() [fs, process, env, error] -> Result[Unit, Error] {
   let receipt = generation.read_generation_receipt(p"/")?
   assert receipt.profile.name == "qemu-self-hosting"
-  assert receipt.target == pm_types.target_x86_64()
+  let expected = match system.uname()?.machine {
+    "x86_64" => pm_types.target_x86_64()
+    "aarch64" => pm_types.target_aarch64()
+    other => { fail f"unsupported self-hosting guest architecture {other}" }
+  }
+  assert receipt.target == expected
   assert "LAPUTA_SELF_HOSTING_PROOF=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   assert unix.id()?.uid == 0
   let root = p"/mnt/self-hosting"

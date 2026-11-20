@@ -98,7 +98,7 @@ export pure qemu_target(os: Str, arch: Str) -> Result[QemuTarget, Error] {
     return {
       arch,
       qemu_name: "qemu-system-aarch64",
-      machine: "virt,accel=hvf,highmem=off",
+      machine: "virt,accel=hvf,highmem=on",
       machine_args: [],
       cpu: "host",
       console: arm_console,

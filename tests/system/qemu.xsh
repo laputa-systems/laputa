@@ -242,7 +242,7 @@ test test_qemu_command_on_macos_is_aarch64_under_hvf [error] {
 
   for argv in pair {
     assert argv[0] == "qemu-system-aarch64"
-    assert "virt,accel=hvf,highmem=off" in argv, "machine"
+    assert "virt,accel=hvf,highmem=on" in argv, "machine"
     assert "virtio-blk-device,drive=root" in argv, "root device"
     assert argv |> any "console=ttyAMA0" in ., "pl011 console"
     assert ! (argv |> any "x86_64" in .), "no other architecture"
