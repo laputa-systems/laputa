@@ -435,3 +435,58 @@ headers, or a discovery report can remain for diagnosis. After consuming the
 result, remove the controller-owned tree and prepare a fresh tree for another
 run. Container and reservation cleanup remain with the controller. Functional
 discovery evidence does not establish P0 timing or qualify a kernel build.
+
+## Benchmarks
+
+`make bench-list` lists the registered workloads. `make bench-check TIER=change`
+checks readiness without running them; `make bench DRY_RUN=1 TIER=change`
+prints the selection without writing files. `make bench TIER=edit` exercises
+selection, and `make bench TIER=change WORKLOADS="pm-catalog make-graph"`
+runs the bounded change workloads. `TIER` is a ceiling: edit, change, scenario,
+full. `WORKLOADS` and `SKIP` take workload names; `AREAS` takes area names.
+Unknown names and empty selections fail. Exclusions are printed. Full requires
+`FULL=1` and an explicit manual request for the named workload; no full
+workload is currently registered. The default ceiling is change.
+
+The driver needs verification XSH and XSHT binaries, the checkout fixtures,
+64 MiB free space and `perf-gate-ready`. Override `BENCH_XSH_ROOT`,
+`BENCH_XSH`, and `BENCH_XSHT` for a different checkout or binary. Edit takes
+seconds; change is estimated at seconds to a minute. Each run writes logs and
+`summary.txt` under `.work/bench/`, including elapsed wall time, exit status,
+exclusions and host readiness. A busy host makes timing inconclusive. A single
+sample has no baseline or budget and completion is not a performance verdict.
+The catalog workload loads all actual x86_64 recipes and checks that baselayout
+is present. The `pm-check` workload type-checks the production PM source. The graph workload checks synthetic kernel graph inventories and
+execution, including no-op and incremental reuse. Neither proves a real build.
+The binaries are not checked for freshness; rebuild them when source changed.
+These workloads do not launch persistent services; an interrupted child may
+still require manual inspection before another run.
+
+The audit maps paid outcomes to available evidence. A gap means that evidence
+is not an accepted representative benchmark with an output oracle.
+
+| Outcome | Workload and oracle | Attribution and gap |
+| --- | --- | --- |
+| Package build throughput and rebuild cost | `make verify` builds world and reruns; successful build and reuse are functional checks | `perf` on container processes and build logs; no controlled throughput benchmark or retained baseline |
+| Plan time | `pm-catalog` validates real recipe inventory; exact fixture plan is checked by `test_pyramid_pm_plan_exact_inventory` | `perf` on XSH; neither measures a complete production plan. A real plan needs seed inputs |
+| Mirror publish time | `make publish` publishes the selected plan | network byte counters and server/client traces; no timed checked benchmark |
+| Image and package size | `installer/rootfs_size.xsh` calculates image capacity; package manifests describe installed files | `du` and manifest bytes; no comparable artifact-size budget |
+| Boot to usable system | `make profile-test` checks the guest profile | QEMU/guest traces and serial timestamps; no bounded boot latency benchmark |
+| xinit service start | xinit supervision tests check readiness | guest process tracing and readiness timestamps; no latency benchmark |
+| PM install, remove, generation switch | PM and activation tests check resulting state | syscall and filesystem tracing; no latency benchmark |
+| gluon configure/build | `gluon/tests/benchmarks/run.sh` exercises synthetic graphs and setup | CPU sampling and syscall counts; synthetic corpus, incomplete output checks and no accepted baseline |
+| Memory footprint | no workload-tree peak measurement | cgroup memory peak and heap profiler; no representative workload or budget |
+
+`make verify` records elapsed seconds, not a regression gate. The gluon script
+uses three samples for setup, skips some command failures and has no established
+comparison anchor; its host checks precede the corpus rather than bracket the
+measurement. Neither establishes a reliable performance verdict. Instrumented
+runs should be separate from timings: `perf` samples CPU, `strace -c` counts
+syscalls with overhead, cgroup counters bound process-tree memory, and network
+and filesystem counters expose bytes and I/O. Guest work needs guest-side
+instrumentation as well as QEMU host attribution. Timing needs matched inputs,
+cache and concurrency, interleaved baseline runs, and readiness checks before
+and after each measurement. No stale performance threshold was identified in
+these harnesses; missing budgets are gaps rather than passes. The highest risks
+are missing representative end-to-end comparisons and memory scope, followed
+by weak gluon oracles and incomplete run provenance and preflight.

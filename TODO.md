@@ -1,7 +1,7 @@
 # TODO
 
 Prefix: LAP
-Next: 63
+Next: 67
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -28,6 +28,42 @@ Timing measurements require quiet-host readiness checks before and after each
 accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
+
+### LAP-63 · P1 · Measure representative package and system journeys
+
+- **Area:** Performance
+- **Where:** `docs/TESTING.md` Benchmarks
+- **Problem:** Package builds and rebuilds, plans, publishing, boot, service readiness and PM operations lack representative checked timing comparisons.
+- **Recommendation:** Define bounded workloads, completed-work oracles, paired baselines and readiness-qualified measurements. Acceptance: each journey has a reproducible comparison and reports inconclusive samples explicitly.
+- **Fix with:** bench-pyramid, benchmark-checklist
+- **Effort:** L (weeks)
+
+### LAP-64 · P2 · Measure workload memory and artifact sizes
+
+- **Area:** Performance
+- **Where:** `docs/TESTING.md` Benchmarks
+- **Problem:** No scoped workload-tree peak memory or comparable package and image size budgets exist.
+- **Recommendation:** Measure representative tree memory and artifact bytes with defined accounting and baselines. Acceptance: reports identify scope, inputs and accepted limits for each selected workload.
+- **Fix with:** bench-pyramid
+- **Effort:** M (days)
+
+### LAP-65 · P2 · Strengthen gluon benchmark oracles
+
+- **Area:** Performance
+- **Where:** `gluon/tests/benchmarks/run.sh`
+- **Problem:** The corpus is synthetic, tolerates failed commands and does not bracket each measurement with readiness checks or compare an accepted anchor.
+- **Recommendation:** Exercise real projects with checked outputs and paired, readiness-qualified comparisons. Acceptance: incomplete work fails and a reproducible baseline detects regressions.
+- **Fix with:** refactor-benchmarks, benchmark-checklist
+- **Effort:** M (days)
+
+### LAP-66 · P3 · Qualify benchmark inputs and provenance
+
+- **Area:** Performance
+- **Where:** `bench/bench.xsh`
+- **Problem:** The bounded entrypoint does not verify binary freshness, leftover processes or record all artifact and host identities.
+- **Recommendation:** Add workload-specific admission and reproducibility evidence without hiding missing inputs. Acceptance: stale inputs and surviving children are reported before execution and results identify the tested artifacts and host conditions.
+- **Fix with:** bench-pyramid
+- **Effort:** M (days)
 
 ### LAP-6 · P2 · Verify shared bootstrap changes on aarch64
 

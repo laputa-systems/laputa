@@ -1,0 +1,63 @@
+use bench.registry
+
+proc words(value: Str) -> List[Str] {
+  [word for word in value.split(" ") if word != ""]
+}
+
+proc main(mode: Str, tier: Str, names: Str, areas: Str, skip: Str, full: Str, xsht: Str) [fs, process, env, time, error] {
+  let all = registry.workloads(xsht)
+  if mode == "list" {
+    for item in all {
+      print f"{item.name} tier={if item.tier == 0 { "edit" } else { "change" }} area={item.area} purpose={item.purpose} cost={item.cost} requires=xsht,fixtures command={item.argv.join(" ")} output=.work/bench/RUN/{item.name}.log"
+    }
+    return
+  }
+  let selected = registry.select(all, tier, words(names), words(areas), words(skip), full == "1")?
+  let selected_names = [w.name for w in selected]
+  for item in all {
+    if item.name not in selected_names {
+      print f"excluded {item.name}: selector or tier"
+    }
+  }
+  if mode == "dry" {
+    for item in selected { print f"would run: {item.argv.join(" ")}" }
+    return
+  }
+  if !fp"{xsht}".exists()? {
+    fail f"preflight: missing xsht {xsht}; set BENCH_XSHT to a built xsht; affected: {selected_names.join(", ")}; nothing ran"
+  }
+  for item in selected {
+    let fixture = if item.name == "selection" { p"tests/bench/test_bench.xsh" } else if item.name == "pm-catalog" { p"bench/catalog.xsh" } else if item.name == "pm-check" { p"pm" } else { p"packages/linux/tests/pyramid.xsh" }
+    if !fixture.exists()? { fail f"preflight: missing {fixture}; restore checkout; affected: {item.name}; nothing ran" }
+    if !fp"{item.argv[0]}".exists()? { fail f"preflight: missing {item.argv[0]}; build or configure the host tool; affected: {item.name}; nothing ran" }
+  }
+  if process.which("perf-gate-ready") is Err(_) { fail f"preflight: missing perf-gate-ready; install the host gate; affected: {selected_names.join(", ")}; nothing ran" }
+  print "warning: host binary freshness is not verified; rebuild after XSH source changes"
+  let space = fs.statvfs(p".")?
+  fail f"preflight: less than 64 MiB free; free disk space; affected: {selected_names.join(", ")}; nothing ran" when space.blocks_available * space.fragment_size < 67108864
+  let ready = process.run(process.command_argv("perf-gate-ready", ["perf-gate-ready"], stdout: p"/dev/null", stderr: p"/dev/null"))?
+  print f"host readiness: {if ready.ok { "quiet" } else { "busy; timings inconclusive" }}"
+  if mode == "check" { print f"preflight ok: {selected_names.join(", ")}"; return }
+  let root = fp".work/bench/{time.format(time.now() * 1000000, "%Y%m%dT%H%M%SZ", utc: true)?}-{time.monotonic()?}"
+  root.mkdir()
+  var lines = ["# Benchmark run", "", "Completion is not a performance verdict; no budgets or baseline are established."]
+  for item in all {
+    if item.name not in [w.name for w in selected] { lines += [f"excluded {item.name}: selector or tier"] }
+  }
+  var failed = false
+  for item in selected {
+    let before = process.run(process.command_argv("perf-gate-ready", ["perf-gate-ready"], stdout: p"/dev/null", stderr: p"/dev/null"))?
+    let start = time.monotonic()?
+    let argv = [arg.replace("@OUTPUT@", with: f"{root}/plan.json") for arg in item.argv]
+    let result = process.run(process.command_argv(fp"{argv[0]}", argv, p".", env: {XSH_PM_REPO: ""}, stdout: fp"{root}/{item.name}.log", stderr: fp"{root}/{item.name}.log", stdout_append: true, stderr_append: true))?
+    let elapsed = (time.monotonic()? - start) / 1000000
+    let after = process.run(process.command_argv("perf-gate-ready", ["perf-gate-ready", "-1"], stdout: p"/dev/null", stderr: p"/dev/null"))?
+    let validity = if before.ok and after.ok { "observational; no comparison" } else { "inconclusive: host busy" }
+    lines += [f"{item.name}: exit={result.shell_code()?} duration_ms={elapsed} timing={validity}"]
+    if !result.ok { failed = true }
+  }
+  fp"{root}/summary.txt".write_lines(lines)
+  print f"summary: {root}/summary.txt"
+  for line in lines { print $line }
+  fail "benchmark workload failed" when failed
+}
