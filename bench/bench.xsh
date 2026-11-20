@@ -8,7 +8,8 @@ proc main(mode: Str, tier: Str, names: Str, areas: Str, skip: Str, full: Str, xs
   let all = registry.workloads(xsht)
   if mode == "list" {
     for item in all {
-      print f"{item.name} tier={if item.tier == 0 { "edit" } else { "change" }} area={item.area} purpose={item.purpose} cost={item.cost} requires=xsht,fixtures command={item.argv.join(" ")} output=.work/bench/RUN/{item.name}.log"
+      let requirements = [requirement.display() for requirement in item.requires]
+      print f"{item.name} tier={registry.tier_name(item.tier)} area={item.area} purpose={item.purpose} cost={item.cost} requires={requirements.join(",")} tools={item.tools.join(",")} command={item.argv.join(" ")} output=.work/bench/RUN/{item.name}.log"
     }
     return
   }
@@ -23,13 +24,13 @@ proc main(mode: Str, tier: Str, names: Str, areas: Str, skip: Str, full: Str, xs
     for item in selected { print f"would run: {item.argv.join(" ")}" }
     return
   }
-  if !fp"{xsht}".exists()? {
-    fail f"preflight: missing xsht {xsht}; set BENCH_XSHT to a built xsht; affected: {selected_names.join(", ")}; nothing ran"
-  }
   for item in selected {
-    let fixture = if item.name == "selection" { p"tests/bench/test_bench.xsh" } else if item.name == "pm-catalog" { p"bench/catalog.xsh" } else if item.name == "pm-check" { p"pm" } else { p"packages/linux/tests/pyramid.xsh" }
-    if !fixture.exists()? { fail f"preflight: missing {fixture}; restore checkout; affected: {item.name}; nothing ran" }
-    if !fp"{item.argv[0]}".exists()? { fail f"preflight: missing {item.argv[0]}; build or configure the host tool; affected: {item.name}; nothing ran" }
+    for requirement in item.requires {
+      if !requirement.exists()? { fail f"preflight: missing {requirement}; restore or prepare the input, or set XSH_ROOT= to the checkout with built verification binaries; affected: {item.name}; nothing ran" }
+    }
+    for tool in item.tools {
+      if process.which(tool) is Err(_) { fail f"preflight: missing tool {tool}; install or configure it; affected: {item.name}; nothing ran" }
+    }
   }
   if process.which("perf-gate-ready") is Err(_) { fail f"preflight: missing perf-gate-ready; install the host gate; affected: {selected_names.join(", ")}; nothing ran" }
   print "warning: host binary freshness is not verified; rebuild after XSH source changes"

@@ -445,11 +445,10 @@ selection, and `make bench TIER=change WORKLOADS="pm-catalog make-graph"`
 runs the bounded change workloads. `TIER` is a ceiling: edit, change, scenario,
 full. `WORKLOADS` and `SKIP` take workload names; `AREAS` takes area names.
 Unknown names and empty selections fail. Exclusions are printed. Full requires
-`FULL=1` and an explicit manual request for the named workload; no full
-workload is currently registered. The default ceiling is change.
+`FULL=1` and an explicit manual request for the named workload; Full workloads include package build, mirror build, installer size, and profile proof. The default ceiling is change.
 
 The driver needs verification XSH and XSHT binaries, the checkout fixtures,
-64 MiB free space and `perf-gate-ready`. Override `BENCH_XSH_ROOT`,
+64 MiB free space and `perf-gate-ready`. Override `XSH_ROOT`, `BENCH_XSH_ROOT`,
 `BENCH_XSH`, and `BENCH_XSHT` for a different checkout or binary. Edit takes
 seconds; change is estimated at seconds to a minute. Each run writes logs and
 `summary.txt` under `.work/bench/`, including elapsed wall time, exit status,
