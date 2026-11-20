@@ -27,14 +27,6 @@ accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
 
-### LAP-78 · P2 · Make artifact identities independent of the planning host's archive encoder
-
-- **Area:** Package manager
-- **Where:** `installer/package_roots_host.xsh` (`plan_in_package_tools`), `seed/world.xsh` (`host_pm_plan`), the PM recipe hash and artifact key derivation
-- **Problem:** A plan made on a macOS host computes different recipe hashes and artifact keys from the artifacts the Linux package-tools container built and published: on m1-max on 2026-11-20 the host plan for `baselayout` had recipe hash `4c7625ae…` and artifact key `44a0ff75…`, the aarch64 mirror `38a74048…` and `520e1dea…`, because the macOS and Linux seed payload-encoder fingerprints differ. `make installer-qemu-test ARCH=aarch64` therefore reported `remote artifact identity differs` for all 21 artifacts. Laputa 4c83319c and 3c723f01 work around it by planning inside package-tools when the host is Darwin, the mirror is a local unsigned one and no snapshot key is set; a macOS host planning against a signed or remote mirror still gets mismatched identities.
-- **Recommendation:** Derive the recipe hash and artifact key from inputs that do not depend on which host's seed encodes the archive (for example, the target encoder's identity recorded in the recipe, or the encoder fingerprint of the package-tools image that builds the artifact), then remove the Darwin branch in `installer/package_roots_host.xsh`. Acceptance: a macOS host plan and a Linux host plan of the same recipe produce identical keys, and the aarch64 installer proof passes on m1-max through `world.host_pm_plan`.
-- **Fix with:** single-source-of-truth
-- **Effort:** M
 - **Deferred:** Wireless and physical-device enablement are out of scope. Any separately selected virtio-audio proof must remain VM-only and must not enable physical drivers or firmware as a side effect. This item is not permission to widen hardware scope.
 
 ### LAP-16 · P3 · Exercise sound and wireless device support
