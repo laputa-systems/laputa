@@ -292,6 +292,9 @@ and the key of every direct `deps` and `mkdeps_*` dependency. Payload recipe
 input digests also include a process-cached SHA-256 fingerprint of the payload
 encoder: PM archives a fixed file, directory, and symlink with the same helper
 and options used for payloads. A changed encoding changes every payload key.
+The XSH archive encoder writes tar entries with owner 0, mtime 0 and symlink
+mode `0777` on every host, so a macOS host plan computes the same keys as the
+Linux package-tools build that produced the artifacts.
 Metapackages do not include this fingerprint directly, but their keys change
 when a build dependency key changes. Each dependency is
 installed into the build root with its runtime closure, because recipes link
