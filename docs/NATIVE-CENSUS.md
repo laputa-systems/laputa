@@ -327,10 +327,8 @@ GCC 9.4.0 object is Rust's bundled musl self-contained sysroot — `libc.a`,
 clang 23.1.4/23.1.5. The xz-utils inside `liblzma-sys` 0.4.9 is 5.8.4, from the
 crate's `xz/NEWS`.
 
-**Existing closure audit.** The shared-stack closure audit
-(`qualification/ghostty-shared/closure.xsh`) passed on this root before its
-candidate recipe was removed; `fe249f5` deleted it with that recipe, so the
-census is now the only re-runnable check on this root. The Rust packages (doas,
+**Existing closure audit.** The shared-stack closure audit passed on this root
+before its candidate recipe and audit were removed. The Rust packages (doas,
 mdevd, seatd, tinyland, and the other Rust daemons) no longer pass
 `-rpath /usr/lib`, which the default search path made redundant. The audit
 accepted a `RUNPATH` only when it was exactly `$ORIGIN/../lib` on a `usr/bin`

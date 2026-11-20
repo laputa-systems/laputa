@@ -379,6 +379,25 @@ these exclusions before execution and checks sonames in the composed files.
 false. Its roots add OxiSH, crabtables (the `nfcrt` firewall loader and ruleset), and laputa-net. The other profiles set
 `development` true and keep their current roots.
 
+## Git history
+
+Run `git-filter-repo` only in an isolated clone, never in the main checkout.
+A local history rewrite lost the following retired Gluon branch objects and the
+stash object. Their contents remain unknown; integrated Gluon work does not
+establish that every branch delta was integrated.
+
+| Original Gluon branch | Unrecovered object |
+|---|---|
+| `backend` | `48c8a28f6fb8659410a61874751407f9d58dcb76` |
+| `builtins` | `758c4ea360dbe4e2f4c789a3c4eb5219bdefd05b` |
+| `install` | `250104c412b9ac6fd03f14a3634f22c03a91b2d9` |
+| `link` | `801eaf6deb8d703a3f6bee78b52400d7f06d9274` |
+| `pkgconfig` | `1f419229c862b117432f6eb72d1c0ad90ea496a8` |
+| `preprocess` | `44c7af4e0d773929c242f8362987fac8fe388f4f` |
+| `rpath` | `2b4e7bd2e2ea18aeb02d4b8b8cb81b72dc5a8295` |
+
+The unrecovered `refs/stash` object is `92dc314a6198cf00e3aec1f05d72537e81a3a6da`.
+
 ## Derived state
 
 | Path | Holds | Removed by |
