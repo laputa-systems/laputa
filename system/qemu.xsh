@@ -203,9 +203,12 @@ export pure qemu_command_argv(
     types.Virtio2d => if mode == .Test { ["-display", "none"] } else { target.interactive_display }
     types.Virgl => if mode == .Test { ["-display", "egl-headless"] } else { target.gl_interactive_display }
   }
+  let root_drive = ["-drive", f"if=none,id=root,format=raw,file={outputs.disk},snapshot=on", "-device", f"{target.block_device},drive=root"]
   let state_drive = if profile.development { [] } else {
     ["-drive", f"if=none,id=state,format=raw,file={outputs.root}/state.ext4", "-device", f"{target.block_device},drive=state"]
   }
+
+  let disks = if target.arch == "aarch64" { state_drive.extend(root_drive) } else { root_drive.extend(state_drive) }
 
   [
     value.qemu.display(),
@@ -222,11 +225,7 @@ export pure qemu_command_argv(
     outputs.kernel.display(),
     "-append",
     kernel_cmdline(target, mode, profile.proof),
-    "-drive",
-    f"if=none,id=root,format=raw,file={outputs.disk},snapshot=on",
-    "-device",
-    f"{target.block_device},drive=root",
-    @state_drive,
+    @disks,
     "-netdev",
     "user,id=net0",
     "-device",

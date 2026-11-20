@@ -53,6 +53,19 @@ proc command_pair(config: qemu.QemuConfig) [error] -> Result[List[List[Str]]] {
   ]
 }
 
+test test_maintained_disk_order_matches_guest_enumeration [error] {
+  let outputs = build.outputs(p"target/laputa/qemu-fixture")
+  let maintained = {...fixture_profile(), development: false}
+  for host in [["Linux", "x86_64"], ["Linux", "aarch64"], ["Darwin", "aarch64"]] {
+    let config = fixture_qemu(host[0], host[1])?
+    let argv = qemu.qemu_command_argv(config, maintained, outputs, types.Test)
+    let root = position(argv, f"{config.target.block_device},drive=root")
+    let state = position(argv, f"{config.target.block_device},drive=state")
+    assert root >= 0 and state >= 0
+    if host[1] == "aarch64" { assert state < root } else { assert root < state }
+  }
+}
+
 test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
   let config = fixture_qemu("Linux", "x86_64")?
   let input = qemu.QemuAsterinasReference(
