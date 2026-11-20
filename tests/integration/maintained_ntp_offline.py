@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Prove ntpd-rs reaches initialization readiness on a maintained guest with no NTS route.
 
-The guest boots the qemu-maintained bundle on a tap that has no DHCP server, so
-eth0 carries no address, default route, or resolver and none of the configured
+The guest boots the qemu-maintained bundle on an isolated link with no DHCP server:
+a tap on Linux and a socket on macOS. eth0 carries no address, default route, or
+resolver and none of the configured
 NTS-KE servers can be reached. The state disk mirrors the G2 activation drill's
 provisioning, including the service state directory that drill creates. The
 daemon must report readiness while unsynchronized (stratum 16) and stay up for
