@@ -22,9 +22,15 @@ then `virtio-gpu-gl-pci` as the render device. QEMU's `screendump` returns
 split keeps both the guest's OpenGL 4.3 context and the host pixel proof.
 
 For aarch64, `qemu-maintained` is the profile proof target. The
-`qemu-tinyland-ghostty` graph includes x86_64-only Play. The
-`qemu-self-hosting` graph resolves on aarch64. Its 12 GiB memory request uses
-the HVF target's high memory address space; the aarch64 proof remains unqualified.
+`qemu-tinyland-ghostty` graph includes x86_64-only Play. On 2026-11-20 on an
+M1 Max under HVF (QEMU 11.1), `maintained_guest.py --proof`,
+`maintained_ntp_offline.py` and `make installer-qemu-test ARCH=aarch64`
+passed against the aarch64 world, and a guest `perf record` took 17,610
+`task-clock` samples; HVF exposes the `armv8_pmuv3` driver but hardware cycle
+sampling was not established. On macOS the drivers format state images in
+package-tools and give the offline guest a socket link with no peer instead of a
+tap. The `qemu-self-hosting` graph resolves on aarch64 and its 12 GiB request
+uses the HVF target's high memory; its build proof remains unqualified there.
 
 ## Host requirements
 

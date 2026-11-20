@@ -27,20 +27,11 @@ accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
 
-### LAP-6 · P2 · Boot the aarch64 world in a guest
-
-- **Area:** Tests
-- **Where:** `docs/TESTING.md:45`, `system/qemu.xsh`, `docs/QEMU.md`
-- **Problem:** The completed x86_64 bootstrap changed shared PM, musl, headers, installer and profile paths. The aarch64 world now builds clean: on 2026-11-20 `make build ARCH=aarch64` on m1-max (OrbStack, linux/arm64) against the published aarch64 images produced all 87 artifacts and passed every package proof, after the libcap proof skipped its loader-started check on aarch64 (`ab7b6cde`; musl's loader SIGBUSes starting an executable shared object with a C entry) and the arm64 Kbuild plan stopped carrying the EFI stub objects its final link builds (`cf2bb1b1`). No aarch64 guest has booted that world, so the installer and profile paths are unproven there.
-- **Recommendation:** Boot the aarch64 world's installer and profile proofs in an aarch64 guest with hardware acceleration (KVM on Linux aarch64, or HVF on macOS aarch64, which `system/qemu.xsh` supports) and fix what fails. Acceptance: the installer and profile proofs pass on aarch64.
-- **Fix with:** root-cause
-- **Effort:** M
-
 ### LAP-47 · P2 · Complete ntpd-rs qualification and clock bootstrap policy
 
 - **Area:** Time discipline
 - **Where:** `ntpd-rs/`, imported from the `laputa-systems/ntpd-rs` fork at `910ecd0`, `2.0.0-alpha.20260715`
-- **Problem:** aarch64 runtime qualification of the maintained NTS clock remains unproven; the x86_64 profile is qualified (see Progress). The aarch64 package builds and passes its package proof (m1-max, 2026-11-20); only the guest cases remain.
+- **Problem:** aarch64 runtime qualification of the maintained NTS clock is partial: on 2026-11-20 `maintained_ntp_offline.py` passed on an aarch64 HVF guest (m1-max; ready at stratum 16 and stable for 121 s), and the x86_64 profile is qualified (see Progress). `maintained_ntp.py` against real NTS operators and the controlled clock-discipline guest (`tests/integration/ntp-clock-guest.sh`, `seed/self_hosting_profile.xsh:9` and `tests/integration/fixtures/ntp-clock-guest.xsh:50` hard-code x86_64) have not run on aarch64.
 - **Recommendation:** Qualify the remaining cases in disposable guests before enabling an authenticated production configuration. Never alter the host clock. Cold boot requires trustworthy RTC or operator-set time; preserve TLS and snapshot expiry verification.
 - **Fix with:** reference-parity
 - **Effort:** M
@@ -79,14 +70,6 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** M
 - **Blocked:** Needs an aarch64 Linux host with KVM (owner ruling 2026-11-20: aarch64 builds run on the m1-max Mac; guest proofs need such a host).
-### LAP-17 · P3 · Check aarch64 perf event recording in a guest
-
-- **Area:** Kernel
-- **Where:** `packages/linux/files/config/aarch64/base-aarch64.fragment`
-- **Problem:** The aarch64 kernel now enables PERF_EVENTS with the symbols upstream `olddefconfig` resolves for it (HW_PERF_EVENTS, ARM_PMU, ARM_PMUV3, ARM64_BRBE and the rest), and `packages/linux/check_config.xsh` reports no drift for either architecture. Recording has not been observed on an aarch64 guest.
-- **Recommendation:** Boot the aarch64 profile on a native aarch64 KVM host and record a `perf` sample. Acceptance: `perf record` and `perf report` show samples from a workload in the guest.
-- **Fix with:** reference-parity
-- **Effort:** S
 - **Acceptance:** No package's installed ELF files carry a libgcc_s NEEDED entry or a GCC runtime import, the PM ELF check reports no gnu-stubs provider, and Rust packages still build and pass their proofs with the source-built toolchain.
 - **Parked:** The prebuilt `cargo`, `rustdoc`, `librustc_driver`, `libstd`, `rust-lld` and helper tools import libgcc_s; `rustc` does not. A source-built `cargo` needs an OpenSSL-compatible TLS library for curl, libgit2 and libssh2, and Laputa ships none: the routes are curl's rustls backend (needs `rustls-ffi`, which the rust source does not vendor, and drops ssh git), AWS-LC through `openssl-sys`, or a `cargo` without network TLS. Each adds work or a native dependency the owner does not want now, so gnu-stubs stays. The prebuilt 1.99.0 works as stage0 and Laputa's LLVM 23.1.5 as the external LLVM. The cargo proof skips its runtime check when `libgcc_s.so.1` is absent, so it must become a real run once gnu-stubs leaves its closure.
 
