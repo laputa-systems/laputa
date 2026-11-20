@@ -27,12 +27,12 @@ accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
 
-### LAP-47 · P2 · Complete ntpd-rs qualification and clock bootstrap policy
+### LAP-47 · P2 · Run the controlled ntpd-rs clock-discipline guest on aarch64
 
 - **Area:** Time discipline
 - **Where:** `ntpd-rs/`, imported from the `laputa-systems/ntpd-rs` fork at `910ecd0`, `2.0.0-alpha.20260715`
-- **Problem:** aarch64 runtime qualification of the maintained NTS clock is partial: on 2026-11-20 `maintained_ntp_offline.py` passed on an aarch64 HVF guest (m1-max; ready at stratum 16 and stable for 121 s), and the x86_64 profile is qualified (see Progress). `maintained_ntp.py` against real NTS operators and the controlled clock-discipline guest (`tests/integration/ntp-clock-guest.sh`, `seed/self_hosting_profile.xsh:9` and `tests/integration/fixtures/ntp-clock-guest.xsh:50` hard-code x86_64) have not run on aarch64.
-- **Recommendation:** Qualify the remaining cases in disposable guests before enabling an authenticated production configuration. Never alter the host clock. Cold boot requires trustworthy RTC or operator-set time; preserve TLS and snapshot expiry verification.
+- **Problem:** On 2026-11-20 the aarch64 maintained clock passed under HVF on m1-max: `maintained_ntp_offline.py` (ready at stratum 16, stable 121 s) and `maintained_ntp.py` against real NTS operators (`PASS maintained clock: sync` at stratum 2 via time.cloudflare.com, nts.netnod.se and nts.time.nl, then `PASS maintained clock: offline`, largest sample change 1 ms). The x86_64 profile is qualified (see Progress). The controlled clock-discipline guest has not run on aarch64: `tests/integration/ntp-clock-guest.sh:42` builds its guest with a pinned Rust toolchain for `x86_64-unknown-linux-musl`, `seed/self_hosting_profile.xsh:9` hard-codes x86_64, and `tests/integration/fixtures/ntp-clock-guest.xsh:50` asserts x86 CPU features; the Mac has only `aarch64-apple-darwin` Rust targets and its self-hosting bundle lacks ntpd-rs and ca-certificates.
+- **Recommendation:** Make the clock-discipline runner build its guest for the host architecture inside the package-tools container (as the aarch64 world build does) instead of with a host Rust toolchain, make the fixture's CPU-feature assertion architecture-aware, and run it under HVF. Never alter the host clock. Acceptance: the clock-discipline guest case passes on an aarch64 guest.
 - **Fix with:** reference-parity
 - **Effort:** M
 ### LAP-63 · P2 · Capture timing anchors for the package and system journeys
