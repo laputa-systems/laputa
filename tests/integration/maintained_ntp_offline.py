@@ -13,6 +13,7 @@ import argparse
 import os
 import pathlib
 import shutil
+import socket
 import sys
 import time
 import traceback
@@ -197,7 +198,7 @@ def run(args):
     (SCRATCH_ROOT / "tmp").mkdir(parents=True, exist_ok=True)
     scratch = pathlib.Path(__import__("tempfile").mkdtemp(prefix="ntp-offline.", dir=SCRATCH_ROOT))
     dl.log(f"scratch {scratch}")
-    guest = errlog = qmp = agent = tap_fd = None
+    guest = errlog = qmp = agent = tap_fd = offline_peer = None
     try:
         if sys.platform != "darwin":
             tap_fd = dl.create_tap(args, "otap0", "192.0.3.1")
@@ -213,7 +214,10 @@ def run(args):
             for index, value in enumerate(argv):
                 if value.startswith("if=none,id=state,"):
                     argv[index] = f"if=none,id=state,format=raw,file={state}"
-            argv[argv.index("-netdev") + 1] = "socket,id=net0,udp=127.0.0.1:9,localaddr=127.0.0.1:0"
+            offline_peer = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            offline_peer.bind(("127.0.0.1", 0))
+            port = offline_peer.getsockname()[1]
+            argv[argv.index("-netdev") + 1] = f"socket,id=net0,udp=127.0.0.1:{port},localaddr=127.0.0.1:0"
             argv[argv.index("-serial") + 1] = f"file:{console}"
             argv[argv.index("-qmp") + 1] = f"unix:{qmp_path},server=on,wait=off"
             append = argv.index("-append") + 1
@@ -253,6 +257,8 @@ def run(args):
             agent.close()
         if tap_fd is not None:
             os.close(tap_fd)
+        if offline_peer is not None:
+            offline_peer.close()
         if not args.keep:
             shutil.rmtree(scratch, ignore_errors=True)
         else:
