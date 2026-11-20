@@ -46,15 +46,14 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Recommendation:** On a quiet host, run `bench/capture.sh` as docs/TESTING.md describes and commit the anchors with their provenance. Acceptance: both workloads report within budget against committed anchors on a ready host.
 - **Fix with:** bench-pyramid
 - **Effort:** S (hours)
-### LAP-65 · P2 · Strengthen gluon benchmark oracles
+### LAP-65 · P3 · Revendor gluon with its checked benchmark and capture its anchor
 
 - **Area:** Performance
-- **Where:** `gluon/tests/benchmarks/run.sh`
-- **Problem:** The corpus is synthetic, tolerates failed commands and does not bracket each measurement with readiness checks or compare an accepted anchor.
-- **Recommendation:** Exercise real projects with checked outputs and paired, readiness-qualified comparisons. Acceptance: incomplete work fails and a reproducible baseline detects regressions.
-- **Fix with:** refactor-benchmarks, benchmark-checklist
-- **Effort:** M (days)
-
+- **Where:** `gluon/` (vendored at `95bdcf5`), upstream `tests/benchmarks/libdrm.py`
+- **Problem:** Upstream gluon `ba818ba` (laputa-systems/gluon#57) adds a real-project benchmark: libdrm 2.4.134, pinned by SHA-256, built by the pinned reference meson/ninja and by gluon with matching outputs and command counts, readiness-bracketed, with anchor verdicts. Its anchor is not captured (the host was busy on 2026-11-20), and Laputa still vendors `95bdcf5`, whose synthetic corpus tolerated failures.
+- **Recommendation:** Revendor gluon at or after `ba818ba` with the usual package qualification, and capture the libdrm anchor on a quiet host as upstream `docs/benchmarks.md` describes. Acceptance: Laputa's vendored gluon includes the libdrm workload and upstream records an anchor that a run on a ready host reports within budget.
+- **Fix with:** benchmark-checklist
+- **Effort:** S (hours)
 ### LAP-6 · P2 · Verify shared bootstrap changes on aarch64
 
 - **Area:** Tests
