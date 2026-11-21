@@ -25,9 +25,11 @@ sudo usermod -aG docker "$USER"   # then log in again
 The image builds read the `TARGETARCH` that BuildKit sets, so Docker's legacy
 builder cannot build them.
 
-`make test` runs on the host. A few PM tests also need host `cargo`,
+`make test` runs on the host. A few tests also need host `cargo`,
 `python3` or a `readelf`, and skip with the missing tool named when it is
-absent; `sudo apt-get install cargo python3 binutils` runs them too. You don't need a Rust toolchain or a pre-built XSH. `make
+absent; `sudo apt-get install cargo python3 binutils` runs them too. Run as
+root, the three tests that make a directory read-only skip, because root
+writes through it. You don't need a Rust toolchain or a pre-built XSH. `make
 host-xsh` builds static XSH binaries and `make mirror` builds the mirror, both
 in XSH's own build image.
 

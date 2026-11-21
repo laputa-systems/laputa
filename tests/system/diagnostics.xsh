@@ -229,6 +229,10 @@ test test_absent_events_create_fresh_history [fs, process, net, error] { |ctx|
 }
 
 test test_failed_event_write_preserves_the_existing_path [fs, process, net, error] { |ctx|
+  guard unix.id()?.euid != 0 else {
+    test.skip("root writes through the read-only directory mode this test relies on")
+    return
+  }
   let root = test.temp_dir(ctx, name: "diagnostics-write-failure")?
   seed_sources(root)
   let store = fp"{root}/store"
