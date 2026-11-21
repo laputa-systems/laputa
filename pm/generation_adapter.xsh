@@ -261,14 +261,3 @@ export proc generation_adapter_execute_profile(
   generation_adapter_require_no_forbidden_packages(receipt, forbidden_packages)
   {generation_root: fp"{output_parent}/{receipt.generation_sha256}"}
 }
-
-## Projects a saved BuildPlan to a generation-plan DTO without executing package artifacts.
-export proc generation_adapter_plan_profile(
-  build_plan_path: Path,
-  runtime_roots: List[Str],
-  profile_name: Str,
-  overlay_root: Path,
-  generation_plan_output: Path,
-) [fs, error] {
-  let _ = generation_adapter_plan(build_plan_path, runtime_roots, profile_name, overlay_root, generation_plan_output)?
-}

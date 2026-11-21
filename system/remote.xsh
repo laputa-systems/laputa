@@ -20,9 +20,6 @@ export type RemoteTarget = {
 
 ## The remote protocol version the guest program speaks.
 export const REMOTE_PROTOCOL = "laputa-remote-1"
-## The largest remote reply the client accepts.
-export const REMOTE_REPLY_LIMIT = 4194304
-
 ## Reads the reviewed remote program from a Laputa checkout.
 export proc remote_program(root: Path) [fs, error] -> Result[Str, Error] {
   fp"{root}/system/remote_guest.xsh".read_text()?

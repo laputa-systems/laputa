@@ -60,14 +60,6 @@ export proc from_packages(
   make_catalog(root, packages, remote_names)?
 }
 
-## Revalidates a catalog after supplying names available from the selected remote snapshot.
-export proc with_remote_names(
-  value: types.PackageCatalog,
-  remote_names: List[Str],
-) [error] -> Result[types.PackageCatalog, Error] {
-  make_catalog(value.root, value.packages, value.remote_names.extend(remote_names))?
-}
-
 ## Returns the catalog package names in canonical lexical order.
 export pure package_names(value: types.PackageCatalog) -> List[Str] {
   [pkg.name for pkg in value.packages]

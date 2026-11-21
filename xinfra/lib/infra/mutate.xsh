@@ -12,8 +12,6 @@ use infra.probe
 use infra.scripts
 use infra.transport
 
-const nul = "\0"
-
 pure failure(phase: outcome.Phase, message: Str, applied: Bool) -> outcome.StepError {
   if applied { outcome.StepError.Partial(phase, message) } else { outcome.StepError.Failed(phase, message) }
 }

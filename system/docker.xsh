@@ -117,11 +117,6 @@ export pure docker_pm_plan_argv(profile: types.SystemProfile, arch: Str) -> List
   argv
 }
 
-## Construct the complete native-platform Docker invocation for a profile BuildPlan without encoding a second package closure.
-export pure docker_plan_command_argv(value: DockerConfig, profile: types.SystemProfile) -> List[Str] {
-  docker_pm_plan_argv(profile, value.arch) |> docker_command_argv(value, _)
-}
-
 ## Construct the typed in-container generation-plan projection without executing or composing artifacts.
 export pure docker_generation_plan_argv(profile: types.SystemProfile) -> List[Str] {
   [

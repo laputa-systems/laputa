@@ -497,7 +497,7 @@ BENCH_XSHT ?= $(BENCH_BIN_DIR)/xsht
 TIER ?= change
 FULL ?= 0
 
-.PHONY: bench bench-check bench-list bench-help
+.PHONY: bench bench-check bench-list
 bench:
 	@test -x "$(BENCH_XSH)" || { printf '%s\n' "preflight: missing verification xsh $(BENCH_XSH); set XSH_ROOT= to the XSH checkout with built verification binaries; affected: selected workloads; nothing ran" >&2; exit 1; }
 	@BENCH_XSH_ROOT="$(BENCH_XSH_ROOT)" BENCH_XSH="$(BENCH_XSH)" BENCH_XSHT="$(BENCH_XSHT)" XSH_MODULE_PATH="$(CURDIR):$(BENCH_XSH_ROOT)/core" "$(BENCH_XSH)" bench/bench.xsh -- $(if $(filter 1,$(DRY_RUN)),dry,run) "$(TIER)" "$(WORKLOADS)" "$(AREAS)" "$(SKIP)" "$(FULL)" "$(BENCH_XSHT)"
@@ -507,5 +507,3 @@ bench-check:
 bench-list:
 	@test -x "$(BENCH_XSH)" || { printf '%s\n' "preflight: missing verification xsh $(BENCH_XSH); set XSH_ROOT= to the XSH checkout with built verification binaries; affected: registry; nothing ran" >&2; exit 1; }
 	@BENCH_XSH_ROOT="$(BENCH_XSH_ROOT)" BENCH_XSH="$(BENCH_XSH)" BENCH_XSHT="$(BENCH_XSHT)" XSH_MODULE_PATH="$(CURDIR):$(BENCH_XSH_ROOT)/core" "$(BENCH_XSH)" bench/bench.xsh -- list "$(TIER)" "" "" "" "$(FULL)" "$(BENCH_XSHT)"
-bench-help:
-	@printf '%s\n' 'bench: TIER=edit|change|scenario|full WORKLOADS="names" AREAS="areas" SKIP="names" DRY_RUN=1; full requires FULL=1 and explicit authorization' 'bench-check: preflight; bench-list: workloads'

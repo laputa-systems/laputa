@@ -61,11 +61,3 @@ export pure proof_input_mode_text(mode: ProofInputMode) -> Str {
     ProofModifiers => "modifiers"
   }
 }
-
-## Render a QEMU execution mode for diagnostics and persisted command records.
-export pure qemu_mode_text(mode: QemuMode) -> Str {
-  match mode {
-    Test => "test"
-    Interactive => "interactive"
-  }
-}

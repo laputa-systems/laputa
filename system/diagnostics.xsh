@@ -14,9 +14,6 @@
 
 use lib.syslog_kmsg as kmsg
 
-## The store and bundle format.
-## Version of the diagnostics store format.
-export const DIAGNOSTICS_FORMAT = "laputa-diagnostics-1"
 ## Version of one persisted event record.
 export const DIAGNOSTICS_EVENT_FORMAT = "laputa-diagnostics-event-1"
 ## Version of the support-bundle manifest.
@@ -35,8 +32,6 @@ export const BOOT_HISTORY_NAME = "boot-history.json"
 export const LEASE_NAME = "lease.json"
 ## Published support-bundle file name.
 export const BUNDLE_NAME = "support.tar.gz"
-## Exclusive collector lock file name.
-export const LOCK_NAME = ".lock"
 ## Support-bundle staging directory name.
 export const STAGING_NAME = ".bundle"
 
@@ -143,9 +138,6 @@ export type ReportOutcome = {file: ReportFile?, degraded: List[Str]}
 
 ## Kernel records from one bounded ring read.
 export type KernelRead = {events: List[DiagnosticEvent], degraded: List[Str], overruns: Int, malformed: Int}
-
-## One support-bundle file in the manifest.
-export type ManifestFile = {name: Str, bytes: Int, sha256: Str}
 
 ## What a support bundle contains.
 export type BundleResult = {

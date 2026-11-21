@@ -285,9 +285,6 @@ export type SourceChecksum = {arch: Str, sha256: Str}
 ## An upstream source and the architectures it serves.
 export type UpstreamSource = {source: Path, kind: SourceKind, architectures: List[Str], checksums: List[SourceChecksum]}
 
-## A stable package tuple used by plans and artifact identities.
-export type PackageId = {name: Str, ver: Str, rel: Str}
-
 ## A typed directional dependency in a resolved package graph.
 export type DependencyEdge = {from: Str, to: Str, kind: DependencyKind}
 
@@ -538,16 +535,6 @@ export type BuiltPackage = {
   etcsums: List[EtcSum],
   metadata_sha256: Str,
   metadata_files: List[ArtifactEntry],
-}
-
-## The compact package-index representation.
-export type PackageIndex = {
-  name: Str,
-  ver: Str,
-  rel: Str,
-  deps: List[Str],
-  mkdeps_host: List[Str],
-  mkdeps_target: List[Str],
 }
 
 ## A package advertised by a remote repository.

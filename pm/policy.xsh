@@ -61,11 +61,6 @@ export pure closed_build_confinement(scratch: Path) -> types.BuildConfinement {
   }
 }
 
-## Returns a copy of a policy configured for native or cross build graph resolution.
-export pure with_native_build(value: types.BuildPolicy, native_build: Bool) -> types.BuildPolicy {
-  {...value, native_build}
-}
-
 ## Returns whether a policy seed rule applies for one package dependency pair.
 export pure is_bootstrap_dependency(value: types.BuildPolicy, package: Str, dependency: Str) -> Bool {
   for rule in value.bootstrap_seeds {
@@ -75,17 +70,4 @@ export pure is_bootstrap_dependency(value: types.BuildPolicy, package: Str, depe
   }
 
   false
-}
-
-## Returns the policy-defined bootstrap dependencies for one package in declaration order.
-export pure bootstrap_dependencies(value: types.BuildPolicy, package: Str) -> List[Str] {
-  var dependencies = []
-
-  for rule in value.bootstrap_seeds {
-    if rule.package == package and (! rule.native_only or value.native_build) and rule.dependency not in dependencies {
-      dependencies += [rule.dependency]
-    }
-  }
-
-  dependencies
 }

@@ -24,18 +24,6 @@ proc fail_phase(phase: Str, message: Str) [fs, error] {
   return Err(GuestTrustError.Failed(phase:, message:))
 }
 
-proc wait_for(path_value: Path, phase: Str, seconds: Int) [fs, time, error] {
-  var elapsed = 0
-  while ! path_value.exists()? {
-    guard elapsed < seconds else {
-      return fail_phase(phase, f"missing {path_value.display()} after {seconds}s")
-    }
-
-    time.sleep(1s)?
-    elapsed += 1
-  }
-}
-
 proc insmod_one(name: Str, phase: Str) [fs, process, error] {
   match linux.insmod(fp"/lib/modules/{name}.ko") {
     Ok(_) => {},

@@ -11,26 +11,6 @@ export pure image_root_partuuid() -> Str {
   "33333333-3333-3333-3333-333333333333"
 }
 
-## Parse a byte count or a whole-MiB string without accepting ambiguous units.
-export proc parse_size_bytes(value: Str) [error] -> Result[Int, Error] {
-  let trimmed = value.trim()
-  if trimmed.ends_with("M") {
-    let mebibytes = trimmed.replace("M", with: "") as Int
-    if mebibytes <= 0 {
-      return Err(ImageError.Failed(f"image size must be positive: {value}"))
-    }
-
-    return mebibytes * 1024 * 1024
-  }
-
-  let byte_count = trimmed as Int
-  if byte_count <= 0 {
-    return Err(ImageError.Failed(f"image size must be positive: {value}"))
-  }
-
-  byte_count
-}
-
 ## Calculate a graphical rootfs size from used bytes, rounded to MiB with a 256-MiB floor.
 export pure rootfs_size_bytes(used_bytes: Int) -> Int {
   let raw = used_bytes + used_bytes / 4 + 64MiB
@@ -71,20 +51,6 @@ export proc image_kernel_source(root: Path, kernel_path: Path) [fs, error] -> Re
   }
 
   source
-}
-
-## Atomically copy one manifest-verified kernel to its profile-owned host output path.
-export proc image_copy_kernel(source: Path, output: Path) [fs, error] {
-  output.parent.mkdir()
-  atomically replace output as temporary {
-    source.copy(to: temporary)
-
-    if hash.sha256(source)?.hex() != hash.sha256(temporary)?.hex() {
-      return Err(ImageError.Failed(f"kernel copy does not match {source}"))
-    }
-
-    fs.fsync(temporary)
-  }
 }
 
 ## Build an ext4 root filesystem from an immutable generation through the native XSH formatter and publish it only after validation.

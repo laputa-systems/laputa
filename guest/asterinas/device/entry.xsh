@@ -1,13 +1,10 @@
 #!/bin/xsh --
-const case_dir = p"/usr/lib/asterinas/case"
 const probe = p"/usr/lib/asterinas/case/device-probe"
 const disk_group = 9
 const disk_mode = 0o660
 const memory_mode = 0o666
 
 error DeviceCaseError = Failed(message: Str)
-
-type Node = {name: Str, kind: Str, mode: Int, owner: Int, group: Int}
 
 proc require(condition: Bool, message: Str) [error] {
   guard condition else {

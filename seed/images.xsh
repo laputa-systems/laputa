@@ -85,11 +85,6 @@ export proc llvm_seed_sha256(laputa_root: Path, arch: Str) [fs, env, error] -> R
   pm_sources.source_checksum(pkg.upstream_sources[0], arch)?
 }
 
-## The fetched LLVM seed archive in the content-addressed source cache.
-export proc llvm_seed_source(laputa_root: Path, arch: Str) [fs, env, error] -> Result[Path, Error] {
-  fp"{laputa_root}/.cache/sources/sha256/{llvm_seed_sha256(laputa_root, arch)?}"
-}
-
 ## The content key for package-tools: its Dockerfile, the LLVM bootstrap helper and recipe, and the base digest.
 ## XSH and PM only run the bootstrap helper; like artifact keys, the key records neither.
 export proc package_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str, Error] {
