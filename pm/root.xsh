@@ -1,4 +1,5 @@
 ##! Deterministic immutable root plans composed only from verified artifact-store receipts.
+use pm.digest as pm_digest
 use confined
 use store as artifact_store
 use types
@@ -51,12 +52,8 @@ type DecodedArtifactMetadata = {kind: types.PackageKind, entries: List[types.Art
 
 type RootOwnership = {plan: types.RootPlan, artifact_entries: Map[List[types.RootEntry]]}
 
-pure root_sha256_text_is_valid(value: Str) -> Bool {
-  value.count_chars() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
-}
-
 proc root_require_sha256(value: Str, label: Str) [error] {
-  guard root_sha256_text_is_valid(value) else {
+  guard pm_digest.digest_is_sha256(value) else {
     return Err(types.PmError.PackageContract(f"{label} must be a lowercase SHA-256 digest"))
   }
 }
@@ -74,28 +71,12 @@ proc root_require_relative_path(value: Str, label: Str) {
 }
 
 proc root_validate_symlink_target(path_value: Str, target: Str) [error] {
-  if target == "" or target.starts_with("/") {
+  let result = util.pm_symlink_target_check(path_value, target, reject_empty: true)
+  if result == util.PmSymlinkInvalid {
     return Err(types.PmError.PackageContract(f"symlink {path_value} has an invalid target {target}"))
   }
-
-  var depth = path_value.split("/").len() - 1
-
-  for component in target.split("/") {
-    if component == "" {
-      return Err(types.PmError.PackageContract(f"symlink {path_value} has an invalid target {target}"))
-    }
-
-    continue when component == "."
-
-    if component == ".." {
-      if depth == 0 {
-        return Err(types.PmError.PackageContract(f"symlink {path_value} escapes the root: {target}"))
-      }
-
-      depth -= 1
-    } else {
-      depth += 1
-    }
+  if result == util.PmSymlinkEscape {
+    return Err(types.PmError.PackageContract(f"symlink {path_value} escapes the root: {target}"))
   }
 }
 

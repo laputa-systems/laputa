@@ -122,22 +122,13 @@ export proc package_tools_image(laputa_root: Path, value: xsh_seed.SeedArch) [fs
   f"oci.17166969.xyz/laputa-package-tools@{digest}"
 }
 
-proc quiet_status(docker: Path, argv: List[Str], cwd: Path) -> Result[Bool] {
-  let handle = fs.tempdir()?
-  let quiet = fp"{handle.host_path()?}/output"
-  let status = process.run(process.command_argv(docker, argv, cwd, stdout: quiet, stderr: quiet))?
-  status.ok
-}
-
 ## Report whether a local image tag exists.
 export proc image_exists(docker: Path, tag: Str, cwd: Path) [fs, process, error] -> Result[Bool, Error] {
-  quiet_status(docker, [docker.display(), "image", "inspect", tag], cwd)?
+  xsh_seed.xsh_seed_image_exists(docker, tag, cwd)?
 }
 
 proc docker_step(docker: Path, argv: List[Str], cwd: Path, what: Str) {
-  let status = process.run(process.command_argv(docker, argv, cwd))?
-
-  return Err(SeedImageError.Failed(f"{what} failed")) unless status.ok
+  return Err(SeedImageError.Failed(f"{what} failed")) unless xsh_seed.xsh_seed_command_ok(docker, argv, cwd)?
 }
 
 ## Fetch the published base by digest.

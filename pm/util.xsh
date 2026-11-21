@@ -365,3 +365,40 @@ export proc normalize_checkout_tree(root: Path) [fs, error] {
     entry.path.chmod(checkout_mode(entry.kind, entry.path.metadata()?.mode))
   }
 }
+
+## Sort package names and remove duplicates.
+export pure pm_sorted_unique_names(names: List[Str]) -> List[Str] {
+  var seen: Map[Bool] = {}
+  let unique: List[Str] = collect {
+    for name in names |> sort {
+      if ! (seen.get(name) ?? false) {
+        yield name
+        seen[name] = true
+      }
+    }
+  }
+  unique
+}
+
+## Result of validating a relative symlink target.
+export enum PmSymlinkTarget { PmSymlinkValid, PmSymlinkInvalid, PmSymlinkEscape }
+
+## Walk a symlink target, optionally rejecting empty path components.
+export pure pm_symlink_target_check(path_value: Str, target: Str, reject_empty: Bool) -> PmSymlinkTarget {
+  return PmSymlinkInvalid when target == "" or target.starts_with("/")
+  var depth = path_value.split("/").len() - 1
+  for component in target.split("/") {
+    if component == "" {
+      return PmSymlinkInvalid when reject_empty
+      continue
+    }
+    continue when component == "."
+    if component == ".." {
+      return PmSymlinkEscape when depth == 0
+      depth -= 1
+    } else {
+      depth += 1
+    }
+  }
+  PmSymlinkValid
+}

@@ -1,4 +1,5 @@
 ##! Verifies signed certificate releases for atomic trust activation.
+use pm.digest as pm_digest
 use trust.policy
 
 ## Exact release inputs captured from the source and installed-policy snapshots.
@@ -45,10 +46,6 @@ proc release_require(condition: Bool, message: Str) [error] {
   }
 }
 
-pure release_sha256_is_valid(value: Str) -> Bool {
-  value.byte_len() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
-}
-
 ## Parses one exact signed-release metadata document.
 export proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMetadata, Error] {
   release_require(! message.is_empty() and message.len() <= MAX_METADATA_BYTES, "signed metadata size is invalid")
@@ -77,13 +74,13 @@ export proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMeta
 
   let root_digest_fields = lines[4].split(" ")
   release_require(
-    root_digest_fields.len() == 2 and root_digest_fields[0] == "root-bundle-sha256" and release_sha256_is_valid(root_digest_fields[1]),
+    root_digest_fields.len() == 2 and root_digest_fields[0] == "root-bundle-sha256" and pm_digest.digest_is_sha256(root_digest_fields[1]),
     "signed metadata root bundle digest is invalid",
   )
 
   let policy_digest_fields = lines[5].split(" ")
   release_require(
-    policy_digest_fields.len() == 2 and policy_digest_fields[0] == "trust-policy-sha256" and release_sha256_is_valid(policy_digest_fields[1]),
+    policy_digest_fields.len() == 2 and policy_digest_fields[0] == "trust-policy-sha256" and pm_digest.digest_is_sha256(policy_digest_fields[1]),
     "signed metadata trust policy digest is invalid",
   )
 

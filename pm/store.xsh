@@ -1,4 +1,5 @@
 ##! Immutable package artifacts addressed by semantic SHA-256 keys; finals appear only after a temporary-directory rename, and XSH reserves standard `path`, so exports use `artifact_path`.
+use pm.digest as pm_digest
 use confined
 use local
 use remote
@@ -72,12 +73,8 @@ pure proof_path(dir: Path) -> Path {
   fp"{dir}/proof.json"
 }
 
-pure sha256_text_is_valid(value: Str) -> Bool {
-  value.count_chars() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
-}
-
 proc require_sha256(value: Str, label: Str) [error] {
-  guard sha256_text_is_valid(value) else {
+  guard pm_digest.digest_is_sha256(value) else {
     return Err(types.PmError.PackageContract(f"{label} must be a lowercase SHA-256 digest"))
   }
 }

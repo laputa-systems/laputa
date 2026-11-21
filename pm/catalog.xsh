@@ -3,21 +3,6 @@ use recipe
 use types
 use util
 
-pure sorted_unique_names(names: List[Str]) -> List[Str] {
-  var seen: Map[Bool] = {}
-
-  let unique: List[Str] = collect {
-    for name in names |> sort {
-      if ! (seen.get(name) ?? false) {
-        yield name
-        seen[name] = true
-      }
-    }
-  }
-
-  unique
-}
-
 pure package_dependencies(pkg: types.Package) -> List[Str] {
   [@pkg.deps, @pkg.runtime_only_deps, @pkg.mkdeps_host, @pkg.mkdeps_target, @pkg.proof_deps]
 }
@@ -28,7 +13,7 @@ proc make_catalog(
   remote_names: List[Str],
 ) [error] -> Result[types.PackageCatalog] {
   let sorted_packages = packages |> sort-by .name
-  let available_remote_names = sorted_unique_names(remote_names)
+  let available_remote_names = util.pm_sorted_unique_names(remote_names)
   var local_names: Set[Str] = set.empty()
   var available_names: Map[Bool] = {name: true for name in available_remote_names}
   for pkg in sorted_packages {

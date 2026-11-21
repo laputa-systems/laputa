@@ -170,13 +170,18 @@ export pure xsh_seed_cargo_fetch_argv(docker: Path, image: Str, laputa_root: Pat
   ]
 }
 
-proc xsh_seed_run(docker: Path, argv: List[Str], cwd: Path, what: Str) {
+## Run a seed command and report its exit status to the owning boundary.
+export proc xsh_seed_command_ok(docker: Path, argv: List[Str], cwd: Path) [fs, process, error] -> Result[Bool, Error] {
   let status = process.run(process.command_argv(docker, argv, cwd))?
-
-  return Err(SeedError.Failed(f"{what} failed")) unless status.ok
+  status.ok
 }
 
-proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) -> Result[Bool] {
+proc xsh_seed_run(docker: Path, argv: List[Str], cwd: Path, what: Str) {
+  return Err(SeedError.Failed(f"{what} failed")) unless xsh_seed_command_ok(docker, argv, cwd)?
+}
+
+## Report whether a local Docker image exists.
+export proc xsh_seed_image_exists(docker: Path, image: Str, cwd: Path) [fs, process, error] -> Result[Bool, Error] {
   let handle = fs.tempdir()?
   let quiet = fp"{handle.host_path()?}/inspect"
   let status = process.run(

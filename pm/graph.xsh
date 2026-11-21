@@ -1,21 +1,7 @@
 ##! Deterministic typed dependency graph resolution.
 use policy
 use types
-
-pure graph_sorted_unique_names(names: List[Str]) -> List[Str] {
-  var seen: Map[Bool] = {}
-
-  let unique: List[Str] = collect {
-    for name in names |> sort {
-      if ! (seen.get(name) ?? false) {
-        yield name
-        seen[name] = true
-      }
-    }
-  }
-
-  unique
-}
+use util
 
 pure kind_is_selected(kind: types.DependencyKind, kinds: List[types.DependencyKind]) -> Bool {
   kind in kinds
@@ -86,7 +72,7 @@ pure selected_edges(
 }
 
 pure direct_dependencies(name: Str, dependency_edges: List[types.DependencyEdge]) -> List[Str] {
-  graph_sorted_unique_names([edge.to for edge in dependency_edges if edge.from == name])
+  util.pm_sorted_unique_names([edge.to for edge in dependency_edges if edge.from == name])
 }
 
 pure index_in_path(trail: List[Str], name: Str) -> Int {
@@ -153,7 +139,7 @@ proc closure_from_edges(
   let local_names = {pkg.name: true for pkg in catalog.packages}
   let remote_names = {name: true for name in catalog.remote_names}
   let kind_edges = selected_edges(dependency_edges, kinds)
-  var pending = graph_sorted_unique_names(roots)
+  var pending = util.pm_sorted_unique_names(roots)
   var included: Map[Bool] = {}
   var index = 0
 
@@ -177,7 +163,7 @@ proc closure_from_edges(
     index += 1
   }
 
-  graph_sorted_unique_names([name for name in pending if included.get(name) ?? false])
+  util.pm_sorted_unique_names([name for name in pending if included.get(name) ?? false])
 }
 
 ## Classifies every declared and policy-seeded dependency edge in a catalog.
@@ -231,7 +217,7 @@ export proc topological_levels(
   selected: List[Str],
   dependency_edges: List[types.DependencyEdge],
 ) [error] -> Result[List[List[Str]], Error] {
-  let selected_names = graph_sorted_unique_names(selected)
+  let selected_names = util.pm_sorted_unique_names(selected)
   let selected_map = {name: true for name in selected_names}
   let local_edges = [
     edge
@@ -332,5 +318,5 @@ export proc packages_buildable_without(
     }
   }
 
-  graph_sorted_unique_names(selected)
+  util.pm_sorted_unique_names(selected)
 }

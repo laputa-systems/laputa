@@ -1,4 +1,5 @@
 ##! Versioned signed repository snapshots binding the exact published index.
+use pm.digest as pm_digest
 use pm.types
 use pm.util
 
@@ -56,10 +57,6 @@ export pure snapshot_u64_is_greater(left: Str, right: Str) -> Bool {
   left.byte_len() > right.byte_len() or (left.byte_len() == right.byte_len() and left > right)
 }
 
-pure snapshot_sha256_is_valid(value: Str) -> Bool {
-  value.byte_len() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
-}
-
 ## Signed indexes must bind every referenced artifact to a digest and a repository-relative path.
 export proc snapshot_validate_index(items: List[types.RemotePackage]) [error] {
   var identities: List[Str] = []
@@ -67,14 +64,14 @@ export proc snapshot_validate_index(items: List[types.RemotePackage]) [error] {
     let identity = f"{item.arch}/{item.name}"
     snapshot_require(identity not in identities, f"signed repository index repeats {identity}")
     identities += [identity]
-    snapshot_require(item.metadata != "" and snapshot_sha256_is_valid(item.metadata_sha256), f"signed repository package {identity} needs an exact metadata digest")
+    snapshot_require(item.metadata != "" and pm_digest.digest_is_sha256(item.metadata_sha256), f"signed repository package {identity} needs an exact metadata digest")
     let _ = util.ensure_relative_path(fp"{item.metadata}", f"signed metadata for {identity}")?
     if ! item.metapackage {
-      snapshot_require(item.tarball != "" and snapshot_sha256_is_valid(item.sha256) and item.size >= 0, f"signed repository package {identity} needs an exact payload digest")
+      snapshot_require(item.tarball != "" and pm_digest.digest_is_sha256(item.sha256) and item.size >= 0, f"signed repository package {identity} needs an exact payload digest")
       let _ = util.ensure_relative_path(fp"{item.tarball}", f"signed payload for {identity}")?
     }
     if item.proof != "" or item.proof_receipt_sha256 != "" {
-      snapshot_require(item.proof != "" and snapshot_sha256_is_valid(item.proof_receipt_sha256), f"signed repository package {identity} needs an exact proof digest")
+      snapshot_require(item.proof != "" and pm_digest.digest_is_sha256(item.proof_receipt_sha256), f"signed repository package {identity} needs an exact proof digest")
       let _ = util.ensure_relative_path(fp"{item.proof}", f"signed proof for {identity}")?
     }
   }
@@ -121,7 +118,7 @@ export proc snapshot_parse_metadata(message: Bytes) [error] -> Result[RepoSnapsh
 
   let digest_fields = lines[4].split(" ")
   snapshot_require(
-    digest_fields.len() == 2 and digest_fields[0] == "index-sha256" and snapshot_sha256_is_valid(digest_fields[1]),
+    digest_fields.len() == 2 and digest_fields[0] == "index-sha256" and pm_digest.digest_is_sha256(digest_fields[1]),
     "signed snapshot metadata index digest is invalid",
   )
 
@@ -249,7 +246,7 @@ export proc snapshot_read_accepted(paths: SnapshotStatePaths) [fs, error] -> Res
     return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
   }
 
-  guard snapshot_u64_text_is_valid(decoded.generation) and snapshot_sha256_is_valid(decoded.index_sha256) and decoded.time_floor > 0 else {
+  guard snapshot_u64_text_is_valid(decoded.generation) and pm_digest.digest_is_sha256(decoded.index_sha256) and decoded.time_floor > 0 else {
     return Err(snapshot_fail("accepted repository snapshot state is corrupt; refusing to validate expiry"))
   }
 
@@ -262,7 +259,7 @@ export proc snapshot_persist_accepted(paths: SnapshotStatePaths, verified: Verif
   let held = fs.lock(fp"{paths.accepted}.lock", shared: false, nonblocking: true)?
   defer fs.unlock(held)
   snapshot_require(
-    snapshot_u64_text_is_valid(verified.generation) and snapshot_sha256_is_valid(verified.index_sha256) and verified.issued_at > 0 and verified.expires_at > verified.issued_at and verified.expires_at - verified.issued_at <= MAX_SNAPSHOT_VALIDITY_SECONDS,
+    snapshot_u64_text_is_valid(verified.generation) and pm_digest.digest_is_sha256(verified.index_sha256) and verified.issued_at > 0 and verified.expires_at > verified.issued_at and verified.expires_at - verified.issued_at <= MAX_SNAPSHOT_VALIDITY_SECONDS,
     "refusing to persist an invalid accepted repository snapshot",
   )
   snapshot_require(verified.verified_at >= verified.issued_at and verified.verified_at < verified.expires_at, "refusing to persist a snapshot outside its verified validity window")

@@ -1,13 +1,10 @@
 ##! Atomic publication of final profile artifacts from container-local Linux staging to the host output bind mount.
+use pm.digest as pm_digest
 ## Publication failures at the local-container to host-output boundary.
 export error ContainerOutputError = Failed : InvalidData
 
 ## One verified file copied into an atomic system bundle.
 export type BundleFile = {name: Str, source: Path}
-
-pure bundle_key_is_valid(value: Str) -> Bool {
-  value.count_chars() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
-}
 
 proc bundle_verify_file(source: Path, output: Path) {
   if ! source.exists() or ! source.is_file() or source.metadata()?.size <= 0 {
@@ -41,7 +38,7 @@ export proc publish_final_file(source: Path, output: Path) [fs, error] {
 ## as `current`. Existing completed bundles are reused only when every file
 ## exactly matches the newly verified local output.
 export proc publish_bundle(output_root: Path, key: Str, files: List[BundleFile]) [fs, error] {
-  guard bundle_key_is_valid(key) else {
+  guard pm_digest.digest_is_sha256(key) else {
     return Err(ContainerOutputError.Failed("system bundle key must be a lowercase SHA-256 digest"))
   }
 

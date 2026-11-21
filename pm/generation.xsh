@@ -1,4 +1,5 @@
 ##! Deterministic runtime-only system generations assembled from verified BuildPlan artifacts.
+use pm.digest as pm_digest
 use confined
 use plan as build_plan
 use root as pm_root
@@ -62,18 +63,10 @@ pure generation_empty_overlay_sha256() -> Str {
   bytes.from_text("format\tlaputa-generation-overlay-1\n").sha256().hex()
 }
 
-pure generation_sha256_text_is_valid(value: Str) -> Bool {
-  value.count_chars() == 64 and value == value.lower() and value.delete("0123456789abcdef") == ""
-}
-
 proc generation_require_sha256(value: Str, label: Str) [error] {
-  guard generation_sha256_text_is_valid(value) else {
+  guard pm_digest.digest_is_sha256(value) else {
     return Err(types.PmError.PackageContract(f"{label} must be a lowercase SHA-256 digest"))
   }
-}
-
-pure generation_canonical_field(value: Str) -> Str {
-  value.replace("\\", with: "\\\\").replace("\t", with: "\\t").replace("\n", with: "\\n")
 }
 
 pure generation_sorted_unique(values: List[Str]) -> List[Str] {
@@ -110,28 +103,12 @@ proc generation_require_overlay_path(value: Str, label: Str) {
 }
 
 proc generation_validate_symlink_target(path_value: Str, target: Str) [error] {
-  if target == "" or target.starts_with("/") {
+  let result = util.pm_symlink_target_check(path_value, target, reject_empty: true)
+  if result == util.PmSymlinkInvalid {
     return Err(types.PmError.PackageContract(f"overlay symlink {path_value} has an invalid target {target}"))
   }
-
-  var depth = path_value.split("/").len() - 1
-
-  for component in target.split("/") {
-    if component == "" {
-      return Err(types.PmError.PackageContract(f"overlay symlink {path_value} has an invalid target {target}"))
-    }
-
-    continue when component == "."
-
-    if component == ".." {
-      if depth == 0 {
-        return Err(types.PmError.PackageContract(f"overlay symlink {path_value} escapes the generation: {target}"))
-      }
-
-      depth -= 1
-    } else {
-      depth += 1
-    }
+  if result == util.PmSymlinkEscape {
+    return Err(types.PmError.PackageContract(f"overlay symlink {path_value} escapes the generation: {target}"))
   }
 }
 
@@ -156,24 +133,24 @@ proc generation_validate_profile(value: types.GenerationProfile) {
 proc generation_digest(value: types.GenerationPlan) [error] -> Result[Str] {
   var lines = [
     "format\tlaputa-generation-fingerprint-1",
-    f"generation-format\t{generation_canonical_field(value.format)}",
+    f"generation-format\t{pm_digest.digest_canonical_field(value.format)}",
     f"target\t{types.target_text(value.target)}",
     f"build-plan\t{value.build_plan_sha256}",
-    f"profile\t{generation_canonical_field(value.profile.name)}",
+    f"profile\t{pm_digest.digest_canonical_field(value.profile.name)}",
     f"overlay\t{value.profile.overlay_sha256}",
   ]
 
   for root in value.runtime_roots {
-    lines += [f"runtime-root\t{generation_canonical_field(root)}"]
+    lines += [f"runtime-root\t{pm_digest.digest_canonical_field(root)}"]
   }
 
   for replacement in value.profile.replacements {
-    lines += [f"replacement\t{generation_canonical_field(replacement)}"]
+    lines += [f"replacement\t{pm_digest.digest_canonical_field(replacement)}"]
   }
 
   for artifact in value.artifacts {
     lines += [
-      f"artifact\t{generation_canonical_field(artifact.package_name)}\t{generation_canonical_field(artifact.package_id)}\t{artifact.artifact_key}",
+      f"artifact\t{pm_digest.digest_canonical_field(artifact.package_name)}\t{pm_digest.digest_canonical_field(artifact.package_id)}\t{artifact.artifact_key}",
     ]
   }
 
@@ -399,13 +376,13 @@ export proc overlay_digest(overlay_root: Path) [fs, error] -> Result[Str, Error]
     let mode = metadata.mode % 4096
 
     if metadata.kind == "file" {
-      lines += [f"file\t{generation_canonical_field(relative)}\t{mode}\t{hash.sha256(entry.path)?.hex()}"]
+      lines += [f"file\t{pm_digest.digest_canonical_field(relative)}\t{mode}\t{hash.sha256(entry.path)?.hex()}"]
     } else if metadata.kind == "dir" {
-      lines += [f"dir\t{generation_canonical_field(relative)}\t{mode}"]
+      lines += [f"dir\t{pm_digest.digest_canonical_field(relative)}\t{mode}"]
     } else if metadata.kind == "symlink" {
       let target = entry.path.readlink()?.display()
       generation_validate_symlink_target(relative, target)
-      lines += [f"symlink\t{generation_canonical_field(relative)}\t{mode}\t{generation_canonical_field(target)}"]
+      lines += [f"symlink\t{pm_digest.digest_canonical_field(relative)}\t{mode}\t{pm_digest.digest_canonical_field(target)}"]
     } else {
       return Err(types.PmError.PackageContract(f"generation overlay has unsupported {metadata.kind} {relative}"))
     }

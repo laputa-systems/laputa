@@ -1,4 +1,5 @@
 ##! Deterministic typed package build-plan resolution and canonical fingerprints.
+use pm.digest as pm_digest
 use catalog
 use fingerprint as pm_fingerprint
 use graph
@@ -9,14 +10,6 @@ use util
 ## The durable on-disk and in-memory build-plan format.
 ## Proof edges order execution and enter proof identity, independently of payload keys.
 export const format = "laputa-build-plan-4"
-
-pure plan_canonical_field(value: Str) -> Str {
-  value.replace("\\", with: "\\\\").replace("\t", with: "\\t").replace("\n", with: "\\n")
-}
-
-proc plan_digest_lines(lines: List[Str]) [error] -> Result[Str] {
-  bytes.from_text((lines |> sort).join("\n") + "\n").sha256().hex()
-}
 
 pure dependency_key(value: types.PlanDependency) -> Str {
   f"{types.dependency_kind_text(value.kind)}\t{value.name}"
@@ -53,33 +46,33 @@ export proc artifact_key_for(
     "format\tlaputa-package-artifact-key-2",
     f"build-epoch\t{build_epoch}",
     f"target\t{types.target_text(target)}",
-    f"package\t{plan_canonical_field(package_id)}",
-    f"recipe\t{plan_canonical_field(recipe_sha256)}",
+    f"package\t{pm_digest.digest_canonical_field(package_id)}",
+    f"recipe\t{pm_digest.digest_canonical_field(recipe_sha256)}",
   ]
 
   for dependency in (dependencies |> sort-by(dependency_key)) {
     continue unless graph.edge_orders_builds(dependency.kind)
     lines += [
-      f"dependency\t{types.dependency_kind_text(dependency.kind)}\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}",
+      f"dependency\t{types.dependency_kind_text(dependency.kind)}\t{pm_digest.digest_canonical_field(dependency.name)}\t{pm_digest.digest_canonical_field(dependency.artifact_key)}",
     ]
   }
 
-  plan_digest_lines(lines)?
+  pm_digest.digest_sorted_lines(lines)?
 }
 
 proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str, dependencies: List[types.PlanDependency]) -> Result[Str] {
   let proof_dependencies = [
-    f"dependency\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}"
+    f"dependency\t{pm_digest.digest_canonical_field(dependency.name)}\t{pm_digest.digest_canonical_field(dependency.artifact_key)}"
     for dependency in dependencies |> sort-by(dependency_key)
     if dependency.kind == types.Proof
   ]
-  plan_digest_lines(
+  pm_digest.digest_sorted_lines(
     [
       @proof_dependencies,
       "format\tlaputa-package-proof-key-1",
-      f"package\t{plan_canonical_field(package_id)}",
-      f"artifact\t{plan_canonical_field(artifact_key)}",
-      f"proof\t{plan_canonical_field(proof_sha256)}",
+      f"package\t{pm_digest.digest_canonical_field(package_id)}",
+      f"artifact\t{pm_digest.digest_canonical_field(artifact_key)}",
+      f"proof\t{pm_digest.digest_canonical_field(proof_sha256)}",
     ],
   )?
 }
@@ -105,10 +98,10 @@ proc repository_fingerprint(target: types.Target, recipe_inputs: Map[Str]) -> Re
   var lines = ["format\tlaputa-package-repository-1", f"target\t{types.target_text(target)}"]
 
   for name in recipe_inputs.keys() |> sort {
-    lines += [f"package\t{plan_canonical_field(name)}\t{recipe_inputs.get(name)?}"]
+    lines += [f"package\t{pm_digest.digest_canonical_field(name)}\t{recipe_inputs.get(name)?}"]
   }
 
-  plan_digest_lines(lines)?
+  pm_digest.digest_sorted_lines(lines)?
 }
 
 proc find_remote(snapshot: types.RemoteSnapshot, name: Str) [error] -> Result[types.RemotePlanArtifact?] {
@@ -611,25 +604,25 @@ proc validate_structure(value: types.BuildPlan) {
 proc fingerprint_unchecked(value: types.BuildPlan) -> Result[Str] {
   var lines = [
     "format\tlaputa-build-plan-fingerprint-1",
-    f"plan-format\t{plan_canonical_field(value.format)}",
+    f"plan-format\t{pm_digest.digest_canonical_field(value.format)}",
     f"target\t{types.target_text(value.target)}",
-    f"repository\t{plan_canonical_field(value.repository_digest)}",
-    f"remote-index\t{plan_canonical_field(value.remote_index_sha256)}",
+    f"repository\t{pm_digest.digest_canonical_field(value.repository_digest)}",
+    f"remote-index\t{pm_digest.digest_canonical_field(value.remote_index_sha256)}",
     f"build-epoch\t{value.build_epoch}",
   ]
 
   for root in value.roots {
-    lines += [f"root\t{plan_canonical_field(root)}"]
+    lines += [f"root\t{pm_digest.digest_canonical_field(root)}"]
   }
 
   for node in value.nodes {
     lines += [
-      f"node\t{node.level}\t{plan_canonical_field(node.name)}\t{plan_canonical_field(node.ver)}\t{plan_canonical_field(node.rel)}\t{plan_canonical_field(node.package_id)}\t{plan_canonical_field(node.recipe_dir.display())}\t{plan_canonical_field(node.recipe_sha256)}\t{plan_canonical_field(node.proof_sha256)}\t{plan_canonical_field(node.artifact_key)}\t{plan_canonical_field(node.proof_key)}\t{types.plan_action_text(node.action)}\t{plan_canonical_field(types.plan_action_reason(node.action))}",
+      f"node\t{node.level}\t{pm_digest.digest_canonical_field(node.name)}\t{pm_digest.digest_canonical_field(node.ver)}\t{pm_digest.digest_canonical_field(node.rel)}\t{pm_digest.digest_canonical_field(node.package_id)}\t{pm_digest.digest_canonical_field(node.recipe_dir.display())}\t{pm_digest.digest_canonical_field(node.recipe_sha256)}\t{pm_digest.digest_canonical_field(node.proof_sha256)}\t{pm_digest.digest_canonical_field(node.artifact_key)}\t{pm_digest.digest_canonical_field(node.proof_key)}\t{types.plan_action_text(node.action)}\t{pm_digest.digest_canonical_field(types.plan_action_reason(node.action))}",
     ]
 
     for dependency in node.dependencies {
       lines += [
-        f"dependency\t{plan_canonical_field(node.name)}\t{types.dependency_kind_text(dependency.kind)}\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}",
+        f"dependency\t{pm_digest.digest_canonical_field(node.name)}\t{types.dependency_kind_text(dependency.kind)}\t{pm_digest.digest_canonical_field(dependency.name)}\t{pm_digest.digest_canonical_field(dependency.artifact_key)}",
       ]
     }
 
@@ -637,12 +630,12 @@ proc fingerprint_unchecked(value: types.BuildPlan) -> Result[Str] {
 
     if retrieval != null {
       lines += [
-        f"remote\t{plan_canonical_field(node.name)}\t{plan_canonical_field(retrieval.arch)}\t{plan_canonical_field(types.remote_payload_tarball(retrieval.payload))}\t{plan_canonical_field(types.remote_payload_sha256(retrieval.payload))}\t{plan_canonical_field(retrieval.metadata)}\t{plan_canonical_field(retrieval.metadata_sha256)}",
+        f"remote\t{pm_digest.digest_canonical_field(node.name)}\t{pm_digest.digest_canonical_field(retrieval.arch)}\t{pm_digest.digest_canonical_field(types.remote_payload_tarball(retrieval.payload))}\t{pm_digest.digest_canonical_field(types.remote_payload_sha256(retrieval.payload))}\t{pm_digest.digest_canonical_field(retrieval.metadata)}\t{pm_digest.digest_canonical_field(retrieval.metadata_sha256)}",
       ]
     }
   }
 
-  plan_digest_lines(lines)?
+  pm_digest.digest_sorted_lines(lines)?
 }
 
 ## Computes the plan's canonical line-oriented fingerprint without its own digest field.

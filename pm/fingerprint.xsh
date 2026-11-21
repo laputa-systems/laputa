@@ -1,11 +1,8 @@
 ##! Exact semantic fingerprints for package inputs and executor provenance.
+use pm.digest as pm_digest
 use payload_archive
 use types
 use util
-
-pure canonical_field(value: Str) -> Str {
-  value.replace("\\", with: "\\\\").replace("\t", with: "\\t").replace("\n", with: "\\n")
-}
 
 pure ignored_tree_path(rel: Path) -> Bool {
   let key = rel.display()
@@ -26,19 +23,15 @@ pure package_input_path(rel: Path) -> Bool {
 proc tree_entry_line(root: Path, path_value: Path, prefix: Str) -> Result[Str] {
   let rel = path_value.strip_prefix(root)?
   let metadata = path_value.metadata()?
-  let label = canonical_field(rel.display())
+  let label = pm_digest.digest_canonical_field(rel.display())
   let mode = util.checkout_mode(metadata.kind, metadata.mode)
 
   match metadata.kind {
     "file" => f"{prefix}\tfile\t{label}\t{mode}\t{hash.sha256(path_value)?.hex()}"
-    "symlink" => f"{prefix}\tsymlink\t{label}\t{canonical_field(path_value.readlink()?.display())}"
+    "symlink" => f"{prefix}\tsymlink\t{label}\t{pm_digest.digest_canonical_field(path_value.readlink()?.display())}"
     "dir" => f"{prefix}\tdir\t{label}\t{mode}"
     else => f"{prefix}\t{metadata.kind}\t{label}\t{metadata.mode % 4096}\t{metadata.size}"
   }
-}
-
-proc digest_lines(lines: List[Str]) [error] -> Result[Str] {
-  bytes.from_text((lines |> sort).join("\n") + "\n").sha256().hex()
 }
 
 pure applicable_checksum(source: types.UpstreamSource, target: types.Target) -> Result[Str] {
@@ -56,26 +49,6 @@ pure applicable_checksum(source: types.UpstreamSource, target: types.Target) -> 
   return all_checksum when all_checksum != ""
 
   Err(types.PmError.PackageContract(f"{source.source} has no checksum for {arch}"))
-}
-
-pure symlink_target_stays_within(rel: Path, target: Str) -> Bool {
-  return false when target == "" or target.starts_with("/")
-
-  var depth = rel.display().split("/").len() - 1
-
-  for component in target.split("/") {
-    continue when component == "" or component == "."
-
-    if component == ".." {
-      return false when depth == 0
-
-      depth -= 1
-    } else {
-      depth += 1
-    }
-  }
-
-  true
 }
 
 proc declared_local_source_lines(pkg: types.Package, target: types.Target) -> Result[List[Str]] {
@@ -115,7 +88,7 @@ proc package_source_lines(pkg: types.Package, target: types.Target) -> Result[Li
       if entry.kind == "symlink" {
         let target = entry.path.readlink()?.display()
 
-        if ! symlink_target_stays_within(rel, target) {
+        if util.pm_symlink_target_check(rel.display(), target, reject_empty: false) != util.PmSymlinkValid {
           return Err(
             types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"),
           )
@@ -186,7 +159,7 @@ export proc package_build_input_with_encoding(
 
   var lines = [
     "format\tlaputa-package-build-input-1",
-    f"package\t{canonical_field(pkg.name)}\t{canonical_field(pkg.ver)}\t{canonical_field(pkg.rel)}",
+    f"package\t{pm_digest.digest_canonical_field(pkg.name)}\t{pm_digest.digest_canonical_field(pkg.ver)}\t{pm_digest.digest_canonical_field(pkg.rel)}",
     f"package-kind\t{types.package_kind_text(pkg.kind)}",
     f"target\t{types.target_text(target)}",
     f"nostrip\t{pkg.nostrip}",
@@ -197,39 +170,39 @@ export proc package_build_input_with_encoding(
   }
 
   for dependency in pkg.deps {
-    lines += [f"dependency\t{types.dependency_kind_text(types.Runtime)}\t{canonical_field(dependency)}"]
+    lines += [f"dependency\t{types.dependency_kind_text(types.Runtime)}\t{pm_digest.digest_canonical_field(dependency)}"]
   }
 
   for dependency in pkg.runtime_only_deps {
     lines += [
-      f"dependency\t{types.dependency_kind_text(types.RuntimeOnly)}\t{canonical_field(dependency)}",
+      f"dependency\t{types.dependency_kind_text(types.RuntimeOnly)}\t{pm_digest.digest_canonical_field(dependency)}",
     ]
   }
 
   for dependency in pkg.mkdeps_host {
-    lines += [f"dependency\t{types.dependency_kind_text(types.BuildHost)}\t{canonical_field(dependency)}"]
+    lines += [f"dependency\t{types.dependency_kind_text(types.BuildHost)}\t{pm_digest.digest_canonical_field(dependency)}"]
   }
 
   for dependency in pkg.mkdeps_target {
     lines += [
-      f"dependency\t{types.dependency_kind_text(types.BuildTarget)}\t{canonical_field(dependency)}",
+      f"dependency\t{types.dependency_kind_text(types.BuildTarget)}\t{pm_digest.digest_canonical_field(dependency)}",
     ]
   }
 
   for source in pkg.upstream_sources {
     continue unless types.pm_target_arch(target) in source.architectures or "all" in source.architectures
     lines += [
-      f"source\t{canonical_field(source.source.display())}\t{types.source_kind_text(source.kind)}\t{canonical_field(applicable_checksum(source, target)?)}",
+      f"source\t{pm_digest.digest_canonical_field(source.source.display())}\t{types.source_kind_text(source.kind)}\t{pm_digest.digest_canonical_field(applicable_checksum(source, target)?)}",
     ]
   }
 
   for entry in pkg.filetree {
-    lines += [f"filetree\t{canonical_field(entry.path.display())}\t{types.file_kind_text(entry.kind)}"]
+    lines += [f"filetree\t{pm_digest.digest_canonical_field(entry.path.display())}\t{types.file_kind_text(entry.kind)}"]
   }
 
   lines += package_source_lines(pkg, target)?
   lines += repository_input_lines(repo_root, pkg, target)?
-  digest_lines(lines)?
+  pm_digest.digest_sorted_lines(lines)?
 }
 
 proc pm_proof_module(pm_root: Path) -> Result[Str] {
@@ -249,12 +222,12 @@ export proc package_proof_input(repo_root: Path, pkg: types.Package) [fs, error]
   if declaration.exists() {
     declaration_lines = [f"proof-dependencies\t{hash.sha256(declaration)?.hex()}"]
   }
-  digest_lines(
+  pm_digest.digest_sorted_lines(
     [
       @declaration_lines,
-      @[f"proof-dependency\t{canonical_field(dependency)}" for dependency in pkg.proof_deps],
+      @[f"proof-dependency\t{pm_digest.digest_canonical_field(dependency)}" for dependency in pkg.proof_deps],
       "format\tlaputa-package-proof-input-1",
-      f"package\t{canonical_field(util.package_id(pkg.name, pkg.ver, pkg.rel))}",
+      f"package\t{pm_digest.digest_canonical_field(util.package_id(pkg.name, pkg.ver, pkg.rel))}",
       f"proof\t{proof_sha256}",
       f"pm-proof\t{pm_proof_module(repo_root)?}",
     ],
@@ -280,7 +253,7 @@ export proc pm_tree(pm_root: Path) [fs, error] -> Result[Str, Error] {
     }
   }
 
-  digest_lines(lines)?
+  pm_digest.digest_sorted_lines(lines)?
 }
 
 ## Hashes mounted XSH core applets by relative path, mode, and contents.
@@ -299,19 +272,19 @@ export proc core_tree(core_root: Path) [fs, error] -> Result[Str, Error] {
     }
   }
 
-  digest_lines(lines)?
+  pm_digest.digest_sorted_lines(lines)?
 }
 
 ## Digests an executor provenance record for receipts and repository metadata.
 export proc executor_provenance_sha256(value: types.ExecutorProvenance) [error] -> Result[Str, Error] {
-  digest_lines(
+  pm_digest.digest_sorted_lines(
     [
-      f"format\t{canonical_field(value.format)}",
-      f"runner\txsh\t{canonical_field(value.xsh_sha256)}",
-      f"runner\txshi\t{canonical_field(value.xshi_sha256)}",
-      f"runner\txsht\t{canonical_field(value.xsht_sha256)}",
-      f"pm\t{canonical_field(value.pm_sha256)}",
-      f"core\t{canonical_field(value.core_sha256 ?? "none")}",
+      f"format\t{pm_digest.digest_canonical_field(value.format)}",
+      f"runner\txsh\t{pm_digest.digest_canonical_field(value.xsh_sha256)}",
+      f"runner\txshi\t{pm_digest.digest_canonical_field(value.xshi_sha256)}",
+      f"runner\txsht\t{pm_digest.digest_canonical_field(value.xsht_sha256)}",
+      f"pm\t{pm_digest.digest_canonical_field(value.pm_sha256)}",
+      f"core\t{pm_digest.digest_canonical_field(value.core_sha256 ?? "none")}",
     ],
   )?
 }
