@@ -162,4 +162,3 @@ export proc guest_bootstrap_cmdline_value(ctx: GuestBootstrap, key: Str) [fs, er
 
   Err(GuestTrustError.Failed(phase: "cmdline", message: f"missing {key} on the kernel command line"))
 }
-
