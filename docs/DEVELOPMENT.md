@@ -14,8 +14,16 @@ targets select `qemu-tinyland-ghostty`. The typed CLI also loads
 ## Host requirements
 
 On a Linux host (aarch64 or x86_64) you need only `git`, `make`, Docker
-(the daemon running and usable by your user), and network access for the
-fetch steps. You don't need a Rust toolchain or a pre-built XSH. `make
+with the Buildx plugin (the daemon running and usable by your user), and
+network access for the fetch steps. On Ubuntu or Debian:
+
+```sh
+sudo apt-get install git make docker.io docker-buildx
+sudo usermod -aG docker "$USER"   # then log in again
+```
+
+The image builds read the `TARGETARCH` that BuildKit sets, so Docker's legacy
+builder cannot build them. You don't need a Rust toolchain or a pre-built XSH. `make
 host-xsh` builds static XSH binaries and `make mirror` builds the mirror, both
 in XSH's own build image.
 
