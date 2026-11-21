@@ -1,5 +1,6 @@
 # Derived state and fetched inputs.
 .out/
+.work/
 .cache/
 target/
 

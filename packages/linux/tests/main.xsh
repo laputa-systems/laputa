@@ -1294,7 +1294,13 @@ CFLAGS_bar.o := $(call cc-disable-warning,xsh-no-such-warning) -DBAR
   let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [p"."], objects: [p"foo.o", p"bar.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
   )
-  let clang = process.which("clang")?
+  let clang = match process.which("clang") {
+    Ok(found) => found,
+    Err(_) => {
+      test.skip("clang is unavailable to evaluate the compiler option calls")
+      return
+    },
+  }
   cd (root) {
     let archive_plan = test_builtin_archive_plan(cache, plan, clang, "x86_64-linux-gnu", [], [], [])?
     for name in ["foo", "bar"] {
