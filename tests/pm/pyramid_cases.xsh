@@ -17,8 +17,8 @@ proc pyramid_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[
 
 proc pyramid_plan(repository: Path, roots: List[Str]) [fs, env, error] -> Result[types.BuildPlan] {
   plan.resolve(
-    catalog.load_for_target(repository, types.target_x86_64())?,
-    {target: types.target_x86_64(), index_sha256: "pyramid-offline-empty", packages: []},
+    catalog.load_for_target(repository, types.X86_64LinuxMusl)?,
+    {target: types.X86_64LinuxMusl, index_sha256: "pyramid-offline-empty", packages: []},
     policy.x86_64_docker(),
     roots,
     false,

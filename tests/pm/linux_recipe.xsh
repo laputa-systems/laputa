@@ -96,10 +96,10 @@ test test_linux_config_fragment_is_explicit_staged_fingerprinted_input [fs, net,
   let copied = fp"{copied_root}/packages/linux"
   let _ = fs.copy_tree(p"packages/linux", copied, parents: true, overwrite: true)?
   let before = recipe.load_package(copied)?
-  let first = fingerprint.package_build_input(copied_root, before, types.target_aarch64())?
+  let first = fingerprint.package_build_input(copied_root, before, types.Aarch64LinuxMusl)?
   fp"{copied}/files/config/aarch64/base-aarch64.fragment".write("# changed staged config input\n")
   let after = recipe.load_package(copied)?
-  assert fingerprint.package_build_input(copied_root, after, types.target_aarch64())? == first == false
+  assert fingerprint.package_build_input(copied_root, after, types.Aarch64LinuxMusl)? == first == false
 }
 
 test test_linux_x86_generated_inputs_are_staged_at_build_source_root [fs, net, process, env, time, error] { |ctx|
@@ -139,7 +139,7 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
   let _ = fs.copy_tree(p"trust", fp"{root}/trust", parents: true, overwrite: true)?
   source.mkdir()
   let pkg = recipe.load_package(package_dir)?
-  let first = fingerprint.package_build_input(root, pkg, types.target_aarch64())?
+  let first = fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?
 
   env ({
     XSH_PM_REPOSITORY_ROOT: root.display(),
@@ -152,7 +152,7 @@ test test_laputa_pm_repository_inputs_stage_and_fingerprint_from_an_isolated_rec
   assert fp"{source}/trust.xsh".exists()?
   assert fp"{source}/trust/store.xsh".exists()?
   fp"{root}/pm/execute.xsh".write("changed PM executor input\n")
-  let second = fingerprint.package_build_input(root, pkg, types.target_aarch64())?
+  let second = fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?
   assert second == first == false
 }
 
@@ -186,7 +186,7 @@ test test_checkout_directory_input_stages_with_checkout_modes [fs, net, process,
 
 test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |_|
   let pkg = recipe.load_package(p"packages/baselayout")?
-  let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == types.file_kind_tree()]
+  let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == types.Tree]
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     assert required in trees
@@ -222,7 +222,7 @@ test test_laputa_net_hook_directories_are_empty_package_payload [fs, net, proces
 
   for hook in ["if-pre-up.d", "if-up.d", "if-down.d", "if-pre-down.d", "if-post-down.d"] {
     let relative = fp"etc/network/{hook}"
-    assert {path: relative, kind: types.file_kind_tree()} in pkg.filetree
+    assert {path: relative, kind: types.Tree} in pkg.filetree
     assert fp"{dest}/{relative}".is_dir()?
     for entry in fs.children(fp"{dest}/{relative}")? {
       test.fail(f"network hook directory contains {entry.name}")

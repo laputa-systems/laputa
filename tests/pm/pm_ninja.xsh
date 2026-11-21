@@ -23,9 +23,9 @@ test test_helper_changes_invalidate_each_consumer [fs, env, error] { |ctx|
   let names = ["wayland-dev", "wayland-libs-client", "wayland-libs-server", "wayland-libs-cursor", "wl-clipboard", "libva"]
   let checkout = fs.cwd()?
   let packages = [recipe.load_package(fp"{checkout}/packages/{name}")? for name in names]
-  let before = [fingerprint.package_build_input(root, pkg, types.target_x86_64())? for pkg in packages]
+  let before = [fingerprint.package_build_input(root, pkg, types.X86_64LinuxMusl)? for pkg in packages]
   helper.write("second\n")?
   for index in range(0, packages.len()) {
-    assert fingerprint.package_build_input(root, packages[index], types.target_x86_64())? != before[index]
+    assert fingerprint.package_build_input(root, packages[index], types.X86_64LinuxMusl)? != before[index]
   }
 }

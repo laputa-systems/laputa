@@ -258,7 +258,7 @@ proc generation_runtime_artifacts(
     artifacts += [{package_name: node.name, package_id: node.package_id, artifact_key: node.artifact_key}]
 
     for dependency in node.dependencies {
-      let runtime = dependency.kind == types.dependency_runtime() or dependency.kind == types.dependency_runtime_only()
+      let runtime = dependency.kind == types.Runtime or dependency.kind == types.RuntimeOnly
 
       if runtime and ! (selected.get(dependency.name) ?? false) {
         pending += [dependency.name]
@@ -458,7 +458,7 @@ proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOve
 
 pure generation_same_directory_metadata(entry: GenerationOverlayEntry, package_entry: types.RootEntry) -> Bool {
   entry.kind == "dir"
-    and package_entry.kind == types.file_kind_tree()
+    and package_entry.kind == types.Tree
     and entry.mode == package_entry.mode
     and entry.sha256 == package_entry.sha256
     and entry.target == package_entry.target
@@ -469,9 +469,9 @@ pure generation_replacement_preserves_file_metadata(
   package_entry: types.RootEntry,
 ) -> Bool {
   let same_kind = if entry.kind == "file" {
-    package_entry.kind == types.file_kind_file() or package_entry.kind == types.file_kind_binary()
+    package_entry.kind == types.File or package_entry.kind == types.Binary
   } else {
-    entry.kind == "symlink" and package_entry.kind == types.file_kind_symlink()
+    entry.kind == "symlink" and package_entry.kind == types.Symlink
   }
 
   same_kind and entry.mode == package_entry.mode
@@ -493,7 +493,7 @@ proc generation_preflight_overlay(
       if entry.path == package_entry.path {
         continue when generation_same_directory_metadata(entry, package_entry)
 
-        if package_entry.kind == types.file_kind_tree() or entry.kind == "dir" {
+        if package_entry.kind == types.Tree or entry.kind == "dir" {
           return Err(
             types.PmError.PackageConflict(
               f"generation overlay {entry.path} has incompatible directory type or mode metadata with package {package_entry.package_name}",
@@ -516,7 +516,7 @@ proc generation_preflight_overlay(
         }
 
         used_replacements = used_replacements.add(entry.path)
-      } else if entry.path.starts_with(f"{package_entry.path}/") and package_entry.kind != types.file_kind_tree() {
+      } else if entry.path.starts_with(f"{package_entry.path}/") and package_entry.kind != types.Tree {
         return Err(
           types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts below package file {package_entry.path}"),
         )

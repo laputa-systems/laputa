@@ -25,12 +25,12 @@ pure kind_is_selected(kind: types.DependencyKind, kinds: List[types.DependencyKi
 ## dependent's build root holds, so it must be built first and its key enters the
 ## dependent's artifact key.
 export pure edge_orders_builds(kind: types.DependencyKind) -> Bool {
-  edge_orders_execution(kind) and kind != types.dependency_proof()
+  edge_orders_execution(kind) and kind != types.Proof
 }
 
 ## Returns whether execution needs a dependency artifact before building or proving a node.
 export pure edge_orders_execution(kind: types.DependencyKind) -> Bool {
-  kind != types.dependency_bootstrap() and kind != types.dependency_runtime_only()
+  kind != types.Bootstrap and kind != types.RuntimeOnly
 }
 
 pure edge_key(from: Str, to: Str) -> Str {
@@ -41,35 +41,35 @@ pure package_edges(pkg: types.Package, value: types.BuildPolicy) -> List[types.D
   let result: List[types.DependencyEdge] = collect {
     for dependency in pkg.deps {
       let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
-        types.dependency_bootstrap()
+        types.Bootstrap
       } else {
-        types.dependency_runtime()
+        types.Runtime
       }
       yield {from: pkg.name, to: dependency, kind}
     }
 
     for dependency in pkg.runtime_only_deps {
-      yield {from: pkg.name, to: dependency, kind: types.dependency_runtime_only()}
+      yield {from: pkg.name, to: dependency, kind: types.RuntimeOnly}
     }
 
     for dependency in pkg.mkdeps_host {
       let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
-        types.dependency_bootstrap()
+        types.Bootstrap
       } else {
-        types.dependency_build_host()
+        types.BuildHost
       }
       yield {from: pkg.name, to: dependency, kind}
     }
 
     for dependency in pkg.proof_deps {
-      yield {from: pkg.name, to: dependency, kind: types.dependency_proof()}
+      yield {from: pkg.name, to: dependency, kind: types.Proof}
     }
 
     for dependency in pkg.mkdeps_target {
       let kind = if policy.is_bootstrap_dependency(value, pkg.name, dependency) {
-        types.dependency_bootstrap()
+        types.Bootstrap
       } else {
-        types.dependency_build_target()
+        types.BuildTarget
       }
       yield {from: pkg.name, to: dependency, kind}
     }
@@ -207,7 +207,7 @@ export proc edges(
       let key = edge_key(rule.package, rule.dependency)
 
       if ! (declared_pairs.get(key) ?? false) {
-        yield {from: rule.package, to: rule.dependency, kind: types.dependency_bootstrap()}
+        yield {from: rule.package, to: rule.dependency, kind: types.Bootstrap}
       }
     }
   }
@@ -283,16 +283,16 @@ export proc topological_levels(
 
 ## Resolves runtime and runtime-only dependencies, excluding host and target build dependencies.
 export proc runtime_closure(catalog: types.PackageCatalog, roots: List[Str]) [error] -> Result[List[Str], Error] {
-  closure(catalog, roots, [types.dependency_runtime(), types.dependency_runtime_only()])?
+  closure(catalog, roots, [types.Runtime, types.RuntimeOnly])?
 }
 
 pure build_closure_kinds() -> List[types.DependencyKind] {
   [
-    types.dependency_runtime(),
-    types.dependency_runtime_only(),
-    types.dependency_build_host(),
-    types.dependency_build_target(),
-    types.dependency_proof(),
+    types.Runtime,
+    types.RuntimeOnly,
+    types.BuildHost,
+    types.BuildTarget,
+    types.Proof,
   ]
 }
 

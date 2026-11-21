@@ -4,10 +4,10 @@ use pm.types
 
 test graph_levels_deduplicate_selection_and_ignore_external_edges [error] {
   let edges = [
-    {from: "app", to: "library", kind: types.dependency_runtime()},
-    {from: "app", to: "seed", kind: types.dependency_bootstrap()},
-    {from: "unselected", to: "app", kind: types.dependency_runtime()},
-    {from: "app", to: "external", kind: types.dependency_build_host()},
+    {from: "app", to: "library", kind: types.Runtime},
+    {from: "app", to: "seed", kind: types.Bootstrap},
+    {from: "unselected", to: "app", kind: types.Runtime},
+    {from: "app", to: "external", kind: types.BuildHost},
   ]
   assert graph.topological_levels(["tool", "app", "library", "app"], edges)? == [["library", "tool"], ["app"]]
   assert graph.topological_levels([], edges)? == []
@@ -15,8 +15,8 @@ test graph_levels_deduplicate_selection_and_ignore_external_edges [error] {
 
 test graph_cycle_retains_package_error_and_deterministic_path [error] {
   let edges = [
-    {from: "beta", to: "alpha", kind: types.dependency_runtime()},
-    {from: "alpha", to: "beta", kind: types.dependency_build_target()},
+    {from: "beta", to: "alpha", kind: types.Runtime},
+    {from: "alpha", to: "beta", kind: types.BuildTarget},
   ]
   match graph.topological_levels(["beta", "alpha"], edges) {
     Ok(_) => test.fail("dependency cycle unexpectedly received levels")

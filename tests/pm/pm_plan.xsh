@@ -31,19 +31,19 @@ proc build_input(pkg: types.Package) -> Result[Str] {
 
 test test_payload_encoding_changes_payload_keys_but_not_metapackage_keys [fs, env, error] { |ctx|
   let pkg = copied_package(ctx, "payload-encoding-key")?
-  for kind in [types.package_payload(), types.package_meta()] {
+  for kind in [types.Payload, types.Meta] {
     let selected = {...pkg, kind}
-    let actual = fingerprint.package_build_input(p".", selected, types.target_x86_64())?
+    let actual = fingerprint.package_build_input(p".", selected, types.X86_64LinuxMusl)?
     let actual_encoding = payload_archive.encoding_fingerprint()?
-    test.eq(actual, fingerprint.package_build_input_with_encoding(p".", selected, types.target_x86_64(), actual_encoding)?)
-    let first = fingerprint.package_build_input_with_encoding(p".", selected, types.target_x86_64(), "encoding-a")?
-    let repeat = fingerprint.package_build_input_with_encoding(p".", selected, types.target_x86_64(), "encoding-a")?
-    let changed = fingerprint.package_build_input_with_encoding(p".", selected, types.target_x86_64(), "encoding-b")?
-    let first_key = plan.artifact_key_for(types.target_x86_64(), 2, "example-1-1", first, [])?
-    let repeat_key = plan.artifact_key_for(types.target_x86_64(), 2, "example-1-1", repeat, [])?
-    let changed_key = plan.artifact_key_for(types.target_x86_64(), 2, "example-1-1", changed, [])?
+    test.eq(actual, fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, actual_encoding)?)
+    let first = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-a")?
+    let repeat = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-a")?
+    let changed = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-b")?
+    let first_key = plan.artifact_key_for(types.X86_64LinuxMusl, 2, "example-1-1", first, [])?
+    let repeat_key = plan.artifact_key_for(types.X86_64LinuxMusl, 2, "example-1-1", repeat, [])?
+    let changed_key = plan.artifact_key_for(types.X86_64LinuxMusl, 2, "example-1-1", changed, [])?
     assert first_key == repeat_key
-    if kind == types.package_meta() {
+    if kind == types.Meta {
       assert first_key == changed_key
     } else {
       assert first_key != changed_key
@@ -76,7 +76,7 @@ test test_x86_build_fingerprint_uses_x86_source_checksum [fs, env, error] { |ctx
   let arm_checksum = {arch: "aarch64", sha256: "arm-source"}
   let x86_checksum = {arch: "x86_64", sha256: "x86-source"}
   let selected = {...pkg, upstream_sources: [{...source, checksums: [arm_checksum, x86_checksum]}]}
-  let baseline = fingerprint.package_build_input(p".", selected, types.target_x86_64())?
+  let baseline = fingerprint.package_build_input(p".", selected, types.X86_64LinuxMusl)?
   let arm_changed = {
     ...selected,
     upstream_sources: [{...source, checksums: [{...arm_checksum, sha256: "changed-arm"}, x86_checksum]}],
@@ -86,8 +86,8 @@ test test_x86_build_fingerprint_uses_x86_source_checksum [fs, env, error] { |ctx
     upstream_sources: [{...source, checksums: [arm_checksum, {...x86_checksum, sha256: "changed-x86"}]}],
   }
 
-  assert fingerprint.package_build_input(p".", arm_changed, types.target_x86_64())? == baseline
-  assert fingerprint.package_build_input(p".", x86_changed, types.target_x86_64())? == baseline == false
+  assert fingerprint.package_build_input(p".", arm_changed, types.X86_64LinuxMusl)? == baseline
+  assert fingerprint.package_build_input(p".", x86_changed, types.X86_64LinuxMusl)? == baseline == false
 }
 
 test test_package_build_fingerprint_changes_for_pkgbuild [fs, env, error] { |ctx|
@@ -123,11 +123,11 @@ test test_package_build_fingerprint_covers_declared_local_sources [fs, env, erro
     checksums: [{arch: "all", sha256: "SKIP"}],
   }
   let selected = {...pkg, upstream_sources: pkg.upstream_sources.push(declared)}
-  let first = fingerprint.package_build_input(p".", selected, types.target_x86_64())?
+  let first = fingerprint.package_build_input(p".", selected, types.X86_64LinuxMusl)?
   fp"{pkg.dir}/notes.txt".write("changed\n")
-  assert fingerprint.package_build_input(p".", selected, types.target_x86_64())? == first
+  assert fingerprint.package_build_input(p".", selected, types.X86_64LinuxMusl)? == first
   fp"{pkg.dir}/settings.toml".write("changed\n")
-  assert fingerprint.package_build_input(p".", selected, types.target_x86_64())? != first
+  assert fingerprint.package_build_input(p".", selected, types.X86_64LinuxMusl)? != first
 }
 
 test test_package_build_fingerprint_changes_for_service [fs, env, error] { |ctx|
@@ -193,7 +193,7 @@ test test_shared_workspace_archive_pin_changes_both_package_inputs [fs, env, err
   let packages = [recipe.load_package(fp"{root}/packages/{name}")? for name in ["tinyland", "seatd-rs"]]
   test.eq(packages[0].upstream_sources[0], packages[1].upstream_sources[0])
   for pkg in packages {
-    let before = fingerprint.package_build_input(root, pkg, types.target_x86_64())?
+    let before = fingerprint.package_build_input(root, pkg, types.X86_64LinuxMusl)?
     let changed = {
       ...pkg,
       upstream_sources: [
@@ -205,7 +205,7 @@ test test_shared_workspace_archive_pin_changes_both_package_inputs [fs, env, err
         for index in range(0, pkg.upstream_sources.len())
       ],
     }
-    assert fingerprint.package_build_input(root, changed, types.target_x86_64())? != before
+    assert fingerprint.package_build_input(root, changed, types.X86_64LinuxMusl)? != before
   }
 }
 
@@ -822,7 +822,7 @@ test test_proof_dependencies_order_execution_and_change_only_proof_identity [fs,
   assert app.artifact_key == initial_app.artifact_key
   assert app.proof_key != initial_app.proof_key
   assert tool.level < app.level
-  assert [dependency.name for dependency in app.dependencies if dependency.kind == types.dependency_proof()] == ["proof-tool"]
+  assert [dependency.name for dependency in app.dependencies if dependency.kind == types.Proof] == ["proof-tool"]
   let tool_recipe = fp"{root}/packages/proof-tool/PKGBUILD.xsh"
   tool_recipe.write(tool_recipe.read_text()?.replace("ver = \"1\"", with: "ver = \"2\""))
   let changed = resolve_plan(catalog.load(root)?, ["app"], empty_remote_snapshot())?

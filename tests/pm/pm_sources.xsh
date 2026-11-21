@@ -375,7 +375,7 @@ pure crate_set_package(lock_url: Str, lock_sha256: Str) -> types.Package {
     upstream_sources: [
       {
         source: fp"{lock_url} => vendor",
-        kind: types.source_cargo_vendor(),
+        kind: types.CargoVendor,
         architectures: [
           "all",
         ],

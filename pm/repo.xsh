@@ -24,12 +24,12 @@ proc repo_verify_node_receipt(value: types.BuildPlan, node: types.PlanNode, rece
   }
 
   if types.plan_action_is_build(node.action) {
-    guard receipt.origin == types.artifact_origin_built() else {
+    guard receipt.origin == types.Built else {
       return Err(
         types.PmError.PackageContract(f"BuildPlan build node {node.package_id} is not a locally proved artifact"),
       )
     }
-  } else if receipt.origin != types.artifact_origin_remote() {
+  } else if receipt.origin != types.Remote {
     return Err(
       types.PmError.PackageContract(f"BuildPlan remote node {node.package_id} is not a verified imported artifact"),
     )
@@ -49,13 +49,13 @@ proc repo_package_kind(receipt: types.ArtifactReceipt, node: types.PlanNode) -> 
     return types.parse_package_kind(raw.get("package_kind")?.require()?)
   }
 
-  types.package_payload()
+  types.Payload
 }
 
 proc repo_verified_proof_path(store_root: Path, node: types.PlanNode, receipt: types.ArtifactReceipt) -> Result[Path] {
   let primary = fp"{receipt.artifact_dir}/proof.json"
 
-  return primary when receipt.origin == types.artifact_origin_remote()
+  return primary when receipt.origin == types.Remote
 
   if receipt.proof_key == node.proof_key {
     pm_proof.verify_artifact_receipt(primary, node, receipt.payload_sha256)
@@ -131,25 +131,25 @@ proc repo_publication_entry(value: types.RepoPublication, arch: Str, metadata: P
     name: node.name,
     ver: node.ver,
     rel: node.rel,
-    deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()],
+    deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime],
     runtime_only_deps: [
       dependency.name
       for dependency in node.dependencies
-      if dependency.kind == types.dependency_runtime_only()
+      if dependency.kind == types.RuntimeOnly
     ],
     mkdeps_host: [
       dependency.name
       for dependency in node.dependencies
-      if dependency.kind == types.dependency_build_host()
+      if dependency.kind == types.BuildHost
     ],
     mkdeps_target: [
       dependency.name
       for dependency in node.dependencies
-      if dependency.kind == types.dependency_build_target()
+      if dependency.kind == types.BuildTarget
     ],
-    sha256: if value.kind == types.package_meta() { "" } else { hash.sha256(value.payload)?.hex() },
-    size: if value.kind == types.package_meta() { 0 } else { value.payload.metadata()?.size },
-    tarball: if value.kind == types.package_meta() { "" } else { payload_rel.display() },
+    sha256: if value.kind == types.Meta { "" } else { hash.sha256(value.payload)?.hex() },
+    size: if value.kind == types.Meta { 0 } else { value.payload.metadata()?.size },
+    tarball: if value.kind == types.Meta { "" } else { payload_rel.display() },
     metadata: metadata_rel.display(),
     metadata_sha256,
     artifact_key: node.artifact_key,
@@ -160,7 +160,7 @@ proc repo_publication_entry(value: types.RepoPublication, arch: Str, metadata: P
     proof: proof_rel.display(),
     proof_receipt_sha256,
     source_sha256: "",
-    metapackage: value.kind == types.package_meta(),
+    metapackage: value.kind == types.Meta,
   }
 }
 
@@ -250,7 +250,7 @@ proc repo_publish_locked(repo_snapshot: types.RepoSnapshot, remote_repo: Str, to
         )
       }
 
-      if publication.receipt.origin == types.artifact_origin_built() {
+      if publication.receipt.origin == types.Built {
         pm_proof.verify_artifact_receipt(publication.proof, publication.node, verified.payload_sha256)
       }
 

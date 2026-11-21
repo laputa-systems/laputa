@@ -540,8 +540,8 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
     ),
   )
   let value = plan.resolve(
-    catalog.load_for_target(repo_root, types.target_x86_64())?,
-    {target: types.target_x86_64(), index_sha256: "execute-empty-x86-remote", packages: []},
+    catalog.load_for_target(repo_root, types.X86_64LinuxMusl)?,
+    {target: types.X86_64LinuxMusl, index_sha256: "execute-empty-x86-remote", packages: []},
     policy.x86_64_docker(),
     ["execute-app"],
     false,
@@ -550,7 +550,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
   let result = execute.build_plan(value, repo_root, object_store, "", 2)?
 
   for receipt in result.artifacts {
-    assert receipt.target == types.target_x86_64()
+    assert receipt.target == types.X86_64LinuxMusl
     let metadata = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     assert metadata.arch == "x86_64"
   }
@@ -1258,7 +1258,7 @@ use pm.policy
 use pm.types
 proc main(mode: Str, repo: Path, plan_path: Path, object_store: Path) [fs, net, process, env, time, error] {
   if mode == "plan" {
-    let remote: types.RemoteSnapshot = {target: types.target_aarch64(), index_sha256: "evaluated-proof-remote", packages: []}
+    let remote: types.RemoteSnapshot = {target: types.Aarch64LinuxMusl, index_sha256: "evaluated-proof-remote", packages: []}
     let resolved = plan.resolve(catalog.load(repo)?, remote, policy.aarch64_docker(), ["execute-service"], false)?
     plan_json.write_plan(plan_path, resolved)
   } else {

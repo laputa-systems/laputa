@@ -98,116 +98,6 @@ export pure remote_payload_is_metadata_only(payload: RemotePayload) -> Bool {
   }
 }
 
-## Return the aarch64 build target without a qualified union-tag expression.
-export pure target_aarch64() -> Target {
-  Aarch64LinuxMusl
-}
-
-## Return the x86_64 build target without a qualified union-tag expression.
-export pure target_x86_64() -> Target {
-  X86_64LinuxMusl
-}
-
-## Return the internal unsupported-target sentinel.
-export pure target_reserved() -> Target {
-  TargetReserved
-}
-
-## Return the package kind that owns a payload.
-export pure package_payload() -> PackageKind {
-  Payload
-}
-
-## Return the package kind that owns no payload.
-export pure package_meta() -> PackageKind {
-  Meta
-}
-
-## Return the runtime dependency edge kind.
-export pure dependency_runtime() -> DependencyKind {
-  Runtime
-}
-
-## Return the runtime-only dependency edge kind.
-export pure dependency_runtime_only() -> DependencyKind {
-  RuntimeOnly
-}
-
-## Return the host build dependency edge kind.
-export pure dependency_build_host() -> DependencyKind {
-  BuildHost
-}
-
-## Return the target build dependency edge kind.
-export pure dependency_build_target() -> DependencyKind {
-  BuildTarget
-}
-
-## Return the proof-only dependency edge kind.
-export pure dependency_proof() -> DependencyKind {
-  Proof
-}
-
-## Return the policy-provided bootstrap edge kind.
-export pure dependency_bootstrap() -> DependencyKind {
-  Bootstrap
-}
-
-## Return automatic source-kind inference.
-export pure source_auto() -> SourceKind {
-  Auto
-}
-
-## Return archive source staging.
-export pure source_archive() -> SourceKind {
-  Archive
-}
-
-## Return ZIP source staging.
-export pure source_zip() -> SourceKind {
-  Zip
-}
-
-## Return CPIO source staging.
-export pure source_cpio() -> SourceKind {
-  Cpio
-}
-
-## Return a single-file source staging kind.
-export pure source_file() -> SourceKind {
-  SourceFile
-}
-
-## Return a directory source staging kind.
-export pure source_directory() -> SourceKind {
-  Directory
-}
-
-## Return the Cargo.lock crate-set staging kind.
-export pure source_cargo_vendor() -> SourceKind {
-  CargoVendor
-}
-
-## Return the regular-file metadata kind.
-export pure file_kind_file() -> FileKind {
-  File
-}
-
-## Return the ELF/binary metadata kind.
-export pure file_kind_binary() -> FileKind {
-  Binary
-}
-
-## Return the symlink metadata kind.
-export pure file_kind_symlink() -> FileKind {
-  Symlink
-}
-
-## Return the directory-tree metadata kind.
-export pure file_kind_tree() -> FileKind {
-  Tree
-}
-
 ## Construct the local-build action with its durable reason.
 export pure plan_action_build(reason: Str) -> PlanAction {
   Build(reason)
@@ -216,16 +106,6 @@ export pure plan_action_build(reason: Str) -> PlanAction {
 ## Construct the remote-reuse action with its durable reason.
 export pure plan_action_reuse_remote(reason: Str) -> PlanAction {
   ReuseRemote(reason)
-}
-
-## Return the local-build artifact origin.
-export pure artifact_origin_built() -> ArtifactOrigin {
-  Built
-}
-
-## Return the imported-remote artifact origin.
-export pure artifact_origin_remote() -> ArtifactOrigin {
-  Remote
 }
 
 ## Renders a target as its stable external text form.
@@ -344,11 +224,6 @@ export pure parse_dependency_kind(raw: Str) -> Result[DependencyKind, Error] {
     "bootstrap" => Bootstrap
     else => Err(PmError.PackageContract(f"invalid dependency kind {raw}"))
   }
-}
-
-## Return checksum-pinned GitHub Cargo workspace archive staging.
-export pure source_cargo_git_workspace() -> SourceKind {
-  CargoGitWorkspace
 }
 
 ## Renders a source kind for legacy recipe metadata and source staging.

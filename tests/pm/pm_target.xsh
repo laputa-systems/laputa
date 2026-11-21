@@ -4,8 +4,8 @@ use pm.types
 use pm.recipe
 
 test typed_target_mappings_preserve_supported_abis [error] {
-  let arm = target.lp64_musl_abi(types.target_aarch64())?
-  let x86 = target.lp64_musl_abi(types.target_x86_64())?
+  let arm = target.lp64_musl_abi(types.Aarch64LinuxMusl)?
+  let x86 = target.lp64_musl_abi(types.X86_64LinuxMusl)?
   assert arm.arch == "aarch64"
   assert x86.arch == "x86_64"
   assert ! arm.signed_wchar_t
@@ -24,22 +24,22 @@ test typed_target_mappings_preserve_supported_abis [error] {
     assert abi.wint_t_suffix == "\"UINT\""
     assert abi.signed_sig_atomic_t
   }
-  assert target.rust_triple(types.target_aarch64())? == "aarch64-unknown-linux-musl"
-  assert target.rust_triple(types.target_x86_64())? == "x86_64-unknown-linux-musl"
-  assert target.kernel_arch(types.target_aarch64())? == "arm64"
-  assert target.kernel_arch(types.target_x86_64())? == "x86"
+  assert target.rust_triple(types.Aarch64LinuxMusl)? == "aarch64-unknown-linux-musl"
+  assert target.rust_triple(types.X86_64LinuxMusl)? == "x86_64-unknown-linux-musl"
+  assert target.kernel_arch(types.Aarch64LinuxMusl)? == "arm64"
+  assert target.kernel_arch(types.X86_64LinuxMusl)? == "x86"
 }
 
 test typed_target_rejects_reserved_and_unknown_targets [env, error] {
-  match target.lp64_musl_abi(types.target_reserved()) {
+  match target.lp64_musl_abi(types.TargetReserved) {
     Ok(_) => test.fail("reserved target received a musl ABI")
     Err(problem) => assert "unsupported" in problem.message
   }
-  match target.rust_triple(types.target_reserved()) {
+  match target.rust_triple(types.TargetReserved) {
     Ok(_) => test.fail("reserved target received a Rust triple")
     Err(problem) => assert "unsupported" in problem.message
   }
-  match target.kernel_arch(types.target_reserved()) {
+  match target.kernel_arch(types.TargetReserved) {
     Ok(_) => test.fail("reserved target received a kernel architecture")
     Err(problem) => assert "unsupported" in problem.message
   }
@@ -62,7 +62,7 @@ test actual_recipes_reject_unsupported_target_before_building [fs, process, env,
   let root = fs.cwd()?
   for name in ["bison", "libffi", "musl", "perf", "strace"] {
     let dir = fp"{root}/packages/{name}"
-    let pkg = recipe.load_package_for_target(dir, types.target_aarch64())?
+    let pkg = recipe.load_package_for_target(dir, types.Aarch64LinuxMusl)?
     env ({XSH_PM_TARGET_ARCH: "riscv64"}) {
       match recipe.call_build(pkg, dir, dest) {
         Ok(_) => test.fail(f"{name} accepted unsupported target")

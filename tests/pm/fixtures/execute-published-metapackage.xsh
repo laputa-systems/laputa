@@ -254,7 +254,7 @@ proc published_parallel_level_barrier_regression(
   write_level_barrier_recipes(repo)?
   let value = plan.resolve(
     catalog.load(workspace)?,
-    {target: types.target_aarch64(), index_sha256: "", packages: []},
+    {target: types.Aarch64LinuxMusl, index_sha256: "", packages: []},
     policy.aarch64_docker(),
     ["direct-leaf"],
     false,
@@ -306,10 +306,10 @@ proc published_legacy_package_kind_regression(
   let payload_sha256 = hash.sha256(payload)?.hex()
   pm_proof.write_artifact_receipt(proof, node, payload_sha256)?
   let executor_sha256 = bytes.from_text("published executor").sha256().hex()
-  let _ = artifact_store.commit(types.target_aarch64(), legacy_store, node, {payload, payload_sha256, metadata, proof, executor_sha256})?
+  let _ = artifact_store.commit(types.Aarch64LinuxMusl, legacy_store, node, {payload, payload_sha256, metadata, proof, executor_sha256})?
   let snapshot = pm_repo.snapshot(value, legacy_store)?
 
-  if snapshot.packages[0].kind != types.package_payload() {
+  if snapshot.packages[0].kind != types.Payload {
     return error.fail("published omitted package_kind did not default to payload")
   }
 
@@ -323,7 +323,7 @@ proc published_legacy_package_kind_regression(
   json.write(invalid_metadata, {arch: "aarch64", name: node.name, ver: node.ver, rel: node.rel, package_kind: "", files: []})?
   let invalid_payload_sha256 = hash.sha256(invalid_payload)?.hex()
   pm_proof.write_artifact_receipt(invalid_proof, node, invalid_payload_sha256)?
-  let _ = artifact_store.commit(types.target_aarch64(), invalid_store, node, {payload: invalid_payload, payload_sha256: invalid_payload_sha256, metadata: invalid_metadata, proof: invalid_proof, executor_sha256})?
+  let _ = artifact_store.commit(types.Aarch64LinuxMusl, invalid_store, node, {payload: invalid_payload, payload_sha256: invalid_payload_sha256, metadata: invalid_metadata, proof: invalid_proof, executor_sha256})?
 
   match pm_repo.snapshot(value, invalid_store) {
     Ok(_) => return error.fail("published explicit empty package_kind unexpectedly published")
@@ -355,7 +355,7 @@ proc published_generation_adapter_regression(
 
   let value = plan.resolve(
     catalog.load(workspace)?,
-    {target: types.target_aarch64(), index_sha256: "", packages: []},
+    {target: types.Aarch64LinuxMusl, index_sha256: "", packages: []},
     policy.aarch64_docker(),
     ["direct-meta", "direct-tool"],
     false,
@@ -397,14 +397,14 @@ proc main() [fs, net, process, env, time, error] {
   let catalog_value = catalog.load(workspace)?
   let value = plan.resolve(
     catalog_value,
-    {target: types.target_aarch64(), index_sha256: "", packages: []},
+    {target: types.Aarch64LinuxMusl, index_sha256: "", packages: []},
     policy.aarch64_docker(),
     ["direct-meta"],
     false,
   )?
   let legacy_value = plan.resolve(
     catalog_value,
-    {target: types.target_aarch64(), index_sha256: "", packages: []},
+    {target: types.Aarch64LinuxMusl, index_sha256: "", packages: []},
     policy.aarch64_docker(),
     ["direct-dep"],
     false,

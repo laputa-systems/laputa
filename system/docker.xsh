@@ -107,9 +107,6 @@ export pure docker_command_argv(value: DockerConfig, inner_argv: List[Str]) -> L
 
 ## Construct the sole PM planning command used by a SystemProfile, with only profile-declared direct roots and its separate kernel package.
 export pure docker_pm_plan_argv(profile: types.SystemProfile, arch: Str) -> List[Str] {
-  # The mounted checkout owns this PM invocation.  Mixing the image's pm.xsh
-  # entrypoint with checkout modules loads pm.types twice under the published
-  # runner's shared user-module namespace.
   var argv = ["/bin/xsh", "/src/laputa/pm.xsh", "--", "repo", "plan", "--repo", "/src/laputa"]
 
   for package_name in profile.package_roots {

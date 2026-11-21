@@ -6,8 +6,8 @@ proc run_guest_proof() [fs, process, env, error] -> Result[Unit, Error] {
   let receipt = generation.read_generation_receipt(p"/")?
   assert receipt.profile.name == "qemu-self-hosting"
   let expected = match system.uname()?.machine {
-    "x86_64" => pm_types.target_x86_64()
-    "aarch64" => pm_types.target_aarch64()
+    "x86_64" => pm_types.X86_64LinuxMusl
+    "aarch64" => pm_types.Aarch64LinuxMusl
     other => { fail f"unsupported self-hosting guest architecture {other}" }
   }
   assert receipt.target == expected

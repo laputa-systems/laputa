@@ -169,7 +169,7 @@ test test_generation_runtime_closure_excludes_build_toolchain [fs, process, env,
 }
 
 test test_generation_x86_64_plan_and_composition_preserve_target [fs, process, env, error] { |ctx|
-  let target = types.target_x86_64()
+  let target = types.X86_64LinuxMusl
   let repo_root = copied_generation_repository(ctx, "generation-x86-plan")?
   let build_value = plan.resolve(
     catalog.load_for_target(repo_root, target)?,

@@ -52,7 +52,7 @@ proc publish_plan(ctx: TestContext, name: Str) -> Result[types.BuildPlan] {
 }
 
 proc plan_publish_repository(repo_root: Path) -> Result[types.BuildPlan] {
-  let catalog_value = catalog.load_for_target(repo_root, types.target_aarch64())?
+  let catalog_value = catalog.load_for_target(repo_root, types.Aarch64LinuxMusl)?
   plan.resolve(catalog_value, publish_empty_remote(), policy.aarch64_docker(), ["app"], false)?
 }
 
@@ -114,7 +114,7 @@ proc stage_plan_artifacts(
   valid_proofs = true,
   include_package_kind = true,
   package_kind = "payload",
-  target: types.Target = types.target_aarch64(),
+  target: types.Target = types.Aarch64LinuxMusl,
   dependency_order: List[Str] = [],
 ) {
   let executor_sha256 = publish_executor_sha256()
@@ -128,7 +128,7 @@ proc stage_plan_artifacts(
     payload.write(if package_kind == "meta" { "laputa metapackage payload marker\n" } else { f"payload {node.package_id}\n" })
     let payload_sha256 = hash.sha256(payload)?.hex()
     let runtime_dependencies = [
-      dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()
+      dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime
     ]
     if include_package_kind {
       json.write(
@@ -141,10 +141,10 @@ proc stage_plan_artifacts(
           rel: node.rel,
           deps: if dependency_order.is_empty() or runtime_dependencies.is_empty() { runtime_dependencies } else { dependency_order },
           runtime_only_deps: [
-            dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime_only()
+            dependency.name for dependency in node.dependencies if dependency.kind == types.RuntimeOnly
           ],
-          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_host()],
-          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_target()],
+          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildHost],
+          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildTarget],
           package_kind,
           filetree: [],
           manifest: [],
@@ -161,12 +161,12 @@ proc stage_plan_artifacts(
           additional_metadata: {source: "recipe"},
           ver: node.ver,
           rel: node.rel,
-          deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()],
+          deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime],
           runtime_only_deps: [
-            dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime_only()
+            dependency.name for dependency in node.dependencies if dependency.kind == types.RuntimeOnly
           ],
-          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_host()],
-          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_target()],
+          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildHost],
+          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildTarget],
           filetree: [],
           manifest: [],
           metadata_sha256: "",
@@ -199,7 +199,7 @@ test test_snapshot_defaults_only_omitted_legacy_package_kind_to_payload [fs, env
   let legacy = repo.snapshot(value, legacy_store)?
 
   for publication in legacy.packages {
-    assert publication.kind == types.package_payload()
+    assert publication.kind == types.Payload
   }
 
   let invalid_store = test.temp_dir(ctx, name: "publish-invalid-package-kind-store")?
@@ -355,7 +355,7 @@ export let upstream_sources = []
 export let filetree = []
 """,
   )
-  let target = types.target_aarch64()
+  let target = types.Aarch64LinuxMusl
   let local_plan = plan.resolve(
     catalog.load_for_target(repo_root, target)?,
     publish_empty_remote(),
@@ -645,7 +645,7 @@ test test_publish_refuses_a_row_behind_the_remote_release [fs, net, env, time, e
 
 test test_publish_x86_64_plan_uses_its_target_arch [fs, net, env, time, error] { |ctx|
   let repo_root = copied_publish_repository(ctx, "publish-x86-repo")?
-  let target = types.target_x86_64()
+  let target = types.X86_64LinuxMusl
   let value = plan.resolve(
     catalog.load_for_target(repo_root, target)?,
     {target, index_sha256: "publish-empty-x86-remote", packages: []},
@@ -767,7 +767,7 @@ test test_remote_decoder_preserves_legacy_fallback_and_new_identity [fs, net, en
   json.write(metadata, {name: node.name, ver: node.ver, rel: node.rel, executor_sha256: publish_executor_sha256()})
   let imported_store = test.temp_dir(ctx, name: "publish-legacy-import-store")?
   let imported = store.import_remote(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     imported_store,
     {
       ...node,
@@ -823,7 +823,7 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
 
   let remote_node = {...node, action: types.ReuseRemote("legacy remote artifact"), remote: hydrated.retrieval}
   let imported = store.import_remote(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     test.temp_dir(ctx, name: "publish-legacy-hash-store")?,
     remote_node,
     f"file://{remote_root}",
@@ -834,7 +834,7 @@ test test_legacy_metadata_hash_is_fetched_into_retrieval_and_enforced_on_import 
   metadata.write("changed legacy metadata")
 
   match store.import_remote(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     test.temp_dir(ctx, name: "publish-legacy-hash-corrupt-store")?,
     remote_node,
     f"file://{remote_root}",

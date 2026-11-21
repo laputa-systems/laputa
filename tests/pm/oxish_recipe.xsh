@@ -31,7 +31,7 @@ test oxish_recipe_pins_one_release_archive_per_architecture [fs, env, error] {
   let root = path.absolute(p".")?
 
   for arch in ["x86_64", "aarch64"] {
-    let target = if arch == "x86_64" { types.target_x86_64() } else { types.target_aarch64() }
+    let target = if arch == "x86_64" { types.X86_64LinuxMusl } else { types.Aarch64LinuxMusl }
     let pkg = recipe.load_package_for_target(fp"{root}/packages/oxish", target)?
     let release_source = pkg.upstream_sources[0]
     let url = util.expand_source(release_source.source.display(), pkg, arch, arch)

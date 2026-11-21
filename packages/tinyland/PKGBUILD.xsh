@@ -77,7 +77,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported tinyland target")) }
   }
 
-  let x86_64_rustflags = if build_target == types.target_x86_64() and target != build_target {
+  let x86_64_rustflags = if build_target == types.X86_64LinuxMusl and target != build_target {
     host_rustflags
   } else {
     target_rustflags

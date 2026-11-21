@@ -72,8 +72,8 @@ test test_vulkan_headers_build_root_carries_the_cxx_toolchain [fs, env, error] {
 }
 
 test test_recipe_selects_target_filetree_variant [fs, env, error] {
-  let x86 = recipe.load_package_for_target(p"packages/musl", types.target_x86_64())?
-  let arm = recipe.load_package_for_target(p"packages/musl", types.target_aarch64())?
+  let x86 = recipe.load_package_for_target(p"packages/musl", types.X86_64LinuxMusl)?
+  let arm = recipe.load_package_for_target(p"packages/musl", types.Aarch64LinuxMusl)?
   let x86_filetree = [entry.path.display() for entry in x86.filetree].join("\n")
   let arm_filetree = [entry.path.display() for entry in arm.filetree].join("\n")
   assert "usr/lib/ld-musl-x86_64.so.1" in x86_filetree
@@ -311,10 +311,10 @@ test test_recipe_runtime_only_deps_load_and_never_repeat_a_build_dependency [fs,
 }
 
 test test_musl_abi_follows_each_arch_wchar_t_signedness [error] {
-  let arm = target.lp64_musl_abi(types.target_aarch64())?
+  let arm = target.lp64_musl_abi(types.Aarch64LinuxMusl)?
   assert ! arm.signed_wchar_t
   assert arm.wchar_t_suffix == "\"UINT\""
-  let x86 = target.lp64_musl_abi(types.target_x86_64())?
+  let x86 = target.lp64_musl_abi(types.X86_64LinuxMusl)?
   assert x86.signed_wchar_t
   assert x86.wchar_t_suffix == "\"INT\""
 }
@@ -357,7 +357,7 @@ test test_recipe_architectures_default_to_every_target_and_reject_invalid_lists 
     "[]",
     "## Fixture export.\nexport let architectures = [\"x86_64\"]",
   )?
-  assert recipe.load_package_for_target(x86_only, types.target_aarch64())?.architectures == ["x86_64"]
+  assert recipe.load_package_for_target(x86_only, types.Aarch64LinuxMusl)?.architectures == ["x86_64"]
 
   for case in [
     {list: "[]", message: "architectures must name at least one target architecture"},
@@ -383,13 +383,13 @@ test test_catalog_omits_a_package_outside_its_architectures_and_rejects_its_depe
   let _ = write_arch_recipe(repo, "x86-firmware", "[]", "## Fixture export.\nexport let architectures = [\"x86_64\"]")?
   let _ = write_arch_recipe(repo, "everywhere", "[]", "")?
 
-  assert catalog.package_names(catalog.load_for_target(repo, types.target_x86_64())?) == ["everywhere", "x86-firmware"]
-  assert catalog.package_names(catalog.load_for_target(repo, types.target_aarch64())?) == ["everywhere"]
+  assert catalog.package_names(catalog.load_for_target(repo, types.X86_64LinuxMusl)?) == ["everywhere", "x86-firmware"]
+  assert catalog.package_names(catalog.load_for_target(repo, types.Aarch64LinuxMusl)?) == ["everywhere"]
 
   let _ = write_arch_recipe(repo, "needs-firmware", "[\"x86-firmware\"]", "")?
-  assert catalog.load_for_target(repo, types.target_x86_64())?.packages.len() == 3
+  assert catalog.load_for_target(repo, types.X86_64LinuxMusl)?.packages.len() == 3
 
-  match catalog.load_for_target(repo, types.target_aarch64()) {
+  match catalog.load_for_target(repo, types.Aarch64LinuxMusl) {
     Ok(_) => test.fail("a dependency on an x86_64-only package unexpectedly loaded for aarch64")
     Err(problem) => assert "needs-firmware depends on x86-firmware, which does not exist for aarch64" in problem.message
   }
@@ -412,10 +412,10 @@ export proc build(dest: Path) [fs, error] {{}}
 
 test test_recipe_infers_identity_and_neutral_source_defaults [fs, env, error] { |ctx|
   let dir = write_default_recipe(ctx, "")?
-  let pkg = recipe.load_package_for_target(dir, types.target_x86_64())?
+  let pkg = recipe.load_package_for_target(dir, types.X86_64LinuxMusl)?
   assert pkg.name == dir.name
   assert pkg.rel == "1"
-  assert pkg.kind == types.package_payload()
+  assert pkg.kind == types.Payload
   assert pkg.upstream_sources[0].architectures == ["all"]
   assert pkg.upstream_sources[0].checksums[0].arch == "all"
   assert recipe.redundant_defaults(dir)? == []

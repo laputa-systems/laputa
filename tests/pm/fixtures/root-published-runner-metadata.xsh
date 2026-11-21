@@ -78,8 +78,8 @@ proc main() [fs, error] {
     dependencies: [],
     remote: null,
   }
-  let receipt = store.commit(types.target_aarch64(), store_root, node, {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256: digest("published executor")})?
-  let plan = root.preflight(types.target_aarch64(), [receipt])?
+  let receipt = store.commit(types.Aarch64LinuxMusl, store_root, node, {payload, payload_sha256: hash.sha256(payload)?.hex(), metadata, proof, executor_sha256: digest("published executor")})?
+  let plan = root.preflight(types.Aarch64LinuxMusl, [receipt])?
 
   if plan.entries.len() != 4 or plan.entries[0].path != "usr/bin/demo" {
     return error.fail("published legacy metadata did not materialize its package database entries")
@@ -128,7 +128,7 @@ proc main() [fs, error] {
     remote: null,
   }
   let shared_alpha = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     store_root,
     shared_alpha_node,
     {payload: shared_alpha_payload, payload_sha256: hash.sha256(shared_alpha_payload)?.hex(), metadata: shared_alpha_metadata, proof: shared_alpha_proof, executor_sha256: digest("published executor")},
@@ -174,15 +174,15 @@ proc main() [fs, error] {
     remote: null,
   }
   let shared_beta = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     store_root,
     shared_beta_node,
     {payload: shared_beta_payload, payload_sha256: hash.sha256(shared_beta_payload)?.hex(), metadata: shared_beta_metadata, proof: shared_beta_proof, executor_sha256: digest("published executor")},
   )?
-  let shared_directories = root.preflight(types.target_aarch64(), [shared_beta, shared_alpha])?
+  let shared_directories = root.preflight(types.Aarch64LinuxMusl, [shared_beta, shared_alpha])?
 
   if shared_directories.entries.len() != 4
-    or [entry.package_name for entry in shared_directories.entries if entry.kind == types.file_kind_tree()] != ["shared-alpha", "shared-alpha"] {
+    or [entry.package_name for entry in shared_directories.entries if entry.kind == types.Tree] != ["shared-alpha", "shared-alpha"] {
     return error.fail("published root preflight did not coalesce identical shared directories")
   }
   let shared_output = fp"{workspace}/shared-root"

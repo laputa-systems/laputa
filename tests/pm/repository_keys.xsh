@@ -32,7 +32,7 @@ proc rebuild_seed(root: Path, arch: Str) [fs, error] {
 }
 
 proc plan_for(value: types.PackageCatalog, target: types.Target, roots: List[Str]) -> Result[types.BuildPlan] {
-  let policy_value = if target == types.target_aarch64() { policy.aarch64_docker() } else { policy.x86_64_docker() }
+  let policy_value = if target == types.Aarch64LinuxMusl { policy.aarch64_docker() } else { policy.x86_64_docker() }
   plan.resolve(value, {target, index_sha256: "repository-keys-empty-remote", packages: []}, policy_value, roots, false)?
 }
 
@@ -56,45 +56,45 @@ pure generation_names(value: types.GenerationPlan) -> List[Str] {
 
 test test_seed_rebuild_changes_only_the_xsh_key [fs, env, error] { |ctx|
   let root = repository_with_seeds(ctx, "repository-keys-seed")?
-  let before = plan_repository(root, types.target_aarch64())?
+  let before = plan_repository(root, types.Aarch64LinuxMusl)?
 
   for name in seed_independent {
     assert name in [node.name for node in before.nodes]
   }
 
   rebuild_seed(root, "aarch64")
-  assert changed_key_names(before, plan_repository(root, types.target_aarch64())?)? == ["xsh"]
+  assert changed_key_names(before, plan_repository(root, types.Aarch64LinuxMusl)?)? == ["xsh"]
 }
 
 test test_seed_rebuild_changes_only_its_own_target_key [fs, env, error] { |ctx|
   let root = repository_with_seeds(ctx, "repository-keys-arch")?
-  let arm_before = plan_repository(root, types.target_aarch64())?
-  let x86_before = plan_repository(root, types.target_x86_64())?
+  let arm_before = plan_repository(root, types.Aarch64LinuxMusl)?
+  let x86_before = plan_repository(root, types.X86_64LinuxMusl)?
 
   rebuild_seed(root, "x86_64")
-  assert changed_key_names(arm_before, plan_repository(root, types.target_aarch64())?)? == []
-  assert changed_key_names(x86_before, plan_repository(root, types.target_x86_64())?)? == ["xsh"]
+  assert changed_key_names(arm_before, plan_repository(root, types.Aarch64LinuxMusl)?)? == []
+  assert changed_key_names(x86_before, plan_repository(root, types.X86_64LinuxMusl)?)? == ["xsh"]
 }
 
 test test_build_dependency_cascades_and_runtime_only_dependency_does_not [fs, env, error] { |ctx|
   let root = repository_with_seeds(ctx, "repository-keys-cascade")?
-  let value = catalog.load_for_target(root, types.target_aarch64())?
+  let value = catalog.load_for_target(root, types.Aarch64LinuxMusl)?
   let roots = ["libpng", "oxish", "laputa-net", "tailscale"]
-  let before = plan_for(value, types.target_aarch64(), roots)?
+  let before = plan_for(value, types.Aarch64LinuxMusl, roots)?
 
-  let zlib = plan_for(with_release(value, "zlib", "999")?, types.target_aarch64(), roots)?
+  let zlib = plan_for(with_release(value, "zlib", "999")?, types.Aarch64LinuxMusl, roots)?
   assert "zlib" in changed_key_names(before, zlib)?
   assert "libpng" in changed_key_names(before, zlib)?
 
-  let xinit = plan_for(with_release(value, "xinit", "999")?, types.target_aarch64(), roots)?
+  let xinit = plan_for(with_release(value, "xinit", "999")?, types.Aarch64LinuxMusl, roots)?
   assert changed_key_names(before, xinit)? == ["xinit"]
 }
 
 test test_runtime_roots_compose_runtime_only_dependencies [fs, env, error] { |ctx|
   let root = repository_with_seeds(ctx, "repository-keys-generation")?
   let value = plan_for(
-    catalog.load_for_target(root, types.target_aarch64())?,
-    types.target_aarch64(),
+    catalog.load_for_target(root, types.Aarch64LinuxMusl)?,
+    types.Aarch64LinuxMusl,
     ["tinyland", "laputa-net", "oxish", "tailscale"],
   )?
   let overlay = generation.overlay_digest(test.temp_dir(ctx, name: "repository-keys-overlay")?)?

@@ -129,7 +129,7 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
     return Err(types.PmError.PackageContract(f"{name}: upstream source {source} has no target architectures"))
   }
 
-  if (kind == types.source_cargo_vendor() or kind == types.source_cargo_git_workspace()) and util.parse_source_line(source)?.dest.normalize() == "." {
+  if (kind == types.CargoVendor or kind == types.CargoGitWorkspace) and util.parse_source_line(source)?.dest.normalize() == "." {
     return Err(types.PmError.PackageContract(f"{name}: {raw_kind} source {source} needs a `=> DIR` destination"))
   }
 
@@ -353,7 +353,7 @@ export proc redundant_defaults(dir: Path) [fs, env, error] -> Result[List[Str], 
 
     if let Ok(value) = recipe.get("package_kind") {
       let kind = value
-      if kind == types.package_kind_text(types.package_payload()) { yield "package_kind repeats the payload default" }
+      if kind == types.package_kind_text(types.Payload) { yield "package_kind repeats the payload default" }
     }
 
     for source in recipe.upstream_sources {
@@ -416,12 +416,12 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   let kind = if metadata.has_package_kind {
     types.parse_package_kind(metadata.package_kind)?
   } else {
-    types.package_payload()
+    types.Payload
   }
   let upstream_sources = decode_upstream_sources(name, metadata.upstream_sources)?
   let filetree = decode_filetree(name, select_filetree(metadata, arch))?
 
-  if kind == types.package_payload() {
+  if kind == types.Payload {
     guard metadata.has_build else {
       return Err(types.PmError.PackageContract(f"{name}: payload package must export build"))
     }
@@ -494,7 +494,7 @@ export proc call_prepare(pkg: types.Package, src: Path) [fs, process, env, error
 
 ## Invokes the required payload `build` procedure through the dynamic recipe boundary.
 export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, env, error] {
-  return when pkg.kind == types.package_meta()
+  return when pkg.kind == types.Meta
 
   let dynamic = load_recipe_procedures(dynamic_recipe_path(pkg)?)?
 

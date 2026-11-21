@@ -23,10 +23,10 @@ pure expanded_sources(pkg: types.Package, arch: Str) -> List[Str] {
 
 test test_rust_distribution_sources_keep_the_loaded_records_and_target_urls [fs, env, error] {
   let root = path.absolute(p".")?
-  let cargo_aarch64 = recipe.load_package_for_target(fp"{root}/packages/cargo", types.target_aarch64())?
-  let cargo_x86_64 = recipe.load_package_for_target(fp"{root}/packages/cargo", types.target_x86_64())?
-  let doas_aarch64 = recipe.load_package_for_target(fp"{root}/packages/doas-rs", types.target_aarch64())?
-  let doas_x86_64 = recipe.load_package_for_target(fp"{root}/packages/doas-rs", types.target_x86_64())?
+  let cargo_aarch64 = recipe.load_package_for_target(fp"{root}/packages/cargo", types.Aarch64LinuxMusl)?
+  let cargo_x86_64 = recipe.load_package_for_target(fp"{root}/packages/cargo", types.X86_64LinuxMusl)?
+  let doas_aarch64 = recipe.load_package_for_target(fp"{root}/packages/doas-rs", types.Aarch64LinuxMusl)?
+  let doas_x86_64 = recipe.load_package_for_target(fp"{root}/packages/doas-rs", types.X86_64LinuxMusl)?
 
   assert cargo_aarch64.ver == "1.99.0"
   assert cargo_x86_64.ver == "1.99.0"
@@ -103,8 +103,8 @@ test test_rust_distribution_sources_keep_the_loaded_records_and_target_urls [fs,
     ...cargo_aarch64,
     upstream_sources: [cargo_aarch64.upstream_sources[0], cargo_aarch64.upstream_sources[1], changed_rust_std],
   }
-  let arm_target = types.target_aarch64()
-  let x86_target = types.target_x86_64()
+  let arm_target = types.Aarch64LinuxMusl
+  let x86_target = types.X86_64LinuxMusl
   let arm_key = fingerprint.package_build_input(root, cargo_aarch64, arm_target)?
   let x86_key = fingerprint.package_build_input(root, cargo_aarch64, x86_target)?
 
@@ -114,12 +114,12 @@ test test_rust_distribution_sources_keep_the_loaded_records_and_target_urls [fs,
 
 test test_kernel_source_record_and_release_are_shared_by_all_recipes [fs, env, error] {
   let root = path.absolute(p".")?
-  let linux_aarch64 = recipe.load_package_for_target(fp"{root}/packages/linux", types.target_aarch64())?
-  let linux_x86_64 = recipe.load_package_for_target(fp"{root}/packages/linux", types.target_x86_64())?
-  let headers_aarch64 = recipe.load_package_for_target(fp"{root}/packages/linux-headers", types.target_aarch64())?
-  let headers_x86_64 = recipe.load_package_for_target(fp"{root}/packages/linux-headers", types.target_x86_64())?
-  let perf_aarch64 = recipe.load_package_for_target(fp"{root}/packages/perf", types.target_aarch64())?
-  let perf_x86_64 = recipe.load_package_for_target(fp"{root}/packages/perf", types.target_x86_64())?
+  let linux_aarch64 = recipe.load_package_for_target(fp"{root}/packages/linux", types.Aarch64LinuxMusl)?
+  let linux_x86_64 = recipe.load_package_for_target(fp"{root}/packages/linux", types.X86_64LinuxMusl)?
+  let headers_aarch64 = recipe.load_package_for_target(fp"{root}/packages/linux-headers", types.Aarch64LinuxMusl)?
+  let headers_x86_64 = recipe.load_package_for_target(fp"{root}/packages/linux-headers", types.X86_64LinuxMusl)?
+  let perf_aarch64 = recipe.load_package_for_target(fp"{root}/packages/perf", types.Aarch64LinuxMusl)?
+  let perf_x86_64 = recipe.load_package_for_target(fp"{root}/packages/perf", types.X86_64LinuxMusl)?
   let expected_kernel_source = {
     source: "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.2.9.tar.xz",
     kind: "auto",
@@ -142,8 +142,8 @@ test test_kernel_source_record_and_release_are_shared_by_all_recipes [fs, env, e
     checksums: [{...source.checksums[0], sha256: "changed-kernel-source"}],
   }
   let changed_headers = {...headers_aarch64, upstream_sources: [changed_source]}
-  let arm_target = types.target_aarch64()
-  let x86_target = types.target_x86_64()
+  let arm_target = types.Aarch64LinuxMusl
+  let x86_target = types.X86_64LinuxMusl
   let arm_key = fingerprint.package_build_input(root, headers_aarch64, arm_target)?
   let x86_key = fingerprint.package_build_input(root, headers_x86_64, x86_target)?
 

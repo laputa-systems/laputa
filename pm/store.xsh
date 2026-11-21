@@ -109,7 +109,7 @@ export pure receipt_dependency_keys(node: types.PlanNode) -> List[Str] {
     [
       dependency.artifact_key
       for dependency in node.dependencies
-      if dependency.kind != types.dependency_runtime_only() and dependency.kind != types.dependency_proof()
+      if dependency.kind != types.RuntimeOnly and dependency.kind != types.Proof
     ],
   )
 }
@@ -120,7 +120,7 @@ export pure receipt_runtime_dependency_keys(node: types.PlanNode) -> List[Str] {
     [
       dependency.artifact_key
       for dependency in node.dependencies
-      if dependency.kind == types.dependency_runtime()
+      if dependency.kind == types.Runtime
     ],
   )
 }
@@ -453,16 +453,16 @@ proc remote_executor_sha256(metadata: Path, node: types.PlanNode) -> Result[Str]
 proc verify_remote_metapackage_metadata(metadata: Path, node: types.PlanNode, arch: Str) {
   let dto = json.read(metadata)?.require(RemoteMetapackageMetadataDto)?
   let runtime_dependencies = [
-    dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime()
+    dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime
   ] |> sort
   let runtime_only_dependencies = [
-    dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_runtime_only()
+    dependency.name for dependency in node.dependencies if dependency.kind == types.RuntimeOnly
   ] |> sort
   let build_host_dependencies = [
-    dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_host()
+    dependency.name for dependency in node.dependencies if dependency.kind == types.BuildHost
   ] |> sort
   let build_target_dependencies = [
-    dependency.name for dependency in node.dependencies if dependency.kind == types.dependency_build_target()
+    dependency.name for dependency in node.dependencies if dependency.kind == types.BuildTarget
   ] |> sort
   let metadata_runtime_dependencies = dto.deps |> sort
   let metadata_runtime_only_dependencies = dto.runtime_only_deps |> sort
@@ -473,7 +473,7 @@ proc verify_remote_metapackage_metadata(metadata: Path, node: types.PlanNode, ar
     return Err(types.PmError.PackageContract(f"remote metapackage metadata does not match plan node {node.package_id}"))
   }
 
-  if types.parse_package_kind(dto.package_kind)? != types.package_meta() {
+  if types.parse_package_kind(dto.package_kind)? != types.Meta {
     return Err(types.PmError.PackageContract(f"remote metapackage metadata for {node.package_id} declares a payload"))
   }
 
@@ -492,7 +492,7 @@ proc verify_remote_archive_metadata(metadata: Path, node: types.PlanNode) {
 
   let kind = types.parse_package_kind(raw.get("package_kind")?.require()?)?
 
-  if kind == types.package_meta() {
+  if kind == types.Meta {
     return Err(types.PmError.PackageContract(f"remote archive metadata for {node.package_id} declares a metapackage"))
   }
 }
@@ -584,7 +584,7 @@ export proc commit(
   node: types.PlanNode,
   staged: types.StagedArtifact,
 ) [fs, error] -> Result[types.ArtifactReceipt, Error] {
-  commit_staged(target, root, node, staged, types.artifact_origin_built())?
+  commit_staged(target, root, node, staged, types.Built)?
 }
 
 ## Imports one exact remote artifact into the immutable store without re-resolving remote metadata.
@@ -617,11 +617,10 @@ export proc import_remote(
     return existing
   }
 
-  commit_locked(target, root, node, remote_staged_artifact(node, remote_repo, cache)?, types.artifact_origin_remote())?
+  commit_locked(target, root, node, remote_staged_artifact(node, remote_repo, cache)?, types.Remote)?
 }
 
 ## Verifies a completed artifact receipt, its key, and hashes of payload, metadata, and proof objects.
-## XSH currently lowers exported user-module procedures into one runtime symbol table: keeping this as `verify` would collide with the required `root.verify` when root imports this module. `verify_artifact` is therefore the unambiguous store boundary; no `verify` alias may be added.
 export proc verify_artifact(root: Path, key: Str) [fs, error] -> Result[types.ArtifactReceipt, Error] {
   require_key(key)
   let final_dir = artifact_path(root, key)

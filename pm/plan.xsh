@@ -71,7 +71,7 @@ proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str, depend
   let proof_dependencies = [
     f"dependency\t{plan_canonical_field(dependency.name)}\t{plan_canonical_field(dependency.artifact_key)}"
     for dependency in dependencies |> sort-by(dependency_key)
-    if dependency.kind == types.dependency_proof()
+    if dependency.kind == types.Proof
   ]
   plan_digest_lines(
     [
@@ -259,7 +259,7 @@ proc with_runtime_only_dependencies(
     var dependencies = node.dependencies
 
     for edge in edges {
-      continue unless edge.from == node.name and edge.kind == types.dependency_runtime_only() and (selected.get(edge.to) ?? false)
+      continue unless edge.from == node.name and edge.kind == types.RuntimeOnly and (selected.get(edge.to) ?? false)
       dependencies += [{name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?}]
     }
 

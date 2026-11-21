@@ -241,7 +241,7 @@ pure cargo_git_workspace(source: Path, checksum: Str) -> Result[CargoGitWorkspac
 pure cargo_git_lock_sources(sources: List[types.UpstreamSource]) -> Result[List[Str]] {
   collect {
     for source in sources {
-      continue unless source.kind == types.source_cargo_git_workspace()
+      continue unless source.kind == types.CargoGitWorkspace
 
       if source.checksums.is_empty() {
         return Err(types.PmError.SourceChecksum(f"{source.source}: missing Git workspace archive checksum"))
@@ -258,7 +258,7 @@ pure cargo_git_lock_sources(sources: List[types.UpstreamSource]) -> Result[List[
 pure selected_cargo_git_sources(pkg: types.Package, arch: Str) -> List[types.UpstreamSource] {
   collect {
     for source in pkg.upstream_sources {
-      yield source when source.kind == types.source_cargo_git_workspace() and source_selected(source, arch)
+      yield source when source.kind == types.CargoGitWorkspace and source_selected(source, arch)
     }
   }
 }
@@ -451,17 +451,17 @@ proc stage_resolved_source(
   verify_source_checksum(source_path, checksum, resolved.kind)
   let dest = util.source_stage_dir(src, line)
 
-  if source_kind == types.source_cargo_vendor() {
+  if source_kind == types.CargoVendor {
     stage_cargo_vendor(crates, dest)
     return
   }
 
-  if source_kind == types.source_cargo_git_workspace() {
+  if source_kind == types.CargoGitWorkspace {
     stage_cargo_git_workspace(line, checksum, source_path, dest)
     return
   }
 
-  if source_kind == types.source_directory() or resolved.kind == "dir" {
+  if source_kind == types.Directory or resolved.kind == "dir" {
     dest.mkdir()
     if sources_is_repository_input(line.source) {
       for input in util.repository_source_paths(source_path)? {
@@ -486,7 +486,7 @@ proc stage_resolved_source(
     return
   }
 
-  if (source_kind == types.source_archive() and util.is_tar_source(name)) or (source_kind == types.source_auto() and util.is_tar_source(
+  if (source_kind == types.Archive and util.is_tar_source(name)) or (source_kind == types.Auto and util.is_tar_source(
     name,
   )) {
     dest.remove()
@@ -495,14 +495,14 @@ proc stage_resolved_source(
     return
   }
 
-  if source_kind == types.source_zip() or (source_kind == types.source_auto() and util.is_zip_source(name)) {
+  if source_kind == types.Zip or (source_kind == types.Auto and util.is_zip_source(name)) {
     dest.remove()
     dest.parent.mkdir()
     archive.extract(source_path, dest, .Zip, collision: .Replace)
     return
   }
 
-  if source_kind == types.source_cpio() or (source_kind == types.source_auto() and util.is_cpio_source(name)) {
+  if source_kind == types.Cpio or (source_kind == types.Auto and util.is_cpio_source(name)) {
     dest.remove()
     dest.parent.mkdir()
     archive.extract(source_path, dest, .Cpio, collision: .Replace)
@@ -527,7 +527,7 @@ export proc stage_package_sources(pkg: types.Package, src: Path) [fs, net, env, 
       let resolved = resolve_source(pkg, line, checksum, arch, build)?
       var crates: List[ResolvedCrate] = []
 
-      if source.kind == types.source_cargo_vendor() {
+      if source.kind == types.CargoVendor {
         crates = resolve_locked_crates(pkg, resolved, checksum, arch)?
       }
 
@@ -752,7 +752,7 @@ export proc cargo_crate_fetch_items(
 
   for pkg in packages {
     for source in pkg.upstream_sources {
-      continue unless source_selected(source, arch) and source.kind == types.source_cargo_vendor()
+      continue unless source_selected(source, arch) and source.kind == types.CargoVendor
       let line = util.parse_source_line(source.source)?
       let expanded = util.expand_source(line.source, pkg, arch, arch)
       let checksum = source_checksum(source, arch)?

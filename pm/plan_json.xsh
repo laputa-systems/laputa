@@ -174,13 +174,6 @@ export proc write_plan(path_value: Path, value: types.BuildPlan) [fs, error] {
   path_value.write_atomic(json.encode(dto)? + "\n")
 }
 
-## Compatibility spelling for the durable BuildPlan write contract.
-## The current native-test indexed backend cannot encode a reachable exported write proc;
-## callers use write_plan for host-independent behavior coverage until that backend limitation lifts.
-export proc write(path_value: Path, value: types.BuildPlan) [fs, error] {
-  write_plan(path_value, value)
-}
-
 ## Reads a build plan through its JSON DTO and verifies every durable invariant.
 ## The format is checked before the DTO so a plan from another PM schema fails
 ## with its format name instead of a missing-field error.
@@ -200,10 +193,4 @@ export proc read(path_value: Path) [fs, error] -> Result[types.BuildPlan, Error]
   let value = plan_json_from_dto(dto)?
   build_plan.validate(value)
   value
-}
-
-## Re-exports durable BuildPlan verification without colliding with `root.verify`
-## when XSH imports modules into one runtime symbol table.
-export proc verify_plan(value: types.BuildPlan) [error] {
-  build_plan.validate(value)
 }

@@ -169,7 +169,7 @@ export proc package_build_input(
   pkg: types.Package,
   target: types.Target,
 ) [fs, error] -> Result[Str, Error] {
-  let encoding = if pkg.kind == types.package_meta() { "" } else { payload_archive.encoding_fingerprint()? }
+  let encoding = if pkg.kind == types.Meta { "" } else { payload_archive.encoding_fingerprint()? }
   package_build_input_with_encoding(repo_root, pkg, target, encoding)?
 }
 
@@ -192,27 +192,27 @@ export proc package_build_input_with_encoding(
     f"nostrip\t{pkg.nostrip}",
   ]
 
-  if pkg.kind != types.package_meta() {
+  if pkg.kind != types.Meta {
     lines += [f"payload-encoding\t{encoding}"]
   }
 
   for dependency in pkg.deps {
-    lines += [f"dependency\t{types.dependency_kind_text(types.dependency_runtime())}\t{canonical_field(dependency)}"]
+    lines += [f"dependency\t{types.dependency_kind_text(types.Runtime)}\t{canonical_field(dependency)}"]
   }
 
   for dependency in pkg.runtime_only_deps {
     lines += [
-      f"dependency\t{types.dependency_kind_text(types.dependency_runtime_only())}\t{canonical_field(dependency)}",
+      f"dependency\t{types.dependency_kind_text(types.RuntimeOnly)}\t{canonical_field(dependency)}",
     ]
   }
 
   for dependency in pkg.mkdeps_host {
-    lines += [f"dependency\t{types.dependency_kind_text(types.dependency_build_host())}\t{canonical_field(dependency)}"]
+    lines += [f"dependency\t{types.dependency_kind_text(types.BuildHost)}\t{canonical_field(dependency)}"]
   }
 
   for dependency in pkg.mkdeps_target {
     lines += [
-      f"dependency\t{types.dependency_kind_text(types.dependency_build_target())}\t{canonical_field(dependency)}",
+      f"dependency\t{types.dependency_kind_text(types.BuildTarget)}\t{canonical_field(dependency)}",
     ]
   }
 

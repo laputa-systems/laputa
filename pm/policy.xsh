@@ -14,8 +14,8 @@ export const BUILD_EPOCH = 2
 ## `gnu-stubs -> llvm-toolchain` likewise uses the seeded compiler until the replacement LLVM is built.
 export pure aarch64_docker() -> types.BuildPolicy {
   {
-    target: types.target_aarch64(),
-    build_target: types.target_aarch64(),
+    target: types.Aarch64LinuxMusl,
+    build_target: types.Aarch64LinuxMusl,
     native_build: true,
     bootstrap_seeds: [
       {
@@ -43,7 +43,7 @@ export pure aarch64_docker() -> types.BuildPolicy {
 
 ## Returns the x86_64 native Docker build policy with the same bootstrap seed rules.
 export pure x86_64_docker() -> types.BuildPolicy {
-  {...aarch64_docker(), target: types.target_x86_64(), build_target: types.target_x86_64()}
+  {...aarch64_docker(), target: types.X86_64LinuxMusl, build_target: types.X86_64LinuxMusl}
 }
 
 ## Returns the closed-build cohort's OS-enforced confinement profile for package

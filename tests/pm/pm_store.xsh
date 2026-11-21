@@ -50,12 +50,12 @@ pure node_with_shared_runtime_and_build_host_dependency(
 ) -> types.PlanNode {
   let runtime: types.PlanDependency = types.PlanDependency(
     name: "llvm-toolchain",
-    kind: types.dependency_runtime(),
+    kind: types.Runtime,
     artifact_key: dependency_key,
   )
   let build_host: types.PlanDependency = types.PlanDependency(
     name: "llvm-toolchain",
-    kind: types.dependency_build_host(),
+    kind: types.BuildHost,
     artifact_key: dependency_key,
   )
 
@@ -113,7 +113,7 @@ test test_store_commits_atomically_and_reuses_exact_artifact [fs, error] { |ctx|
   let root = store_root(ctx, "store-commit")?
   let key = digest("commit")
   let first_stage = staged_artifact(ctx, "store-commit-first", payload: "first payload")?
-  let first = store.commit(types.target_aarch64(), root, test_node(key), first_stage.staged)?
+  let first = store.commit(types.Aarch64LinuxMusl, root, test_node(key), first_stage.staged)?
   let final_dir = store.artifact_path(root, key)
   assert first.origin == .Built
   assert first.key == key
@@ -121,7 +121,7 @@ test test_store_commits_atomically_and_reuses_exact_artifact [fs, error] { |ctx|
   assert store.lookup(root, key)? == first
 
   let replacement = staged_artifact(ctx, "store-commit-replacement", payload: "replacement payload")?
-  let reused = store.commit(types.target_aarch64(), root, test_node(key), replacement.staged)?
+  let reused = store.commit(types.Aarch64LinuxMusl, root, test_node(key), replacement.staged)?
   assert reused == first
   assert fp"{final_dir}/payload.tar.gz".read_text()? == "first payload"
 }
@@ -130,12 +130,12 @@ test test_store_receipt_preserves_x86_64_target [fs, error] { |ctx|
   let root = store_root(ctx, "store-x86-target")?
   let key = digest("x86-target")
   let stage = staged_artifact(ctx, "store-x86-target-stage")?
-  let receipt = store.commit(types.target_x86_64(), root, test_node(key), stage.staged)?
+  let receipt = store.commit(types.X86_64LinuxMusl, root, test_node(key), stage.staged)?
 
   assert types.target_text(receipt.target) == "x86_64-linux-musl"
   assert types.target_text(store.lookup(root, key)?.target) == "x86_64-linux-musl"
 
-  match store.commit(types.target_aarch64(), root, test_node(key), stage.staged) {
+  match store.commit(types.Aarch64LinuxMusl, root, test_node(key), stage.staged) {
     Ok(_) => test.fail("artifact key was reused across targets")
     Err(problem) => assert "target does not match requested aarch64-linux-musl" in problem.message
   }
@@ -154,7 +154,7 @@ test test_store_receipts_deduplicate_shared_runtime_and_build_host_artifacts [fs
   assert store.receipt_runtime_dependency_keys(build_host_first) == [dependency_key]
 
   let receipt = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     root,
     runtime_first,
     staged_artifact(ctx, "store-shared-edge-stage")?.staged,
@@ -177,7 +177,7 @@ test test_store_discards_incomplete_temporary_artifacts [fs, error] { |ctx|
   temporary.mkdir()
   fp"{temporary}/payload.tar.gz".write("incomplete")
   let receipt = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     root,
     test_node(key),
     staged_artifact(ctx, "store-temporary-stage")?.staged,
@@ -190,7 +190,7 @@ test test_store_verify_all_ignores_temporary_state_and_checks_finals [fs, error]
   let root = store_root(ctx, "store-verify-all")?
   let key = digest("verify-all")
   let receipt = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     root,
     test_node(key),
     staged_artifact(ctx, "store-verify-all-stage")?.staged,
@@ -232,7 +232,7 @@ proc main(...argv: List[Str]) [fs, error] {
     remote: null,
   }
   let _ = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     fp"{argv[0]}",
     node,
     {payload: fp"{argv[2]}", payload_sha256: hash.sha256(fp"{argv[2]}")?.hex(), metadata: fp"{argv[3]}", proof: fp"{argv[4]}", executor_sha256: digest("executor")},
@@ -259,7 +259,7 @@ test test_store_detects_payload_receipt_and_key_corruption [fs, error] { |ctx|
   let key = digest("corrupt")
   let final_dir = store.artifact_path(root, key)
   let stage = staged_artifact(ctx, "store-corrupt-stage")?
-  let committed = store.commit(types.target_aarch64(), root, test_node(key), stage.staged)?
+  let committed = store.commit(types.Aarch64LinuxMusl, root, test_node(key), stage.staged)?
 
   fp"{final_dir}/payload.tar.gz".write("corrupted payload")
   assert store.lookup(root, key)? == committed
@@ -275,7 +275,7 @@ test test_store_detects_payload_receipt_and_key_corruption [fs, error] { |ctx|
   let clean_root = store_root(ctx, "store-key-corrupt")?
   let clean_dir = store.artifact_path(clean_root, key)
   let _ = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     clean_root,
     test_node(key),
     staged_artifact(ctx, "store-key-corrupt-stage")?.staged,
@@ -290,7 +290,7 @@ test test_store_staging_failure_never_publishes_final [fs, error] { |ctx|
   let key = digest("staging-failure")
   let stage = staged_artifact(ctx, "store-staging-failure-stage")?
   let broken = {...stage.staged, payload: fp"{stage.root}/missing-payload.tar.gz"}
-  expect_store_error(ctx, store.commit(types.target_aarch64(), root, test_node(key), broken), "No such file")
+  expect_store_error(ctx, store.commit(types.Aarch64LinuxMusl, root, test_node(key), broken), "No such file")
   assert store.artifact_path(root, key).exists()? == false
 }
 
@@ -299,11 +299,11 @@ test test_store_rejects_a_payload_changed_after_it_was_hashed [fs, error] { |ctx
   let key = digest("late-writer")
   let stage = staged_artifact(ctx, "store-late-writer-stage")?
   stage.staged.payload.write("late writer payload")
-  expect_store_error(ctx, store.commit(types.target_aarch64(), root, test_node(key), stage.staged), "changed after hashing")
+  expect_store_error(ctx, store.commit(types.Aarch64LinuxMusl, root, test_node(key), stage.staged), "changed after hashing")
   assert store.artifact_path(root, key).exists()? == false
 
   let honest = staged_artifact(ctx, "store-late-writer-honest")?
-  let receipt = store.commit(types.target_aarch64(), root, test_node(key), honest.staged)?
+  let receipt = store.commit(types.Aarch64LinuxMusl, root, test_node(key), honest.staged)?
   assert receipt.payload_sha256 == digest("payload")
   assert store.verify_artifact(root, key)? == receipt
 }
@@ -344,7 +344,7 @@ test test_store_imports_verified_remote_artifact [fs, net, error] { |ctx|
   let root = store_root(ctx, "store-remote-local")?
   let key = digest("remote")
   let receipt = store.import_remote(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     root,
     remote_node(key, payload, metadata),
     f"file://{remote_root}",
@@ -366,7 +366,7 @@ test test_store_rejects_remote_hash_and_metadata_mismatches [fs, net, error] { |
   expect_store_error(
     ctx,
     store.import_remote(
-      types.target_aarch64(),
+      types.Aarch64LinuxMusl,
       root,
       bad_hash_node,
       repo,
@@ -382,7 +382,7 @@ test test_store_rejects_remote_hash_and_metadata_mismatches [fs, net, error] { |
   expect_store_error(
     ctx,
     store.import_remote(
-      types.target_aarch64(),
+      types.Aarch64LinuxMusl,
       root,
       remote_node(metadata_key, payload, bad_metadata),
       f"file://{metadata_remote}",
@@ -397,7 +397,7 @@ test test_store_rejects_receipts_of_another_schema_and_ignores_older_layouts [fs
   let root = store_root(ctx, "store-schema")?
   let key = digest("schema")
   let receipt = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     root,
     test_node(key),
     staged_artifact(ctx, "store-schema-stage")?.staged,
@@ -425,9 +425,9 @@ test test_store_gc_keeps_named_artifacts_and_removes_the_rest [fs, error] { |ctx
   let root = store_root(ctx, "store-gc")?
   let kept = digest("gc-kept")
   let dropped = digest("gc-dropped")
-  let _ = store.commit(types.target_aarch64(), root, test_node(kept), staged_artifact(ctx, "store-gc-kept")?.staged)?
+  let _ = store.commit(types.Aarch64LinuxMusl, root, test_node(kept), staged_artifact(ctx, "store-gc-kept")?.staged)?
   let _ = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     root,
     test_node(dropped),
     staged_artifact(ctx, "store-gc-dropped")?.staged,

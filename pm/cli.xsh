@@ -169,7 +169,7 @@ export proc pm_cli_repo_plan(args: PmRepoPlanArgs) [fs, net, process, env, time,
   let target_name = if args.target == "" { f"{util.host_arch()?}-linux-musl" } else { args.target }
   let target = types.parse_target(target_name)?
   let repo_root = pm_cli_resolve_repo_root(args.repo)?
-  let policy_value = if target == types.target_aarch64() { policy.aarch64_docker() } else { policy.x86_64_docker() }
+  let policy_value = if target == types.Aarch64LinuxMusl { policy.aarch64_docker() } else { policy.x86_64_docker() }
 
   let cache_handle = fs.tempdir()?
   let cache_root = cache_handle.host_path()?
@@ -206,7 +206,7 @@ export proc pm_cli_repo_show(args: PmRepoShowArgs) {
 ## Execute the typed repo build command.
 export proc pm_cli_repo_build(args: PmRepoBuildArgs) {
   let value = pm_plan_json.read(args.input)?
-  if value.target == types.target_x86_64() and (system.uname()?.sysname != "Linux" or util.host_arch()? != "x86_64") {
+  if value.target == types.X86_64LinuxMusl and (system.uname()?.sysname != "Linux" or util.host_arch()? != "x86_64") {
     return Err(types.PmError.PackageContract("repo build requires a native Linux x86_64 runner for x86_64-linux-musl"))
   }
 

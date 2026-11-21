@@ -33,7 +33,7 @@ proc copied_repository(ctx: TestContext, name: Str) -> Result[Path] {
 }
 
 pure cli_empty_remote() -> types.RemoteSnapshot {
-  {target: types.target_aarch64(), index_sha256: "cli-empty-remote", packages: []}
+  {target: types.Aarch64LinuxMusl, index_sha256: "cli-empty-remote", packages: []}
 }
 
 proc published_generation_receipt(ctx: TestContext) -> Result[Path] {
@@ -160,7 +160,7 @@ test test_store_extract_copies_only_manifest_declared_file_from_saved_plan [fs, 
   proof.write("proof\n")
   let store_root = test.temp_dir(ctx, name: "store-extract-store")?
   let _ = store.commit(
-    types.target_aarch64(),
+    types.Aarch64LinuxMusl,
     store_root,
     selected,
     {

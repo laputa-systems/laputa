@@ -8,7 +8,7 @@ pure hook_package(dir: Path) -> types.Package {
     name: "hook-probe",
     ver: "1",
     rel: "1",
-    kind: types.package_payload(),
+    kind: types.Payload,
     deps: [],
     runtime_only_deps: [],
     proof_deps: [],
@@ -74,7 +74,7 @@ test recipe_hooks_preserve_optional_absence_and_required_build_error [fs, proces
     )
   }
 
-  recipe.call_build({...pkg, kind: types.package_meta()}, dir, dir)
+  recipe.call_build({...pkg, kind: types.Meta}, dir, dir)
 }
 
 test recipe_hooks_reject_incompatible_parameters_results_and_capabilities [fs, process, env, error] { |ctx|

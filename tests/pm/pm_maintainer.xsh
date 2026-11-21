@@ -20,7 +20,7 @@ proc maintainer_repository(ctx: TestContext) -> Result[Path] {
 }
 
 proc maintainer_plan(repository: Path) -> Result[types.BuildPlan] {
-  plan.resolve(catalog.load_for_target(repository, types.target_aarch64())?, {target: types.target_aarch64(), index_sha256: "empty", packages: []}, policy.aarch64_docker(), ["runtime-lib"], false)?
+  plan.resolve(catalog.load_for_target(repository, types.Aarch64LinuxMusl)?, {target: types.Aarch64LinuxMusl, index_sha256: "empty", packages: []}, policy.aarch64_docker(), ["runtime-lib"], false)?
 }
 
 proc maintainer_artifact(ctx: TestContext, value: types.BuildPlan, metadata_name: Str, inventory: Str) -> Result[Path] {
