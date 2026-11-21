@@ -21,7 +21,7 @@ docker info >/dev/null 2>&1 || fail 'Docker is unavailable to this user'
 [[ "$ASTERINAS_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail 'invalid Asterinas commit pin'
 [[ "$XSH_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail 'invalid XSH commit pin'
 [[ "$XSH_REPOSITORY" == https://github.com/laputa-systems/xsh.git ]] || fail 'invalid XSH repository pin'
-[[ "$ASTERINAS_REPOSITORY" == https://github.com/joshuarli/asterinas.git ]] || fail 'invalid Asterinas fork pin'
+[[ "$ASTERINAS_REPOSITORY" == https://github.com/laputa-systems/asterinas.git ]] || fail 'invalid Asterinas fork pin'
 [[ "$ASTERINAS_DEV_IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || fail 'invalid Asterinas dev image digest'
 [[ "$FIRECRACKER_BINARY_SHA256" =~ ^[0-9a-f]{64}$ ]] || fail 'invalid Firecracker binary digest'
 
@@ -35,7 +35,7 @@ submodule_commit="$(git -C "$repo_root" ls-files --stage -- asterinas | awk '$4 
     fail 'Asterinas gitlink differs from inputs.lock; update inputs.lock and the gitlink together'
 asterinas_remote="$(git -C "$asterinas_source" remote get-url origin)"
 [[ "$asterinas_remote" == "$ASTERINAS_REPOSITORY" || \
-   "$asterinas_remote" == git@github.com:joshuarli/asterinas.git ]] || \
+   "$asterinas_remote" == git@github.com:laputa-systems/asterinas.git ]] || \
     fail 'Asterinas submodule origin differs from the fork pin'
 asterinas_changes="$(git -C "$asterinas_source" status --porcelain --untracked-files=normal)"
 if [[ -n "$asterinas_changes" && "${ASTERINAS_LOCAL:-0}" != 1 ]]; then

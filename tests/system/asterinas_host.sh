@@ -147,7 +147,7 @@ printf '%s\n' 'version = 4' > "$setup_toolchain/lib/rustlib/src/rust/library/Car
 git -C "$setup_source" init -q
 git -C "$setup_source" config user.email asterinas-test@example.invalid
 git -C "$setup_source" config user.name Asterinas
-git -C "$setup_source" remote add origin https://github.com/joshuarli/asterinas.git
+git -C "$setup_source" remote add origin https://github.com/laputa-systems/asterinas.git
 git -C "$setup_source" add --all
 git -C "$setup_source" commit -qm 'test(asterinas): pin setup fixture'
 setup_source_commit="$(git -C "$setup_source" rev-parse HEAD)"
@@ -312,7 +312,7 @@ setup_environment=(
 )
 write_setup_lock() {
     cat > "$setup_root/infra/asterinas/inputs.lock" <<LOCK
-ASTERINAS_REPOSITORY=https://github.com/joshuarli/asterinas.git
+ASTERINAS_REPOSITORY=https://github.com/laputa-systems/asterinas.git
 ASTERINAS_COMMIT=$setup_source_commit
 ASTERINAS_DEV_IMAGE_VERSION=0.18.1-test
 ASTERINAS_DEV_IMAGE_DIGEST=$setup_image_digest

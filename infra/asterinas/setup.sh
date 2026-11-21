@@ -111,7 +111,7 @@ git -C "$source_dir" rev-parse --git-dir >/dev/null 2>&1 || \
     fail "Asterinas submodule is not initialized: $source_dir; run make asterinas-fetch"
 source_remote="$(git -C "$source_dir" remote get-url origin)"
 [[ "$source_remote" == "$ASTERINAS_REPOSITORY" || \
-   "$source_remote" == git@github.com:joshuarli/asterinas.git ]] || \
+   "$source_remote" == git@github.com:laputa-systems/asterinas.git ]] || \
     fail "Asterinas submodule origin differs from the fork pin: $source_remote"
 asterinas_commit="$ASTERINAS_COMMIT"
 [[ "$asterinas_commit" =~ ^[0-9a-f]{40}$ ]] || fail 'Asterinas commit pin must be a full Git commit id'
