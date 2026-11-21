@@ -25,7 +25,18 @@ sudo usermod -aG docker "$USER"   # then log in again
 The image builds read the `TARGETARCH` that BuildKit sets, so Docker's legacy
 builder cannot build them.
 
-`make test` runs on the host. A few tests also need host `cargo`,
+`make test` runs on the host and also needs `rg` and `jaq`, which the
+Asterinas scripts use. Ubuntu 24.04 packages ripgrep but not jaq; take jaq from
+its [releases](https://github.com/01mf02/jaq/releases):
+
+```sh
+sudo apt-get install ripgrep
+sudo curl -fsSLo /usr/local/bin/jaq \
+  https://github.com/01mf02/jaq/releases/download/v3.2.0/jaq-$(uname -m)-unknown-linux-musl
+sudo chmod 755 /usr/local/bin/jaq
+```
+
+A few tests also need host `cargo`,
 `python3` or a `readelf`, and skip with the missing tool named when it is
 absent; `sudo apt-get install cargo python3 binutils` runs them too. Run as
 root, the three tests that make a directory read-only skip, because root

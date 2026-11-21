@@ -155,7 +155,7 @@ sleep 1.2
 
 cohort_root="$scratch/cohort"
 mkdir -p "$cohort_root/infra/asterinas" "$cohort_root/.work/tmp" "$cohort_root/guest/asterinas/clock"
-cp "$infra/run-cancellable.sh" "$infra/qualify-cohort.sh" "$cohort_root/infra/asterinas/"
+cp "$infra/run-cancellable.sh" "$infra/cpu-budget.sh" "$infra/qualify-cohort.sh" "$cohort_root/infra/asterinas/"
 for stub in run-witness run-guest-case; do
     cat > "$cohort_root/infra/asterinas/$stub.sh" <<'STUB'
 #!/usr/bin/env bash
@@ -173,14 +173,10 @@ cohort_runner="$cohort_root/infra/asterinas/qualify-cohort.sh"
 
 : > "$COHORT_TRACE"
 COHORT_STUB=quick bash "$cohort_runner" clock-abi both '' > "$scratch/cohort-serial.log" 2>&1 || { cat "$scratch/cohort-serial.log" >&2; fail "the quick cohort failed"; }
-[[ "$(cat "$COHORT_TRACE")" == "linux start
-linux end
-asterinas start
-asterinas end
-linux start
-linux end
-asterinas start
-asterinas end" ]] || fail "the backends did not run one after the other: $(tr '\n' ',' < "$COHORT_TRACE")"
+clock_abi_witnesses="$(sed -n '/^    clock-abi)/,/;;/s/.*witnesses=(\(.*\)).*/\1/p' "$infra/qualify-cohort.sh" | wc -w)"
+(( clock_abi_witnesses > 0 )) || fail "the clock-abi cohort lists no witnesses"
+expected_trace="$(for _ in $(seq "$clock_abi_witnesses"); do printf 'linux start\nlinux end\nasterinas start\nasterinas end\n'; done)"
+[[ "$(cat "$COHORT_TRACE")" == "$expected_trace" ]] || fail "the backends did not run one after the other: $(tr '\n' ',' < "$COHORT_TRACE")"
 
 for signal in TERM INT; do
     expected=143
@@ -210,7 +206,7 @@ bundle="$runner_root/.out/asterinas-firecracker/builds/fake"
 mkdir -p "$runner_root/infra/asterinas" "$runner_root/.work/tmp" "$bundle" "$runner_root/.out/host/x86_64" \
     "$runner_root/.out/asterinas-firecracker/bin" "$runner_root/asterinas/test/initramfs/src/regression/fake" \
     "$runner_root/guest/asterinas/fake"
-cp "$infra/run-cancellable.sh" "$infra/run-guest-case.sh" "$infra/run-witness.sh" "$infra/run-test-vm.sh" \
+cp "$infra/run-cancellable.sh" "$infra/cpu-budget.sh" "$infra/run-guest-case.sh" "$infra/run-witness.sh" "$infra/run-test-vm.sh" \
     "$infra/check-guest-output.xsh" "$infra/guest_protocol.xsh" "$runner_root/infra/asterinas/"
 printf '#!/usr/bin/env bash\n[[ -s "$2" ]]\n' > "$runner_root/infra/asterinas/inject-guest-file.sh"
 printf '0.0.0\n' > "$runner_root/asterinas/DOCKER_IMAGE_VERSION"
@@ -324,7 +320,7 @@ expect_gone "$(cat "$scratch/client.pid")" "the container client of a terminated
 resources_root="$scratch/resources"
 bundle="$resources_root/.out/asterinas-firecracker/builds/fake"
 mkdir -p "$resources_root/infra/asterinas" "$resources_root/.work/tmp" "$bundle"
-cp "$infra/run-cancellable.sh" "$infra/resources.sh" "$resources_root/infra/asterinas/"
+cp "$infra/run-cancellable.sh" "$infra/cpu-budget.sh" "$infra/resources.sh" "$resources_root/infra/asterinas/"
 ln -s builds/fake "$resources_root/.out/asterinas-firecracker/current"
 printf '{"machine-config":{"vcpu_count":2,"mem_size_mib":768}}\n' > "$bundle/firecracker.json"
 head -c 4096 /dev/zero > "$bundle/kernel.elf"
@@ -339,8 +335,15 @@ cat > "$resources_root/infra/asterinas/qualify.sh" <<QUALIFY
 #!/usr/bin/env bash
 "$scratch/firecracker" --config-file "$bundle/firecracker.json"
 QUALIFY
+perf_gate_bin="$scratch/perf-gate-bin"
+mkdir -p "$perf_gate_bin"
+cat > "$perf_gate_bin/perf-gate-ready" <<'GATE'
+#!/usr/bin/env bash
+exit "$PERF_GATE_STATUS"
+GATE
+chmod 755 "$perf_gate_bin/perf-gate-ready"
 for gate in 0 75; do
-    PERF_GATE_MAX_LOAD=$([[ "$gate" == 0 ]] && echo 1000000 || echo 0) bash "$resources_root/infra/asterinas/resources.sh" asterinas boot > "$scratch/resources-$gate.out" 2>&1 \
+    PATH="$perf_gate_bin:$PATH" PERF_GATE_STATUS="$gate" bash "$resources_root/infra/asterinas/resources.sh" asterinas boot > "$scratch/resources-$gate.out" 2>&1 \
         || { cat "$scratch/resources-$gate.out" >&2; fail "the resource measurement failed with gate status $gate"; }
     rg -q 'backend=asterinas case=boot vmm=firecracker kernel_bytes=4096 initramfs_bytes=100 root_bytes=8192 .* memory_mib=768 peak_rss_kib=[1-9][0-9]*' "$scratch/resources-$gate.out" \
         || { cat "$scratch/resources-$gate.out" >&2; fail "the resource record is wrong with gate status $gate"; }
