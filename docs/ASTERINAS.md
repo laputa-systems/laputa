@@ -1,8 +1,35 @@
 # Asterinas and Firecracker
 
-The checked-in kernel pin is `d27b665aa`, with XSH `748dc69e5`, recorded with
-the other inputs in `infra/asterinas/inputs.lock`; both are published. The
-kernel adds four lanes to the previous pin `c505c5dc6`:
+The checked-in kernel pin is `21c9e9fb4`, with XSH `748dc69e5`, recorded with
+the other inputs in `infra/asterinas/inputs.lock`; both are published
+(`qualify.sh published-inputs --backend asterinas`). It is the fork's 186
+commits rebased onto upstream Asterinas `12374d133` (2026-11-21), built in
+upstream's dev image `0.19.0-20261012`. That image ships only
+`nightly-2026-07-21`, so the fork reverts upstream's two toolchain bumps
+(`12599001c`, `7c3c8a9ad`) until a matching image is published. The rebase
+ports the fork onto upstream's new APIs: `errno!` and `Error::new`, the
+thread-local, timer and path interfaces, the netlink framework
+(`SegmentBody`, `AttrValidation`, `SendOptions`) and `append_uevent_vars` for
+block uevents. Two fork behaviours the port had lost are restored, each with
+its regression: uevent sockets send to multicast groups again, so mdevd
+coldplug completes, and legacy state-changing rtnetlink requests reject a
+malformed trailing attribute with `EINVAL` (`network/rtnl_ack`; Linux ignores
+it, LAP-86). The fork also clears its clippy backlog and replaces upstream's
+CI with `ci.yml` (unit tests, the PVH kernel and a Firecracker boot) and
+`lint.yml` (`make lint`).
+
+The kernel ELF SHA-256 is
+`2fee2ecbcd444f34d6a1c4486abd4d03ce05c5c5869e3edd0081cd11644175af`. On
+2026-11-21 the Asterinas backend passed every cohort, including all ten
+recovery rounds and the clock and `rtnl_ack` witnesses:
+`ASTERINAS_LOCAL=1 LAPUTA_RECOVERY_REPEATS=10 bash infra/asterinas/qualify.sh all --backend asterinas`,
+after `ASTERINAS_EXTRA_PACKAGES=ntpd-rs bash infra/asterinas/viability.sh build`.
+The Linux backend and the native corpus were not rerun at this pin: the
+retained legacy-ACPI Linux reference package is no longer on this host. No
+cohort assertion, deadline or poweroff requirement changed.
+
+The previous pin `d27b665aa`, with XSH `748dc69e5`, added four lanes to
+`c505c5dc6`:
 - TCP telemetry for inet_diag (LAP-60): `struct tcp_info` at Linux's size,
   `INET_DIAG_CONG`, the cgroup attribute and the armed timer. smoltcp 0.11.0
   is vendored at `asterinas/vendor/smoltcp` with counters and estimator
@@ -22,7 +49,7 @@ kernel adds four lanes to the previous pin `c505c5dc6`:
   timers and timerfd, and cancels timerfds armed with
   `TFD_TIMER_CANCEL_ON_SET`.
 
-The kernel ELF SHA-256 is
+Its kernel ELF SHA-256 was
 `0f35d8551a84256e5a3fcd962cecdb1df2e363358733bc565ad5d1fd30b3c2e4`.
 Each lane has a C witness that passes on Linux and on this kernel as root and
 UID 1000 and fails on `c505c5dc6`: `network/tcp_diag_telemetry`,
@@ -33,7 +60,7 @@ the Linux 7.2.9 host, as root in a container and as UID 1000. The two time
 witnesses join the `clock-abi` cohort. Lane evidence is at
 `.work/tmp/lane-evidence-20261116/`.
 
-On 2026-11-16 the maintained replay with this pin passed every cohort on both
+On 2026-11-16 the maintained replay with `d27b665aa` passed every cohort on both
 backends, including all ten recovery rounds and the clock `pause` case:
 `LAPUTA_RECOVERY_REPEATS=10 bash infra/asterinas/qualify.sh all --backend both`.
 `qualify.sh published-inputs --backend asterinas` confirms that both pins are
@@ -46,23 +73,23 @@ deadline or poweroff requirement changed. A worktree replay needs
 `make asterinas-fetch` and the operator's
 `packages/ca-certificates/files/trust-update-key` first.
 
-The full native corpus at this pin ran on 2026-11-16 as eight parallel
+The full native corpus at `d27b665aa` ran on 2026-11-16 as eight parallel
 two-vCPU, 4 GiB guests, from a fixture built from XSH `748dc69e5`
 verification products. Every one of the 15,675 discovered IDs ran: 15,670
 passed, 5 failed and 300 were skipped, with none unexecuted or unknown. The
 five failures were per-test timeouts under the parallel load (`wc` and
 `factor` parallel logs, `vdir` terminal quoting, `sensors` option rejection
 and the `lscpu` fixture), and all five pass when run alone in one guest on the
-same kernel and fixture. Every failure of the previous pin's corpus passes.
+same kernel and fixture. Every failure of the `c505c5dc6` corpus passes.
 Evidence is at `.work/tmp/native-shard-748dc69e5-d27b665aa-s00/` through
 `-s07/` and `.work/tmp/native-rerun5-748dc69e5-d27b665aa-s00/`, with the
 fixture at `.work/tmp/native-fixture-748dc69e5/`.
 
-The previous pin `c505c5dc6`, with XSH `3913c9be3`, stopped epoll
+The pin before it, `c505c5dc6`, with XSH `3913c9be3`, stopped epoll
 modifications from growing an entry's poll handle without bound, which had
 exhausted the kernel heap two thirds of the way through the native corpus. Its
 eight-guest corpus passed 15,365 IDs, failed 10 and skipped 300; the failures
-are fixed by this pin's kernel lanes and by XSH `6ab5843ea`, `58df39400`,
+are fixed by `d27b665aa`'s kernel lanes and by XSH `6ab5843ea`, `58df39400`,
 `c3c574aa1` and `f08174ef2`. Evidence is at
 `.work/tmp/native-shard-3913c9be3-c505c5dc6-s00/` through `-s07/`.
 
