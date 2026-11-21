@@ -136,7 +136,7 @@ test-system: need-xsh
 	$(HOST_XSH_ENV) bash tests/system/asterinas_cpu_budget.sh
 
 test-xinit: need-xsh
-	$(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
+	umask 022 && $(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
 
 test-linux: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test packages/linux/tests

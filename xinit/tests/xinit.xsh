@@ -2292,7 +2292,10 @@ export let service = {{
   var alive = true
   var waits = 0
   while alive and waits < 100 {
-    alive = process.kill(pid, signal: "0") is Ok(_)
+    alive = match fp"/proc/{pid}/stat".read_text() {
+      Ok(stat) => ! stat.split(") ")[-1].starts_with("Z"),
+      Err(_) => false,
+    }
     waits += 1
     time.sleep(20ms)?
   }
@@ -2735,4 +2738,29 @@ print "direct-start-cleanup-ok"
   }, name: "direct-ready-error.xsh")?
   assert result.success, result.stderr
   assert result.stdout == "direct-start-cleanup-ok\n"
+}
+
+test test_xinit_accepts_the_run_directory_it_creates_under_a_group_writable_umask [fs, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "umask-run")?
+  let service_dir = fp"{root}/services"
+  let run_dir = fp"{root}/run"
+  service_dir.mkdir()
+  write_named_service(fp"{service_dir}/app.xsh", "app", "process.command_argv(\"true\", [\"true\"])", ["boot"], "")
+  let xsh = ctx.xsh_bin
+  let script = xinit_script()
+  var stderr = ""
+  env ({
+    XINIT_SERVICE_DIR: service_dir.display(),
+    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_LOG_ROOT: fp"{root}/logs".display(),
+    XINIT_TEST_MAX_EVENTS: "1",
+    XINIT_TEST_ALLOW_NON_PID1: "1",
+    XINIT_TEST_FAKE_PIDS: "1",
+  }) {
+    let result = run.capture --text sh -c "umask 002; exec \"$@\"" sh $xsh $script scan app
+    stderr = result.stderr
+  }
+  assert ! ("group or world writable" in stderr), stderr
+  let mode = run_dir.metadata()?.mode
+  assert mode.bit_and(0o022) == 0, f"run directory mode {mode}"
 }
