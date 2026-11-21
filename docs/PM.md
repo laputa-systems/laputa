@@ -87,7 +87,7 @@ compared exactly. A missing optional hook is a no-op; a present hook with an
 incompatible signature or effects is rejected before invocation.
 
 `upstream_sources` selects `auto`, `archive`, `zip`, `cpio`, `file`,
-`directory`, or `cargo-vendor` materialization (see [Sources](#sources)). A URL source pins a sha256 per architecture; a
+`directory`, `cargo-vendor`, or `cargo-git-workspace` materialization (see [Sources](#sources)). A URL source pins a sha256 per architecture; a
 `SKIP` checksum is accepted only for a relative repository-local source. Source
 strings may name whole-word placeholders such as `VERSION` and `ARCH`
 (`pm/util.xsh::expand_source` lists them); a word that merely contains one, such
@@ -615,7 +615,7 @@ holds staged inputs. Run the module for the contract you are changing, for
 example `$XSHT test --jobs 1 tests/pm/pm_graph_contracts.xsh`. Suites and wider
 runs are in [Testing](TESTING.md). In `pm/generation.xsh` the compiler can
 infer private `pure` and `proc` parameter types, so those annotations are not
-contracts. Keep the 19 exported parameter annotations, private `proc` return
+contracts. Keep the exported parameter annotations, private `proc` return
 types, effect clauses, and `Map` or `.require()` locals: erasing them changes
 the exported interface or fails the type check. Ordinary
 Make targets build the local `XSH_ROOT` checkout. Independent

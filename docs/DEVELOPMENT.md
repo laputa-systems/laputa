@@ -233,7 +233,7 @@ PM has no default remote; these make targets use the loopback mirror.
   The source tree's local scan-record cache uses format `linux-local-records-v4`;
   older records are discarded and rebuilt on the next discovery.
   The compile-flags cache binds parsed inputs and stored flags with format
-  `linux-kbuild-compile-flags-v4`, and
+  `linux-kbuild-compile-flags-v5`, and
   discovered-plan fingerprints use `linux-kbuild-plan-fingerprint-v12`.
   Archive-plan cache format `linux-archive-plan-cache-v4` binds the compiler
   path, prepared flags and source selections, EFI stub helper, and the report

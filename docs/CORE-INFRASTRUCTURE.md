@@ -12,7 +12,7 @@ macOS, KVM on Linux).
 | `pm.xsh`, `pm/` | package manager CLI and modules |
 | `packages/<name>/` | recipes (`PKGBUILD.xsh`), package proofs, package files |
 | `system/`, `laputa.xsh` | typed profile CLI: Docker adapter, image construction, QEMU proof |
-| `profiles/`, `guest/`, `boot/` | profile data, guest proof payload, QMP helper |
+| `profiles/`, `guest/` | profile data and guest proof payload; QMP is native in `system/qmp.xsh` |
 | `infra/asterinas/`, `guest/asterinas/` | pinned Asterinas/Firecracker backend, Laputa guest proof, and serial shell |
 | `installer/`, `build-installer-*.xsh`, `installer-*.xsh` | aarch64 and x86_64 installer image and its QEMU harness (separate from the profile CLI) |
 | `xinit/` | `xinit.xsh`, Laputa's pure-XSH PID 1 and service manager, with tests and docs |
@@ -42,8 +42,9 @@ runtime edge.
 
 ## Images and the seed
 
-The package-tools image is built on demand from `Dockerfile.package-tools`
-without network: the saved `laputa-host-tools` base (pinned Alpine and its
+The package-tools image is published and pulled by the digest in
+`seed/images.lock` (`make fetch`); repinning builds it from
+`Dockerfile.package-tools` without network: the saved `laputa-host-tools` base (pinned Alpine and its
 native build and image tools) plus the explicit LLVM seed. It holds no XSH;
 containers mount the local seed from `.out/seed/<arch>/`, binaries and core
 together.

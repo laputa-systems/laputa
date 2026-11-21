@@ -474,8 +474,8 @@ processes or containers before retrying. The verification binaries' hashes and
 XSH HEAD are recorded, but their source freshness is not established by the
 seed check.
 
-`tree-memory` runs an offline baselayout package plan in the pinned
-`laputa-package-tools:x86_64-f9f80dd0840f482b` image. It extracts the hashed
+`tree-memory` runs an offline baselayout package plan in the package-tools
+image pinned by digest in `seed/images.lock`. It extracts the hashed
 seed core archive inside the container and requires a plan containing
 baselayout before reading `memory.peak`. The value is the container cgroup's
 peak in bytes: it includes the shell, extraction, plan process tree and
@@ -563,15 +563,15 @@ is not an accepted representative benchmark with an output oracle.
 
 | Outcome | Workload and oracle | Attribution and gap |
 | --- | --- | --- |
-| Package build throughput and rebuild cost | `warm-rebuild` checks reuse of the baselayout and xsh closure with no builds | five-round elapsed median and spread; no accepted anchor or throughput benchmark |
-| Plan time | `world-plan` checks the complete package inventory and stable plan digest | five-round elapsed median and spread; no accepted anchor |
-| Mirror publish time | `mirror-publish` verifies the published plan artifacts through a private mirror | five-round elapsed median and spread; no accepted anchor |
-| Image and package size | `artifact-sizes` checks seed and three package payloads and records image size | comparable bytes and identities; no accepted anchor; installer ISO excluded |
-| Boot to usable system | `profile-ready` checks the profile proof readiness marker on the serial console | five-round elapsed median and spread; no accepted anchor |
-| xinit service start | `xinit-service-start` checks a supervised service notification and ready state | five-round elapsed median and spread; no accepted anchor |
-| PM install, remove, generation switch | `root-compose` checks the baselayout and xsh root inventory; PM and activation tests check other operations | five-round composition median and spread; no accepted anchor or latency benchmark for install, remove, and generation switch |
+| Package build throughput and rebuild cost | `warm-rebuild` checks reuse of the baselayout and xsh closure with no builds | five-round elapsed median and spread against its `bench/anchors.tsv` anchor; no throughput benchmark |
+| Plan time | `world-plan` checks the complete package inventory and stable plan digest | five-round elapsed median and spread against its anchor |
+| Mirror publish time | `mirror-publish` verifies the published plan artifacts through a private mirror | five-round elapsed median and spread against its anchor |
+| Image and package size | `artifact-sizes` checks seed and three package payloads and records image size | comparable bytes and identities against their anchors; installer ISO excluded |
+| Boot to usable system | `profile-ready` checks the profile proof readiness marker on the serial console | five-round elapsed median and spread against its anchor |
+| xinit service start | `xinit-service-start` checks a supervised service notification and ready state | five-round elapsed median and spread against its anchor |
+| PM install, remove, generation switch | `root-compose` checks the baselayout and xsh root inventory; PM and activation tests check other operations | five-round composition median and spread against its anchor; no latency benchmark for install, remove, and generation switch |
 | gluon configure/build | `gluon/tests/benchmarks/run.sh` exercises synthetic graphs and setup | CPU sampling and syscall counts; synthetic corpus, incomplete output checks and no accepted baseline |
-| Memory footprint | `tree-memory` checks an offline baselayout plan and reads the container cgroup peak | whole container tree, including cache; no accepted anchor |
+| Memory footprint | `tree-memory` checks an offline baselayout plan and reads the container cgroup peak | whole container tree, including cache, against its anchor |
 
 `make verify` records elapsed seconds, not a regression gate. The gluon script
 uses three samples for setup, skips some command failures and has no established

@@ -177,8 +177,9 @@ operation with a duration budget.
 
 The native supervisor covers readiness, input, VT switches, screenshots and
 pause/resume. Frames are limited to 1 MiB; replies match request IDs and events
-are skipped while awaiting replies. Fifteen peer cases and fourteen supervisor
-cases cover these contracts. `QemuConfig` contains only the QEMU executable and
+are skipped while awaiting replies. The peer cases in
+`tests/system/qmp_client.py` and the supervisor cases in `tests/system/qemu.xsh`
+cover these contracts. `QemuConfig` contains only the QEMU executable and
 target; `qemu_config(target)` does not discover a Python helper.
 
 | Boundary | Native implementation |
@@ -187,7 +188,7 @@ target; `qemu_config(target)` does not discover a Python helper.
 | QMP subprocesses | None; requests stay in the host XSH process. |
 | Argument conversion | Native JSON encoding and decoding replace the XSH-to-Python argv crossing. Screenshot filenames use structured QMP arguments. |
 | Lifetime | One bounded connection per operation, with ordered input steps, response IDs and an absolute deadline shared with the supervisor. |
-| Laputa source | The client and supervisor total 615 lines, versus the previous 645 lines of helper and supervisor. The helper and its runtime dependency are removed. |
+| Laputa source | The native client replaced the Python helper and its runtime dependency. |
 | Shared substrate | XSH adds the reusable Unix stream connection operation using its existing rustix dependency. That Rust host boundary is additional first-party source. |
 | Verification | Local protocol peers and supervisor fixtures remain Python test tooling. Linux x86_64/KVM provides the graphical proof; macOS and aarch64 runtime qualification remain separate. |
 

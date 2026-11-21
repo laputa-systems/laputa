@@ -121,8 +121,9 @@ native Unix or Linux fake providers.
 
 The remaining explicitly controlled fields are:
 
-- `XINIT_TEST_FAKE_PIDS`: preserves fake saved PIDs and bypasses live scanner
-  detection for native fixtures. It also selects their synthetic cgroup label.
+- `XINIT_TEST_FAKE_PIDS`: preserves fake saved PIDs, bypasses live scanner
+  detection, skips the session sweep and the scanner wake, and selects a
+  synthetic cgroup label for native fixtures.
 - `XINIT_TEST_MAX_EVENTS`: bounds scanner events for native fixtures.
 - `XINIT_TEST_EXIT_WHEN_IDLE`: returns when a bounded inittab fixture is idle.
 - `XINIT_TEST_FAST_SHUTDOWN`: skips the owned-group TERM grace in an inittab fixture.
@@ -194,7 +195,8 @@ mode `0700` beneath the run directory descriptor, given the `xinit-admin` group,
 and only then widened to mode `0770`. `xinit-admin` is a reserved group defined
 by baselayout. A request is a regular single-link file of at most 64 bytes,
 owned by the requester and carrying exactly one of `up`, `down`, `restart`, or
-`reload`. The client creates it with mode `0770` and group `xinit-admin` through
+`reload`; `down owner=TOKEN` and `up if-owner=TOKEN` are the only qualified
+forms ([supervision](SUPERVISION.md)). The client creates it with mode `0770` and group `xinit-admin` through
 a hidden temporary name, then renames it into place.
 
 The scanner accepts a request only when the file owner uid is 0 or a current
