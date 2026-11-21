@@ -1,3 +1,4 @@
+source "$(dirname "${BASH_SOURCE[0]}")/cpu-budget.sh"
 cancellable_child=""
 cancellable_container=""
 cancellable_spawning=""

@@ -22,6 +22,7 @@ if [[ -n "$requested_xsh_test" ]]; then
 fi
 unset XSH_BIN_DIR XSH_HOST
 source "$repo_root/infra/asterinas/inputs.lock"
+source "$repo_root/infra/asterinas/cpu-budget.sh"
 output_dir="$repo_root/.out/asterinas-firecracker"
 source_cache="${SOURCE_CACHE:-$repo_root/.cache/sources}"
 firecracker_bin="$output_dir/bin/firecracker"

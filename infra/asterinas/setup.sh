@@ -13,6 +13,7 @@ input_lock="$repo_root/infra/asterinas/inputs.lock"
     exit 1
 }
 source "$input_lock"
+source "$repo_root/infra/asterinas/cpu-budget.sh"
 cache_dir="$repo_root/.cache/asterinas"
 output_dir="$repo_root/.out/asterinas-firecracker"
 source_dir="$repo_root/asterinas"

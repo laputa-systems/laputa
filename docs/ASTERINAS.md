@@ -118,6 +118,16 @@ The [roadmap](ROADMAP.md) owns the successor kernel
 slices and the [TODO queue](../TODO.md) owns the remaining compatibility
 obligations.
 
+## Host CPU budget
+
+Builds, qualification and VM runs share the host with other jobs. Run them
+under [`cpu-slot`](https://github.com/joshuarli/usr/blob/main/docs/cpu-slot.md),
+for example `cpu-slot run --cpus 16 -- make asterinas-build`. Firecracker and
+QEMU inherit the granted CPUs, and `infra/asterinas/cpu-budget.sh` passes them to
+every `docker run` as `--cpuset-cpus`. A timeout or signal ends the whole job,
+but a container outlives its `docker` client, so the scripts' own cancellation
+removes their named containers.
+
 ## Maintained surface qualified at d59567c40
 
 - Boot and numeric: the pinned PM root boots and passes the numeric native

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "$repo_root/infra/asterinas/cpu-budget.sh"
 [[ $# == 1 ]] || { printf 'usage: run-ktest.sh CRATE_DIR_UNDER_ASTERINAS (for example ostd)\n' >&2; exit 2; }
 crate_dir="$1"
 source_dir="$repo_root/asterinas"
