@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 86
+Next: 87
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -47,6 +47,16 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Effort:** M
 - **Acceptance:** No package's installed ELF files carry a libgcc_s NEEDED entry or a GCC runtime import, the PM ELF check reports no gnu-stubs provider, and Rust packages still build and pass their proofs with the source-built toolchain.
 - **Parked:** The prebuilt `cargo`, `rustdoc`, `librustc_driver`, `libstd`, `rust-lld` and helper tools import libgcc_s; `rustc` does not. A source-built `cargo` needs an OpenSSL-compatible TLS library for curl, libgit2 and libssh2, and Laputa ships none: the routes are curl's rustls backend (needs `rustls-ffi`, which the rust source does not vendor, and drops ssh git), AWS-LC through `openssl-sys`, or a `cargo` without network TLS. Each adds work or a native dependency the owner does not want now, so gnu-stubs stays. The prebuilt 1.99.0 works as stage0 and Laputa's LLVM 23.1.5 as the external LLVM. The cargo proof skips its runtime check when `libgcc_s.so.1` is absent, so it must become a real run once gnu-stubs leaves its closure.
+
+### LAP-86 · P3 · Asterinas rejects malformed trailing netlink attributes that Linux ignores
+
+- **Area:** Asterinas fork · netlink
+- **Where:** `asterinas/kernel/core/src/net/socket/netlink/message/attr/mod.rs` (`AttrValidation::LegacyChange`), `asterinas/test/initramfs/src/regression/network/rtnl_ack.c:114`
+- **Problem:** A legacy (non-strict) `RTM_NEWADDR` whose last attribute overruns the message gets `EINVAL` on Asterinas. Linux parses these requests with `NL_VALIDATE_LIBERAL`, warns about the leftover bytes and applies the attributes before them. The fork chose the stricter answer in `12249b0fe` and marked the `rtnl_ack` case Asterinas-only. Upstream's 2026 netlink framework had moved Asterinas to the Linux behavior; the 2026-11-21 rebase restored the fork's divergence with `LegacyChange` so the witness keeps passing.
+- **Recommendation:** Once the Linux backend can run again, record Linux's reply for the three malformed-attribute requests in `rtnl_ack` on both backends. If Linux acknowledges them, drop `LegacyChange`, change the case to expect the Linux reply (deleting the address it creates), and run it on both backends.
+- **Fix with:** reference-parity
+- **Effort:** S
+- **Acceptance:** `qualify.sh all --backend both` passes `network/rtnl_ack` with the malformed-attribute case run on both backends and the same result on each.
 
 ### LAP-16 · P3 · Exercise sound and wireless device support
 
