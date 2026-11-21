@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 85
+Next: 86
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -115,3 +115,12 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** none
 - **Effort:** S
 
+### LAP-85 · P3 · Gluon consumer parity succeeds when reference builds fail
+
+- **Area:** Tests
+- **Where:** `gluon/tests/laputa/run.sh:48,60-73`, `gluon/tests/laputa/expected-fail`, `docs/DEVELOPMENT.md`
+- **Problem:** The Laputa-owned consumer parity runner reports any reference setup, build or install failure as `SKIP` without setting its failure status. If the reference compiler or dependencies are broken for every selected package, the runner can exit zero without comparing any installed trees. The empty expected-fail ledger does not prevent this. GLU-32 covers the separate upstream fixture runner, not this consumer gate.
+- **Recommendation:** Make failed reference stages fail the qualification run before consulting candidate-divergence allowances. If a diagnostic mode permits missing-prerequisite skips, report it as partial coverage and prevent it from satisfying the qualification gate. Account for selected and completed comparisons, reject a run with none completed, and retain the reference stage, exit status and logs in the result.
+- **Fix with:** test-audit, reference-parity
+- **Effort:** S
+- **Acceptance:** Focused harness controls make reference setup, build and install fail independently and require a nonzero qualification result, including when every selected package fails or a candidate divergence is listed. A matching positive fixture passes, a differing installed tree fails, and an explicitly partial diagnostic run cannot be reported as qualified. Keep the fix in Laputa's consumer harness; shared Gluon semantics and fixtures remain upstream-owned.
