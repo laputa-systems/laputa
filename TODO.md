@@ -120,7 +120,7 @@ qualification remains open; manual cross-build evidence is bounded in
 
 - **Area:** Tooling
 - **Where:** `Makefile:110-115`
-- **Problem:** `make lint` runs `xsht lint` only on `pm.xsh pm system installer xinit`, so `guest/`, `seed/`, `trust/`, `xinfra/`, `profiles/`, the top-level scripts and `tests/` are never linted, and `make check` does not run it. Dead private code that xsht already flags (`guest/trust-guest.xsh:27 wait_for`, `guest/asterinas/device/entry.xsh:10 Node`) survived for that reason.
+- **Problem:** `make lint` runs `xsht lint` only on `pm.xsh pm system installer xinit`, so `guest/`, `seed/`, `trust/`, `xinfra/`, `profiles/`, the top-level scripts and `tests/` are never linted, and `make check` does not run it. Dead private code that xsht already flags (`guest/trust-guest.xsh:27 wait_for`, `guest/asterinas/device/entry.xsh:10 Node`) survived for that reason. Even that subset does not pass: on 2026-11-21 it reported 541 findings with the host xsht built from the pinned XSH and 654 with XSH master `aef945569` (`lint.redundant-propagation`, `unused-export` and `prefer-inferred-variant` lead), so `make lint` exits nonzero on every host, including a fresh newcomer capsule.
 - **Recommendation:** Lint every XSH root from the project config and run it in `make check` (or CI) with warnings failing, once the debloat lane removes the current dead code.
 - **Fix with:** none
 - **Effort:** S
