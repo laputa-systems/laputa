@@ -674,3 +674,30 @@ forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
   assert retained == git_source
   assert fp"{src}/Cargo.lock".read_text()? == lockfile.read_text()?
 }
+
+test test_source_downloads_name_their_client_to_hosts_that_require_one [fs, net, process, time, error] { |ctx|
+  let python = match process.which("python3") {
+    Ok(found) => found,
+    Err(_) => {
+      test.skip("python3 is unavailable for the fixture HTTP server")
+      return
+    },
+  }
+  let root = test.temp_dir(ctx, name: "agent-download")?
+  let port_file = fp"{root}/port"
+  let server = spawn run $python p"tests/pm/fixtures/sources/agent_server.py" $port_file ?
+  defer {
+    let _ = process.kill(server.pid, signal: "KILL")
+    let _ = process.wait_any([server])
+  }
+  var tries = 0
+  while ! port_file.exists()? or port_file.read_text()?.trim() == "" {
+    assert tries < 100, "fixture HTTP server did not start"
+    time.sleep(100ms)?
+    tries += 1
+  }
+  let port = port_file.read_text()?.trim()
+  let dest = fp"{root}/source"
+  test.eq(util.download_file(f"http://127.0.0.1:{port}/source", dest)?, "")
+  test.eq(dest.read_text()?, "payload\n")
+}
