@@ -123,12 +123,13 @@ proc stage_initramfs(
     return root
   }
 
-  for dir in ["bin", "guest", "lib/trust", "lib/pm", "lib/modules", "etc/laputa", "etc/ssl/certs", "var/lib/laputa", "usr/share/laputa/trust/seed", "releases/release-b", "store", "proc", "sys", "dev", "tmp"] {
+  for dir in ["bin", "guest", "lib/trust", "lib/guest", "lib/pm", "lib/modules", "etc/laputa", "etc/ssl/certs", "var/lib/laputa", "usr/share/laputa/trust/seed", "releases/release-b", "store", "proc", "sys", "dev", "tmp"] {
     fp"{root}/{dir}".mkdir(parents: true)
   }
 
   xsh.copy(to: fp"{root}/bin/xsh", overwrite: true)?
   fp"{root}/bin/xsh".chmod(0o755)
+  p"guest/bootstrap.xsh".copy(to: fp"{root}/lib/guest/bootstrap.xsh", overwrite: true)?
   p"guest/trust-guest-init.xsh".copy(to: fp"{root}/init", overwrite: true)?
   fp"{root}/init".chmod(0o755)
   if main_script == "" {
