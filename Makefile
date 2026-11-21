@@ -131,9 +131,9 @@ mirror-bin:
 test-system: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test tests/system
 	$(HOST_XSH_ENV) $(XSHT) test tests/integration
-	bash tests/system/asterinas_host.sh
-	bash tests/system/asterinas_runners.sh
-	bash tests/system/asterinas_cpu_budget.sh
+	$(HOST_XSH_ENV) bash tests/system/asterinas_host.sh
+	$(HOST_XSH_ENV) bash tests/system/asterinas_runners.sh
+	$(HOST_XSH_ENV) bash tests/system/asterinas_cpu_budget.sh
 
 test-xinit: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
