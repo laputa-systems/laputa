@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 84
+Next: 85
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -104,5 +104,14 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Problem:** The host XSH feature set, the static-musl rustflags (including the `__isoc23_*` aliases) and the `xsh-test:<Dockerfile.test digest>` tag are written in both the Makefile and `seed/xsh_seed.xsh`, with a third copy of the rustflags in the self-hosting build. The Makefile's comments say to keep them identical; nothing checks it. The mirror's rust-toolchain pin carries the same unchecked rule.
 - **Recommendation:** Make `seed/xsh_seed.xsh` the one owner and have the Makefile call it (or read its output) for the features, flags and tag; add a check for the toolchain pin.
 - **Fix with:** single-source-of-truth
+- **Effort:** S
+
+### LAP-84 · P3 · make lint covers a third of the tree and gates nothing
+
+- **Area:** Tooling
+- **Where:** `Makefile:110-115`
+- **Problem:** `make lint` runs `xsht lint` only on `pm.xsh pm system installer xinit`, so `guest/`, `seed/`, `trust/`, `xinfra/`, `profiles/`, the top-level scripts and `tests/` are never linted, and `make check` does not run it. Dead private code that xsht already flags (`guest/trust-guest.xsh:27 wait_for`, `guest/asterinas/device/entry.xsh:10 Node`) survived for that reason.
+- **Recommendation:** Lint every XSH root from the project config and run it in `make check` (or CI) with warnings failing, once the debloat lane removes the current dead code.
+- **Fix with:** none
 - **Effort:** S
 
