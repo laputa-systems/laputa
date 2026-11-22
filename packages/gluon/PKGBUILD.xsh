@@ -1,5 +1,5 @@
 ##! gluon package: the in-tree Rust Meson front end and Ninja executor.
-use packages.upstream_pins as upstream_pins
+use packages.upstream_pins
 use pm.rust as pm_rust
 use pm.target as pm_target
 use pm.types

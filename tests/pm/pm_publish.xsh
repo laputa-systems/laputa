@@ -1,7 +1,7 @@
 ##! Behavior coverage for verified BuildPlan repository snapshots and immutable file publication.
 use pm.catalog
-use pm.execute as execute
-use pm.local as local
+use pm.execute
+use pm.local
 use pm.plan
 use pm.plan_json
 use pm.policy

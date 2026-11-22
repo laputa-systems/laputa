@@ -1,5 +1,5 @@
 ##! XSH module `PKGBUILD` package and build operations.
-use packages.upstream_pins as upstream_pins
+use packages.upstream_pins
 use pm.util as pm_util
 
 ## Exported declaration `name`.

@@ -1,5 +1,5 @@
 ##! XSH module `rust-fontconfig` package and build operations.
-use packages.upstream_pins as upstream_pins
+use packages.upstream_pins
 use pm.make
 use pm.rust as pm_rust
 use pm.target as pm_target

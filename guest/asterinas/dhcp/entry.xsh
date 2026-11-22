@@ -2,7 +2,7 @@
 use lib.dhcp_apply as apply
 use lib.dhcp_net as network
 use lib.dhcp_wire as wire
-use lib.gnu as gnu
+use lib.gnu
 use lib.net_state as state
 use lib.nettools_fixture as fixture
 

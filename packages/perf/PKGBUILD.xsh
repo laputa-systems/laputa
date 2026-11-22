@@ -1,5 +1,5 @@
 ##! perf, the Linux performance tool, built from the kernel tarball's tools/perf.
-use packages.upstream_pins as upstream_pins
+use packages.upstream_pins
 use pm.make
 use pm.target as pm_target
 use pm.types

@@ -1,7 +1,7 @@
 ##! Composed images carry factory trust state for profiles that include the
 ##! CA package, so first boot has readable CA roots and distrust policy.
 use pm.generation as pm_generation
-use system.container_build as container_build
+use system.container_build
 
 proc seed_overlay(ctx: TestContext, name: Str) -> Result[Path, Error] {
   let overlay = test.temp_dir(ctx, name:)?
