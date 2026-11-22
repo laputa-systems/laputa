@@ -72,8 +72,3 @@ export pure lp64_musl_abi(target: types.Target) -> Result[MuslAbi, Error] {
     signed_wchar_t,
   }
 }
-
-## Exported PM declaration `musl_abi`.
-export proc musl_abi() [env, error] -> Result[MuslAbi, Error] {
-  lp64_musl_abi(recipe_target()?)?
-}

@@ -21,9 +21,6 @@ export const localstatedir = p"/var"
 ## Exported PM declaration `libdir_name`.
 export const libdir_name = "lib"
 
-## Exported PM declaration `libexecdir_name`.
-export const libexecdir_name = "libexec"
-
 ## Exported PM declaration `bindir`.
 export const bindir = p"/usr/bin"
 
@@ -74,58 +71,9 @@ pure root_is_system(root: Path) -> Bool {
   root == p"/"
 }
 
-pure rooted(root: Path, rel: Str) -> Str {
-  return rel when root_is_system(root)
-
-  f"{root}{rel}"
-}
-
-## Exported PM declaration `build_path`.
-export pure build_path(root: Path, current: Str) -> Str {
-  return current when root_is_empty(root)
-
-  let tool_bin = rooted(root, "/usr/lib/llvm-toolchain/bin")
-  let usr_bin = rooted(root, "/usr/bin")
-  f"{tool_bin}:{usr_bin}:{current}"
-}
-
-## Exported PM declaration `build_ld_library_path`.
-export pure build_ld_library_path(root: Path, current = "") -> Str {
-  return current when root_is_empty(root)
-
-  if current == "" {
-    let lib = rooted(root, "/usr/lib")
-    let llvm_lib = rooted(root, "/usr/lib/llvm23/lib")
-    return f"{lib}:{llvm_lib}"
-  }
-
-  let lib = rooted(root, "/usr/lib")
-  let llvm_lib = rooted(root, "/usr/lib/llvm23/lib")
-  f"{lib}:{llvm_lib}:{current}"
-}
-
 ## Exported PM declaration `target_root`.
 export proc target_root() [env] -> Path {
   fp"{e"LAPUTA_ROOT" ?? ""}"
-}
-
-## Exported PM declaration `build_root`.
-export proc build_root() [env] -> Path {
-  let value = (e"XSH_PM_BUILD_ROOT" ?? "").trim()
-
-  return fp"{value}" when value != ""
-
-  target_root()
-}
-
-## Exported PM declaration `build_path_env`.
-export proc build_path_env(root: Path) [env] -> Str {
-  build_path(root, e"PATH" ?? "")
-}
-
-## Exported PM declaration `build_ld_library_path_env`.
-export proc build_ld_library_path_env(root: Path) [env] -> Str {
-  build_ld_library_path(root, e"LD_LIBRARY_PATH" ?? "")
 }
 
 ## Exported PM declaration `pkg_config_context`.

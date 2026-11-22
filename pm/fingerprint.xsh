@@ -86,11 +86,11 @@ proc package_source_lines(pkg: types.Package, target: types.Target) -> Result[Li
       continue when ignored_tree_path(rel)
 
       if entry.kind == "symlink" {
-        let target = entry.path.readlink()?.display()
+        let link_target = entry.path.readlink()?.display()
 
-        if util.pm_symlink_target_check(rel.display(), target, reject_empty: false) != .PmSymlinkValid {
+        if util.pm_symlink_target_check(rel.display(), link_target, reject_empty: false) != .PmSymlinkValid {
           return Err(
-            types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"),
+            types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {link_target} leaves the recipe directory"),
           )
         }
       }

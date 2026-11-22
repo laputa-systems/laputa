@@ -357,7 +357,7 @@ export proc write_remote_index_cache(out: Path, index: List[types.RemotePackage]
 ## Exported PM declaration `write_remote_index_to_repo`.
 export proc write_remote_index_to_repo(
   repo: Str,
-  work: Path,
+  _: Path,
   out: Path,
   index: List[types.RemotePackage],
   token: Str,

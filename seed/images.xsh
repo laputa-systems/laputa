@@ -74,17 +74,6 @@ export proc host_tools_tag(laputa_root: Path, value: xsh_seed.SeedArch) [fs, err
   f"oci.17166969.xyz/laputa-host-tools@{digest}"
 }
 
-## The pinned LLVM seed archive digest for one architecture, read through the typed recipe boundary.
-export proc llvm_seed_sha256(laputa_root: Path, arch: Str) [fs, env, error] -> Result[Str, Error] {
-  let pkg = pm_recipe.load_package_for_target(llvm_recipe_dir(laputa_root), pm_types.parse_target(arch)?)?
-
-  if pkg.upstream_sources.len() != 1 {
-    return Err(SeedImageError.Missing("packages/llvm-toolchain must declare exactly one LLVM seed source"))
-  }
-
-  pm_sources.source_checksum(pkg.upstream_sources[0], arch)?
-}
-
 ## The content key for package-tools: its Dockerfile, the LLVM bootstrap helper and recipe, and the base digest.
 ## XSH and PM only run the bootstrap helper; like artifact keys, the key records neither.
 export proc package_tools_key(laputa_root: Path, value: xsh_seed.SeedArch) [fs, error] -> Result[Str, Error] {

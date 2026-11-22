@@ -9,6 +9,13 @@ export type SeedEnvVar = {name: Str, value: Str}
 ## Errors raised when the seed inputs, build, or outputs violate their contract.
 export error SeedError = Usage : Usage | Missing : NotFound | Failed : ProcessFailure
 
+const xsh_seed_manifest_format = "laputa-xsh-seed-1"
+const xsh_seed_features = "xsh/net xsh/ssh xsh/tools xsht/native-tests"
+const xsh_seed_asterinas_shell_feature = "xshi/laputa-asterinas"
+
+## The products a seed directory holds beside its manifest; `core` is the tarball's extracted tree.
+export const xsh_seed_binaries = ["xsh", "xshi", "xsht"]
+
 ## The XSH image whose toolchain and musl CRT objects every Linux XSH build links against.
 ## Each Dockerfile.test pins its own nightly and builds run offline, so the tag
 ## names the Dockerfile's digest; the Makefile's XSH_TEST_IMAGE derives the same tag.
@@ -16,14 +23,6 @@ export proc xsh_seed_build_image(xsh_root: Path) -> Result[Str, Error] {
   let digest = hash.sha256(fp"{xsh_root}/Dockerfile.test")?.hex()
   f"xsh-test:{digest[..16]}"
 }
-
-const xsh_seed_manifest_format = "laputa-xsh-seed-1"
-
-const xsh_seed_features = "xsh/net xsh/ssh xsh/tools xsht/native-tests"
-const xsh_seed_asterinas_shell_feature = "xshi/laputa-asterinas"
-
-## The products a seed directory holds beside its manifest; `core` is the tarball's extracted tree.
-export const xsh_seed_binaries = ["xsh", "xshi", "xsht"]
 
 pure xsh_seed_features_for(asterinas_shell: Bool) -> Str {
   return f"{xsh_seed_features} {xsh_seed_asterinas_shell_feature}" when asterinas_shell
