@@ -33,13 +33,11 @@ proc serve_chain(ctx: TestContext, name: Str, python: Str, chain: Str, key: Str)
 
 proc stop_server(server: ConsumerServer) [process, error] {
   match process.kill(server.pid, signal: "KILL") {
-    Ok(_) => {},
-    Err(_) => {}
+    Ok(_) | Err(_) => {}
   }
 
   match process.wait_any([server.handle]) {
-    Ok(_) => {},
-    Err(_) => {}
+    Ok(_) | Err(_) => {}
   }
 }
 

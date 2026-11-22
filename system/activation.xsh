@@ -341,8 +341,7 @@ export proc activation_select_image(state_dir: Path) [fs, time, error] -> Result
   return {image, boot_serial: record.boot_serial, failed: null} when record.pending == null
   let selection = activation_begin_boot_record(state_dir, record)?
   let serial = match selection {
-    PendingBoot(boot) => boot.serial
-    FellBack(boot) => boot.serial
+    PendingBoot(boot) | FellBack(boot) => boot.serial
   }
   let failed = match selection {
     PendingBoot(_) => null

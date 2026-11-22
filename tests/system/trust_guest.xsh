@@ -262,8 +262,7 @@ proc wait_for_exit(pid: Int, attempts: Int) {
 
 proc stop_guest(pid: Int) [process, error] {
   match process.kill(pid, signal: "KILL") {
-    Ok(_) => {},
-    Err(_) => {},
+    Ok(_) | Err(_) => {},
   }
 }
 
@@ -310,13 +309,11 @@ proc serve_release_c(
 
 proc stop_server(server: GuestTlsServer) [process, error] {
   match process.kill(server.pid, signal: "KILL") {
-    Ok(_) => {},
-    Err(_) => {},
+    Ok(_) | Err(_) => {},
   }
 
   match process.wait_any([server.handle]) {
-    Ok(_) => {},
-    Err(_) => {},
+    Ok(_) | Err(_) => {},
   }
 }
 

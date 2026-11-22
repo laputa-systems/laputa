@@ -48,13 +48,11 @@ proc serve_fixture_tls(
 
 proc stop_fixture(server: TrustFixtureServer) [process, error] {
   match process.kill(server.pid, signal: "KILL") {
-    Ok(_) => {},
-    Err(_) => {}
+    Ok(_) | Err(_) => {}
   }
 
   match process.wait_any([server.handle]) {
-    Ok(_) => {},
-    Err(_) => {}
+    Ok(_) | Err(_) => {}
   }
 }
 

@@ -173,8 +173,7 @@ proc wait_for_exit(pid: Int, attempts: Int) {
 
 proc stop_guest(pid: Int) [process, error] {
   match process.kill(pid, signal: "KILL") {
-    Ok(_) => {},
-    Err(_) => {},
+    Ok(_) | Err(_) => {},
   }
 }
 
