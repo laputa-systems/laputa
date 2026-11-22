@@ -410,7 +410,7 @@ proc wait_for_marker(log: Path, marker: Str, attempts: Int) -> Result[Str, Error
 
   let tail = if log.exists() { log.read_text()? } else { "<no serial log>" }
   assert false, f"guest never printed {marker}; serial tail: {tail}"
-  
+
 }
 
 proc guest_alive(pid: Int) -> Result[Bool, Error] {
