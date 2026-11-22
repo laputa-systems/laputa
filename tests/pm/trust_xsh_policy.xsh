@@ -83,6 +83,10 @@ proc run_client(ctx: TestContext, name: Str, port: Int, root: Str, verify: Str, 
 
 test xsh_enforces_intermediate_policy_across_cross_signed_chains [fs, process, env, time, error] { |ctx|
   let python = python_or_skip()?
+  guard (run.capture --text docker image inspect --format "{{.Id}}" "debian:stable-slim").status.exited_with(0) else {
+    test.skip("the client container needs debian:stable-slim; run `docker pull debian:stable-slim`")
+    return
+  }
   let control = serve_chain(ctx, "xsh-policy-control", python, fixture("tls/chain-control.pem").display(), fixture("tls/ee-control.key").display())?
   defer stop_server(control)
   run_client(ctx, "control", control.port, "cross-r1", "verify", "accept", true)?
