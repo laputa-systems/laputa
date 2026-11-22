@@ -264,16 +264,16 @@ proc quiesce_wait(qe: QuiesceEnv, service: Str, up: Bool, timeout_ms: Int) [fs, 
     if up {
       if value != null and json.get(value, ["desired"], "down").require(Str)? == "down" {
         print f"quiesce service={service} desired=down note=operator-state-preserved"
-        return Ok()
+        return
       }
       if quiesce_up(value) {
         print f"quiesce service={service} desired=up state=running"
-        return Ok()
+        return
       }
     } else {
       if quiesce_down(value) {
         print f"quiesce service={service} desired=down state=down"
-        return Ok()
+        return
       }
     }
     guard waited < timeout_ms else {
@@ -366,7 +366,7 @@ export proc quiesce_release_service(qe: QuiesceEnv, record: QuiesceRecord, servi
     let owner = quiesce_owner(qe, service)?
     let queued = fp"{qe.state_dir}/inbox/{service}".exists()?
     let step = quiesce_release_step(record.token, owner, queued)
-    return Ok() when step == "done"
+    return when step == "done"
     if step == "request" {
       match quiesce_xinit(qe, ["start", "--if-owner", record.token, service]) {
         Ok(_) => {}
@@ -463,7 +463,7 @@ proc quiesce_main(...argv: List[Str]) [fs, process, time, io, error] {
   }
   if parsed.help {
     print $QUIESCE_USAGE
-    return Ok()
+    return
   }
   let qe = quiesce_env_default()
   if parsed.action == "stop" {

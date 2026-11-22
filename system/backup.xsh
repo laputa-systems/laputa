@@ -458,7 +458,7 @@ proc backup_list_snapshots(config: BackupConfig, label: Str) -> Result[List[Str]
 
 proc backup_run_hook(hook: BackupHook?, label: Str) {
   guard let value = hook else {
-    return Ok()
+    return
   }
   let scratch = backup_scratch()?
   let out = fp"{scratch}/hook-{label}.out"
@@ -516,7 +516,7 @@ proc backup_init(config: BackupConfig) {
   let marker = fp"{repository}/config"
   if marker.exists() {
     backup_log(f"event=backup-init repository={config.repository} state=already-initialized")
-    return Ok()
+    return
   }
   repository.mkdir()
   let text = backup_rustic(config, ["init"], "init")?
@@ -585,7 +585,7 @@ export proc backup_main(...argv: List[Str]) [fs, process, time, io, env, error] 
   }
   if parsed.help {
     print $BACKUP_USAGE
-    return Ok()
+    return
   }
   let config = backup_read_config(parsed)?
   match parsed.action {
