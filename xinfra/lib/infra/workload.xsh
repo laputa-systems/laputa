@@ -45,7 +45,7 @@ pure dialect_refusal(host: model.Host, resource: model.Resource, operation: scri
   f"{host.name}: {resource.id}: the {host.dialect} dialect has no script for {operation}; a {model.kind(resource.spec)} resource cannot run on this host"
 }
 
-proc check_dialect(host: model.Host, resources: List[model.Resource]) -> Result[Unit, Error] {
+proc check_dialect(host: model.Host, resources: List[model.Resource]) {
   for resource in resources {
     for operation in scripts.operations(resource.spec) {
       guard scripts.supports(host.dialect, operation) else {

@@ -1,6 +1,6 @@
 use pm.generation
 
-proc main(root: Path) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(root: Path) [fs, process, env, error] {
   assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   for fixture in ["clock_budget_guest.xsh", "lifecycle_replay_guest.xsh"] {

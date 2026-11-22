@@ -1,4 +1,4 @@
-proc main(root: Path) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(root: Path) [fs, process, env, error] {
   assert p"/etc/os-release".read_bytes()? == fp"{root}/inputs/previous-os-release".read_bytes()?
   assert p"/etc/os-release".read_bytes()? != fp"{root}/inputs/development-os-release".read_bytes()?
   let toolchain = fp"{root}/inputs/seed-A"

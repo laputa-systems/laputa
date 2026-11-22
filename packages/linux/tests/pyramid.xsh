@@ -37,7 +37,7 @@ proc pyramid_kernel_source(ctx: TestContext) -> Result[Path] {
   source
 }
 
-proc pyramid_stop(stage: kbuild_verify.LinuxKbuildStop) -> Result[Unit, Error] {
+proc pyramid_stop(stage: kbuild_verify.LinuxKbuildStop) {
   let requested = kbuild_verify.linux_kbuild_stop_name(stage)
   env ({XSH_LINUX_KBUILD_STOP_AFTER: requested}) {
     linux_shared.stop_after(requested)

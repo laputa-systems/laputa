@@ -917,7 +917,7 @@ proc format_ext_image(image: Path, source_root_path: Path, label: Str, owners: L
 
 type MkfsExt4Options = {label: Str, source_root: Str, features: Str, inode_owners: Str, image: List[Str]}
 
-proc main(...argv: List[Str]) [fs, error] -> Result[Unit, Error] {
+proc main(...argv: List[Str]) [fs, error] {
   let opts: MkfsExt4Options = cli.applet(
     argv,
     {

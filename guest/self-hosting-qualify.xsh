@@ -1,6 +1,6 @@
 use pm.generation
 
-proc run_closed(root: Path, script: Str, arguments: List[Str]) -> Result[Unit, Error] {
+proc run_closed(root: Path, script: Str, arguments: List[Str]) {
   let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", script, @arguments], env: {
     PATH: "/bin:/usr/lib/xsh/core:/usr/bin",
     XSH_MODULE_PATH: "/pm",
@@ -18,7 +18,7 @@ proc run_closed(root: Path, script: Str, arguments: List[Str]) -> Result[Unit, E
   fail f"guest qualification failed: {script}" unless status.ok
 }
 
-proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
+proc main(root: Path) [fs, process, env, time, error] {
   let receipt = generation.read_generation_receipt(p"/")?
   assert receipt.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")

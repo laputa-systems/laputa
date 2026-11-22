@@ -33,6 +33,6 @@ export proc self_hosting_verify_bundle(bundle: Path, expected_generation: Str, s
   }
 }
 
-proc main(bundle: Path, expected_generation: Str, selected_kernel: Path, tools_image: Str) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(bundle: Path, expected_generation: Str, selected_kernel: Path, tools_image: Str) [fs, process, env, error] {
   self_hosting_verify_bundle(bundle, expected_generation, selected_kernel, tools_image)
 }

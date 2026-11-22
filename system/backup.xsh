@@ -389,7 +389,7 @@ pure backup_options(argv: List[Str]) -> Result[BackupOptions, Str] {
   Ok(options)
 }
 
-proc backup_log(line: Str) [io, error] -> Result[Unit, Error] {
+proc backup_log(line: Str) [io, error] {
   print $line
   io.flush_stdout()
 }
@@ -454,7 +454,7 @@ proc backup_list_snapshots(config: BackupConfig, label: Str) -> Result[List[Str]
   }
 }
 
-proc backup_run_hook(hook: BackupHook?, label: Str) -> Result[Unit, Error] {
+proc backup_run_hook(hook: BackupHook?, label: Str) {
   guard let value = hook else {
     return Ok()
   }
@@ -501,7 +501,7 @@ proc backup_new_snapshot(config: BackupConfig, before: List[Str]) -> Result[Str,
   Err(error.failure("backup produced no new snapshot"))
 }
 
-proc backup_write_receipt(config: BackupConfig, receipt: BackupReceipt) -> Result[Unit, Error] {
+proc backup_write_receipt(config: BackupConfig, receipt: BackupReceipt) {
   let file = fp"{config.receipt}"
   file.parent().mkdir()
   let body = json.encode(receipt)? + "\n"
@@ -512,7 +512,7 @@ proc backup_write_receipt(config: BackupConfig, receipt: BackupReceipt) -> Resul
   fs.fsync(file.parent())
 }
 
-proc backup_init(config: BackupConfig) -> Result[Unit, Error] {
+proc backup_init(config: BackupConfig) {
   let repository = fp"{config.repository}"
   let marker = fp"{repository}/config"
   if marker.exists() {
@@ -525,7 +525,7 @@ proc backup_init(config: BackupConfig) -> Result[Unit, Error] {
   Ok()
 }
 
-proc backup_run(config: BackupConfig) [fs, process, time, io, error] -> Result[Unit, Error] {
+proc backup_run(config: BackupConfig) [fs, process, time, io, error] {
   let attempt = e"LAPUTA_TIMER_ATTEMPT" ?? "0"
   let job = e"LAPUTA_TIMER_NAME" ?? ""
   guard fp"{config.password_file}".exists() else {

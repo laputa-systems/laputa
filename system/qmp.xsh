@@ -6,7 +6,7 @@ export enum QmpStep { QmpExecute(Str, Str, QmpRequestKind), QmpDelay(Int) }
 ## Protocol failures, command rejections, and uncertain mutation outcomes.
 export error QmpError = Protocol(message: Str) | Rejected(message: Str) | Indeterminate(operation: Str)
 
-proc qmp_wait(fd: Int, event: Str, deadline: Int) -> Result[Unit, Error] {
+proc qmp_wait(fd: Int, event: Str, deadline: Int) {
   let remaining = deadline - time.monotonic()?
   return Err(QmpError.Protocol("QMP deadline expired")) when remaining <= 0
   let ready = unix.poll_fd(fd, [event], timeout_ms: (remaining + 999999) / 1000000)?
@@ -36,7 +36,7 @@ proc qmp_frame(fd: Int, pending: Bytes, deadline: Int) -> Result[QmpFrame, Error
   }
 }
 
-proc qmp_send(fd: Int, payload: Bytes, deadline: Int) -> Result[Unit, Error] {
+proc qmp_send(fd: Int, payload: Bytes, deadline: Int) {
   var offset = 0
   while offset < payload.len() {
     qmp_wait(fd, "writable", deadline)

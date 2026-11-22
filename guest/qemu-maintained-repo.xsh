@@ -10,7 +10,7 @@ use pm.repo_snapshot
 const KEY_FILE = p"/etc/laputa/repo-snapshot-keys"
 const STATE_DIR = "/var/lib/laputa/repo-state"
 
-proc say(message: Str) -> Result[Unit] {
+proc say(message: Str) {
   p"/dev/console".write(f"LAPUTA_REPO_INSTALLED_STEP {message}\n")
 }
 

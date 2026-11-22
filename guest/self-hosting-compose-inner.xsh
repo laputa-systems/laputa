@@ -1,7 +1,7 @@
 use system.docker
 use system.profile
 
-proc main() [fs, process, env, error] -> Result[Unit, Error] {
+proc main() [fs, process, env, error] {
   let intent = profile.load_system_profile("qemu-self-hosting", p"/src/laputa/profiles")?
   let commands = [
     docker.docker_pm_plan_argv(intent, "x86_64"),

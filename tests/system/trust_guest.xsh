@@ -180,7 +180,7 @@ proc stage_initramfs(
   root
 }
 
-proc build_initramfs(root: Path, output: Path) -> Result[Unit, Error] {
+proc build_initramfs(root: Path, output: Path) {
   var entries = ["."]
   for entry in fs.walk(root, hidden: true)? {
     let rel = entry.path.strip_prefix(root)?
@@ -205,7 +205,7 @@ proc build_initramfs(root: Path, output: Path) -> Result[Unit, Error] {
   assert status.ok, "cpio could not pack the guest initramfs"
 }
 
-proc build_store_disk(path_value: Path, size_mb: Int) [fs, process, error] -> Result[Unit, Error] {
+proc build_store_disk(path_value: Path, size_mb: Int) [fs, process, error] {
   let command = process.command_argv(
     "mke2fs",
     ["mke2fs", "-F", "-q", "-t", "ext4", "-L", "LAPUTA_TRUST_STORE", path_value, f"{size_mb}M"],
@@ -245,7 +245,7 @@ proc guest_alive(pid: Int) -> Result[Bool, Error] {
   false
 }
 
-proc wait_for_exit(pid: Int, attempts: Int) -> Result[Unit, Error] {
+proc wait_for_exit(pid: Int, attempts: Int) {
   var tries = 0
   while tries < attempts {
     guard guest_alive(pid) else {

@@ -2,7 +2,7 @@ use pm.generation
 use seed.self_hosting_verify as verify
 use system.activation
 
-proc main(operation: Str, output: Path, bundle: Path, selected_kernel: Path, tools_image: Str) [fs, process, env, time, error] -> Result[Unit, Error] {
+proc main(operation: Str, output: Path, bundle: Path, selected_kernel: Path, tools_image: Str) [fs, process, env, time, error] {
   let state = fp"{output}/generations"
   let receipt = generation.read_generation_receipt_file(fp"{bundle}/generation.json")?
   guard receipt.profile.name == "qemu-self-hosting" else { fail "local self-hosting admission requires the development profile" }

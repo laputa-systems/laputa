@@ -257,7 +257,7 @@ proc quiesce_xinit(qe: QuiesceEnv, args: List[Str]) -> Result[Str, Error] {
   Ok(text)
 }
 
-proc quiesce_wait(qe: QuiesceEnv, service: Str, up: Bool, timeout_ms: Int) [fs, time, io, error] -> Result[Unit, Error] {
+proc quiesce_wait(qe: QuiesceEnv, service: Str, up: Bool, timeout_ms: Int) [fs, time, io, error] {
   var waited = 0
   while true {
     let value = quiesce_status(qe, service)?
@@ -413,7 +413,7 @@ export proc quiesce_release_record(qe: QuiesceEnv, job: Str, timeout_ms: Int) [f
   Ok(true)
 }
 
-proc quiesce_supervised(qe: QuiesceEnv, job: Str, attempt: Int) -> Result[Unit, Error] {
+proc quiesce_supervised(qe: QuiesceEnv, job: Str, attempt: Int) {
   let file = fp"{qe.writers}/{job}.json"
   guard file.exists() else {
     return Err(error.failure(f"{job} has no supervised attempt: quiescence runs under the timer supervisor"))
@@ -454,7 +454,7 @@ export proc quiesce_acquire(qe: QuiesceEnv, job: Str, attempt: Int, options: Qui
   Ok()
 }
 
-proc quiesce_main(...argv: List[Str]) [fs, process, time, io, error] -> Result[Unit, Error] {
+proc quiesce_main(...argv: List[Str]) [fs, process, time, io, error] {
   let parsed = match quiesce_options(argv) {
     Ok(value) => value,
     Err(problem) => {

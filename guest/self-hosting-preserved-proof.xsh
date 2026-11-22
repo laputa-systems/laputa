@@ -1,6 +1,6 @@
 use pm.generation
 
-proc verify_previous(root: Path, expected_os_release: Path? = null) [fs, process, env, error] -> Result[Unit, Error] {
+proc verify_previous(root: Path, expected_os_release: Path? = null) [fs, process, env, error] {
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let expected = generation.read_generation_receipt_file(fp"{root}/inputs/generation-A.json")?
   assert generation.read_generation_receipt(p"/")? == expected
@@ -11,7 +11,7 @@ proc verify_previous(root: Path, expected_os_release: Path? = null) [fs, process
   print "LAPUTA_SELF_HOSTING_PREVIOUS_BOOTED" $expected.generation_sha256
 }
 
-proc main(root: Path, ...release_inputs: List[Str]) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(root: Path, ...release_inputs: List[Str]) [fs, process, env, error] {
   guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
   let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
   verify_previous(root, release_input)

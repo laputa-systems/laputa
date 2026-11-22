@@ -11,7 +11,7 @@ proc record_failed_pending(state: Path) {
   if record.pending != null { activation.activation_boot_failed(state) }
 }
 
-proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, process, net, env, time, io, error] -> Result[Unit, Error] {
+proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, process, net, env, time, io, error] {
   let declared = profile.load_system_profile("qemu-self-hosting", fp"{repository}/profiles")?
   let runtime_proof = completion_marker in ["LAPUTA_SELF_HOSTING_SUCCESSOR_BOOTED", "LAPUTA_SELF_HOSTING_PREVIOUS_BOOTED"]
   let intent = if runtime_proof { {...declared, qemu_memory: "4G"} } else { declared }

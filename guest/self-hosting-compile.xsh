@@ -1,7 +1,7 @@
 #!/bin/xsh
 use pm.generation
 
-proc main(root: Path) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(root: Path) [fs, process, env, error] {
   let receipt = generation.read_generation_receipt(p"/")?
   assert receipt.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")

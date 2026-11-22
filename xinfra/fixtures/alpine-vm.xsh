@@ -70,7 +70,7 @@ proc start_seed(seed: Path, port: Int, out: Path, err: Path) -> Result[Int] {
   fail f"seed HTTP server on port {port} did not listen: {err.read_text()?.trim()}"
 }
 
-proc stop_process(pid: Int, grace_ms: Int) -> Result[Unit] {
+proc stop_process(pid: Int, grace_ms: Int) {
   return when pid <= 0
 
   let _ = process.kill(pid, signal: "TERM")
@@ -90,7 +90,7 @@ proc ssh_capture(client: Path, port: Int, account: Str, script: Str) -> Result[C
   Ok({code: out.status.exit_code() ?? -1, stdout: out.stdout, stderr: out.stderr})
 }
 
-proc wait_ready(client: Path, port: Int) -> Result[Unit] {
+proc wait_ready(client: Path, port: Int) {
   let started = time.now()
   var last = ""
   while time.now() - started < boot_timeout_ms {
@@ -104,7 +104,7 @@ proc wait_ready(client: Path, port: Int) -> Result[Unit] {
   fail f"guest on port {port} did not finish cloud-init ({last})"
 }
 
-proc verify_guest(client: Path, port: Int) -> Result[Unit] {
+proc verify_guest(client: Path, port: Int) {
   let comm = ssh_capture(client, port, "deploy", "cat /proc/1/comm")?
   guard comm.code == 0 and comm.stdout.trim() == "init" else {
     fail f"guest on port {port}: PID 1 is not init: exit {comm.code}: {comm.stdout.trim()} {comm.stderr.trim()}"

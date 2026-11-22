@@ -17,7 +17,7 @@ proc fingerprint(pub: Path) -> Result[Str] {
   Ok(line.fields()[1])
 }
 
-proc wait_for_sshd(container: Str) -> Result[Unit] {
+proc wait_for_sshd(container: Str) {
   for _ in range(50) {
     let status = run.status docker exec $container nc -z 127.0.0.1 22
     return when status.ok

@@ -1,6 +1,6 @@
 use pm.generation
 
-proc verify_successor(root: Path, expected_tools = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", expected_os_release: Path? = null) [fs, process, env, error] -> Result[Unit, Error] {
+proc verify_successor(root: Path, expected_tools = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", expected_os_release: Path? = null) [fs, process, env, error] {
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let expected = generation.read_generation_receipt_file(fp"{root}/inputs/generation-B.json")?
   let previous = generation.read_generation_receipt_file(fp"{root}/inputs/generation-A.json")?
@@ -31,7 +31,7 @@ proc verify_successor(root: Path, expected_tools = p"/run/self-hosting-output/ta
   print "LAPUTA_SELF_HOSTING_SUCCESSOR_BOOTED" $identity
 }
 
-proc main(root: Path, expected_tools = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(root: Path, expected_tools = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, error] {
   guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
   let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
   verify_successor(root, expected_tools, release_input)

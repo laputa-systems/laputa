@@ -883,7 +883,7 @@ proc timer_read_clock() -> Result[TimerClock, Error] {
   {mono_ms: mono.ms, wall_ms: time.now()}
 }
 
-proc timer_log(line: Str) [io, error] -> Result[Unit, Error] {
+proc timer_log(line: Str) [io, error] {
   print $line
   io.flush_stdout()
 }
@@ -1202,7 +1202,7 @@ proc timer_writer_observe(record: TimerWriter, boot_id: Str) -> Result[TimerWrit
   Ok({verdict: verdict, groups: if verdict == "gone" { [] } else { groups }})
 }
 
-proc timer_writer_signal(groups: List[Int], signal: Str) [process, error] -> Result[Unit, Error] {
+proc timer_writer_signal(groups: List[Int], signal: Str) [process, error] {
   for pgid in groups {
     match process.kill_group(pgid, signal) {
       Ok(_) => {}
@@ -1457,7 +1457,7 @@ proc timer_pid_alive(pid: Int) -> Bool {
   }
 }
 
-proc timers_status(config: SchedulerConfig, as_json: Bool) -> Result[Unit, Error] {
+proc timers_status(config: SchedulerConfig, as_json: Bool) {
   let loaded = timer_load_jobs(config.job_dir)?
   let states = timer_load_state(fp"{config.state_dir}/{TIMER_STATE_NAME}")?
   let cancelled = timer_load_cancels(fp"{config.state_dir}/{TIMER_CANCEL_DIR}")?
@@ -1617,7 +1617,7 @@ proc timer_status_write(
   boot_id: Str,
   resume: Str,
   last_step: TimerStep?,
-) -> Result[Unit, Error] {
+) {
   match status_path.parent().mkdir() {
     Ok(_) => {}
     Err(problem) => {
@@ -1662,7 +1662,7 @@ proc timer_sleep_wait(
   wait_ms
 }
 
-proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> Result[Unit, Error] {
+proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
   config.state_dir.mkdir()
   config.run_dir.mkdir()
   let lock = fs.lock(fp"{config.run_dir}/{TIMER_LOCK_NAME}", nonblocking: true) ?? { |problem|
@@ -2048,7 +2048,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
   }
 }
 
-proc timers_run_now(config: SchedulerConfig, name: Str) [fs, io, error] -> Result[Unit, Error] {
+proc timers_run_now(config: SchedulerConfig, name: Str) [fs, io, error] {
   let loaded = timer_load_jobs(config.job_dir)?
   guard timer_find_job(loaded.jobs, name) != null else {
     return Err(error.failure(f"unknown timer job {name}"))
@@ -2063,7 +2063,7 @@ proc timers_run_now(config: SchedulerConfig, name: Str) [fs, io, error] -> Resul
   print f"laputa-timers run-now {name}"
 }
 
-proc timers_cancel(config: SchedulerConfig, name: Str, active: Bool) [fs, io, error] -> Result[Unit, Error] {
+proc timers_cancel(config: SchedulerConfig, name: Str, active: Bool) [fs, io, error] {
   let loaded = timer_load_jobs(config.job_dir)?
   guard timer_find_job(loaded.jobs, name) != null else {
     return Err(error.failure(f"unknown timer job {name}"))

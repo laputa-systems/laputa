@@ -63,7 +63,7 @@ proc ensure_x86_bzimage(image_path: Path) {
   }
 }
 
-proc main(rootfs = p"/rootfs") [fs, env, error] -> Result[Unit, Error] {
+proc main(rootfs = p"/rootfs") [fs, env, error] {
   let target = match pm_target.recipe_target() {
     Ok(value) => value
     Err(problem) => { return Err(ProofError.Failed(kind: "proof-linux", message: f"unsupported proof arch: {problem.message}")) }

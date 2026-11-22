@@ -102,7 +102,7 @@ proc wait_for_remote(host: model.Host, script: Str, args: List[Str], limit_ms: I
   Ok(found)
 }
 
-proc lost_patience(handle: ProcessHandle) [process, error] -> Result[Unit, Error] {
+proc lost_patience(handle: ProcessHandle) [process, error] {
   let _ = process.kill(handle.pid, signal: "KILL")
   let _ = wait handle?
 }
@@ -136,7 +136,7 @@ proc apply_again_with_apk_lock_retry(
   Ok(result)
 }
 
-proc assert_lock_free(host: model.Host, lock_path: Str) [fs, env, process, error] -> Result[Unit, Error] {
+proc assert_lock_free(host: model.Host, lock_path: Str) [fs, env, process, error] {
   let connection = transport.connect(host)?
   let held = lock.inspect(connection, lock_path)?
   let _ = transport.disconnect(connection)
@@ -735,7 +735,7 @@ test cancellation_before_and_after_a_user_is_reported_from_the_target_side_and_c
   }
 }
 
-proc service_cleanup(host: model.Host, name: Str) [fs, env, process, error] -> Result[Unit, Error] {
+proc service_cleanup(host: model.Host, name: Str) [fs, env, process, error] {
   let _ = testing.remote_text(host, "rc-service \"$1\" stop >/dev/null 2>&1 || true; rc-update del \"$1\" default >/dev/null 2>&1 || true; rm -f \"/etc/init.d/$1\" \"/var/tmp/$1\".*", [name], privileged: true)?
 }
 

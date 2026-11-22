@@ -1,6 +1,6 @@
 use pm.build
 
-proc main(repository: Path) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(repository: Path) [fs, process, env, error] {
   let executor = build.executor_provenance()?
   assert executor.xsh_sha256 == hash.sha256(p"/bin/xsh")?.hex()
   assert executor.xsht_sha256 == hash.sha256(p"/bin/xsht")?.hex()

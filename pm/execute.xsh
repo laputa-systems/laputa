@@ -128,7 +128,7 @@ proc execute_run_confined_build(
   source: Path,
   dest: Path,
   payload: Path,
-) -> Result[Unit] {
+) {
   let confinement = context.confinement
 
   if confinement == null {

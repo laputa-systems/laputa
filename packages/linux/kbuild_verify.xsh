@@ -61,7 +61,7 @@ export proc linux_kbuild_verify_stopped(
 }
 
 
-proc linux_kbuild_discovery_stop() -> Result[Unit, Error] {
+proc linux_kbuild_discovery_stop() {
   env ({XSH_LINUX_KBUILD_STOP_AFTER: "discover"}) {
     linux_shared.stop_after("discover")
   }
