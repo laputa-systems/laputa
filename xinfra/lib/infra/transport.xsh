@@ -89,11 +89,11 @@ pure ssh_connection(host: model.Host, session: Session) -> Connection {
 
 pure ssh_target(host: model.Host) -> Result[Record, TransportError] {
   guard let key = host.key else {
-    return Err(.Refused(f"{host.name}: an ssh host needs a key"))
+    fail .Refused(f"{host.name}: an ssh host needs a key")
   }
 
   guard let host_key = host.host_key else {
-    return Err(.Refused(f"{host.name}: an ssh host needs a pinned host_key"))
+    fail .Refused(f"{host.name}: an ssh host needs a pinned host_key")
   }
 
   Ok(ssh_options(host, key, host_key))
@@ -196,7 +196,7 @@ pure render(connection: Connection, script: Str, args: List[Str], privileged: Bo
     }
     model.Xsh => {
       guard ! (privileged and connection.privilege == .Doas) else {
-        return Err(.Refused("the xsh dialect has no doas escalation; use privilege plain or root"))
+        fail .Refused("the xsh dialect has no doas escalation; use privilege plain or root")
       }
 
       match shell.xsh_command(script, args) {
@@ -225,7 +225,7 @@ pure capture_result(captured: Result[Captured, ProcessError]) -> Result[Executio
 
 proc exec_local_xsh(command: Str, stdin: Bytes?, stdin_path: Path?, timeout_ms: Int) [fs, process, error] -> Result[Execution, TransportError] {
   let interpreter = process.which("xsh") ?? { |error|
-    return Err(.Refused(f"a local xsh target needs an xsh interpreter on PATH: {error.message}"))
+    fail .Refused(f"a local xsh target needs an xsh interpreter on PATH: {error.message}")
   }
   let source = fs.tempfile() ?? { |error|
     return Err(.NotSubmitted(error.message), cause: error)
@@ -311,7 +311,7 @@ proc exec_rendered(
     model.Local => exec_local(command, connection.dialect, stdin, stdin_path, limit)
     model.Ssh => {
       guard let session = connection.session else {
-        return Err(.Refused("an ssh connection has no session"))
+        fail .Refused("an ssh connection has no session")
       }
 
       exec_ssh(session, command, stdin, stdin_path, limit)
@@ -352,7 +352,7 @@ export proc exec_script(
   timeout_ms: Int? = null,
 ) [fs, process, error] -> Result[Execution, TransportError] {
   guard connection.dialect == .Posix else {
-    return Err(.Refused("a raw POSIX script cannot run on an xsh target"))
+    fail .Refused("a raw POSIX script cannot run on an xsh target")
   }
   exec_rendered(connection, script, args, privileged, stdin, stdin_path, timeout_ms)
 }
