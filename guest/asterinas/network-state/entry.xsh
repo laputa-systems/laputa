@@ -343,9 +343,9 @@ proc main() [fs, process, env, time, net, error] {
     }
     "address" => {
       step("up", "eth0", true, 6)
-      let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
-      let second: Address = {local: "192.0.2.77", prefix: 24, broadcast: null}
-      let host: Address = {local: "198.51.100.5", prefix: 32, broadcast: null}
+      let primary: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
+      let second: Address = Address(local: "192.0.2.77", prefix: 24, broadcast: null)
+      let host: Address = Address(local: "198.51.100.5", prefix: 32, broadcast: null)
       probe("before_address", "192.0.2.1")
       add_address("add_primary", "eth0", primary)
       probe("with_address", "192.0.2.1")
@@ -371,11 +371,11 @@ proc main() [fs, process, env, time, net, error] {
     }
     "route" => {
       let c = linux.net_constants()
-      let address: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
-      let default: Route = {destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP}
+      let address: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
+      let default: Route = Route(destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP)
       let slower: Route = {...default, priority: 200}
-      let network: Route = {destination: "10.20.0.0", prefix: 16, gateway: "192.0.2.1", priority: 0, protocol: c.RTPROT_STATIC}
-      let direct: Route = {destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC}
+      let network: Route = Route(destination: "10.20.0.0", prefix: 16, gateway: "192.0.2.1", priority: 0, protocol: c.RTPROT_STATIC)
+      let direct: Route = Route(destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC)
       step("up", "eth0", true, 6)
       add_address("address", "eth0", address)
       add_route("add_default", "eth0", default)
@@ -401,11 +401,11 @@ proc main() [fs, process, env, time, net, error] {
       let listener = linux.netlink_open(c.NETLINK_ROUTE, c.RTMGRP_LINK.bit_or(c.RTMGRP_IPV4_IFADDR).bit_or(c.RTMGRP_IPV4_ROUTE))?
       defer unix.close_fd(listener)
       let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
-      let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
-      let second: Address = {local: "192.0.2.77", prefix: 24, broadcast: null}
-      let host: Address = {local: "198.51.100.5", prefix: 32, broadcast: null}
-      let default: Route = {destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP}
-      let direct: Route = {destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC}
+      let primary: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
+      let second: Address = Address(local: "192.0.2.77", prefix: 24, broadcast: null)
+      let host: Address = Address(local: "198.51.100.5", prefix: 32, broadcast: null)
+      let default: Route = Route(destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP)
+      let direct: Route = Route(destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC)
       let index = ifindex_of("eth0")?
       linux.link_up("eth0")
       drain_events("up", listener)
@@ -451,7 +451,7 @@ proc main() [fs, process, env, time, net, error] {
       drain_events("up_last", listener)
     }
     "packet" => {
-      let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
+      let primary: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
       step("up", "eth0", true, 6)
       add_address("address", "eth0", primary)
       let index = ifindex_of("eth0")?

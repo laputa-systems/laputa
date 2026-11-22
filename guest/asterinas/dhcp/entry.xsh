@@ -301,7 +301,7 @@ proc await_default_route(label: Str, timeout_ms: Int) [process, env, time, net, 
 }
 
 proc reject_routes() {
-  let none: state.Hop = {ifindex: null, gateway: null}
+  let none: state.Hop = state.Hop(ifindex: null, gateway: null)
   let eth0 = fixture.index_of("eth0")
   let rejecting = [RTN_BLACKHOLE, RTN_UNREACHABLE, RTN_PROHIBIT, RTN_THROW]
   for route_type in rejecting + [RTN_LOCAL, 3, 4, 5] {

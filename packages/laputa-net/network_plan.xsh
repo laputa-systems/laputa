@@ -317,10 +317,12 @@ export pure network_replay(plan: NetworkPlan, events: List[NetworkReplayEvent]) 
   }
   var next_operation = 0
   var converged = false
-  let expected: NetworkOwnership = {
-    ifindex: plan.intent.ifindex, name: plan.intent.name,
-    addresses: [plan.intent.address], routes: [network_desired_route(plan.intent)],
-  }
+  let expected: NetworkOwnership = NetworkOwnership(
+    ifindex: plan.intent.ifindex,
+    name: plan.intent.name,
+    addresses: [plan.intent.address],
+    routes: [network_desired_route(plan.intent)],
+  )
   for event_index, event in events {
     continue when event_index == 0
     return NetworkInvalid("events after final observation") when converged

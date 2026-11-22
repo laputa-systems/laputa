@@ -20,18 +20,18 @@ proc main(image: Str, seed: Path) [fs, process, env, error] {
   sentinel.write("host sentinel\n")
   mounted_sentinel.write("mounted sentinel\n")
   let identity = unix.id()?
-  let config: docker.DockerConfig = {
+  let config: docker.DockerConfig = docker.DockerConfig(
     docker: process.which("docker")?,
     arch: "x86_64",
     platform: "linux/amd64",
     laputa_root: root,
-    seed: seed,
+    seed:,
     output_root: output,
     artifact_root: artifacts,
-    image: image,
+    image:,
     repo_url: "",
     owner: {uid: identity.uid, gid: identity.gid},
-  }
+  )
 
   for expected in ["reachable", "isolated"] {
     let inner = ["/bin/xsh", "/src/laputa/probe.xsh", "--", expected, sentinel.display()]

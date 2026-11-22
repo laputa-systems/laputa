@@ -782,7 +782,7 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, time, err
   assert second.read_text()? == "changedsecond"
   assert calls.read_text()? == "first\nsecond\nfirst\nsecond\n"
   assert ! unused.exists()?
-  let archive_plan: kbuild.BuiltinArchivePlan = {
+  let archive_plan: kbuild.BuiltinArchivePlan = kbuild.BuiltinArchivePlan(
     tasks: [
       {name: "first", outputs: [first], inputs: [source], deps: [], argv: ["/bin/true"], cwd: root,
         env: {}, depfile: p"", stamp: p""},
@@ -798,7 +798,7 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, time, err
     missing_sources: [],
     generated_objects: [],
     duplicate_outputs: [],
-  }
+  )
   cd (root) {
     env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_LINUX_KBUILD_JOBS: "1"}) {
       match linux_shared.run_targeted_kbuild_outputs(archive_plan, second.display()) {

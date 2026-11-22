@@ -166,13 +166,17 @@ test test_applier_refuses_to_run_outside_its_disposable_namespace [fs, process, 
 }
 
 test test_zero_metric_route_changes_never_reach_a_request [error] {
-  let observed: policy.NetworkSnapshot = {
-    sequence: 1, ifindex: 7, name: "veth-test", kind: "veth", up: true,
+  let observed: policy.NetworkSnapshot = policy.NetworkSnapshot(
+    sequence: 1,
+    ifindex: 7,
+    name: "veth-test",
+    kind: "veth",
+    up: true,
     addresses: [{local: "192.0.2.2", prefix: 24}],
     routes: [{gateway: "192.0.2.1", metric: 0}],
-  }
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: [{gateway: "192.0.2.1", metric: 0}]}
-  let raised: policy.NetworkIntent = {ifindex: 7, name: "veth-test", address: {local: "192.0.2.2", prefix: 24}, gateway: "192.0.2.1", metric: 200}
+  )
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: [{gateway: "192.0.2.1", metric: 0}])
+  let raised: policy.NetworkIntent = policy.NetworkIntent(ifindex: 7, name: "veth-test", address: {local: "192.0.2.2", prefix: 24}, gateway: "192.0.2.1", metric: 200)
   let plan = policy.network_plan(raised, owned, observed)?
   assert plan.operations == [policy.NetworkAddDefaultRoute({gateway: "192.0.2.1", metric: 200}), policy.NetworkRemoveDefaultRoute({gateway: "192.0.2.1", metric: 0})]
   if let Err(problem) = kernel.network_changes(plan) {
@@ -200,9 +204,9 @@ test test_zero_metric_route_changes_never_reach_a_request [error] {
 }
 
 test test_forged_operations_are_rejected_by_the_whole_change_set [error] {
-  let intent: policy.NetworkIntent = {ifindex: 7, name: "veth-test", address: {local: "192.0.2.3", prefix: 24}, gateway: "192.0.2.1", metric: 100}
-  let ownership: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [], routes: []}
-  let observed: policy.NetworkSnapshot = {sequence: 1, ifindex: 7, name: "veth-test", kind: "veth", up: true, addresses: [], routes: []}
+  let intent: policy.NetworkIntent = policy.NetworkIntent(ifindex: 7, name: "veth-test", address: {local: "192.0.2.3", prefix: 24}, gateway: "192.0.2.1", metric: 100)
+  let ownership: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [], routes: [])
+  let observed: policy.NetworkSnapshot = policy.NetworkSnapshot(sequence: 1, ifindex: 7, name: "veth-test", kind: "veth", up: true, addresses: [], routes: [])
   let plan = policy.network_plan(intent, ownership, observed)?
   assert plan.operations.len() == 2
   let changes = kernel.network_changes(plan)?

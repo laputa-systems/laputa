@@ -395,11 +395,11 @@ export let filetree = []
     remote.plan_artifact_from_package_at_repo(entry, remote_url, index_cache)?
     for entry in index
   ]
-  let remote_snapshot: types.RemoteSnapshot = {
-    target,
+  let remote_snapshot: types.RemoteSnapshot = types.RemoteSnapshot(
+    target:,
     index_sha256: hash.sha256(index_path)?.hex(),
     packages: remote_packages,
-  }
+  )
   let imported_plan = plan.resolve(
     catalog.load_for_target(repo_root, target)?,
     remote_snapshot,

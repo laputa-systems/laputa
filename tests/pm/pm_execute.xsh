@@ -1289,7 +1289,7 @@ main(@args)?
 test test_execute_refuses_a_confined_plan_with_more_than_one_job [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-confinement-jobs")?
   let value = resolve_execute_plan(repo_root)?
-  let confinement: types.BuildConfinement = {read: [p"/bin"], write: [], tcp: false}
+  let confinement: types.BuildConfinement = types.BuildConfinement(read: [p"/bin"], write: [], tcp: false)
   let object_store = execute_store(ctx, "execute-confinement-jobs-store")?
 
   match execute.build_plan(value, repo_root, object_store, "", 2, confinement:) {

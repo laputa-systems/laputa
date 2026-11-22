@@ -20,7 +20,7 @@ pure owned() -> policy.NetworkOwnership {
 test test_no_change_is_empty_and_foreign_resources_are_preserved [error] {
   let plan = policy.network_plan(intent(), owned(), snapshot())?
   assert plan.operations.is_empty()
-  let empty: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [], routes: []}
+  let empty: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [], routes: [])
   match policy.network_plan(intent(), empty, snapshot()) {
     Err(_) => {}
     Ok(_) => assert false
@@ -41,7 +41,7 @@ test test_changed_address_removes_only_owned_resources [error] {
   var observed = snapshot()
   observed.sequence = 2
   observed.addresses = [desired.address, {local: "198.51.100.2", prefix: 24}]
-  let next_owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [desired.address], routes: owned().routes}
+  let next_owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [desired.address], routes: owned().routes)
   let next = policy.network_plan(desired, next_owned, observed)?
   assert next.operations.is_empty()
 }
@@ -87,7 +87,7 @@ test test_acknowledged_changes_need_new_complete_observation [error] {
     policy.NetworkConverged(_) => assert false
   }
   observed.addresses = [desired.address, {local: "198.51.100.2", prefix: 24}]
-  let expected: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [desired.address], routes: owned().routes}
+  let expected: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [desired.address], routes: owned().routes)
   assert policy.network_replay(plan, prefix + [.NetworkObserved(observed)]) == policy.NetworkConverged(expected)
   observed.addresses = [desired.address]
   assert policy.network_replay(plan, prefix + [.NetworkObserved(observed)]) == policy.NetworkReobserve("foreign address disappeared")
@@ -220,7 +220,7 @@ test test_ipv4_zero_metric_is_not_rewritten_to_the_ipv6_default [error] {
   var zero = intent()
   zero.metric = 0
   let observed: policy.NetworkSnapshot = {...snapshot(), addresses: [], routes: []}
-  let empty: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [], routes: []}
+  let empty: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [], routes: [])
   let plan = policy.network_plan(zero, empty, observed)?
   assert plan.operations == [policy.NetworkAddAddress(zero.address), policy.NetworkAddDefaultRoute({gateway: "192.0.2.1", metric: 0})]
 }
@@ -340,7 +340,7 @@ test test_a_cohort_never_mixes_address_families [error] {
     assert false
   }
 
-  let route_only: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [], routes: [{gateway: "192.0.2.1", metric: 100}]}
+  let route_only: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [], routes: [{gateway: "192.0.2.1", metric: 100}])
   if let Err(problem) = policy.network_plan(intent6(), route_only, snapshot6()) {
     assert problem.message == "ownership holds a default route outside the intent's IPv6 family"
   } else {
@@ -394,7 +394,7 @@ test test_ipv6_replay_converges_with_the_kernel_metric_and_catches_foreign_loss 
   var observed = snapshot6()
   observed.sequence = 2
   observed.addresses = [{local: "2001:db8:1::3", prefix: 64}, {local: "2001:db8:ff::2", prefix: 64}]
-  let expected: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::3", prefix: 64}], routes: [{gateway: "fe80::1", metric: 1024}]}
+  let expected: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::3", prefix: 64}], routes: [{gateway: "fe80::1", metric: 1024}])
   assert policy.network_replay(plan, prefix + [.NetworkObserved(observed)]) == policy.NetworkConverged(expected)
   var lost_foreign = observed
   lost_foreign.routes = [{gateway: "fe80::1", metric: 1024}]

@@ -242,9 +242,11 @@ proc read_archive_plan_cache(path_value: Path, fingerprint: Str, report: Path, p
 proc write_archive_plan_cache(report: Path, path_value: Path, fingerprint: Str, payloads: kbuild.ArchivePlanPayloads) {
   kbuild.write_text_if_changed(report, payloads.report)
   kbuild.write_text_if_changed(kbuild.archive_plan_summary_path(report), payloads.summary)
-  let manifest: ArchiveCacheManifest = {
-    fingerprint: fingerprint, report_hash: archive_payload_hash(payloads.report), summary_hash: archive_payload_hash(payloads.summary),
-  }
+  let manifest: ArchiveCacheManifest = ArchiveCacheManifest(
+    fingerprint:,
+    report_hash: archive_payload_hash(payloads.report),
+    summary_hash: archive_payload_hash(payloads.summary),
+  )
   kbuild.write_text_if_changed(path_value, json.encode(manifest)?)
 }
 

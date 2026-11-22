@@ -223,12 +223,16 @@ test test_outcomes_and_lost_notices_map_to_replay_events [fs, error] {
 }
 
 pure retired_route_plan() -> Result[policy.NetworkPlan, Error] {
-  let observed: policy.NetworkSnapshot = {
-    sequence: 1, ifindex: 7, name: "veth-test", kind: "veth", up: true,
+  let observed: policy.NetworkSnapshot = policy.NetworkSnapshot(
+    sequence: 1,
+    ifindex: 7,
+    name: "veth-test",
+    kind: "veth",
+    up: true,
     addresses: [{local: "192.0.2.2", prefix: 24}],
     routes: [{gateway: "192.0.2.1", metric: 100}, {gateway: "192.0.2.1", metric: 300}],
-  }
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 100}, {gateway: "192.0.2.1", metric: 300}]}
+  )
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 100}, {gateway: "192.0.2.1", metric: 300}])
   policy.network_plan(intent(), owned, observed)
 }
 
@@ -253,12 +257,16 @@ test test_retired_owned_default_route_with_a_nonzero_metric_is_removable [fs, er
 }
 
 test test_zero_metric_default_route_removal_is_refused_before_any_request [error] {
-  let observed: policy.NetworkSnapshot = {
-    sequence: 1, ifindex: 7, name: "veth-test", kind: "veth", up: true,
+  let observed: policy.NetworkSnapshot = policy.NetworkSnapshot(
+    sequence: 1,
+    ifindex: 7,
+    name: "veth-test",
+    kind: "veth",
+    up: true,
     addresses: [{local: "192.0.2.2", prefix: 24}],
     routes: [{gateway: "192.0.2.1", metric: 0}, {gateway: "192.0.2.1", metric: 300}],
-  }
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 0}]}
+  )
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 0}])
   let plan = policy.network_plan(intent(), owned, observed)?
   assert plan.operations == [policy.NetworkAddDefaultRoute({gateway: "192.0.2.1", metric: 100}), policy.NetworkRemoveDefaultRoute({gateway: "192.0.2.1", metric: 0})]
   let message = "a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"
@@ -306,7 +314,7 @@ test test_change_set_is_complete_ordered_and_empty_for_a_no_change_plan [error] 
   settled.up = true
   settled.addresses = [intent().address]
   settled.routes = [{gateway: "192.0.2.1", metric: 100}]
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 100}]}
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 100}])
   let no_change = policy.network_plan(intent(), owned, settled)?
   assert no_change.operations.is_empty()
   assert kernel.network_changes(no_change)?.is_empty()
@@ -351,7 +359,7 @@ test test_projected_route_identity_matches_the_removal_request_exactly [fs, erro
   let state = net_state.project(dump)?
   let projected = kernel.network_project_state(state, plan.intent, 1)?
   assert projected.routes == [{gateway: "192.0.2.1", metric: 100}]
-  let settled: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: [{gateway: "192.0.2.1", metric: 100}]}
+  let settled: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: [{gateway: "192.0.2.1", metric: 100}])
   let desired = policy.network_plan({...plan.intent, address: {local: "192.0.2.2", prefix: 24}}, settled, projected)?
   assert desired.operations.is_empty()
   let removal = policy.network_plan({...plan.intent, address: {local: "192.0.2.2", prefix: 24}, metric: 200}, {ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: [{gateway: "192.0.2.1", metric: 100}]}, projected)?
@@ -376,13 +384,13 @@ test test_reconcile_result_reports_conflicts_instead_of_rolling_back [fs, error]
   let plan = healthy_plan()?
   assert plan.operations == [policy.NetworkAddAddress({local: "192.0.2.3", prefix: 24}), policy.NetworkRemoveAddress({local: "192.0.2.2", prefix: 24})]
   let stale: policy.NetworkSnapshot = {...plan.before, sequence: 2, routes: []}
-  let conflict: kernel.NetworkReconcile = {
-    plan,
+  let conflict: kernel.NetworkReconcile = kernel.NetworkReconcile(
+    plan:,
     attempts: 0,
     observed: stale,
     events: [.NetworkPrecondition(plan.before)],
     result: .NetworkReobserve("observation changed before operation 0"),
-  }
+  )
   assert conflict.attempts == 0
   if let policy.NetworkReobserve(reason) = conflict.result {
     assert reason == "observation changed before operation 0"
@@ -448,7 +456,7 @@ test test_ipv6_cohort_projects_static_addresses_and_defaults_and_ignores_kernel_
   assert projected.addresses == [{local: "2001:db8:1::2", prefix: 64}, {local: "2001:db8:ff::2", prefix: 64}]
   assert projected.routes == [{gateway: "2001:db8:1::1", metric: 300}, {gateway: "fe80::1", metric: 1024}]
   assert projected.kind == "veth" and projected.up
-  let settled: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [{gateway: "fe80::1", metric: 1024}]}
+  let settled: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [{gateway: "fe80::1", metric: 1024}])
   let plan = policy.network_plan(intent6(), settled, projected)?
   assert plan.operations.is_empty()
 }
@@ -633,7 +641,7 @@ test test_ipv6_requests_select_exact_local_prefix_gateway_interface_and_metric [
 
 test test_ipv6_has_no_primary_secondary_rule_so_same_prefix_additions_are_planned [error] {
   let observed: policy.NetworkSnapshot = {...empty6(), addresses: [{local: "2001:db8:1::2", prefix: 64}]}
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: []}
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [])
   let plan = policy.network_plan({...intent6(), address: {local: "2001:db8:1::3", prefix: 64}}, owned, observed)?
   assert plan.operations[0] == policy.NetworkAddAddress({local: "2001:db8:1::3", prefix: 64})
   let changes = kernel.network_changes(plan)?
@@ -650,7 +658,7 @@ test test_ipv6_zero_metric_is_never_sent_and_a_zero_metric_removal_is_refused [e
   }
 
   let observed: policy.NetworkSnapshot = {...empty6(), routes: [{gateway: "fe80::9", metric: 0}]}
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [], routes: [{gateway: "fe80::9", metric: 0}]}
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [], routes: [{gateway: "fe80::9", metric: 0}])
   let retiring = policy.network_plan(intent6(), owned, observed)?
   assert policy.NetworkRemoveDefaultRoute({gateway: "fe80::9", metric: 0}) in retiring.operations
   let message = "a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"

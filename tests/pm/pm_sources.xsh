@@ -620,12 +620,12 @@ source = "{git_source}"
 """)
   let lock_sha256 = cache_file(cache, lockfile)?
   let base = crate_set_package("https://upstream.invalid/Cargo.lock", lock_sha256)
-  let git_archive: types.UpstreamSource = {
+  let git_archive: types.UpstreamSource = types.UpstreamSource(
     source: fp"https://github.com/example/fork/archive/{revision}.tar.gz => git-fork",
     kind: types.CargoGitWorkspace,
     architectures: ["all"],
     checksums: [{arch: "all", sha256: archive_sha256}],
-  }
+  )
   let src = test.temp_dir(ctx, name: "git-workspace-src")?
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
