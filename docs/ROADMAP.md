@@ -1050,8 +1050,9 @@ application work remain separate. Retain Mesa, musl, and Linux. Crabc evaluation
 or adoption, allocator work, runtime/kernel replacement, and GPU-driver rewrites
 are excluded. Hardware enablement stays deferred. The
 [follow-on design](rfc/LAP-51-c-free-userspace.md) records these boundaries and
-lower-confidence research. LAP-52 precedes LAP-51's bounded census. This
-direction launches no new pilot and changes no current acceptance gate.
+lower-confidence research. LAP-52 precedes LAP-51's bounded census. The owner
+started LAP-51 on 2026-11-22 with Ghostty out of scope; its status section
+names the running pilots, and it changes no current acceptance gate.
 
 ## Delivery gates and evidence
 

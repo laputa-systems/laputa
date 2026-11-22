@@ -1,6 +1,6 @@
 # LAP-51: Reduce native dependencies in the owned desktop
 
-Status: draft
+Status: active since 2026-11-22
 
 ## Summary
 
@@ -229,11 +229,39 @@ attribution. Each admitted replacement must establish maintenance, licenses,
 ABI coverage, musl behavior, quality, and costs. No candidate is qualified by
 this document, and no FFmpeg build qualification is claimed.
 
+## Status of the tracks
+
+The owner started this campaign on 2026-11-22: a Rust/XSH/Zig-owned desktop
+above an explicitly retained native GPU and media substrate, with Chromium as
+the last major application stack that keeps native C and C++ ownership.
+Ghostty work is out of scope for now, as are Chromium, FFmpeg and Mesa.
+
+Integrated, with guest evidence in [Tinyland](../TINYLAND.md) and the
+[font contract](../FONT-STACK.md): the Rust compositor, the Rust seatd daemon
+and Tinyland's native seat client (the C `libseat.so.1` client no longer
+ships), KBVM inside Tinyland, mdevd-rs, and shared rust-fontconfig discovery
+for Ghostty and Play.
+
+Not yet executed: every replacement gate in the table above. The first pilots
+are zlib-rs as a candidate `libz.so.1` (Track C) and a HarfRust/Skrifa
+differential against Play's overlay text (Track D); neither changes a
+production default.
+
+Parked while Ghostty is out of scope: libxkbcommon, whose only production
+consumer is Ghostty, and a shared HarfRust provider, which needs Ghostty and
+Play to migrate together.
+
+Retained substrate: `libwayland-client.so.0` stays while Mesa's Wayland
+platform does. Mesa's EGL and Vulkan WSI import it (`packages/mesa` depends on
+`wayland-libs-client`), and Play hands its native `wl_display` to Vulkan,
+which is why its `wayland-client` dependency enables `system`. Replacing the
+protocol engine in a client removes neither dependency.
+
 ## Decision
 
 Apply the owner's 2026-11-04 corrections. Prioritize existing text and desktop
 infrastructure, distribution compression, and later text backend qualification.
 Exclude FFmpeg/codec replacement, musl/Linux replacement, crabc, allocator work,
 and GPU-driver rewrites. Keep deferred hardware outside the immediate queue.
-This draft launches no new pilot and does not waive the active campaign's
-acceptance requirements.
+The 2026-11-22 start launches the pilots named above; it does not waive any
+acceptance requirement or change a production default.
