@@ -106,7 +106,7 @@ proc watch_states(label: Str, duration_ms: Int) {
   let deadline = elapsed_ms()? + duration_ms
   while elapsed_ms()? < deadline {
     let state = client_state() |> significant(_)
-    if sequence.is_empty() or sequence[sequence.len() - 1] != state { sequence += [state] }
+    if sequence.is_empty() or sequence[-1] != state { sequence += [state] }
     time.sleep(POLL_MS * 1ms)
   }
   eprint --flush f"NET_DHCP_{label}_STATES {sequence.join(">")}"

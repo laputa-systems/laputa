@@ -98,7 +98,7 @@ export pure cells(raster: Raster, left: Int, cell_width: Int, count: Int, top: I
         ink += part.ink
         chroma += part.chroma
       }
-      let last = inside[inside.len() - 1]
+      let last = inside[-1]
       if ink >= minimum_cell_ink {
         found = found + [{left: inside[0].left, width: last.left + last.width - inside[0].left, chroma, ink}]
       }
