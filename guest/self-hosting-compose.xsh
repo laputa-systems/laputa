@@ -1,7 +1,7 @@
 use pm.generation
 use pm.util
 
-proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", development_os_release: Path? = null) [fs, process, env, time, error] -> Result[Unit, Error] {
+proc compose(root: Path, toolchain = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", development_os_release: Path? = null) [fs, process, env, time, error] -> Result[Unit, Error] {
   assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let output = p"/run/self-hosting-output"
@@ -74,7 +74,7 @@ proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86
   print "LAPUTA_SELF_HOSTING_SUCCESSOR_COMPOSED"
 }
 
-proc main(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, time, error] -> Result[Unit, Error] {
+proc main(root: Path, toolchain = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, time, error] -> Result[Unit, Error] {
   guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
   let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
   compose(root, toolchain, release_input)

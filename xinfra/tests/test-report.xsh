@@ -16,7 +16,7 @@ pure entry(host: Str, id: Str, status: Str, act: Str? = null, detail: Str? = nul
   )
 }
 
-pure scenario(mode: Str, entries: List[report.Entry], ok: Bool = true) -> report.Report {
+pure scenario(mode: Str, entries: List[report.Entry], ok = true) -> report.Report {
   report.Report(mode:, hosts: [report.HostReport(host: "web-1", ok:, phase: null, detail: null, entries:)])
 }
 

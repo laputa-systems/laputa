@@ -110,7 +110,7 @@ proc stage_initramfs(
   name: Str,
   xsh: Path,
   modules_dir: Path,
-  main_script: Str = "",
+  main_script = "",
 ) [fs, process, env, error] -> Result[Path, Error] {
   let root = test.temp_dir(ctx, name: name)?
   let key_bytes = fixture("keys/signing-key.public.base64").read_text()?.trim().base64_decode()?

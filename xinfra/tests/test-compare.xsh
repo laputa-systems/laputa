@@ -5,9 +5,9 @@ use infra.model
 
 pure info(
   kind: fact.PathKind,
-  mode: Int = 0o644,
-  owner: Str = "root",
-  group_name: Str = "root",
+  mode = 0o644,
+  owner = "root",
+  group_name = "root",
   digest: Str? = null,
   target: Str? = null,
 ) -> fact.PathInfo {
@@ -191,7 +191,7 @@ test the_package_index_is_never_evaluated {
   assert compare.verdict(resource.spec, fact.Nothing, null, none) is .Unevaluated(_)
 }
 
-pure account_fact(uid: Int = 1000, group_name: Str? = "app", memberships: List[Str] = [], home: Str = "/home/app", shell: Str = "/bin/ash") -> fact.Fact {
+pure account_fact(uid = 1000, group_name: Str? = "app", memberships: List[Str] = [], home = "/home/app", shell = "/bin/ash") -> fact.Fact {
   .OnUser(.UserFound(fact.UserInfo(name: "app", uid:, gid: 1000, group: group_name, home:, shell:, memberships:)))
 }
 

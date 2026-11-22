@@ -15,7 +15,7 @@ proc assert_no_substrate_leftovers() {
 ## Resolves and builds the closed cohort, running every package build child
 ## through the cohort confinement profile. `mode` selects the honest cohort, or
 ## one hostile package that must fail under confinement.
-proc main(repository: Path, mode: Str = "cohort") [fs, net, process, env, time, error] {
+proc main(repository: Path, mode = "cohort") [fs, net, process, env, time, error] {
   let hostiles: Map[Path] = {
     "cohort-hostile-read": p"cohort-hostile-read",
     "cohort-hostile-write": p"cohort-hostile-write",

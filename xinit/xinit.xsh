@@ -1504,7 +1504,7 @@ proc scanner_active() -> Result[Bool] {
   observed > 0 and (start_time_ms <= 0 or observed == start_time_ms)
 }
 
-proc request_desired(name: Str, desired: Str, qualifier: Str = "") {
+proc request_desired(name: Str, desired: Str, qualifier = "") {
   let dir = inbox_dir()?
   let group_gid = control_group_gid()?
   let target = fp"{dir}/{name}"
@@ -1566,7 +1566,7 @@ proc require_scanner_for_owner(qualifier: Str) {
   }
 }
 
-proc start_service(name: Str, qualifier: Str = "") {
+proc start_service(name: Str, qualifier = "") {
   require_scanner_for_owner(qualifier)
 
   if scanner_active() {
@@ -1605,7 +1605,7 @@ proc running_dependents(name: Str) -> Result[List[Str]] {
   out
 }
 
-proc stop_service(name: Str, qualifier: Str = "") {
+proc stop_service(name: Str, qualifier = "") {
   require_scanner_for_owner(qualifier)
 
   if scanner_active() {
@@ -2526,7 +2526,7 @@ proc control_qualifier(parsed: Record) -> Result[Str] {
   ""
 }
 
-proc control(verb: Str, name: Str, qualifier: Str = "") {
+proc control(verb: Str, name: Str, qualifier = "") {
   if qualifier != "" and verb != "start" and verb != "up" and verb != "stop" and verb != "down" {
     return Err(XinitError.Failed(kind: "xinit-control", message: f"{verb} takes no owner qualifier"))
   }

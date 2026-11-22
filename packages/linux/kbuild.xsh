@@ -479,7 +479,7 @@ proc load_config_if_present(path_value: Path) -> Result[Kconfig] {
 }
 
 ## Exported declaration `write_config_headers`.
-export proc write_config_headers(config_path: Path, root: Path, release: Str, arch: Str = "arm64") [fs, error] {
+export proc write_config_headers(config_path: Path, root: Path, release: Str, arch = "arm64") [fs, error] {
   let config = load_config(config_path)?
 
   var autoconf = [
@@ -534,7 +534,7 @@ proc version_header(release: Str) -> Result[Str] {
 }
 
 ## Exported declaration `write_build_headers`.
-export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [fs, error] {
+export proc write_build_headers(root: Path, release: Str, arch = "arm64") [fs, error] {
   fp"{root}/include/generated/uapi/linux".mkdir()
   let uts_machine = if arch == "x86" { "x86_64" } else { "aarch64" }
 
@@ -1499,7 +1499,7 @@ export proc augment_missing_composites(
   root: Path,
   config: Kconfig,
   plan: KbuildPlan,
-  srcarch: Str = "arm64",
+  srcarch = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   var composites = plan.composites
   var dirs = []
@@ -1556,7 +1556,7 @@ export proc prune_inactive_objects(
   root: Path,
   config: Kconfig,
   plan: KbuildPlan,
-  srcarch: Str = "arm64",
+  srcarch = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   var active: Map[Bool] = {}
 
@@ -1989,8 +1989,8 @@ proc apply_item(
   dir: Path,
   item: Str,
   vars: Map[Str],
-  as_lib: Bool = false,
-  build_plan: Bool = true,
+  as_lib = false,
+  build_plan = true,
 ) -> ItemResult {
   return {plan: plan, dirs: [], entries: []} when item == ""
 
@@ -2033,8 +2033,8 @@ proc apply_words(
   dir: Path,
   words: List[Str],
   vars: Map[Str],
-  as_lib: Bool = false,
-  build_plan: Bool = true,
+  as_lib = false,
+  build_plan = true,
 ) -> ItemResult {
   var current = plan
   var dirs = []
@@ -2821,7 +2821,7 @@ proc merge_local_record_graph_with_options(
 export proc discover_plan(
   root: Path,
   config: Kconfig,
-  srcarch: Str = "arm64",
+  srcarch = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   discover_plan_with_options(root, config, srcarch, default_discover_options())
 }
@@ -3401,7 +3401,7 @@ export proc select_archive_tasks_outputs(
 export proc run_archive_tasks_output(
   tasks: List[make.MakeTask],
   output: Path,
-  jobs_count: Int = 1,
+  jobs_count = 1,
 ) [fs, process, env, error] {
   make.run_tasks(select_archive_tasks_outputs(tasks, [output])?, jobs_count)
 }
@@ -3410,13 +3410,13 @@ export proc run_archive_tasks_output(
 export proc run_archive_tasks_outputs(
   tasks: List[make.MakeTask],
   outputs: List[Path],
-  jobs_count: Int = 1,
+  jobs_count = 1,
 ) [fs, process, env, error] {
   make.run_tasks(select_archive_tasks_outputs(tasks, outputs)?, jobs_count)
 }
 
 ## Exported declaration `run_archive_plan_output`.
-export proc run_archive_plan_output(plan_path: Path, output: Path, jobs_count: Int = 1) [fs, process, env, error] {
+export proc run_archive_plan_output(plan_path: Path, output: Path, jobs_count = 1) [fs, process, env, error] {
   let tasks = read_archive_plan_tasks(plan_path)?
   run_archive_tasks_output(tasks, output, jobs_count)
 }
@@ -3426,7 +3426,7 @@ export proc write_plan(
   root: Path,
   config_path: Path,
   out: Path,
-  srcarch: Str = "arm64",
+  srcarch = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   let config = load_config(config_path)?
   let plan = discover_plan(root, config, srcarch)?
@@ -4243,7 +4243,7 @@ export proc generate_syscall_numbers(
   out: Path,
   header_guard: Str,
   syscall_count_name: Str,
-  prefix: Str = "",
+  prefix = "",
   abis: List[Str] = [],
 ) [fs, error] {
   var lines = [f"#ifndef {header_guard}", f"#define {header_guard}", ""]
@@ -5452,7 +5452,7 @@ export proc build_scratch_x86_final(
   defs: List[Str],
   includes: List[Str],
   link_inputs: List[Path],
-  jobs_count: Int = 1,
+  jobs_count = 1,
 ) [fs, process, env, error] {
   write_minimal_vmlinux_export(p".")
   let _ = cc
@@ -5843,7 +5843,7 @@ export proc build_scratch_arm64_final(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-  jobs_count: Int = 1,
+  jobs_count = 1,
 ) [fs, process, env, error] {
   write_minimal_vmlinux_export(p".")
   let _ = cc
@@ -5970,12 +5970,12 @@ export proc build_scratch_arm64_final(
 }
 
 ## Exported declaration `relink_existing_arm64`.
-export proc relink_existing_arm64(ar: Path, ld: Path, objcopy: Path, jobs_count: Int = 1) [fs, process, env, error] {
+export proc relink_existing_arm64(ar: Path, ld: Path, objcopy: Path, jobs_count = 1) [fs, process, env, error] {
   relink_existing_arm64_argv([ar.display()], [ld.display()], [objcopy.display()], jobs_count)
 }
 
 ## Exported declaration `relink_existing_arm64_llvm`.
-export proc relink_existing_arm64_llvm(jobs_count: Int = 1) [fs, process, env, error] {
+export proc relink_existing_arm64_llvm(jobs_count = 1) [fs, process, env, error] {
   relink_existing_arm64_argv(["llvm-ar"], ["ld.lld"], ["llvm-objcopy"], jobs_count)
 }
 
@@ -5984,7 +5984,7 @@ export proc relink_existing_arm64_argv(
   ar_argv: List[Str],
   ld_argv: List[Str],
   objcopy_argv: List[Str],
-  jobs_count: Int = 1,
+  jobs_count = 1,
 ) [fs, process, env, error] {
   let vmlinux_a = p"vmlinux.a"
   let vmlinux_o = p"vmlinux.o"

@@ -38,7 +38,7 @@ cli main build() [process, error] {
 }
 
 ## Start COUNT hosts and write DIR/inventory.toml.
-cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, error] {
+cli main up(count: UInt = 3, dir = p".work/fixtures") [fs, process, time, error] {
   guard count >= 1 and count <= 8 else {
     fail "count must be 1..8"
   }
@@ -103,7 +103,7 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
 }
 
 ## Remove the containers recorded in DIR/containers.json.
-cli main down(dir: Path = p".work/fixtures") [fs, process, error] {
+cli main down(dir = p".work/fixtures") [fs, process, error] {
   let record = fp"{dir}/containers.json"
   return unless record.exists()
 

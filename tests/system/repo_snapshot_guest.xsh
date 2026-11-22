@@ -215,8 +215,8 @@ proc stage_initramfs(
   ctx: TestContext,
   xsh: Path,
   modules_dir: Path,
-  root_name: Str = "repo-guest-root",
-  main_script: Str = "",
+  root_name = "repo-guest-root",
+  main_script = "",
   provisioned_keys: List[Str] = [],
 ) -> Result[Path, Error] {
   let root = test.temp_dir(ctx, name: root_name)?

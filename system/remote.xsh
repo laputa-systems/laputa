@@ -139,7 +139,7 @@ export pure remote_run_request(argv: List[Str], timeout_ms: Int, environment: Ma
 }
 
 ## Runs an explicit argv, without a shell, with the operator's authority.
-export proc remote_run(session: RemoteSession, program: Str, argv: List[Str], timeout_ms: Int = 30000, environment: Map[Str]? = null, cwd: Str? = null) [fs, net, error] -> Result[RemoteRun, Error] {
+export proc remote_run(session: RemoteSession, program: Str, argv: List[Str], timeout_ms = 30000, environment: Map[Str]? = null, cwd: Str? = null) [fs, net, error] -> Result[RemoteRun, Error] {
   let reply = call(session, program, remote_run_request(argv, timeout_ms, environment, cwd), null, timeout_ms + 15000)?
   {
     exit_code: json.get(reply, ["exit_code"], -1).require(Int)?,
@@ -162,7 +162,7 @@ export proc remote_digest(source: Path) [fs, error] -> Result[Str, Error] {
 ## named `name` is refused, and a refused or interrupted transfer leaves no file.
 ## A failure after the request left is never retried here; reconcile with `remote_staged`.
 ## Verified staging is not an authenticity claim.
-export proc remote_stage(session: RemoteSession, program: Str, source: Path, name: Str, sha256: Str, timeout_ms: Int = 600000) [fs, net, error] -> Result[RemoteStage, Error] {
+export proc remote_stage(session: RemoteSession, program: Str, source: Path, name: Str, sha256: Str, timeout_ms = 600000) [fs, net, error] -> Result[RemoteStage, Error] {
   let size = source.metadata()?.size
   let reply = call(session, program, {protocol: REMOTE_PROTOCOL, op: "stage", name: name, size: size, sha256: sha256}, source, timeout_ms)?
   {

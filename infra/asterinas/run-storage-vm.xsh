@@ -35,7 +35,7 @@ cli main(
   backend_log: Path,
   kill_marker: Str,
   timeout_seconds: Int,
-  memory_mib: Int = 1024,
+  memory_mib = 1024,
 ) [fs, process, time, env, error] {
   guard kind == "firecracker" or kind == "qemu" else { fail f"storage runner: unknown kind {kind}" }
   console.remove()

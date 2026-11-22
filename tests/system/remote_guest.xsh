@@ -3,7 +3,7 @@
 const protocol = "laputa-remote-1"
 const zeros = "0000000000000000000000000000000000000000000000000000000000000000"
 
-proc ask(ctx: TestContext, home: Path, request: Str, payload: Bytes = bytes.from_text("")) -> Result[Record] {
+proc ask(ctx: TestContext, home: Path, request: Str, payload = bytes.from_text("")) -> Result[Record] {
   let program = p"system/remote_guest.xsh".resolve()?
   let input = fp"{home}/request.bin"
   input.write(bytes.concat([bytes.from_text(request + "\n"), payload]))
@@ -20,7 +20,7 @@ proc ask(ctx: TestContext, home: Path, request: Str, payload: Bytes = bytes.from
   json.read(output)?.require(Record)?
 }
 
-proc header(op: Str, fields: Str = "") -> Str {
+proc header(op: Str, fields = "") -> Str {
   f"{{\"protocol\":\"{protocol}\",\"op\":\"{op}\"{fields}}}"
 }
 

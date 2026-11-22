@@ -593,7 +593,7 @@ proc write_tree(rootfs: FsRoot, config: FirstBoot) {
 ## live root untouched; only uniquely named staging siblings are abandoned.
 ## Passing "stage" as `crash_at` fails after staging but before publication
 ## to exercise that path; production callers omit it.
-export proc apply(root: Path, document: Str, crash_at: Str = "") [fs, error] -> Result[Unit, Error] {
+export proc apply(root: Path, document: Str, crash_at = "") [fs, error] -> Result[Unit, Error] {
   let config = parse(document)?
   let live_present = root.exists()?
   let key_present = if live_present {

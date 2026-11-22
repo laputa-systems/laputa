@@ -64,7 +64,7 @@ pure count_of(output: Str, needle: Str) -> Int {
   output.lines() |> where { |line| needle in line } |> count()
 }
 
-proc pyinfra_run(address: Str, work: Path, deploy: Str, key: Str = "client", port: Int = 22) -> Result[Run] {
+proc pyinfra_run(address: Str, work: Path, deploy: Str, key = "client", port = 22) -> Result[Run] {
   let mount = f"{work}:/work"
   let script = f"/work/{deploy}.py"
   let keyfile = f"/work/{key}"
@@ -150,7 +150,7 @@ cli main build() [process, error] {
 }
 
 ## Compare pyinfra's results with xsh-infra's for SCENARIO on fixture host HOST.
-cli main diff(scenario: Str = "all", inventory: Path = p".work/fixtures/inventory.toml", host: Str = "fx-2", dir: Path = p".work/pyinfra") [fs, process, time, error] {
+cli main diff(scenario = "all", inventory = p".work/fixtures/inventory.toml", host = "fx-2", dir = p".work/pyinfra") [fs, process, time, error] {
   let names = if scenario == "all" { ["files", "packages", "services", "commands", "failures"] } else { [scenario] }
   var chosen: List[Scenario] = []
   for name in names {

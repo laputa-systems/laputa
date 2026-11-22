@@ -241,7 +241,7 @@ proc cleanup(vms: List[Vm]) {
 
 ## Download the pinned base image and start COUNT VMs beginning at host number
 ## FIRST, writing DIR/inventory.toml.
-cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [fs, net, process, time, error] {
+cli main up(count = 2, first = 1, dir = p".work/fixtures/vm") [fs, net, process, time, error] {
   guard count >= 1 and count <= 2 else {
     fail "count must be 1..2: at most two VMs run at once"
   }
@@ -335,7 +335,7 @@ cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [f
 }
 
 ## Stop the VMs recorded in DIR/vms.json and remove their work directories.
-cli main down(dir: Path = p".work/fixtures/vm") [fs, process, time, error] {
+cli main down(dir = p".work/fixtures/vm") [fs, process, time, error] {
   let record = fp"{dir}/vms.json"
   return unless record.exists()
 

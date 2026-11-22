@@ -1,4 +1,4 @@
-proc main(mode: Str = "verification") [fs, process, env, error] -> Result[Unit, Error] {
+proc main(mode = "verification") [fs, process, env, error] -> Result[Unit, Error] {
   let toolchain = "/seed/rust/lib/rustlib/x86_64-unknown-linux-musl/bin"
   var build_environment = {
     PATH: f"/bin:/usr/lib/xsh/core:/usr/bin:/seed/rust/bin:{toolchain}",

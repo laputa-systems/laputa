@@ -54,7 +54,7 @@ export pure directory(
   owner: Str? = null,
   group_name: Str? = null,
   mode: Int? = null,
-  parents: Bool = false,
+  parents = false,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
   require_args("directory", id, needs)
@@ -150,7 +150,7 @@ export pure file(
   group_name: Str? = null,
   mode: Int? = null,
   validate: List[Str] = [],
-  sensitive: Bool = false,
+  sensitive = false,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
   require_args("file", id, needs)
@@ -173,9 +173,9 @@ export pure file(
 export pure symlink(
   id: Str,
   at: Str,
-  target: Str = "",
+  target = "",
   presence: model.Presence = .Present,
-  replace: Bool = false,
+  replace = false,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
   require_args("symlink", id, needs)
@@ -276,7 +276,7 @@ export pure user_account(
   groups: List[Str] = [],
   home: Str? = null,
   shell: Str? = null,
-  system_account: Bool = false,
+  system_account = false,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
   require_args("user", id, needs)
@@ -327,10 +327,10 @@ export pure command(
   only_if: List[Str]? = null,
   only_if_shell: Str? = null,
   run_on: List[Str] = [],
-  always: Bool = false,
+  always = false,
   stdin_env: Str? = null,
-  accept: List[Int] = [0],
-  timeout_seconds: Int = 600,
+  accept = [0],
+  timeout_seconds = 600,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
   require_args("command", id, needs)
@@ -393,7 +393,7 @@ export pure service(
   name: Str,
   enabled: Bool? = null,
   running: Bool? = null,
-  runlevel: Str = "default",
+  runlevel = "default",
   reload_on: List[Str] = [],
   restart_on: List[Str] = [],
   needs: List[Str] = [],
