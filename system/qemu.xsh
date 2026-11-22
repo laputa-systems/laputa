@@ -581,7 +581,7 @@ export proc run_test(
     for name in requested_captures(log_text) {
       if ! (name in captured) {
         qemu_qmp_retry(QmpRetryScreenshot(capture_path(outputs, name)), outputs.qmp_socket, deadline)
-        captured = captured + [name]
+        captured = [@captured, name]
         verify_capture(name, capture_path(outputs, name), outputs)
       }
     }

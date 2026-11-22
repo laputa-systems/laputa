@@ -145,8 +145,8 @@ proc execute_run_confined_build(
   )
   let status = linux.run_confined(
     command,
-    read: confinement.read + [work, build_root, xsh.parent],
-    write: confinement.write + [work],
+    read: [@confinement.read, work, build_root, xsh.parent],
+    write: [@confinement.write, work],
     tcp: confinement.tcp,
   )?
   return when status.ok

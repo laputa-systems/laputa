@@ -350,10 +350,10 @@ pure blocked_reason(state: HostState, resource: model.Resource, aborted: Str?) -
 pure absorb(state: HostState, done: Reconciled, policy: FailurePolicy) -> HostState {
   let settled = outcome.settled(done.outcome)
   let changed = match done.outcome {
-    outcome.Changed(_) => state.changed + [done.id]
+    outcome.Changed(_) => [@state.changed, done.id]
     else => state.changed
   }
-  let unsettled = if settled { state.unsettled } else { state.unsettled + [done.id] }
+  let unsettled = if settled { state.unsettled } else { [@state.unsettled, done.id] }
   let stopped = if outcome.bad(done.outcome) and policy == .Host and state.stopped == null {
     f"{done.id} failed earlier on this host"
   } else {
@@ -364,7 +364,7 @@ pure absorb(state: HostState, done: Reconciled, policy: FailurePolicy) -> HostSt
 
 pure blocked_state(state: HostState, resource: model.Resource, reason: Str, secrets: List[Str]) -> HostState {
   let entry = outcome_entry(state.workload.host.name, resource, .Blocked(reason), secrets)
-  {...state, unsettled: state.unsettled + [resource.id], entries: state.entries + [entry]}
+  {...state, unsettled: [@state.unsettled, resource.id], entries: state.entries + [entry]}
 }
 
 proc release_all(states: Map[Str, HostState]) [fs, env, process, error] {

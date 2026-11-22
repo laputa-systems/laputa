@@ -253,7 +253,7 @@ test test_an_operator_stop_after_acquisition_survives_recovery [fs, process, tim
   quiesce.quiesce_write_record(r.env, record)
   quiesce.quiesce_stop_service(r.env, record, "logger")
   quiesce.quiesce_stop_service(r.env, record, "dhcp-eth0")
-  let operator = process.run(process.command_argv(r.env.xinit[0], r.env.xinit + ["stop", "logger"]))?
+  let operator = process.run(process.command_argv(r.env.xinit[0], [@r.env.xinit, "stop", "logger"]))?
   assert operator.ok
   let release = test.run_script(ctx, """use system.backup_quiesce as quiesce
 let qe: quiesce.QuiesceEnv = {
@@ -275,7 +275,7 @@ test test_an_operator_start_after_acquisition_is_not_restarted [fs, process, tim
   let record = plan(r, ["logger"])?
   quiesce.quiesce_write_record(r.env, record)
   quiesce.quiesce_stop_service(r.env, record, "logger")
-  assert process.run(process.command_argv(r.env.xinit[0], r.env.xinit + ["start", "logger"]))?.ok
+  assert process.run(process.command_argv(r.env.xinit[0], [@r.env.xinit, "start", "logger"]))?.ok
   assert quiesce.quiesce_release_record(r.env, "backup", 0)?
   assert transitions(r)? == ["logger down", "logger up"]
 }

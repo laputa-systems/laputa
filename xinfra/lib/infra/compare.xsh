@@ -52,12 +52,12 @@ export pure octal(mode: Int) -> Str {
   var rest = mode
   var digits = []
   while rest > 0 {
-    digits = [f"{rest % 8}"] + digits
+    digits = [f"{rest % 8}", @digits]
     rest = rest / 8
   }
 
   while digits.len() < 4 {
-    digits = ["0"] + digits
+    digits = ["0", @digits]
   }
 
   digits.join("")

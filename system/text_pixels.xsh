@@ -202,7 +202,7 @@ export proc check_player_text(image: Bytes) [error] {
     if ink and top < 0 {
       top = y
     } else if ! ink and top >= 0 {
-      bands = bands + [[top, y]]
+      bands = [@bands, [top, y]]
       top = -1
     }
     y += 1

@@ -28,7 +28,7 @@ pure gap(width: Int) -> List[Int] {
 
 pure line(words: List[List[Int]]) -> List[Int] {
   var columns: List[Int] = gap(2)
-  for item in words { columns = columns + item + gap(4) }
+  for item in words { columns = [@columns, @item, @gap(4)] }
   columns + gap(band_width - columns.len())
 }
 

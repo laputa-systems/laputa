@@ -6,5 +6,5 @@ test test_smoke_target_carries_the_firewall_that_oxish_needs {
 
   assert "oxish" not in production
   assert "crabtables" not in production
-  assert smoke == production + ["oxish", "crabtables"]
+  assert smoke == [@production, "oxish", "crabtables"]
 }

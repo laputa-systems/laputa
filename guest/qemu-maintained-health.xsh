@@ -45,7 +45,7 @@ proc append_boot_marker(path_value: Path, line: Str) {
   if path_value.exists() {
     lines = path_value.read_text()?.lines() |> where .trim() != "" |> collect
   }
-  lines = cap_marker_lines(lines + [line], 20)
+  lines = cap_marker_lines([@lines, line], 20)
   path_value.write_atomic(lines.join("\n") + "\n")
   fs.fsync(path_value)
 }

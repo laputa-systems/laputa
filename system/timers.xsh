@@ -1303,7 +1303,7 @@ proc timer_release_run(command: List[Str], name: Str, policy: TimerReleasePolicy
   if let Ok(status) = process.run(
     process.command_argv(
       command[0],
-      command + [name],
+      [@command, name],
       cwd: p"/",
       stdin: p"/dev/null",
       timeout: time.millis(timer_release_cap_ms(policy)),

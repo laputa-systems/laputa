@@ -70,7 +70,7 @@ proc spawn_apply(
   err.remove()
   let command = process.command_argv(
     "xsh",
-    ["xsh"] + apply_args(inventory, deploy, limit, lock_path),
+    ["xsh", @apply_args(inventory, deploy, limit, lock_path)],
     p".",
     {},
     b"",

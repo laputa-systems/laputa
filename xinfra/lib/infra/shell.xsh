@@ -27,7 +27,7 @@ pure quote_all(values: List[Str]) -> Result[List[Str], Error] {
 ## constant single-quoted word run by `/bin/sh -c`, and every request value
 ## follows it as a positional argument.
 export pure command(script: Str, args: List[Str]) -> Result[Str, Error] {
-  let words = ["/bin/sh", "-c", quote(script)?, "xinfra"] + quote_all(args)?
+  let words = ["/bin/sh", "-c", quote(script)?, "xinfra", @quote_all(args)?]
   Ok(words.join(" "))
 }
 

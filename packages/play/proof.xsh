@@ -21,10 +21,10 @@ proc square_wave_wav(wav: Path) {
       yield @le(level, 2)
     }
   }
-  var header = [82, 73, 70, 70] + le(36 + samples.len(), 4) + [87, 65, 86, 69]
-  header += [102, 109, 116, 32] + le(16, 4) + le(1, 2) + le(1, 2)
-  header += le(rate, 4) + le(rate * 2, 4) + le(2, 2) + le(16, 2)
-  header += [100, 97, 116, 97] + le(samples.len(), 4)
+  var header = [82, 73, 70, 70, @le(36 + samples.len(), 4), 87, 65, 86, 69]
+  header += [102, 109, 116, 32, @le(16, 4), @le(1, 2), @le(1, 2)]
+  header += [@le(rate, 4), @le(rate * 2, 4), @le(2, 2), @le(16, 2)]
+  header += [100, 97, 116, 97, @le(samples.len(), 4)]
   let _ = bytes.write_at(wav, 0, bytes.from_ints(header + samples)?, create: true)?
 }
 
