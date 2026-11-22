@@ -123,8 +123,7 @@ proc qualification_run() {
   let root = p"/run/doas-qualification"
   root.mkdir()
   root.chmod(0o755)
-  p"/run/doas-qualification/private.conf".write("permit nopass root\n")
-  p"/run/doas-qualification/private.conf".chmod(0o600)
+  p"/run/doas-qualification/private.conf".write("permit nopass root\n", mode: 0o600)
   let detached = qualification_detached(process.command_argv(
     p"/usr/bin/su",
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/doas-qualification.xsh", "detached"],

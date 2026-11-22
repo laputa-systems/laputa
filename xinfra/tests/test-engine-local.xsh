@@ -72,8 +72,7 @@ test deliberate_drift_is_detected_and_repaired { |ctx|
   let dir = test.temp_dir(ctx)?
   let prepared = prepare(single("a", site(dir)?))?
   let _ = engine.apply(prepared, settings(dir))
-  fp"{dir}/site/motd".write("tampered\n")
-  fp"{dir}/site/motd".chmod(0o666)
+  fp"{dir}/site/motd".write("tampered\n", mode: 0o666)
   fp"{dir}/site/conf".chmod(0o755)
   let checked = engine.survey(.Check, prepared, settings(dir))
   assert testing.status_of(checked, "a", "motd") == "drift"

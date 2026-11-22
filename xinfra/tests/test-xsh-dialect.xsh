@@ -42,8 +42,7 @@ proc xinit_fixture(dir: Path) [fs, error] {
   let bin = fp"{dir}/bin"
   bin.mkdir()
   let fake = fp"{bin}/xinit"
-  fake.write(fake_xinit)
-  fake.chmod(0o755)
+  fake.write(fake_xinit, mode: 0o755)
   let services = fp"{dir}/services"
   services.mkdir()
   for name in ["logger", "sealed"] {
@@ -151,8 +150,7 @@ test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
   let root = fp"{dir}/tree"
   root.mkdir()
   let file = fp"{root}/motd"
-  file.write("hello\n")
-  file.chmod(0o640)
+  file.write("hello\n", mode: 0o640)
   let link = fp"{root}/current"
   fs.symlink(p"motd", link)
   let blocker = fp"{root}/blocker"

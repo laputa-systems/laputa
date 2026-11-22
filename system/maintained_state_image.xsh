@@ -15,8 +15,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
     let owner_file = fp"{scratch.host_path()?}/owners.json"
     json.write(owner_file, owners)
     atomically replace output as temporary {
-      temporary.write(b"")
-      temporary.chmod(0o600)
+      temporary.write(b"", mode: 0o600)
       temporary.truncate(size)
       let status = process.run(process.command_argv(xsh, [xsh, formatter, "--", "-d", root, "--inode-owners", owner_file, temporary]))?
       guard status.ok else { fail "maintained state image formatter failed" }

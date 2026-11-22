@@ -89,8 +89,7 @@ test test_ext4_applies_explicit_inode_owners_and_rejects_invalid_paths [fs, proc
   let image = fp"{root}/state.ext4"
   let owners = fp"{root}/owners.json"
   source.mkdir()
-  fp"{source}/a".write("private")
-  fp"{source}/a".chmod(0o600)
+  fp"{source}/a".write("private", mode: 0o600)
   fp"{source}/b".write("root")
   image.write(b"")
   image.truncate(8MiB)

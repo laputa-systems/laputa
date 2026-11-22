@@ -302,8 +302,7 @@ test trust_update_changes_admissions_without_restarting_services [fs, process, e
   let sentinel = fp"{fake_path}/service-restarted"
   for name in ["xinit", "systemctl", "service"] {
     let launcher = fp"{fake_path}/{name}"
-    launcher.write(bytes.from_text(f"#!/bin/sh\ntouch {sentinel}\n"))
-    launcher.chmod(0o755)
+    launcher.write(bytes.from_text(f"#!/bin/sh\ntouch {sentinel}\n"), mode: 0o755)
   }
   let xsh = runner()?
   let modules = module_root()?

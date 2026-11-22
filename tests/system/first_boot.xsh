@@ -377,8 +377,7 @@ test test_first_boot_makes_shadow_root_only_and_keeps_public_identity_files_read
   fp"{root}/etc".mkdir()
   fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\n")
   fp"{root}/etc/group".write("root:x:0:\nxinit-admin:x:124:\n")
-  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\n")
-  fp"{root}/etc/shadow".chmod(0o644)
+  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\n", mode: 0o644)
   fp"{root}/etc/shells".write("/bin/xshi\n")
   first_boot.apply(root, base("new"))
   assert "pazu:*:0:0:99999:7:::" in fp"{root}/etc/shadow".read_lines()?
@@ -393,8 +392,7 @@ test test_first_boot_tightens_an_existing_shadow_mode_without_appending [fs, err
   fp"{root}/etc".mkdir()
   fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\npazu:x:1000:1000::/home/pazu:/usr/bin/xsh-login\n")
   fp"{root}/etc/group".write("root:x:0:\npazu:x:1000:\nxinit-admin:x:124:\n")
-  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\npazu:*:0:0:99999:7:::\n")
-  fp"{root}/etc/shadow".chmod(0o644)
+  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\npazu:*:0:0:99999:7:::\n", mode: 0o644)
   fp"{root}/etc/shells".write("/bin/xshi\n")
   first_boot.apply(root, base("new"))
   assert fp"{root}/etc/shadow".read_text()? == "root:*:0:0:99999:7:::\npazu:*:0:0:99999:7:::\n"
@@ -499,8 +497,7 @@ test test_apply_tightens_preexisting_operator_paths_and_replaces_a_stale_account
   fp"{root}/etc/oxish".mkdir()
   fp"{root}/home/pazu".mkdir()
   fp"{root}/home/pazu".chmod(0o777)
-  fp"{root}/etc/oxish/accounts".write("stale\n")
-  fp"{root}/etc/oxish/accounts".chmod(0o666)
+  fp"{root}/etc/oxish/accounts".write("stale\n", mode: 0o666)
   first_boot.apply(root, base("new"))
   assert fp"{root}/home/pazu".metadata()?.mode % 4096 == 0o755
   assert fp"{root}/etc/oxish/accounts".metadata()?.mode % 4096 == 0o644

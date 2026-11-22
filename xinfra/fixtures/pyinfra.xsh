@@ -161,8 +161,7 @@ cli main diff(scenario = "all", inventory = p".work/fixtures/inventory.toml", ho
   dir.mkdir()
   let client = fp"{inventory.parent()}/client"
   let work = dir.resolve()?
-  fp"{work}/client".write(client.read_bytes()?)
-  fp"{work}/client".chmod(0o600)
+  fp"{work}/client".write(client.read_bytes()?, mode: 0o600)
   fp"{work}/motd".write("hello\n")
   for source in fs.children(p"fixtures/pyinfra")? {
     if source.name.ends_with(".py") or source.name == "xinfradiff" {

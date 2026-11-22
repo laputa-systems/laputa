@@ -34,8 +34,7 @@ proc fixture(dir: Path) [fs, error] {
   let bin = fp"{dir}/bin"
   bin.mkdir()
   let fake = fp"{bin}/xinit"
-  fake.write(fake_xinit)
-  fake.chmod(0o755)
+  fake.write(fake_xinit, mode: 0o755)
   let services = fp"{dir}/services"
   services.mkdir()
   for name in ["logger", "sealed"] {

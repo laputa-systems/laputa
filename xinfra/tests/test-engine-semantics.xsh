@@ -202,8 +202,7 @@ test apply_recomputes_from_current_facts_not_from_the_plan { |ctx|
   let prepared = prepare([on("h", resources)])?
   let planned = engine.survey(.Plan, prepared, settings(dir))
   assert testing.status_of(planned, "h", "f") == "drift"
-  fp"{dir}/f".write("same\n")
-  fp"{dir}/f".chmod(0o644)
+  fp"{dir}/f".write("same\n", mode: 0o644)
   let applied = engine.apply(prepared, settings(dir))
   assert testing.status_of(applied, "h", "f") == "unchanged"
 }
