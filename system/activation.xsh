@@ -147,11 +147,11 @@ export proc activation_publish_image(state_dir: Path, receipt: GenerationReceipt
   disk.copy(to: fp"{bundle}/disk")
   let admission = ImageAdmission(
     generation: receipt,
-    state_format: state_format,
+    state_format:,
     kernel_sha256: hash.sha256(fp"{bundle}/kernel")?.hex(),
     disk_sha256: hash.sha256(fp"{bundle}/disk")?.hex(),
   )
-  let metadata = ImageReceipt(format: "laputa-activation-image-2", admission: admission)
+  let metadata = ImageReceipt(format: "laputa-activation-image-2", admission:)
   fp"{bundle}/receipt.json".write(json.encode(metadata)? + "\n")
   for item in [p"kernel", p"disk", p"receipt.json"] { fs.fsync(fp"{bundle}/{item}") }
   fs.fsync(bundle)

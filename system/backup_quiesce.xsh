@@ -191,7 +191,7 @@ export pure quiesce_record_from_json(value: Any) -> Result[QuiesceRecord, Error]
       return Err(error.failure(f"quiescence record of {job} names an invalid service"))
     }
     services += [QuiesceService(
-      name: name,
+      name:,
       prior_desired: json.get(item, ["prior_desired"], "down").require()?,
       acquired: json.get(item, ["acquired"], false).require()?,
     )]
@@ -334,7 +334,7 @@ export proc quiesce_plan(
     for name in services {
       let status = quiesce_status(qe, name)?
       let desired = if status == null { "down" } else { json.get(status, ["desired"], "down").require(Str) ?? "down" }
-      yield QuiesceService(name: name, prior_desired: desired, acquired: desired == "up")
+      yield QuiesceService(name:, prior_desired: desired, acquired: desired == "up")
     }
   }
   Ok({

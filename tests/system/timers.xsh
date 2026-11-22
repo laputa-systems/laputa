@@ -370,7 +370,7 @@ proc writer_spawn(root: Path, script: Str) [fs, process, error] -> Result[Proces
 
 proc writer_record(store: timers.TimerWriterStore, handle: ProcessHandle, name: Str) -> Result[timers.TimerWriter, Error] {
   let record = timers.TimerWriter(
-    name: name,
+    name:,
     attempt: 1,
     boot_id: store.boot_id,
     pid: handle.pid,
@@ -476,7 +476,7 @@ proc main(...argv: List[Str]) [fs, error] {
 type ReleaseRig = {store: timers.TimerWriterStore, command: List[Str], root: Path}
 
 proc release_rig(ctx: TestContext, name: Str, jobs: List[Str]) [fs, process, env, error] -> Result[ReleaseRig, Error] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   fp"{root}/quiesce".mkdir()
   fp"{root}/release.xsh".write(RELEASE_STUB)
   for job in jobs {
@@ -553,7 +553,7 @@ test test_a_running_attempts_quiescence_is_left_alone [fs, process, time, io, en
   test.timeout(ctx, 60s)
   let rig = release_rig(ctx, "release-live", ["backup", "other"])?
   let handle = writer_spawn(rig.root, "sleep 300")?
-  let live = [timers.TimerRunning(name: "backup", handle: handle, deadline_mono_ms: 0, occurrence_wall_ms: 0, attempt: 1, missed: 0)]
+  let live = [timers.TimerRunning(name: "backup", handle:, deadline_mono_ms: 0, occurrence_wall_ms: 0, attempt: 1, missed: 0)]
   let _ = timers.timer_quiesce_reconcile(rig.store, rig.command, live, {}, at(1000, BASE))?
   assert release_calls(rig)? == ["other"]
   assert timers.timer_quiesce_names(rig.store)? == ["backup"]

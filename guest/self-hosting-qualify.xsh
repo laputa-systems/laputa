@@ -14,7 +14,7 @@ proc run_closed(root: Path, script: Str, arguments: List[Str]) {
     LAPUTA_SENTINEL_PATH: "/run/self-hosting-sentinel",
     LAPUTA_COHORT_SOURCE: f"{arguments[0]}/packages/cohort-c/files/hello.c",
   })
-  let status = linux.run_in_namespaces(command, unshare: ["net"], root: root, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
+  let status = linux.run_in_namespaces(command, unshare: ["net"], root:, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
   fail f"guest qualification failed: {script}" unless status.ok
 }
 

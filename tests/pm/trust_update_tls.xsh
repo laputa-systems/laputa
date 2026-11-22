@@ -34,7 +34,7 @@ proc serve_fixture_tls(
   drip: Str,
   delay_ms: Str,
 ) [fs, process, env, time, error] -> Result[TrustFixtureServer, Error] {
-  let dir = test.temp_dir(ctx, name: name)?
+  let dir = test.temp_dir(ctx, name:)?
   let port_file = fp"{dir}/port"
   let script = fixture("tls_server.py")
   if drip != "" {
@@ -59,7 +59,7 @@ proc stop_fixture(server: TrustFixtureServer) [process, error] {
 }
 
 proc fixture_routes(ctx: TestContext, name: Str, body: Str) -> Result[Path, Error] {
-  let dir = test.temp_dir(ctx, name: name)?
+  let dir = test.temp_dir(ctx, name:)?
   fp"{dir}/hello".write(bytes.from_text(body))
   dir
 }

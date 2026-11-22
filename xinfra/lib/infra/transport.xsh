@@ -79,7 +79,7 @@ pure ssh_connection(host: model.Host, session: Session) -> Connection {
     host: host.name,
     kind: .Ssh,
     dialect: host.dialect,
-    session: session,
+    session:,
     privilege: host.privilege,
     escalate_reads: host.escalate_reads,
     timeout_ms: host.timeout_ms,

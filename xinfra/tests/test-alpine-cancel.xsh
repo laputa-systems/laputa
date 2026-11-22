@@ -203,7 +203,7 @@ proc apply_cancelled_at_gate(
   }
 
   assert reached, f"the apply never reached the gate at {mark}"
-  process.kill(handle.pid, signal: signal)
+  process.kill(handle.pid, signal:)
   let status = wait handle?
   let code = status.exit_code() ?? -1
   let _ = testing.remote_text(host, "rm -f -- \"$1/hold\"", [mark])?
@@ -227,7 +227,7 @@ proc cancelled_inflight(
   }
 
   assert reached, "the mutation never reached its in-flight marker"
-  process.kill(handle.pid, signal: signal)
+  process.kill(handle.pid, signal:)
   let status = wait handle?
   let code = status.exit_code() ?? -1
   collect(dir, code)

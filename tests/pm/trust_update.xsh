@@ -16,7 +16,7 @@ proc key_bytes(name: Str) -> Result[Bytes] {
 ## Stages a disposable system root with live seeds, canonical symlinks, and
 ## the given fixture verification key.
 proc stage_system(ctx: TestContext, name: Str, key: Str) -> Result[Path, Error] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   let seed_bundle = fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt"
   let seed_policy = fp"{root}/usr/share/laputa/trust/seed/trust-policy"
   let key_path = fp"{root}/etc/laputa/trust-update-key"
@@ -35,7 +35,7 @@ proc stage_system(ctx: TestContext, name: Str, key: Str) -> Result[Path, Error] 
 
 ## Stages a release source directory from fixtures without touching them.
 proc stage_release(ctx: TestContext, name: Str, which: Str) -> Result[Path, Error] {
-  let out = fp"{test.temp_dir(ctx, name: name)?}/release"
+  let out = fp"{test.temp_dir(ctx, name:)?}/release"
   out.mkdir()
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
     fp"{fixture(which)}/{file}".copy(to: fp"{out}/{file}")

@@ -1393,7 +1393,7 @@ proc timer_launch(
   let handle = spawn plan?
   let record = TimerWriter(
     name: job.name,
-    attempt: attempt,
+    attempt:,
     boot_id: store.boot_id,
     pid: handle.pid,
     start_time_ms: timer_process_start_ms(handle.pid) ?? 0,
@@ -1677,7 +1677,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
   let store = TimerWriterStore(
     dir: fp"{config.state_dir}/{TIMER_WRITER_DIR}",
     quiesce_dir: fp"{config.state_dir}/{TIMER_QUIESCE_DIR}",
-    boot_id: boot_id,
+    boot_id:,
   )
   var releases: Map[TimerRelease] = {}
   for name in timer_writer_names(store)? {

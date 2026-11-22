@@ -16,7 +16,7 @@ proc invoke(ctx: TestContext, entry: NetworkInputEntry, input: Path) -> Result[N
   let stderr = fp"{root}/stderr"
   let script = entry.script.resolve()?
   let argv = [ctx.xsh_bin.display(), script.display()] + entry.arguments + [input.display()]
-  let status = process.run(process.command_argv(ctx.xsh_bin, argv, stdout: stdout, stderr: stderr, timeout: 5s))?
+  let status = process.run(process.command_argv(ctx.xsh_bin, argv, stdout:, stderr:, timeout: 5s))?
   Ok({code: status.shell_code()?, stdout: stdout.read_text()?, stderr: stderr.read_text()?})
 }
 

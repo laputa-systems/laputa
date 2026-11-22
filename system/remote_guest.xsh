@@ -13,7 +13,7 @@ const chunk = 1048576
 error RemoteError = Refused(kind: Str, message: Str)
 
 proc refuse(kind: Str, message: Str) -> RemoteError {
-  .Refused(kind: kind, message: message)
+  .Refused(kind:, message:)
 }
 
 proc read_header() [io, error] -> Result[Record, Error] {

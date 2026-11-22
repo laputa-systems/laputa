@@ -112,7 +112,7 @@ proc stage_initramfs(
   modules_dir: Path,
   main_script = "",
 ) [fs, process, env, error] -> Result[Path, Error] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   let key_bytes = fixture("keys/signing-key.public.base64").read_text()?.trim().base64_decode()?
   guard key_bytes.len() == 32 else {
     test.skip("guest proof needs the fixture verification key")
@@ -291,7 +291,7 @@ proc serve_release_c(
   drip: Str,
   delay_ms: Str,
 ) [fs, process, env, time, error] -> Result[GuestTlsServer, Error] {
-  let dir = test.temp_dir(ctx, name: name)?
+  let dir = test.temp_dir(ctx, name:)?
   let port_file = fp"{dir}/port"
   let port_text = port_file.display()
   let chain = fixture("tls/server-guest.crt").display()
@@ -332,7 +332,7 @@ proc launch_guest(
   mode: Str,
 ) [fs, process, env, error] -> Result[GuestBoot, Error] {
   let qemu = guest_tool_or_skip(GUEST_QEMU_NAME)?
-  let dir = test.temp_dir(ctx, name: name)?
+  let dir = test.temp_dir(ctx, name:)?
   let log = fp"{dir}/serial.log"
   let argv = [
     qemu.display(),

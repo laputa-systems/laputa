@@ -189,7 +189,7 @@ proc launch_guest(
   url: Str,
 ) [fs, process, env, error] -> Result[GuestBoot, Error] {
   let qemu = guest_tool_or_skip(GUEST_QEMU_NAME)?
-  let dir = test.temp_dir(ctx, name: name)?
+  let dir = test.temp_dir(ctx, name:)?
   let log = fp"{dir}/serial.log"
   let argv = [
     qemu.display(),

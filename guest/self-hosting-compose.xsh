@@ -68,7 +68,7 @@ proc compose(root: Path, toolchain = p"/run/self-hosting-output/target/x86_64-un
   })
   fp"{bundle}/tmp".mkdir()
   fs.set_owner(fp"{bundle}/tmp", uid: 65534, gid: 65534)
-  let status = linux.run_in_namespaces(command, unshare: ["net"], root: root, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
+  let status = linux.run_in_namespaces(command, unshare: ["net"], root:, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
   fs.sync()
   fail "in-guest successor composition failed" unless status.ok
   print "LAPUTA_SELF_HOSTING_SUCCESSOR_COMPOSED"

@@ -2417,7 +2417,7 @@ proc scan_units(names: List[Str]) {
 
     return when remaining == 0
 
-    let event = unix.wait_pid1_event(timeout: time.millis(next_wait_ms(units, elapsed_now_ms()?)), wake_fd: wake_fd)?
+    let event = unix.wait_pid1_event(timeout: time.millis(next_wait_ms(units, elapsed_now_ms()?)), wake_fd:)?
 
     if remaining > 0 {
       remaining -= 1

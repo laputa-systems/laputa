@@ -53,7 +53,7 @@ proc assert_pending(record: activation.ActivationRecord, id: Str) {
 }
 
 proc health_services(names: List[Str], state: Str) -> List[activation.ServiceHealth] {
-  [activation.ServiceHealth(name: name, state: state) for name in names]
+  [activation.ServiceHealth(name:, state:) for name in names]
 }
 
 test test_guest_health_requires_current_boot_identity_and_critical_services [fs, time, error] { |ctx|

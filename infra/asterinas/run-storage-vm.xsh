@@ -51,7 +51,7 @@ cli main(
       kernel: fp"{kernel}",
       initramfs: fp"{initramfs}",
       disk: fp"{root}",
-      memory_mib: memory_mib,
+      memory_mib:,
       data_disk: .DataDisk(fp"{state}"),
       network: qemu.NoNetwork,
       control: qemu.NoControl,

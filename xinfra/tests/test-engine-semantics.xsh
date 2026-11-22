@@ -235,7 +235,7 @@ test a_binary_source_file_is_replaced_atomically_and_streamed { |ctx|
   let dir = test.temp_dir(ctx)?
   let source = fp"{dir}/source.bin"
   run dd if=/dev/urandom of=$source bs=1M count=20 status=none
-  let resources = [declare.file(id: "blob", at: f"{dir}/blob", source: source, mode: 0o600)?]
+  let resources = [declare.file(id: "blob", at: f"{dir}/blob", source:, mode: 0o600)?]
   let prepared = prepare([on("h", resources)])?
   let first = engine.apply(prepared, settings(dir))
   assert testing.status_of(first, "h", "blob") == "changed"

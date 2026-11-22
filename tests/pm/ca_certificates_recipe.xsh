@@ -29,7 +29,7 @@ proc stage_layout(root: Path) {
 }
 
 proc prove_ok(ctx: TestContext, name: Str) {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   stage_layout(root)
   let xsh = runner()?
   let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root])
@@ -42,12 +42,12 @@ proc prove_ok(ctx: TestContext, name: Str) {
 }
 
 proc prove_fails(ctx: TestContext, name: Str, mutate: Path, body: Str, fragment: Str) {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   stage_layout(root)
   let stderr = fp"{root}/proof.stderr"
   let xsh = runner()?
   fp"{root}/{mutate}".write(bytes.from_text(body))
-  let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr: stderr)
+  let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr:)
   assert ! process.run(command)?.ok
   assert fragment in stderr.read_text()?
 }
@@ -130,7 +130,7 @@ test ca_certificate_proof_rejects_bad_metadata [fs, process, env, error] { |ctx|
   let stderr = fp"{root}/proof.stderr"
   let xsh = runner()?
   let metadata = fp"{root}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
-  let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr: stderr)
+  let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root], stderr:)
   json.write(metadata, {deps: ["unexpected-runtime"]})
   assert ! process.run(command)?.ok
   assert "expected no runtime deps" in stderr.read_text()?

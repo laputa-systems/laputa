@@ -82,7 +82,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
 type Rig = {env: quiesce.QuiesceEnv, root: Path}
 
 proc rig(ctx: TestContext, name: Str, services: Record) [fs, process, env, error] -> Result[Rig, Error] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   let state = fp"{root}/state"
   state.mkdir()
   fp"{root}/stub.xsh".write(STUB)

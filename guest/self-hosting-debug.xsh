@@ -18,10 +18,10 @@ proc main(root: Path) [fs, process, env, error] {
   }
   fp"{root}/scratch/seed-version.xsh".write("run /bin/kache \"--version\"\nrun /seed/rust/bin/rustc \"-vV\"\n")
   let diagnostic = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/scratch/seed-version.xsh"])
-  let diagnostic_status = linux.run_in_namespaces(diagnostic, unshare: ["net"], root: root, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
+  let diagnostic_status = linux.run_in_namespaces(diagnostic, unshare: ["net"], root:, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
   fail "guest kache seed diagnostic failed" unless diagnostic_status.ok
   let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/inputs/build.xsh", "--", "debug"])
-  let status = linux.run_in_namespaces(command, unshare: ["net"], root: root, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
+  let status = linux.run_in_namespaces(command, unshare: ["net"], root:, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
   fs.sync()
   fail "in-guest source build failed" unless status.ok
   print "LAPUTA_SELF_HOSTING_DEBUG_DONE"

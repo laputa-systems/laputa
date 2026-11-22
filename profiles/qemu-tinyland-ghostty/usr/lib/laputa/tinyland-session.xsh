@@ -6,7 +6,7 @@
 error SessionError = DeniedOpen(device: Str)
 
 proc deny_open(path_value: Path, write: Bool, runtime: Path) {
-  match unix.open_fd(path_value, write: write, nonblock: true) {
+  match unix.open_fd(path_value, write:, nonblock: true) {
     Ok(fd) => {
       unix.close_fd(fd)
       fp"{runtime}/laputa-direct-opened".write(path_value.display())
