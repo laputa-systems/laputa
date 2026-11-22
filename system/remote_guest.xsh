@@ -138,7 +138,7 @@ proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[
 }
 
 proc staging_root() [env, fs, error] -> Result[Path, Error] {
-  let home = env.get("HOME")?
+  let home = e"HOME"?
   guard home.starts_with("/") and ".." not in home else {
     return Err(refuse("home", "HOME is not an absolute path"))
   }

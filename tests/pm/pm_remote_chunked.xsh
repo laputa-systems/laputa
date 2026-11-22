@@ -17,7 +17,7 @@ test immutable_http_publication_across_chunk_boundary [fs, process, env, time, n
   let root = test.temp_dir(ctx, name: "chunked-mirror")?
   let data = fp"{root}/data"
   let output = fp"{root}/server.log"
-  let configured = env.get("LAPUTA_MIRROR_BIN") ?? ""
+  let configured = e"LAPUTA_MIRROR_BIN" ?? ""
   guard configured != "" else {
     return test.fail("LAPUTA_MIRROR_BIN must name a built laputa-mirror; run this test through make test-pm")
   }

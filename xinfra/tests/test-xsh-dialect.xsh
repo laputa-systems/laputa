@@ -168,7 +168,7 @@ test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
 test the_xsh_xinit_probe_reports_the_same_service_facts_as_the_posix_script { |ctx|
   let dir = test.temp_dir(ctx)?
   xinit_fixture(dir)
-  let search = env.get("PATH")?
+  let search = e"PATH"?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let posix = connect(testing.local_host())?
     let xsh = connect(testing.local_xsh_host())?
@@ -238,11 +238,11 @@ test a_local_xsh_host_converges_file_directory_link_command_and_service_and_reru
   testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   xinit_fixture(dir)
-  let search = env.get("PATH")?
+  let search = e"PATH"?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let site = fp"{dir}/site"
     let stamp = fp"{dir}/stamp"
-    let account = env.get("USER")?
+    let account = e"USER"?
     let account_id = f"{user.current()?.uid}"
     let resources = [
       declare.directory(id: "root", at: f"{site}", mode: 0o750, owner: account)?,

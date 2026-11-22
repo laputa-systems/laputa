@@ -63,7 +63,7 @@ test an_xinit_service_starts_restarts_and_stops_through_the_control_plane { |ctx
   let dir = test.temp_dir(ctx)?
   fixture(dir)
   let trigger = fp"{dir}/trigger"
-  let search = env.get("PATH")?
+  let search = e"PATH"?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let running = [
       declare.file(id: "trigger", at: f"{trigger}", text: "one\n", mode: 0o600)?,
@@ -96,7 +96,7 @@ test an_xinit_service_starts_restarts_and_stops_through_the_control_plane { |ctx
 test an_unknown_xinit_service_is_uncertain_and_never_controlled { |ctx|
   let dir = test.temp_dir(ctx)?
   fixture(dir)
-  let search = env.get("PATH")?
+  let search = e"PATH"?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let resources = [declare.xinit_service(id: "ghost", name: "ghost", running: true)?]
     let planned = engine.survey(.Plan, prepared(resources)?, settings(dir))
@@ -110,7 +110,7 @@ test an_unknown_xinit_service_is_uncertain_and_never_controlled { |ctx|
 test an_unreadable_xinit_status_is_uncertain_not_down { |ctx|
   let dir = test.temp_dir(ctx)?
   fixture(dir)
-  let search = env.get("PATH")?
+  let search = e"PATH"?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let resources = [declare.xinit_service(id: "sealed", name: "sealed", running: true)?]
     let planned = engine.survey(.Plan, prepared(resources)?, settings(dir))

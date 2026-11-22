@@ -51,7 +51,7 @@ export pure local_xsh_host(name: Str = "local-xsh") -> model.Host {
 ## The disposable hosts a fixture run published, or none when no fixture
 ## environment is present.
 export proc fixture_hosts() [env, fs, error] -> Result[List[model.Host], Error] {
-  match env.get("XINFRA_TEST_INVENTORY") {
+  match e"XINFRA_TEST_INVENTORY" {
     Err(_) => Ok([])
     Ok(file) => Ok(inventory.load(fp"{file}")?.hosts)
   }

@@ -44,7 +44,7 @@ type Invocation = {code: Int, stdout: Str, stderr: Str}
 type Cancelled = {code: Int, stdout: Str, stderr: Str}
 
 proc inventory() [env, error] -> Result[Path, Error] {
-  Ok(fp"{env.get("XINFRA_TEST_INVENTORY")?}")
+  Ok(fp"{e"XINFRA_TEST_INVENTORY"?}")
 }
 
 proc apply_args(inventory: Path, deploy: Path, limit: Str, lock_path: Str) -> List[Str] {
