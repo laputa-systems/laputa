@@ -6,7 +6,7 @@ const nul = "\0"
 ## Quote one value as a single POSIX shell word. A value with a NUL byte has no
 ## shell representation and is refused instead of truncated.
 export pure quote(value: Str) -> Result[Str, Error] {
-  if value.find(nul) != null {
+  guard value.find(nul) == null else {
     fail "a remote shell word cannot contain a NUL byte"
   }
 
@@ -47,7 +47,7 @@ pure xsh_hex_byte(byte: Int) -> Str {
 ## whatever the value contains; a value with a NUL byte has no representation
 ## on an SSH command line and is refused instead of truncated.
 export pure xsh_quote(value: Str) -> Result[Str, Error] {
-  if value.find(nul) != null {
+  guard value.find(nul) == null else {
     fail "a remote command string cannot contain a NUL byte"
   }
 

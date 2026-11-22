@@ -514,7 +514,7 @@ pure requested_captures(console: Str) -> List[Str] {
 }
 
 proc verify_capture(name: Str, screenshot: Path, outputs: build.ProfileOutputs) {
-  if ! screenshot_is_valid(screenshot) {
+  guard screenshot_is_valid(screenshot) else {
     return Err(types.LaputaError.Profile(f"QMP did not create a nonempty {name} screenshot; inspect {qemu_output_locations(outputs)}"))
   }
   match name {

@@ -207,7 +207,7 @@ proc confirm(
   drift: compare.Drift,
   material: compare.Material?,
 ) [fs, env, process, error] -> outcome.Outcome {
-  if ! verifiable(resource.spec) {
+  guard verifiable(resource.spec) else {
     return .Changed(outcome.Applied(changes: drift.changes, verified: false))
   }
 

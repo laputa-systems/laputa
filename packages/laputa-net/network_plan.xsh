@@ -232,7 +232,7 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
   }
   var seen_addresses: List[NetworkAddress] = []
   for address in observed.addresses {
-    if network_is_ipv6(address.local) != ipv6 {
+    guard network_is_ipv6(address.local) == ipv6 else {
       return Err(NetworkPolicyError.NetworkInvalid(f"observed cohort holds an address outside the intent's {family} family"))
     }
     if !valid_address(address) or address in seen_addresses {
@@ -242,7 +242,7 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
   }
   var seen_routes: List[NetworkDefaultRoute] = []
   for route in observed.routes {
-    if network_is_ipv6(route.gateway) != ipv6 {
+    guard network_is_ipv6(route.gateway) == ipv6 else {
       return Err(NetworkPolicyError.NetworkInvalid(f"observed cohort holds a default route outside the intent's {family} family"))
     }
     if !valid_route(route, ipv6) or route in seen_routes {
@@ -252,7 +252,7 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
   }
   seen_addresses = []
   for address in owned.addresses {
-    if network_is_ipv6(address.local) != ipv6 {
+    guard network_is_ipv6(address.local) == ipv6 else {
       return Err(NetworkPolicyError.NetworkInvalid(f"ownership holds an address outside the intent's {family} family"))
     }
     if !valid_address(address) or address in seen_addresses {
@@ -262,7 +262,7 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
   }
   seen_routes = []
   for route in owned.routes {
-    if network_is_ipv6(route.gateway) != ipv6 {
+    guard network_is_ipv6(route.gateway) == ipv6 else {
       return Err(NetworkPolicyError.NetworkInvalid(f"ownership holds a default route outside the intent's {family} family"))
     }
     if !valid_route(route, ipv6) or route in seen_routes {
@@ -345,12 +345,12 @@ export pure network_replay(plan: NetworkPlan, events: List[NetworkReplayEvent]) 
         return NetworkReobserve(f"operation {index} failed; partial state requires observation")
       }
       NetworkObserved(observed) => {
-        if next_operation != plan.operations.len() { return NetworkInvalid("missing operation results") }
+        guard next_operation == plan.operations.len() else { return NetworkInvalid("missing operation results") }
         if observed.sequence <= plan.before.sequence { return NetworkReobserve("final observation is not newer") }
         match network_plan(plan.intent, expected, observed) {
           Err(_) => return NetworkReobserve("final observation conflicts with intent")
           Ok(remaining) => {
-            if !remaining.operations.is_empty() { return NetworkReobserve("operations acknowledged but state has not converged") }
+            guard remaining.operations.is_empty() else { return NetworkReobserve("operations acknowledged but state has not converged") }
           }
         }
         for address in plan.before.addresses {

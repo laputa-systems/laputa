@@ -13,7 +13,7 @@ pure unreadable(cause: fact.Cause, detail: Str) -> fact.Unreadable {
 }
 
 pure report(execution: transport.Execution) -> Result[Str, fact.Unreadable] {
-  if execution.code != 0 {
+  guard execution.code == 0 else {
     let stderr = execution.stderr.utf8() ?? "(stderr is not text)"
     return Err(unreadable(.Unavailable, f"exit {execution.code}: {stderr.trim()}"))
   }

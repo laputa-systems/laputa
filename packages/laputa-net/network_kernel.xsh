@@ -58,7 +58,7 @@ pure address_derived_route(route: net_state.Route, address: net_state.Address, i
 }
 
 pure selected_default_route(route: net_state.Route, family: net_state.Family) -> Result[policy.NetworkDefaultRoute, Error] {
-  if route.tos != 0 {
+  guard route.tos == 0 else {
     return Err(NetworkKernelError.Conflict("selected default route is TOS-specific and cannot converge with ordinary traffic"))
   }
   let gateway = route.hops[0].gateway

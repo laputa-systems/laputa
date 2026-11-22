@@ -1340,7 +1340,7 @@ proc cleanup_failed_start(service: Service, pid: Int, failure: Error) {
   if pid > 0 {
     match unix.shutdown_process_groups([pid], time.millis(service.stop_timeout_ms), 100ms) {
       Ok(cleanup) => {
-        if ! cleanup.remaining.is_empty() {
+        guard cleanup.remaining.is_empty() else {
           return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"{service.name}: {failure.message}; retained process group {pid}"))
         }
       }

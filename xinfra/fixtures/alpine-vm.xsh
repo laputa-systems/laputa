@@ -56,7 +56,7 @@ proc start_seed(seed: Path, port: Int, out: Path, err: Path) -> Result[Int] {
   let command = process.command_argv("python3", argv, p".", {}, b"", out, err, detach: true, new_session: true, ignore_hup: true)
   let spawned = process.spawn(command)?
   for _ in range(20) {
-    if ! fp"/proc/{spawned.pid}".exists() {
+    guard fp"/proc/{spawned.pid}".exists() else {
       fail f"seed HTTP server on port {port} exited: {err.read_text()?.trim()}"
     }
 

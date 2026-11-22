@@ -275,7 +275,7 @@ export pure timer_calendar_occurrences(next_wall_ms: Int, now_wall_ms: Int) -> I
 
 ## The interval decision at one monotonic reading.
 export pure timer_interval_due(interval_ms: Int, next_mono_ms: Int, now_mono_ms: Int, missed: Str) -> TimerDue {
-  if now_mono_ms < next_mono_ms {
+  guard now_mono_ms >= next_mono_ms else {
     return {
       kind: "wait",
       missed: 0,
@@ -1917,7 +1917,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
         timer_log(f"event=job-run-now name={job.name}")
       }
       if runtime.retry_at_mono_ms > 0 {
-        if now.mono_ms < runtime.retry_at_mono_ms {
+        guard now.mono_ms >= runtime.retry_at_mono_ms else {
           runtimes[job.name] = runtime
           continue
         }
