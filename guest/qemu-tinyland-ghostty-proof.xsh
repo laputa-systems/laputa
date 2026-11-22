@@ -63,7 +63,7 @@ proc guest_find_input(name: Str, phase: Str) -> Result[Path, Error] {
   }
 
   guest_fail(phase, f"no input device named {name}")
-  return Err(GuestProofError.Failed(phase:, message: f"no input device named {name}"))
+  Err(GuestProofError.Failed(phase:, message: f"no input device named {name}"))
 }
 
 ## Resolve the PCI address behind an input event node through sysfs, so the
@@ -83,7 +83,7 @@ proc guest_pci_of_input(event_name: Str, phase: Str) -> Result[Str, Error] {
   }
 
   guest_fail(phase, f"no PCI parent for {event_name}")
-  return Err(GuestProofError.Failed(phase:, message: f"no PCI parent for {event_name}"))
+  Err(GuestProofError.Failed(phase:, message: f"no PCI parent for {event_name}"))
 }
 
 proc guest_process_alive(pid: Int) -> Result[Bool, Error] {
@@ -110,7 +110,7 @@ proc guest_wait_unit(name: Str, previous: Int, ready: Bool) -> Result[Int, Error
     elapsed += 1
   }
   guest_fail(name, "service did not become ready")
-  return Err(GuestProofError.Failed(phase: name, message: "service did not become ready"))
+  Err(GuestProofError.Failed(phase: name, message: "service did not become ready"))
 }
 
 proc guest_wait_session(runtime: Path, previous: Int) -> Result[Int, Error] {
@@ -139,7 +139,7 @@ proc guest_wait_session(runtime: Path, previous: Int) -> Result[Int, Error] {
     if log.exists() { guest_console(log.read_text()?) }
   }
   guest_fail("session", "replacement session did not become ready")
-  return Err(GuestProofError.Failed(phase: "session", message: "replacement session did not become ready"))
+  Err(GuestProofError.Failed(phase: "session", message: "replacement session did not become ready"))
 }
 
 ## Count Ghostty renderer starts in the session log. Ghostty fails closed
@@ -161,7 +161,7 @@ proc guest_wait_gl(previous: Int, phase: Str) -> Result[Int, Error] {
   }
   if p"/var/log/tinyland/current".exists() { guest_console(p"/var/log/tinyland/current".read_text()?) }
   guest_fail(phase, "Ghostty did not load an OpenGL 4.3 renderer")
-  return Err(GuestProofError.Failed(phase:, message: "Ghostty did not load an OpenGL 4.3 renderer"))
+  Err(GuestProofError.Failed(phase:, message: "Ghostty did not load an OpenGL 4.3 renderer"))
 }
 
 proc guest_require_broker_census(mdevd_pid: Int, seatd_pid: Int) {

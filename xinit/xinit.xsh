@@ -1356,7 +1356,7 @@ proc spawned_readiness(service: Service, pid: Int) -> Result[Bool] {
     Ok(ready) => ready
     Err(failure) => {
       cleanup_failed_start(service, pid, failure)
-      return Err(failure)
+      Err(failure)
     }
   }
 }
@@ -1481,7 +1481,7 @@ proc start_one_service(name: Str) -> Result[SavedStatus] {
     Ok(status) => status
     Err(failure) => {
       cleanup_failed_start(service, base.pid, failure)
-      return Err(failure)
+      Err(failure)
     }
   }
 }

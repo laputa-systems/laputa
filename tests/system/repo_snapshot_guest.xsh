@@ -21,7 +21,7 @@ proc guest_tool_or_skip(name: Str) [fs, process, error] -> Result[Path, Error] {
     Ok(found) => found,
     Err(_) => {
       test.skip(f"guest proof needs {name}")
-      return p"/nonexistent"
+      p"/nonexistent"
     },
   }
 }
@@ -86,7 +86,7 @@ proc guest_xsh() [fs, process, env, error] -> Result[Path, Error] {
     Ok(found) => found,
     Err(_) => {
       test.skip("guest proof needs the host xsh binary")
-      return p"/nonexistent"
+      p"/nonexistent"
     },
   }
 }
