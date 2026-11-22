@@ -197,9 +197,7 @@ proc guest_run_required(command: Command, phase: Str) {
 proc guest_rss_kb(pid: Int) -> Result[Int, Error] {
   let status = fp"/proc/{pid}/status".read_text()?
   for line in status.split("\n") {
-    if line.starts_with("VmRSS:") {
-      return line.split(":")[1].trim().split(" ")[0] as Int
-    }
+    return line.split(":")[1].trim().split(" ")[0] as Int when line.starts_with("VmRSS:")
   }
   0
 }

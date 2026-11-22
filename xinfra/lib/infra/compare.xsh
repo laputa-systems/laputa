@@ -91,17 +91,11 @@ pure attribute_changes(owner: Str?, group_name: Str?, mode: Int?, info: fact.Pat
 
 pure wanted_attributes(owner: Str?, group_name: Str?, mode: Int?) -> List[Change] {
   let changes: List[Change] = collect {
-    if mode != null {
-      yield change("mode", "(none)", octal(mode))
-    }
+    yield change("mode", "(none)", octal(mode)) when mode != null
 
-    if owner != null {
-      yield change("owner", "(none)", owner)
-    }
+    yield change("owner", "(none)", owner) when owner != null
 
-    if group_name != null {
-      yield change("group", "(none)", group_name)
-    }
+    yield change("group", "(none)", group_name) when group_name != null
   }
 
   changes

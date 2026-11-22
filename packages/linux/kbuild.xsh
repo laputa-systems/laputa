@@ -788,7 +788,7 @@ pure make_fields(raw: Str) -> List[Str] {
         start = index
       }
     }
-    if start >= 0 { yield raw.byte_slice(start) }
+    yield raw.byte_slice(start) when start >= 0
   }
   fields
 }

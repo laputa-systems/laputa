@@ -156,9 +156,7 @@ proc incoming_names(root: Path) [fs, error] -> Result[List[Str], Error] {
   return [] unless root.exists()
   let names = collect {
     for entry in fs.children(root)? {
-      if entry.name.starts_with(".incoming-") {
-        yield entry.name
-      }
+      yield entry.name when entry.name.starts_with(".incoming-")
     }
   }
   names

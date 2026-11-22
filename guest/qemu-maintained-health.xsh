@@ -64,7 +64,7 @@ proc main() {
     for item in g"/run/xinit/*.json" {
       let value = json.read(item)?
       let name = json.get(value, ["name"], "").require(Str)?
-      if name != "" { yield {name: name, state: json.get(value, ["state"], "").require(Str)?} }
+      yield {name: name, state: json.get(value, ["state"], "").require(Str)?} when name != ""
     }
   }
   let report = {

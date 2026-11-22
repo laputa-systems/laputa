@@ -80,17 +80,11 @@ pure content_of(
   template_json: Str?,
 ) -> Result[model.Content?, Error] {
   let chosen: List[model.Content] = collect {
-    if text != null {
-      yield .Inline(bytes.from_text(text))
-    }
+    yield .Inline(bytes.from_text(text)) when text != null
 
-    if data != null {
-      yield .Inline(data)
-    }
+    yield .Inline(data) when data != null
 
-    if source != null {
-      yield .FromFile(source)
-    }
+    yield .FromFile(source) when source != null
 
     if secret_env != null {
       check.environment_ok(secret_env)
@@ -355,9 +349,7 @@ export pure command(
       yield model.OnChange
     }
 
-    if always {
-      yield model.Always
-    }
+    yield model.Always when always
   }
 
   guard guards.len() == 1 else {

@@ -290,9 +290,9 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
     }
   }
   let operations: List[NetworkOperation] = collect {
-    if !observed.up { yield NetworkBringLinkUp }
-    if intent.address not in observed.addresses { yield NetworkAddAddress(intent.address) }
-    if desired_route not in observed.routes { yield NetworkAddDefaultRoute(desired_route) }
+    yield NetworkBringLinkUp unless observed.up
+    yield NetworkAddAddress(intent.address) when intent.address not in observed.addresses
+    yield NetworkAddDefaultRoute(desired_route) when desired_route not in observed.routes
     for route in owned.routes {
       if route != desired_route and route in observed.routes { yield NetworkRemoveDefaultRoute(route) }
     }

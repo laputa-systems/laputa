@@ -99,9 +99,7 @@ test the_merged_sequence_respects_every_hosts_order_for_many_generated_inputs {
       let picked = collect {
         for id in universe {
           state = (state * 1103515245 + 12345) % 2147483648
-          if state / 65536 % 3 != 0 {
-            yield id
-          }
+          yield id when state / 65536 % 3 != 0
         }
       }
 

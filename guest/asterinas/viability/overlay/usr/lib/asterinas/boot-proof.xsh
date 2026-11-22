@@ -248,9 +248,7 @@ proc main() [fs, process, env, time, net, error] {
         eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
         let test_run = try { stream_xsh_tests(source_root, test_selection)? }
         match test_run {
-          Ok(passed) => {
-            if ! passed { yield test_selection }
-          },
+          Ok(passed) => yield test_selection unless passed,
           Err(problem) => {
             eprint --flush f"XSH test selection could not run: {test_selection}: {problem.message}"
             yield test_selection

@@ -1840,9 +1840,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
         var position = 0
         let kept: List[TimerRunning] = collect {
           for item in running {
-            if position != done.index {
-              yield item
-            }
+            yield item when position != done.index
             position += 1
           }
         }

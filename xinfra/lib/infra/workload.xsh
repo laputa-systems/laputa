@@ -65,11 +65,7 @@ proc secret_values(host: Str, resource: model.Resource) -> Result[List[Str], Err
           }
         }
       }
-      model.Exec(spec) => {
-        if spec.stdin_env != null {
-          yield spec.stdin_env
-        }
-      }
+      model.Exec(spec) => yield spec.stdin_env when spec.stdin_env != null
       else => {}
     }
   }
