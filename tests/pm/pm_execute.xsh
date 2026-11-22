@@ -691,6 +691,7 @@ test test_execute_recomposes_generation_through_failed_publication_and_gc [fs, n
 proc main(...argv: List[Str]) [fs, net, env, process, error] -> Result[Unit] {
   if argv[4] == "limited" {
     let _ = process.set_signal_action("XFSZ", "default")?
+    let _ = process.set_rlimit("core", soft: 0)?
     let _ = process.set_rlimit("fsize", soft: 4096)?
   }
 
