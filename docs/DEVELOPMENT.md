@@ -224,6 +224,13 @@ make root PKGS=baselayout   # import from the mirror, compose a root, check it r
 kill %1              # stop the mirror
 ```
 
+To check a fresh checkout without building the world, stop after the seed and
+run the tests: `make host-xsh fetch seed test`. On a fresh Ubuntu 24.04
+container with 8 CPUs (2026-11-22), `make host-xsh` took 11 to 20 minutes,
+`make fetch` 1 to 9 minutes for about 1 GB of sources and 931 crates, `make
+seed` under a minute and `make test` about 3 minutes; it passes as root and as
+an unprivileged user with umask 002. `make lint` does not pass yet (LAP-84).
+
 PM has no default remote; these make targets use the loopback mirror.
 
 - `make build` plans and builds in package-tools with `--network none`. The
