@@ -137,10 +137,7 @@ proc pyramid_kernel_graph(
 }
 
 proc pyramid_archive_graph(fixture: PyramidKernelGraph, cache: Path) -> Result[kbuild.BuiltinArchivePlan] {
-  let discovered = fixture.discovered
-  let groups = fixture.directories
-  let objects = fixture.objects
-  let objects_per_group = fixture.objects_per_directory
+  let {discovered, directories: groups, objects, objects_per_directory: objects_per_group, ..} = fixture
   let planned = pyramid_plan_archives(discovered, cache)?
   let archive_names = [p".xsh-kbuild/built-in.a", @[fp".xsh-kbuild/{directory}/built-in.a" for directory in groups]]
   let object_names = [fp".xsh-kbuild/obj/{object}" for object in objects]

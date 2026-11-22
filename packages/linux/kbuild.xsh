@@ -7176,8 +7176,7 @@ export proc plan_builtin_archives_with_analysis_workers(
   xsh_bin: Path,
   worker: Path,
 ) [fs, process, env, time, error] -> Result[BuiltinArchivePlan, Error] {
-  let plan = prepared.plan
-  let triple = prepared.triple
+  let {plan, triple, ..} = prepared
   archive_plan_progress(
     f"xsh-kbuild-archive-plan analysis-start {plan.objects.len() + plan.lib_objects.len()} items {analysis_jobs} requested-workers",
   )

@@ -126,8 +126,7 @@ proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[
       run.capture --bytes --timeout=time.millis(timeout_ms) @argv
     }?
   }?
-  let stdout = result.stdout
-  let stderr = result.stderr
+  let {stdout, stderr, ..} = result
   {
     exit_code: if result.status.exited() { result.status.exit_code()? } else { -1 },
     signaled: ! result.status.exited(),

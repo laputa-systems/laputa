@@ -193,9 +193,7 @@ proc archive_plan_cache_fingerprint(
   cflags: List[Str],
   includes: List[Str],
 ) -> Result[Str] {
-  let plan = prepared.plan
-  let triple = prepared.triple
-  let items = prepared.items
+  let {plan, triple, items, ..} = prepared
   let efi_stubs = [item for item in items if srcarch == "x86" and item.library and
     item.object.starts_with("drivers/firmware/efi/libstub/") and item.object.ends_with(".stub.o")]
   let helper = if efi_stubs.is_empty() {
