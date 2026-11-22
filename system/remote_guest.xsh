@@ -110,7 +110,7 @@ proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[
       }
       overlay = overlay.set(name, value)
     }
-    let requested: Str? = json.get(header, ["cwd"], null).require(Str?)?
+    let requested: Str? = json.get(header, ["cwd"], null).require()?
     if requested != null {
       guard requested.starts_with("/") and "\u{0}" not in requested else {
         return Err(refuse("cwd", "cwd must be an absolute directory"))

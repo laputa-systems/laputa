@@ -647,7 +647,7 @@ export proc state_ownership(root: Path) [fs, error] -> Result[List[StateInodeOwn
     guard fields[5] == f"/home/{config.operator}" else { fail "operator home does not match the applied document" }
     let home = f"home/{config.operator}"
     for entry in ["home", home] {
-      let info = tree.stat(fp"{entry}".require(RelPath)?, follow_symlinks: false)?
+      let info = tree.stat(fp"{entry}".require()?, follow_symlinks: false)?
       guard info.kind == "dir" else { fail f"operator state path is not a dir: {entry}" }
       if entry == home { guard info.mode.bit_and(0o022) == 0 else { fail "operator home must not be group or world writable" } }
     }

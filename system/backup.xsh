@@ -138,8 +138,8 @@ export pure backup_config_from_json(value: Any) -> Result[BackupConfig, Error] {
   guard format == BACKUP_CONFIG_FORMAT else {
     return Err(error.failure(f"format must be {BACKUP_CONFIG_FORMAT}"))
   }
-  let repository = backup_absolute_path(json.get(value, ["repository"], "").require(Str)?, "repository")?
-  let password_file = backup_absolute_path(json.get(value, ["password_file"], "").require(Str)?, "password_file")?
+  let repository = backup_absolute_path(json.get(value, ["repository"], "").require()?, "repository")?
+  let password_file = backup_absolute_path(json.get(value, ["password_file"], "").require()?, "password_file")?
   let sources_value = json.get(value, ["sources"], []).require(List[Str])?
   guard ! sources_value.is_empty() and sources_value.len() <= BACKUP_MAX_SOURCES else {
     return Err(error.failure(f"sources must hold 1..{BACKUP_MAX_SOURCES} paths"))
@@ -190,7 +190,7 @@ export pure backup_config_from_json(value: Any) -> Result[BackupConfig, Error] {
   guard quiesce == null == (release == null) else {
     return Err(error.failure("quiesce and release must be configured together"))
   }
-  let rustic = backup_absolute_path(json.get(value, ["rustic"], BACKUP_RUSTIC).require(Str)?, "rustic")?
+  let rustic = backup_absolute_path(json.get(value, ["rustic"], BACKUP_RUSTIC).require()?, "rustic")?
   Ok({
     repository: repository,
     password_file: password_file,

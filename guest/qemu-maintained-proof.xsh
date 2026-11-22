@@ -9,7 +9,7 @@ proc listener_ready() -> Result[Bool] {
 proc service_state(name: Str) -> Result[Str] {
   let status = fp"/run/xinit/{name}.json"
   wait until status.exists() within 30s every 100ms
-  json.get(json.read(status)?, ["state"], "").require(Str)?
+  json.get(json.read(status)?, ["state"], "").require()?
 }
 
 proc unit_summary() -> Result[Str] {

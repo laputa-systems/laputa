@@ -192,20 +192,20 @@ export pure quiesce_record_from_json(value: Any) -> Result[QuiesceRecord, Error]
     }
     services += [QuiesceService(
       name: name,
-      prior_desired: json.get(item, ["prior_desired"], "down").require(Str)?,
-      acquired: json.get(item, ["acquired"], false).require(Bool)?,
+      prior_desired: json.get(item, ["prior_desired"], "down").require()?,
+      acquired: json.get(item, ["acquired"], false).require()?,
     )]
   }
   Ok({
     job: job,
-    attempt: json.get(value, ["attempt"], 0).require(Int)?,
+    attempt: json.get(value, ["attempt"], 0).require()?,
     token: token,
-    boot_id: json.get(value, ["boot_id"], "").require(Str)?,
-    created_wall_ms: json.get(value, ["created_wall_ms"], 0).require(Int)?,
-    timeout_ms: json.get(value, ["timeout_ms"], QUIESCE_DEFAULT_TIMEOUT_MS).require(Int)?,
-    release_timeout_ms: json.get(value, ["release_timeout_ms"], QUIESCE_DEFAULT_RELEASE_TIMEOUT_MS).require(Int)?,
-    retry_delay_ms: json.get(value, ["retry_delay_ms"], QUIESCE_DEFAULT_RETRY_DELAY_MS).require(Int)?,
-    max_attempts: json.get(value, ["max_attempts"], QUIESCE_DEFAULT_MAX_ATTEMPTS).require(Int)?,
+    boot_id: json.get(value, ["boot_id"], "").require()?,
+    created_wall_ms: json.get(value, ["created_wall_ms"], 0).require()?,
+    timeout_ms: json.get(value, ["timeout_ms"], QUIESCE_DEFAULT_TIMEOUT_MS).require()?,
+    release_timeout_ms: json.get(value, ["release_timeout_ms"], QUIESCE_DEFAULT_RELEASE_TIMEOUT_MS).require()?,
+    retry_delay_ms: json.get(value, ["retry_delay_ms"], QUIESCE_DEFAULT_RETRY_DELAY_MS).require()?,
+    max_attempts: json.get(value, ["max_attempts"], QUIESCE_DEFAULT_MAX_ATTEMPTS).require()?,
     services: services,
   })
 }

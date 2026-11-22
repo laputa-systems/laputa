@@ -969,6 +969,6 @@ proc main(...argv: List[Str]) [fs, error] {
     source_root = empty_dir
   }
 
-  let owners: List[InodeOwner] = if opts.inode_owners == "" { [] } else { json.read(fp"{opts.inode_owners}")?.require_exact(List[InodeOwner])? }
+  let owners: List[InodeOwner] = if opts.inode_owners == "" { [] } else { json.read(fp"{opts.inode_owners}")?.require_exact()? }
   format_ext_image(fp"{image}", source_root, label, owners)
 }

@@ -15,7 +15,7 @@ const top_fields = ["defaults", "hosts", "groups"]
 export type Inventory = {hosts: List[model.Host]}
 
 pure table(value: Any, what: Str) -> Result[Map[Str, Any], Error] {
-  ctx what { value.require(Map[Str, Any])? }
+  ctx what { value.require()? }
 }
 
 pure only_fields(what: Str, entries: Map[Str, Any], allowed: List[Str]) -> Result[Unit, Error] {
@@ -27,21 +27,21 @@ pure only_fields(what: Str, entries: Map[Str, Any], allowed: List[Str]) -> Resul
 }
 
 pure text_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[Str?, Error] {
-  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require(Str?)?) }
+  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require()?) }
 }
 
 pure int_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[Int?, Error] {
-  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require(Int?)?) }
+  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require()?) }
 }
 
 pure bool_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[Bool?, Error] {
-  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require(Bool?)?) }
+  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require()?) }
 }
 
 pure list_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[List[Str], Error] {
   return Ok([]) when key not in entries.keys()
 
-  ctx f"{what}.{key}" { Ok(entries.get(key)?.require(List[Str])?) }
+  ctx f"{what}.{key}" { Ok(entries.get(key)?.require()?) }
 }
 
 pure vars_of(what: Str, entries: Map[Str, Any]) -> Result[Map[Str, Any], Error] {

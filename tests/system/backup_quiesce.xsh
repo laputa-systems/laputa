@@ -129,7 +129,7 @@ proc plan(rig: Rig, services: List[Str]) -> Result[quiesce.QuiesceRecord, Error]
 
 proc status_of(rig: Rig, service: Str) -> Result[Str, Error] {
   let value = json.read(fp"{rig.env.state_dir}/{service}.json")?
-  Ok(json.get(value, ["desired"], "").require(Str)?)
+  Ok(json.get(value, ["desired"], "").require()?)
 }
 
 test test_release_step_never_restores_a_stop_it_does_not_own [error] {

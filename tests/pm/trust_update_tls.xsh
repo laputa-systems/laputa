@@ -75,7 +75,7 @@ proc https_get(url: Str, bundle: Path, pool: Str) [fs, net, time, error] -> Resu
     connect_timeout: 10s,
     timeout: 30s,
   })?
-  {status: response.status.require(Int)?, body: response.body.require(Bytes)?}
+  {status: response.status.require()?, body: response.body.require()?}
 }
 
 test trust_tls_accepts_trusted_chain [fs, process, env, time, net, error] { |ctx|

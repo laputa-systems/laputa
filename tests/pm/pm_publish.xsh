@@ -433,7 +433,7 @@ export let filetree = []
 
   let selector_artifact = [package for package in remote_packages if package.name == "selector"][0]
   let remote_metadata = fp"{remote_root}/{selector_row.metadata}"
-  let original_metadata: local.PackageMetadataDto = json.read(remote_metadata)?.require(local.PackageMetadataDto)?
+  let original_metadata: local.PackageMetadataDto = json.read(remote_metadata)?.require()?
   let selector_remote_node = {...selector_node, remote: selector_artifact.retrieval}
   json.write(remote_metadata, {...original_metadata, package_kind: "payload"})
   let wrong_kind_node = {

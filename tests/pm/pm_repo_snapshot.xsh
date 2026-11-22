@@ -696,7 +696,7 @@ test test_persist_accepted_refuses_a_concurrent_writer [fs, error] { |ctx|
 }
 
 test test_signed_index_requires_digests_for_every_referenced_artifact [fs, error] { |_|
-  let item = remote.decode_remote_index(json.read(fixture("index.json"))?.require(List[Record])?)?[0]
+  let item = remote.decode_remote_index(json.read(fixture("index.json"))?.require()?)?[0]
   for invalid in [
     {...item, metadata_sha256: ""},
     {...item, sha256: ""},

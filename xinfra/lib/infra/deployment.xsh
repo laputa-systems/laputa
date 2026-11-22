@@ -16,5 +16,5 @@ export type Deployment = module {
 ## Load and check a deployment module. A module that lacks `resources` or gives
 ## it another signature is refused with every difference listed.
 export proc load(file: Path) [fs, error] -> Result[Deployment, Error] {
-  ctx f"loading deployment {file}" { module.load(file)?.require(Deployment)? }
+  ctx f"loading deployment {file}" { module.load(file)?.require()? }
 }

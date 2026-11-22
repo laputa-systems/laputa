@@ -773,11 +773,11 @@ export pure timer_writer_from_json(value: Any) -> Result[TimerWriter, Error] {
   }
   Ok({
     name: name,
-    attempt: json.get(value, ["attempt"], 0).require(Int)?,
-    boot_id: json.get(value, ["boot_id"], "").require(Str)?,
+    attempt: json.get(value, ["attempt"], 0).require()?,
+    boot_id: json.get(value, ["boot_id"], "").require()?,
     pid: pid,
-    start_time_ms: json.get(value, ["start_time_ms"], 0).require(Int)?,
-    started_wall_ms: json.get(value, ["started_wall_ms"], 0).require(Int)?,
+    start_time_ms: json.get(value, ["start_time_ms"], 0).require()?,
+    started_wall_ms: json.get(value, ["started_wall_ms"], 0).require()?,
   })
 }
 

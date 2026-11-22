@@ -66,7 +66,7 @@ export proc remote_decode_reply(result: ExecResult) [error] -> Result[Record, Er
     return json.get(reply, ["result"], {}).require(Record)?
   }
   let failure = json.get(reply, ["error"], {}).require(Record)?
-  Err(RemoteError.Refused(kind: plain(json.get(failure, ["kind"], "").require(Str)?), message: plain(json.get(failure, ["message"], "").require(Str)?)))
+  Err(RemoteError.Refused(kind: plain(json.get(failure, ["kind"], "").require()?), message: plain(json.get(failure, ["message"], "").require()?)))
 }
 
 proc call(session: RemoteSession, program: Str, request: Any, payload: Path?, timeout_ms: Int) [fs, net, error] -> Result[Record, Error] {
@@ -127,8 +127,8 @@ export proc remote_inspect(session: RemoteSession, program: Str) [fs, net, error
     generation: json.get(reply, ["generation"], null),
     health: json.get(reply, ["health"], null),
     services: services_of(json.get(reply, ["services"], []))?,
-    kernel: json.get(reply, ["kernel"], "").require(Str)?,
-    hostname: json.get(reply, ["hostname"], "").require(Str)?,
+    kernel: json.get(reply, ["kernel"], "").require()?,
+    hostname: json.get(reply, ["hostname"], "").require()?,
   }
 }
 
@@ -144,11 +144,11 @@ export pure remote_run_request(argv: List[Str], timeout_ms: Int, environment: Ma
 export proc remote_run(session: RemoteSession, program: Str, argv: List[Str], timeout_ms = 30000, environment: Map[Str]? = null, cwd: Str? = null) [fs, net, error] -> Result[RemoteRun, Error] {
   let reply = call(session, program, remote_run_request(argv, timeout_ms, environment, cwd), null, timeout_ms + 15000)?
   {
-    exit_code: json.get(reply, ["exit_code"], -1).require(Int)?,
-    signaled: json.get(reply, ["signaled"], false).require(Bool)?,
+    exit_code: json.get(reply, ["exit_code"], -1).require()?,
+    signaled: json.get(reply, ["signaled"], false).require()?,
     stdout: json.get(reply, ["stdout_b64"], "").require(Str)?.base64_decode()?,
     stderr: json.get(reply, ["stderr_b64"], "").require(Str)?.base64_decode()?,
-    truncated: json.get(reply, ["truncated"], false).require(Bool)?,
+    truncated: json.get(reply, ["truncated"], false).require()?,
   }
 }
 
@@ -168,10 +168,10 @@ export proc remote_stage(session: RemoteSession, program: Str, source: Path, nam
   let size = source.metadata()?.size
   let reply = call(session, program, {protocol: REMOTE_PROTOCOL, op: "stage", name: name, size: size, sha256: sha256}, source, timeout_ms)?
   {
-    outcome: json.get(reply, ["outcome"], "").require(Str)?,
-    path: json.get(reply, ["path"], "").require(Str)?,
-    size: json.get(reply, ["size"], 0).require(Int)?,
-    sha256: json.get(reply, ["sha256"], "").require(Str)?,
+    outcome: json.get(reply, ["outcome"], "").require()?,
+    path: json.get(reply, ["path"], "").require()?,
+    size: json.get(reply, ["size"], 0).require()?,
+    sha256: json.get(reply, ["sha256"], "").require()?,
   }
 }
 
@@ -179,10 +179,10 @@ export proc remote_stage(session: RemoteSession, program: Str, source: Path, nam
 export proc remote_staged(session: RemoteSession, program: Str, name: Str) [fs, net, error] -> Result[RemoteStaged, Error] {
   let reply = call(session, program, {protocol: REMOTE_PROTOCOL, op: "staged", name: name}, null, 30000)?
   {
-    present: json.get(reply, ["present"], false).require(Bool)?,
-    size: json.get(reply, ["size"], 0).require(Int)?,
-    sha256: json.get(reply, ["sha256"], "").require(Str)?,
-    incoming: json.get(reply, ["incoming"], []).require(List[Str])?,
+    present: json.get(reply, ["present"], false).require()?,
+    size: json.get(reply, ["size"], 0).require()?,
+    sha256: json.get(reply, ["sha256"], "").require()?,
+    incoming: json.get(reply, ["incoming"], []).require()?,
   }
 }
 

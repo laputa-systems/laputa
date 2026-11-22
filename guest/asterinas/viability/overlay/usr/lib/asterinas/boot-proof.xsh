@@ -157,7 +157,7 @@ proc main() [fs, process, env, time, net, error] {
     "new tmpfs directory was not visible through rooted enumeration",
   )
   let raw_name = b"raw\xfffile" as Path
-  raw_tmp_root.write(raw_name.require(RelPath)?, b"ok")
+  raw_tmp_root.write(raw_name.require()?, b"ok")
   require(raw_tmp_dir.exists()?, "tmpfs-path", "rooted create removed its parent path")
   require(
     raw_tmp_root.children(p".")?.children == [raw_name],

@@ -173,7 +173,7 @@ proc rerun_status(invocation: Invocation, id: Str) [error] -> Str {
     let kind = record.get("type")?.require(Str)?
     if kind == "entry" {
       let identity = record.get("id")?.require(Str)?
-      return record.get("status")?.require(Str)? when identity == id
+      return record.get("status")?.require()? when identity == id
     }
   }
 
