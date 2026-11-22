@@ -84,5 +84,5 @@ proc main(rootfs = p"/rootfs") [fs, process, env, error] {
 
   env ({LD_LIBRARY_PATH: fp"{rootfs}/usr/lib"}) {
     prove_perf(loader, fp"{rootfs}/usr/bin/perf", ver)
-  }?
+  }
 }

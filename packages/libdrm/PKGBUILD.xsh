@@ -249,5 +249,5 @@ export proc build(dest: Path) [fs, process, env, error] {
     }) {
       run $meson "install" "-C" "build"
     }
-  }?
+  }
 }

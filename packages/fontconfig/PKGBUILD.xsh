@@ -129,7 +129,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     env ({DESTDIR: dest}) {
       run $meson "install" "-C" "build" "--no-rebuild"
     }
-  }?
+  }
   fp"{dest}/etc/fonts".remove(missing_ok: false)
   fp"{dest}/var/cache/fontconfig".mkdir(true)
 }

@@ -45,7 +45,7 @@ proc main(image: Str, seed: Path) [fs, process, env, error] {
     env ({LAPUTA_AMBIENT_POISON: "host-only", HTTP_PROXY: "http://laputa-poison.invalid:9", HTTPS_PROXY: "http://laputa-poison.invalid:9"}) {
       let status = process.run(process.command_argv(config.docker, argv, root))?
       assert status.ok
-    }?
+    }
     assert sentinel.read_text()? == "host sentinel\n"
     assert mounted_sentinel.read_text()? == "mounted sentinel\n"
     assert fp"{output}/offline-result".read_text()? == "declared offline operation passed\n"

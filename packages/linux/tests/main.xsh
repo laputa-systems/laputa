@@ -360,7 +360,7 @@ test test_kbuild_rebuilds_legacy_discovered_plan_cache [fs, process, env, time, 
       let repaired = linux_shared.cached_package_plan("arm64")?
       assert contains_path(repaired.objects, "init/main.o")
       assert ! contains_path(repaired.objects, "init/stale.o")
-    }?
+    }
   }
 }
 
@@ -385,7 +385,7 @@ endif
       let x86 = linux_shared.cached_package_plan("x86")?
       assert contains_path(x86.objects, "x86.o")
       assert ! contains_path(x86.objects, "arm.o")
-    }?
+    }
   }
 }
 
@@ -411,7 +411,7 @@ test test_kbuild_plan_cache_invalidates_nested_and_included_makefiles [fs, proce
       nested.write(nested.read_text()? + "obj-y += nested-added.o\n")
       let third = linux_shared.cached_package_plan("arm64")?
       assert contains_path(third.objects, "init/nested-added.o")
-    }?
+    }
   }
 }
 
@@ -1136,7 +1136,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
       assert "-DCHANGED" not in tasks[0].argv
       assert p"first.o" not in captured.missing_sources
       assert [task for task in captured.tasks if task.name == ".xsh-kbuild/obj/kernel/jump_label.o"].len() == 1
-    }?
+    }
   }
 }
 
@@ -1541,7 +1541,7 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
       env ({XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let reused = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert reused.task_count == repaired.task_count
-      }?
+      }
       for report in [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"] {
         let summary = kbuild.archive_plan_summary_path(report)
         let stored = json.read(summary)?.require(ArchiveSummaryReport)?
@@ -1550,20 +1550,20 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan"}) {
         let repaired_summary = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert repaired_summary.task_count == repaired.task_count
-      }?
+      }
       let reports = [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"]
       for report in reports { report.chmod(0o000) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count
-      }?
+      }
       for report in reports { report.chmod(0o644) }
       let report_texts = [report.read_text()? for report in reports]
       for report in reports { report.remove(missing_ok: false) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count
-      }?
+      }
       for index in range(reports.len()) { reports[index].write(report_texts[index]) }
       p"foo.S".write(".text\n")
       p"foo.c".remove(missing_ok: false)

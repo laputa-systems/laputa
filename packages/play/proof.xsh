@@ -49,6 +49,6 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
       let played = run.text $player "--no-config" "--vo=null" "--ao=null" "--term-playing-msg=duration=\${duration}" $tone
       proof.ensure("duration=0.5\n" in played, "player-wav-playback", f"unexpected playback output:\n{played}")
     }
-  }?
+  }
   print "play ok: player 0.43.2 links Laputa's libraries and plays a WAV headlessly"
 }
