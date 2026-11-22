@@ -7,7 +7,7 @@ proc guest(ctx: TestContext, request: Record) [fs, process, error] -> Result[Rec
   json.decode(result.stdout)?.require(Record)?
 }
 
-proc stdout_text(reply: Record) [error] -> Result[Str, Error] {
+proc stdout_text(reply: Record) -> Result[Str, Error] {
   json.get(reply, ["result", "stdout_b64"], "").require(Str)?.base64_decode()?.utf8()?
 }
 

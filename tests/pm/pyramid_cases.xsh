@@ -15,7 +15,7 @@ proc pyramid_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[
   repository
 }
 
-proc pyramid_plan(repository: Path, roots: List[Str]) [fs, env, error] -> Result[types.BuildPlan] {
+proc pyramid_plan(repository: Path, roots: List[Str]) -> Result[types.BuildPlan] {
   plan.resolve(
     catalog.load_for_target(repository, types.X86_64LinuxMusl)?,
     {target: types.X86_64LinuxMusl, index_sha256: "pyramid-offline-empty", packages: []},

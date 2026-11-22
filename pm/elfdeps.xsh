@@ -110,7 +110,7 @@ export pure missing_elf_runtime_dependencies_with_allowed(
   failures
 }
 
-proc library_link_reaches_file(root: Path, link: Path) [fs, error] -> Result[Bool, Error] {
+proc library_link_reaches_file(root: Path, link: Path) -> Result[Bool, Error] {
   var current = link
   for _ in range(8) {
     return false unless current.exists()

@@ -5,7 +5,7 @@ export proc create(tarball: Path, dest: Path, archive_paths: List[Path]) [fs, er
   archive.create(tarball, dest, archive_paths, .Tar, compression: .Gzip, collision: .Replace)
 }
 
-proc compute_encoding_fingerprint() [fs, error] -> Result[Str, Error] {
+proc compute_encoding_fingerprint() -> Result[Str, Error] {
   let handle = fs.tempdir()?
   let root = handle.host_path()?
   defer root.remove()

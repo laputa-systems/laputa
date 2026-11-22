@@ -14,7 +14,7 @@ proc guest_console(message: Str) [fs, error] {
 
 # Phase timing for lifecycle recovery claims: boot-relative seconds from the
 # guest clock, logged raw and parsed on the host.
-proc guest_tick(label: Str) [fs, error] {
+proc guest_tick(label: Str) {
   match p"/proc/uptime".read_text() {
     Ok(text) => guest_console(f"LAPUTA_TINYLAND_T {label} uptime={text.trim()}")
     Err(_) => guest_console(f"LAPUTA_TINYLAND_T {label} uptime=unknown")
@@ -89,7 +89,7 @@ proc guest_pci_of_input(event_name: Str, phase: Str) -> Result[Str, Error] {
   return Err(GuestProofError.Failed(phase:, message: f"no PCI parent for {event_name}"))
 }
 
-proc guest_process_alive(pid: Int) [process, error] -> Result[Bool, Error] {
+proc guest_process_alive(pid: Int) -> Result[Bool, Error] {
   for entry in process.list()? {
     if entry.pid == pid {
       return true
@@ -99,7 +99,7 @@ proc guest_process_alive(pid: Int) [process, error] -> Result[Bool, Error] {
   false
 }
 
-proc guest_wait_unit(name: Str, previous: Int, ready: Bool) [fs, time, error] -> Result[Int, Error] {
+proc guest_wait_unit(name: Str, previous: Int, ready: Bool) -> Result[Int, Error] {
   let path_value = fp"/run/xinit/{name}.json"
   var elapsed = 0
   while elapsed < 60 {
@@ -120,7 +120,7 @@ proc guest_wait_unit(name: Str, previous: Int, ready: Bool) [fs, time, error] ->
   return Err(GuestProofError.Failed(phase: name, message: "service did not become ready"))
 }
 
-proc guest_wait_session(runtime: Path, previous: Int) [fs, process, time, error] -> Result[Int, Error] {
+proc guest_wait_session(runtime: Path, previous: Int) -> Result[Int, Error] {
   let path_value = fp"{runtime}/laputa-tinyland.pid"
   var elapsed = 0
   while elapsed < 60 {
@@ -152,13 +152,13 @@ proc guest_wait_session(runtime: Path, previous: Int) [fs, process, time, error]
 ## Count Ghostty renderer starts in the session log. Ghostty fails closed
 ## below an OpenGL 4.3 core context, which softpipe cannot create, so each
 ## start proves the session rendered on the virgl driver.
-proc guest_gl_count() [fs, error] -> Result[Int, Error] {
+proc guest_gl_count() -> Result[Int, Error] {
   let log = p"/var/log/tinyland/current"
   return 0 unless log.exists()
   log.read_text()?.split("\n") |> where "info(opengl): loaded OpenGL 4.3" in . |> count
 }
 
-proc guest_wait_gl(previous: Int, phase: Str) [fs, time, error] -> Result[Int, Error] {
+proc guest_wait_gl(previous: Int, phase: Str) -> Result[Int, Error] {
   var elapsed = 0
   while elapsed < 60 {
     let count = guest_gl_count()?
@@ -171,7 +171,7 @@ proc guest_wait_gl(previous: Int, phase: Str) [fs, time, error] -> Result[Int, E
   return Err(GuestProofError.Failed(phase:, message: "Ghostty did not load an OpenGL 4.3 renderer"))
 }
 
-proc guest_require_broker_census(mdevd_pid: Int, seatd_pid: Int) [fs, process, error] {
+proc guest_require_broker_census(mdevd_pid: Int, seatd_pid: Int) {
   var mdevd_count = 0
   var seatd_count = 0
   var matching_mdevd = false
@@ -201,7 +201,7 @@ proc guest_run_required(command: Command, phase: Str) {
   }
 }
 
-proc guest_rss_kb(pid: Int) [fs, error] -> Result[Int, Error] {
+proc guest_rss_kb(pid: Int) -> Result[Int, Error] {
   let status = fp"/proc/{pid}/status".read_text()?
   for line in status.split("\n") {
     if line.starts_with("VmRSS:") {
@@ -211,7 +211,7 @@ proc guest_rss_kb(pid: Int) [fs, error] -> Result[Int, Error] {
   0
 }
 
-proc guest_granted_device_control(runtime: Path) [fs, process, error] {
+proc guest_granted_device_control(runtime: Path) {
   let device = p"/dev/dri/card0"
   let original = fs.stat(device, follow_symlinks: false)?.mode % 4096
   let marker = fp"{runtime}/laputa-direct-opened"

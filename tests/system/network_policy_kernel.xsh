@@ -6,7 +6,7 @@ pure request_of(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Reques
   Ok(net_state.request(kernel.network_change(plan, index)?)?)
 }
 
-proc fixture_plan() [fs, error] -> Result[policy.NetworkPlan, Error] {
+proc fixture_plan() -> Result[policy.NetworkPlan, Error] {
   let raw = p"tests/system/fixtures/network-policy-conflict.json".read_text()?
   let input: policy.NetworkPlanInput = json.decode(raw)?.require()?
   var intent = input.intent
@@ -378,7 +378,7 @@ test test_reconcile_result_reports_conflicts_instead_of_rolling_back [fs, error]
   assert !kernel.same_cohort(plan.before, stale)
 }
 
-proc healthy_plan() [fs, error] -> Result[policy.NetworkPlan, Error] {
+proc healthy_plan() -> Result[policy.NetworkPlan, Error] {
   let raw = p"tests/system/fixtures/network-policy-conflict.json".read_text()?
   let input: policy.NetworkPlanInput = json.decode(raw)?.require()?
   policy.network_plan(input.intent, input.owned, input.observed)

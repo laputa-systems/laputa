@@ -6,7 +6,7 @@ proc fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/trust-update/{name}"
 }
 
-proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port(port_file: Path, attempts: Int) -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
     if port_file.exists() {
@@ -60,7 +60,7 @@ proc stop_fixture(server: TrustFixtureServer) [process, error] {
   }
 }
 
-proc fixture_routes(ctx: TestContext, name: Str, body: Str) [fs, error] -> Result[Path, Error] {
+proc fixture_routes(ctx: TestContext, name: Str, body: Str) -> Result[Path, Error] {
   let dir = test.temp_dir(ctx, name: name)?
   fp"{dir}/hello".write(bytes.from_text(body))
   dir

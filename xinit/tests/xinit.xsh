@@ -1462,7 +1462,7 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
 """
 }
 
-proc crash_replay_service(root: Path, unix_log: Path) [fs, error] {
+proc crash_replay_service(root: Path, unix_log: Path) {
   let service_dir = fp"{root}/services"
   service_dir.mkdir()
   fp"{service_dir}/demo.xsh".write(f"""##! Replay a leader exit while its group still owns descendants.

@@ -356,7 +356,7 @@ test test_writer_record_refuses_foreign_or_malformed_input [error] {
   assert timers.timer_writer_from_json({format: timers.TIMER_WRITER_FORMAT, name: "backup", pid: "x"}) is Err(_)
 }
 
-proc writer_group_live(pid: Int) [process, error] -> Result[Bool, Error] {
+proc writer_group_live(pid: Int) -> Result[Bool, Error] {
   for entry in process.list()? {
     if (entry.session ?? 0) == pid and ! entry.status.starts_with("Z") {
       return Ok(true)
@@ -370,7 +370,7 @@ proc writer_spawn(root: Path, script: Str) [fs, process, error] -> Result[Proces
   Ok(handle)
 }
 
-proc writer_record(store: timers.TimerWriterStore, handle: ProcessHandle, name: Str) [fs, process, error] -> Result[timers.TimerWriter, Error] {
+proc writer_record(store: timers.TimerWriterStore, handle: ProcessHandle, name: Str) -> Result[timers.TimerWriter, Error] {
   let record = timers.TimerWriter(
     name: name,
     attempt: 1,
@@ -500,7 +500,7 @@ proc release_rig(ctx: TestContext, name: Str, jobs: List[Str]) [fs, process, env
   })
 }
 
-proc release_calls(rig: ReleaseRig) [fs, error] -> Result[List[Str], Error] {
+proc release_calls(rig: ReleaseRig) -> Result[List[Str], Error] {
   let calls = fp"{rig.root}/calls.log"
   if ! calls.exists() {
     return Ok([])
@@ -582,7 +582,7 @@ test test_release_waits_for_the_lost_writer_to_be_stopped [fs, process, time, io
   assert timers.timer_writer_names(rig.store)? == []
 }
 
-proc writer_foreign_groups(session: Int) [process, error] -> Result[Int, Error] {
+proc writer_foreign_groups(session: Int) -> Result[Int, Error] {
   var found = 0
   for entry in process.list()? {
     if (entry.session ?? 0) == session and (entry.pgrp ?? 0) != session and ! entry.status.starts_with("Z") {

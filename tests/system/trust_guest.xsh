@@ -40,14 +40,14 @@ proc guest_tool_or_skip(name: Str) [fs, process, error] -> Result[Path, Error] {
   }
 }
 
-proc guest_file_or_skip(path_value: Path, label: Str) [fs, error] {
+proc guest_file_or_skip(path_value: Path, label: Str) {
   guard path_value.exists() else {
     test.skip(f"guest proof needs {label} at {path_value.display()}")
     return
   }
 }
 
-proc guest_kernel() [fs, error] -> Result[Path, Error] {
+proc guest_kernel() -> Result[Path, Error] {
   for candidate in GUEST_KERNEL_CANDIDATES {
     if fp"{candidate}".exists() {
       return fp"{candidate}"
@@ -58,7 +58,7 @@ proc guest_kernel() [fs, error] -> Result[Path, Error] {
   p"/nonexistent"
 }
 
-proc guest_modules_dir() [fs, error] -> Result[Path, Error] {
+proc guest_modules_dir() -> Result[Path, Error] {
   var found = p"/nonexistent"
   for entry in fs.children(p"/lib/modules")? {
     if entry.kind == "dir" {
@@ -184,7 +184,7 @@ proc stage_initramfs(
   root
 }
 
-proc build_initramfs(root: Path, output: Path) [fs, process, error] -> Result[Unit, Error] {
+proc build_initramfs(root: Path, output: Path) -> Result[Unit, Error] {
   var entries = ["."]
   for entry in fs.walk(root, hidden: true)? {
     let rel = entry.path.strip_prefix(root)?
@@ -220,7 +220,7 @@ proc build_store_disk(path_value: Path, size_mb: Int) [fs, process, error] -> Re
   assert status.ok, "mke2fs could not format the guest store disk"
 }
 
-proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] -> Result[Str, Error] {
+proc wait_for_marker(log: Path, marker: Str, attempts: Int) -> Result[Str, Error] {
   var tries = 0
   while tries < attempts {
     if log.exists() {
@@ -243,7 +243,7 @@ proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] ->
   
 }
 
-proc guest_alive(pid: Int) [process, error] -> Result[Bool, Error] {
+proc guest_alive(pid: Int) -> Result[Bool, Error] {
   for entry in process.list()? |> where .pid == pid {
     return entry.status != "Z"
   }
@@ -251,7 +251,7 @@ proc guest_alive(pid: Int) [process, error] -> Result[Bool, Error] {
   false
 }
 
-proc wait_for_exit(pid: Int, attempts: Int) [process, time, error] -> Result[Unit, Error] {
+proc wait_for_exit(pid: Int, attempts: Int) -> Result[Unit, Error] {
   var tries = 0
   while tries < attempts {
     guard guest_alive(pid) else {
@@ -275,7 +275,7 @@ proc stop_guest(pid: Int) [process, error] {
 
 type GuestTlsServer = {port: Int, pid: Int, handle: ProcessHandle}
 
-proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port(port_file: Path, attempts: Int) -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
     if port_file.exists() {
@@ -364,7 +364,7 @@ proc launch_guest(
 
 type GuestDigests = {b_bundle: Str, b_policy: Str, c_bundle: Str, c_policy: Str}
 
-proc expected_digests() [fs, error] -> Result[GuestDigests, Error] {
+proc expected_digests() -> Result[GuestDigests, Error] {
   {
     b_bundle: fixture("release-b/ca-certificates.crt").read_bytes()?.sha256().hex(),
     b_policy: fixture("release-b/trust-policy").read_bytes()?.sha256().hex(),
@@ -373,7 +373,7 @@ proc expected_digests() [fs, error] -> Result[GuestDigests, Error] {
   }
 }
 
-proc assert_clean_markers(text: Str, digests: GuestDigests, phase0: Bool) [error] {
+proc assert_clean_markers(text: Str, digests: GuestDigests, phase0: Bool) {
   assert "LAPUTA_TRUST_GUEST FAIL" not in text
   if phase0 {
     assert f"PHASE0_OK generation=2 bundle={digests.b_bundle} policy={digests.b_policy}" in text
@@ -607,7 +607,7 @@ proc marker_boot(
   store: Path,
   mode: Str,
   marker: Str,
-) [fs, process, env, time, error] -> Result[GuestBoot, Error] {
+) -> Result[GuestBoot, Error] {
   let boot = launch_guest(ctx, name, kernel, initramfs, store, "https://unused.invalid/", mode)?
   let _ = wait_for_marker(boot.log, marker, 50)?
   boot

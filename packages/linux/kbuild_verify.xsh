@@ -61,13 +61,13 @@ export proc linux_kbuild_verify_stopped(
 }
 
 
-proc linux_kbuild_discovery_stop() [env, error] -> Result[Unit, Error] {
+proc linux_kbuild_discovery_stop() -> Result[Unit, Error] {
   env ({XSH_LINUX_KBUILD_STOP_AFTER: "discover"}) {
     linux_shared.stop_after("discover")
   }
 }
 
-proc linux_kbuild_config_source(pkg: types.Package, arch: Str) [error] -> Result[types.UpstreamSource, Error] {
+proc linux_kbuild_config_source(pkg: types.Package, arch: Str) -> Result[types.UpstreamSource, Error] {
   let expected = f"files/config/{arch}/base-{arch}.fragment"
   let matches = [
     input

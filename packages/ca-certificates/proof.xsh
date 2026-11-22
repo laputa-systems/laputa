@@ -20,7 +20,7 @@ proc ensure(condition: Bool, kind: Str, message: Str) [error] {
   }
 }
 
-proc verify_package_metadata(rootfs: Path) [fs, error] {
+proc verify_package_metadata(rootfs: Path) {
   let metadata_path = fp"{rootfs}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
   ensure(metadata_path.exists()?, "ca-certificates-metadata", "missing package metadata")
   let metadata = json.read(metadata_path)?.require(Record)?
@@ -28,7 +28,7 @@ proc verify_package_metadata(rootfs: Path) [fs, error] {
   ensure(deps.is_empty(), "ca-certificates-deps", f"expected no runtime deps, got {deps.join(" ")}")
 }
 
-proc verify_managed_symlinks(rootfs: Path) [fs, error] {
+proc verify_managed_symlinks(rootfs: Path) {
   let bundle_link = fp"{rootfs}/etc/ssl/certs/ca-certificates.crt"
   ensure(bundle_link.is_symlink()?, "ca-certificates-layout", "canonical bundle is not a managed symlink")
   ensure(
@@ -50,14 +50,14 @@ proc verify_managed_symlinks(rootfs: Path) [fs, error] {
   ensure(cert_link.readlink()? == p"certs/ca-certificates.crt", "ca-certificates-layout", "cert.pem target changed")
 }
 
-proc verify_provisioned_key(rootfs: Path) [fs, error] {
+proc verify_provisioned_key(rootfs: Path) {
   let key_path = fp"{rootfs}/etc/laputa/trust-update-key"
   ensure(key_path.exists()?, "ca-certificates-key", "missing provisioned trust-update key")
   let key = key_path.read_bytes()?
   ensure(key.len() == 32, "ca-certificates-key", "provisioned trust-update key must contain exactly 32 raw Ed25519 bytes")
 }
 
-proc verify_distrust_policy(rootfs: Path) [fs, error] {
+proc verify_distrust_policy(rootfs: Path) {
   let policy_path = fp"{rootfs}/etc/laputa/trust-policy"
   ensure(policy_path.exists()?, "ca-certificates-policy", "missing /etc/laputa/trust-policy")
   let policy = trust_policy.parse(policy_path.read_bytes()?)?

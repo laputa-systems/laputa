@@ -900,14 +900,14 @@ pure timer_options(argv: List[Str]) -> Result[TimerOptions, Str] {
   Ok(options)
 }
 
-proc timer_read_boot_id() [fs] -> Str {
+proc timer_read_boot_id() -> Str {
   match p"/proc/sys/kernel/random/boot_id".read_text() {
     Ok(text) => text.trim()
     Err(_) => ""
   }
 }
 
-proc timer_read_clock() [time, error] -> Result[TimerClock, Error] {
+proc timer_read_clock() -> Result[TimerClock, Error] {
   let mono = monotonic.now()?
   {mono_ms: mono.ms, wall_ms: time.now()}
 }
@@ -1008,7 +1008,7 @@ export proc timer_load_cancels(dir: Path) [fs, error] -> Result[Set[Str], Error]
   cancelled
 }
 
-proc timer_write_cancel(dir: Path, name: Str, active: Bool) [fs, error] -> Result[Unit, Error] {
+proc timer_write_cancel(dir: Path, name: Str, active: Bool) -> Result[Unit, Error] {
   let marker = fp"{dir}/{name}"
   if active {
     dir.mkdir(parents: true)
@@ -1130,7 +1130,7 @@ export proc timer_snapshot(
   }
 }
 
-proc timer_format_wall(value: Int?) [time] -> Str {
+proc timer_format_wall(value: Int?) -> Str {
   if let wall = value {
     if wall > 0 {
       return time.format(wall * 1000000, "%Y-%m-%dT%H:%M:%SZ", utc: true) ?? f"{wall}ms"
@@ -1217,7 +1217,7 @@ export proc timer_writer_names(store: TimerWriterStore) [fs, error] -> Result[Li
 
 type TimerWriterScan = {verdict: Str, groups: List[Int]}
 
-proc timer_writer_observe(record: TimerWriter, boot_id: Str) [process, error] -> Result[TimerWriterScan, Error] {
+proc timer_writer_observe(record: TimerWriter, boot_id: Str) -> Result[TimerWriterScan, Error] {
   var leader = 0
   var groups: List[Int] = []
   for entry in process.list()? {
@@ -1249,7 +1249,7 @@ proc timer_writer_signal(groups: List[Int], signal: Str) [process, error] -> Res
   Ok()
 }
 
-proc timer_writer_wait_gone(record: TimerWriter, boot_id: Str, resend: Str, limit_ms: Int) [process, time, error] -> Result[Bool, Error] {
+proc timer_writer_wait_gone(record: TimerWriter, boot_id: Str, resend: Str, limit_ms: Int) -> Result[Bool, Error] {
   var waited = 0
   while true {
     let scan = timer_writer_observe(record, boot_id)?
@@ -1327,7 +1327,7 @@ export proc timer_quiesce_names(store: TimerWriterStore) [fs, error] -> Result[L
   Ok(names)
 }
 
-proc timer_release_policy(store: TimerWriterStore, name: Str) [fs, error] -> Result[TimerReleasePolicy, Error] {
+proc timer_release_policy(store: TimerWriterStore, name: Str) -> Result[TimerReleasePolicy, Error] {
   let value = json.read(fp"{store.quiesce_dir}/{name}.json")?
   let format = json.get(value, ["format"], "").require(Str)?
   guard format == "laputa-quiesce-1" else {
@@ -1417,7 +1417,7 @@ proc timer_launch(
   missed: Int,
   now: TimerClock,
   store: TimerWriterStore,
-) [fs, process, time, io, error] -> Result[TimerRunning, Error] {
+) -> Result[TimerRunning, Error] {
   if timer_writer_settle(store, job.name)? == "unproven" {
     return Err(error.failure(f"the previous attempt of {job.name} is not proven stopped"))
   }
@@ -1471,7 +1471,7 @@ proc timer_start(
   missed: Int,
   now: TimerClock,
   store: TimerWriterStore,
-) [fs, process, time, io, error] -> Result[TimerStartOutcome, Error] {
+) -> Result[TimerStartOutcome, Error] {
   match timer_launch(job, occurrence_wall_ms, attempt, missed, now, store) {
     Ok(started) => Ok({started: started, state: timer_state_started(state, now.wall_ms), runtime: runtime})
     Err(problem) => {
@@ -1491,7 +1491,7 @@ proc timer_start(
   }
 }
 
-proc timer_pid_alive(pid: Int) [process] -> Bool {
+proc timer_pid_alive(pid: Int) -> Bool {
   if pid <= 0 {
     return false
   }
@@ -1501,7 +1501,7 @@ proc timer_pid_alive(pid: Int) [process] -> Bool {
   }
 }
 
-proc timers_status(config: SchedulerConfig, as_json: Bool) [fs, process, time, io, error] -> Result[Unit, Error] {
+proc timers_status(config: SchedulerConfig, as_json: Bool) -> Result[Unit, Error] {
   let loaded = timer_load_jobs(config.job_dir)?
   let states = timer_load_state(fp"{config.state_dir}/{TIMER_STATE_NAME}")?
   let cancelled = timer_load_cancels(fp"{config.state_dir}/{TIMER_CANCEL_DIR}")?
@@ -1663,7 +1663,7 @@ proc timer_status_write(
   boot_id: Str,
   resume: Str,
   last_step: TimerStep?,
-) [fs, error] -> Result[Unit, Error] {
+) -> Result[Unit, Error] {
   match status_path.parent().mkdir() {
     Ok(_) => {}
     Err(problem) => {

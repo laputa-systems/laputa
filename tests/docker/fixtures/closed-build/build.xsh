@@ -4,7 +4,7 @@ use pm.plan
 use pm.policy
 use pm.types
 
-proc assert_no_substrate_leftovers() [fs, error] {
+proc assert_no_substrate_leftovers() {
   let leftovers = fs.walk(p"/scratch", hidden: true)
     |> where .name == "build-root"
     |> map .path

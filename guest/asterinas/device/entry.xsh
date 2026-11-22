@@ -13,12 +13,12 @@ proc require(condition: Bool, message: Str) [error] {
   }
 }
 
-proc coldplug() [process, error] {
+proc coldplug() {
   let result = process.run(process.command_argv(p"/usr/bin/mdevd-coldplug", ["mdevd-coldplug", "-O", "4"]))?
   require(result.ok, "mdevd-coldplug failed")
 }
 
-proc show_node(name: Str, expected_kind: Str, expected_mode: Int, expected_group: Int) [fs, error] {
+proc show_node(name: Str, expected_kind: Str, expected_mode: Int, expected_group: Int) {
   let node = fs.stat(fp"/dev/{name}")?
   eprint --flush f"DEV_NODE name={name} kind={node.kind} major={node.rdev / 256} minor={node.rdev % 256} mode={node.mode % 4096} owner={node.uid} group={node.gid}"
   require(node.kind == expected_kind, f"/dev/{name} is a {node.kind}, expected a {expected_kind}")
@@ -26,7 +26,7 @@ proc show_node(name: Str, expected_kind: Str, expected_mode: Int, expected_group
   require(node.uid == 0 and node.gid == expected_group, f"/dev/{name} belongs to {node.uid}:{node.gid}, expected 0:{expected_group}")
 }
 
-proc nodes() [fs, process, error] {
+proc nodes() {
   for name in ["vda", "vdb", "vdb1", "vdb2"] {
     fp"/dev/{name}".remove()
   }

@@ -1,6 +1,6 @@
 use pm.generation
 
-proc run_closed(root: Path, script: Str, arguments: List[Str]) [process, error] -> Result[Unit, Error] {
+proc run_closed(root: Path, script: Str, arguments: List[Str]) -> Result[Unit, Error] {
   let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", script, @arguments], env: {
     PATH: "/bin:/usr/lib/xsh/core:/usr/bin",
     XSH_MODULE_PATH: "/pm",

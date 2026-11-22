@@ -141,7 +141,7 @@ proc test_builtin_archive_plan(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+) -> Result[kbuild.BuiltinArchivePlan] {
   env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
     XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
@@ -159,7 +159,7 @@ proc test_builtin_archive_plan_with_workers(
   analysis_jobs: Int,
   xsh_bin: Path,
   worker: Path,
-) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+) -> Result[kbuild.BuiltinArchivePlan] {
   env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
     XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives_with_analysis_workers(

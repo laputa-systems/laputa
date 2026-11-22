@@ -6,7 +6,7 @@ use pm.policy
 use pm.store
 use pm.types
 
-proc manual_fixture_entries(contents: Path) [fs, error] -> Result[List[Record], Error] {
+proc manual_fixture_entries(contents: Path) -> Result[List[Record], Error] {
   var entries: List[Record] = []
   for entry in fs.walk(contents, hidden: true, gitignore: false) |> sort-by .path {
     let relative = entry.path.strip_prefix(contents)?.display()

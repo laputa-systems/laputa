@@ -5,7 +5,7 @@
 ##! success markers are owned by the outer guest proof and the host.
 error SessionError = DeniedOpen(device: Str)
 
-proc deny_open(path_value: Path, write: Bool, runtime: Path) [fs, process, error] {
+proc deny_open(path_value: Path, write: Bool, runtime: Path) {
   match unix.open_fd(path_value, write: write, nonblock: true) {
     Ok(fd) => {
       unix.close_fd(fd)

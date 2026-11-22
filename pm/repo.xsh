@@ -238,7 +238,7 @@ export proc publish(
   repo_publish_locked(repo_snapshot, remote_repo, token, work, arch)
 }
 
-proc repo_publish_locked(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: Str, work: Path, arch: Str) [fs, net, env, time, error] {
+proc repo_publish_locked(repo_snapshot: types.RepoSnapshot, remote_repo: Str, token: Str, work: Path, arch: Str) {
   work.mkdir()
   let stages: List[RepoPublishStage] = collect {
     for publication in repo_snapshot.packages {

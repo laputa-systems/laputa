@@ -277,7 +277,7 @@ proc executor_fixture_payload(ctx: TestContext, name: Str) [fs, env, error] -> R
   fp"{dest}/payload.bin".read_bytes()?
 }
 
-proc executor_fixture_provenance(name: Str) [fs, error] -> Result[types.ExecutorProvenance] {
+proc executor_fixture_provenance(name: Str) -> Result[types.ExecutorProvenance] {
   let root = path.absolute(fixture(f"executor-validity/{name}"))?
   {
     format: "laputa-executor-provenance-1",

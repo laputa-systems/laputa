@@ -28,7 +28,7 @@ export proc measure(content: model.Content) [fs, env, error] -> Result[compare.M
   }
 }
 
-proc render(source: model.TemplateSource) [fs, error] -> Result[Bytes, Error] {
+proc render(source: model.TemplateSource) -> Result[Bytes, Error] {
   ctx f"rendering {source.file}" {
     let text = source.file.read_text()?
     let data = json.decode(source.json)?

@@ -66,7 +66,7 @@ proc send_request(label: Str, kind: Int, flags: Int, payload: Bytes) [process, n
   }
 }
 
-proc probe(label: Str, host: Str) [process, net, error] {
+proc probe(label: Str, host: Str) {
   let c = linux.net_constants()
   let fd = linux.socket(c.AF_INET, c.SOCK_STREAM)?
   linux.set_socket_timeout(fd, c.SO_SNDTIMEO, 3000)
@@ -91,14 +91,14 @@ pure route_payload(ifindex: Int, item: Route, add: Bool) -> Result[Bytes, Error]
   Ok(bytes.concat([header, destination, via, device, priority]))
 }
 
-proc add_route(label: Str, name: Str, item: Route) [fs, process, env, time, net, error] {
+proc add_route(label: Str, name: Str, item: Route) {
   let c = linux.net_constants()
   let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
   send_request(label, c.RTM_NEWROUTE, flags, route_payload(ifindex_of(name)?, item, true)?)
   report(label, "", false)
 }
 
-proc delete_route(label: Str, name: Str, item: Route) [fs, process, env, time, net, error] {
+proc delete_route(label: Str, name: Str, item: Route) {
   let c = linux.net_constants()
   send_request(label, c.RTM_DELROUTE, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), route_payload(ifindex_of(name)?, item, false)?)
   report(label, "", false)
@@ -109,14 +109,14 @@ proc ifindex_of(name: Str) [fs, process, env, time, net, error] -> Result[Int] {
   Err(NetworkStateError.Failed(f"no link {name}"))
 }
 
-proc add_address(label: Str, name: Str, item: Address) [fs, process, env, time, net, error] {
+proc add_address(label: Str, name: Str, item: Address) {
   let c = linux.net_constants()
   let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
   send_request(label, c.RTM_NEWADDR, flags, address_payload(ifindex_of(name)?, item, c.RT_SCOPE_UNIVERSE, true)?)
   report(label, "", false)
 }
 
-proc delete_address(label: Str, name: Str, item: Address) [fs, process, env, time, net, error] {
+proc delete_address(label: Str, name: Str, item: Address) {
   let c = linux.net_constants()
   send_request(label, c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(ifindex_of(name)?, item, c.RT_SCOPE_UNIVERSE, false)?)
   report(label, "", false)
@@ -133,7 +133,7 @@ proc wait_for_operstate(name: Str, expected: Int) [fs, process, env, time, net, 
   eprint --flush f"NET_TIMEOUT {name} operstate {expected}"
 }
 
-proc step(label: Str, name: Str, up: Bool, expected: Int) [fs, process, env, time, net, error] {
+proc step(label: Str, name: Str, up: Bool, expected: Int) {
   let result = if up { linux.link_up(name) } else { linux.link_down(name) }
   match result {
     Ok(_) => {
@@ -145,7 +145,7 @@ proc step(label: Str, name: Str, up: Bool, expected: Int) [fs, process, env, tim
   report(label, "", true)
 }
 
-proc ip_step(label: Str, name: Str, state_word: Str, expected: Int) [fs, process, env, time, net, error] {
+proc ip_step(label: Str, name: Str, state_word: Str, expected: Int) {
   let output = p"/run/ip-link.out"
   let status = process.run(process.command_argv(p"/usr/bin/xsh", [p"/usr/bin/xsh", p"/usr/lib/xsh/core/ip", "link", "set", "dev", name, state_word], p"/", {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", output, output))?
   if status.ok {
@@ -268,7 +268,7 @@ pure broadcast_udp(mac: Bytes) -> Result[Bytes, Error] {
   bytes.concat([b"\xff\xff\xff\xff\xff\xff", mac, bytes.pack_be(2048, 2)?, bytes.from_ints([69, 0])?, bytes.pack_be(32, 2)?, bytes.zero(4)?, bytes.from_ints([64, 17])?, bytes.zero(2)?, bytes.zero(4)?, bytes.from_ints([255, 255, 255, 255])?, bytes.pack_be(68, 2)?, bytes.pack_be(67, 2)?, bytes.pack_be(12, 2)?, bytes.zero(2)?, payload])
 }
 
-proc open_packet_socket(protocol: Int, ifindex: Int) [process, net, error] -> Result[Int, Error] {
+proc open_packet_socket(protocol: Int, ifindex: Int) -> Result[Int, Error] {
   let c = linux.net_constants()
   let socket = linux.socket(c.AF_PACKET, c.SOCK_RAW.bit_or(c.SOCK_NONBLOCK), bytes.unpack_le(bytes.pack_be(protocol, 2)?, 2)?)?
   if ifindex != 0 { linux.bind(socket, packet_address(ifindex, protocol, b"")?) }
@@ -313,7 +313,7 @@ proc address_ioctl(label: Str, fd: Int, request: Int, name: Str, family: Int, oc
   ioctl_result(label, linux.ioctl(fd, request, ifreq(name, sockaddr_in(family, octets)?)?, 0))
 }
 
-proc route_ioctl(label: Str, operation: Str, destination: Str, genmask: Str, gateway: Str, device: Str) [process, error] {
+proc route_ioctl(label: Str, operation: Str, destination: Str, genmask: Str, gateway: Str, device: Str) {
   let text = run.text /usr/lib/asterinas/case/ioctl-route-probe ${label} ${operation} ${destination} ${genmask} ${gateway} ${device}
   eprint --flush text.trim()
 }

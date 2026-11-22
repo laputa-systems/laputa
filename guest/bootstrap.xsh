@@ -20,7 +20,7 @@ export proc guest_bootstrap_fail_phase(ctx: GuestBootstrap, phase: Str, message:
   return Err(GuestTrustError.Failed(phase:, message:))
 }
 
-proc guest_bootstrap_insmod_one(ctx: GuestBootstrap, name: Str, phase: Str) [fs, process, error] {
+proc guest_bootstrap_insmod_one(ctx: GuestBootstrap, name: Str, phase: Str) {
   match linux.insmod(fp"/lib/modules/{name}.ko") {
     Ok(_) => {},
     Err(problem) => {
@@ -72,7 +72,7 @@ export proc guest_bootstrap_mount_store(ctx: GuestBootstrap, phase: Str) [fs, pr
   }
 }
 
-proc guest_bootstrap_wait_for_dev_vda(ctx: GuestBootstrap, phase: Str) [fs, time, error] {
+proc guest_bootstrap_wait_for_dev_vda(ctx: GuestBootstrap, phase: Str) {
   var elapsed = 0
   while ! p"/dev/vda".exists() {
     guard elapsed < 30 else {

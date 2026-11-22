@@ -10,7 +10,7 @@ pure entries() -> List[NetworkInputEntry] {
   ]
 }
 
-proc invoke(ctx: TestContext, entry: NetworkInputEntry, input: Path) [fs, process, error] -> Result[NetworkInputCommand, Error] {
+proc invoke(ctx: TestContext, entry: NetworkInputEntry, input: Path) -> Result[NetworkInputCommand, Error] {
   let root = test.temp_dir(ctx, name: entry.script.name)?
   let stdout = fp"{root}/stdout"
   let stderr = fp"{root}/stderr"

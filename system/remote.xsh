@@ -94,7 +94,7 @@ export type RemoteLog = {path: Str, readable: Bool, lines: List[Str]}
 ## Bounded evidence for a failure.
 export type RemoteDiagnosis = {services: List[RemoteService], unhealthy: List[RemoteService], logs: List[RemoteLog]}
 
-proc services_of(value: Any) [error] -> Result[List[RemoteService], Error] {
+proc services_of(value: Any) -> Result[List[RemoteService], Error] {
   var found: List[RemoteService] = []
   for item in value.require(List[Record])? {
     found += [{
@@ -106,7 +106,7 @@ proc services_of(value: Any) [error] -> Result[List[RemoteService], Error] {
   found
 }
 
-proc logs_of(value: Any) [error] -> Result[List[RemoteLog], Error] {
+proc logs_of(value: Any) -> Result[List[RemoteLog], Error] {
   var found: List[RemoteLog] = []
   for item in value.require(List[Record])? {
     found += [{

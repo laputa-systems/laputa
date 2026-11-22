@@ -2,7 +2,7 @@
 use trust.store as trust_store
 use trust.update as trust_update
 
-proc stage_target(ctx: TestContext, name: Str) [fs, error] -> Result[Path, Error] {
+proc stage_target(ctx: TestContext, name: Str) -> Result[Path, Error] {
   let root = test.temp_dir(ctx, name: name)?
   let seed_bundle = fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt"
   let seed_policy = fp"{root}/usr/share/laputa/trust/seed/trust-policy"

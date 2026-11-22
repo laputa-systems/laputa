@@ -7,14 +7,14 @@ use packages.linux.PKGBUILD-shared as linux_shared
 
 error PyramidStopError = Failed(message: Str)
 
-proc pyramid_plan_archives(plan: kbuild.KbuildPlan, cache: Path) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+proc pyramid_plan_archives(plan: kbuild.KbuildPlan, cache: Path) -> Result[kbuild.BuiltinArchivePlan] {
   env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
     XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives(plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
   }
 }
 
-proc pyramid_kernel_source(ctx: TestContext) [fs, env, time, process, error] -> Result[Path] {
+proc pyramid_kernel_source(ctx: TestContext) -> Result[Path] {
   let source = test.temp_dir(ctx, name: "pyramid-kernel")?
   fp"{source}/.config".write("CONFIG_TEST=y\n")
   fp"{source}/include/generated".mkdir()
@@ -37,14 +37,14 @@ proc pyramid_kernel_source(ctx: TestContext) [fs, env, time, process, error] -> 
   source
 }
 
-proc pyramid_stop(stage: kbuild_verify.LinuxKbuildStop) [env, error] -> Result[Unit, Error] {
+proc pyramid_stop(stage: kbuild_verify.LinuxKbuildStop) -> Result[Unit, Error] {
   let requested = kbuild_verify.linux_kbuild_stop_name(stage)
   env ({XSH_LINUX_KBUILD_STOP_AFTER: requested}) {
     linux_shared.stop_after(requested)
   }
 }
 
-proc pyramid_reject_stop(stage: kbuild_verify.LinuxKbuildStop, outcome: Result[Unit, Error], source: Path) [fs, error] {
+proc pyramid_reject_stop(stage: kbuild_verify.LinuxKbuildStop, outcome: Result[Unit, Error], source: Path) {
   match kbuild_verify.linux_kbuild_verify_stopped(stage, outcome, source) {
     Ok(_) => test.fail("invalid kernel stop passed verification")
     Err(_) => {}
@@ -129,7 +129,7 @@ proc pyramid_kernel_graph(
   {source, discovered, directories: groups, objects, objects_per_directory: objects_per_group}
 }
 
-proc pyramid_archive_graph(fixture: PyramidKernelGraph, cache: Path) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+proc pyramid_archive_graph(fixture: PyramidKernelGraph, cache: Path) -> Result[kbuild.BuiltinArchivePlan] {
   let discovered = fixture.discovered
   let groups = fixture.directories
   let objects = fixture.objects
@@ -161,7 +161,7 @@ proc pyramid_archive_graph(fixture: PyramidKernelGraph, cache: Path) [fs, proces
   planned
 }
 
-proc pyramid_graph_runner(source: Path) [fs, error] -> Result[Path] {
+proc pyramid_graph_runner(source: Path) -> Result[Path] {
   let script = fp"{source}/synthetic-task.xsh"
   script.write(r"""let counter = fp"{args[0]}"
 let output = fp"{args[1]}"
@@ -184,7 +184,7 @@ fs.set_times(output, mtime_ns: latest + 1000000000)?
   script
 }
 
-proc pyramid_graph_counts(source: Path, tasks: List[make.MakeTask]) [fs, error] -> Result[Map[Int]] {
+proc pyramid_graph_counts(source: Path, tasks: List[make.MakeTask]) -> Result[Map[Int]] {
   var counts: Map[Int] = {}
   for task in tasks {
     let counter = fp"{source}/executions/{task.name}"
@@ -193,7 +193,7 @@ proc pyramid_graph_counts(source: Path, tasks: List[make.MakeTask]) [fs, error] 
   counts
 }
 
-proc pyramid_graph_behavior(ctx: TestContext, groups: Int, objects: Int) [fs, process, env, time, error] {
+proc pyramid_graph_behavior(ctx: TestContext, groups: Int, objects: Int) {
   let fixture = pyramid_kernel_graph(ctx, groups, objects)?
   let source = fixture.source
   let script = pyramid_graph_runner(source)?
@@ -254,7 +254,7 @@ test test_pyramid_kernel_graph_medium [fs, process, env, time, error] { |ctx|
 }
 
 
-proc pyramid_discovery_source(ctx: TestContext) [fs, error] -> Result[Path] {
+proc pyramid_discovery_source(ctx: TestContext) -> Result[Path] {
   let scratch = fp"{fs.cwd()?}/.work/tmp"
   scratch.mkdir(parents: true)
   let unique = test.temp_dir(ctx, name: "pyramid-prepared-discovery")?

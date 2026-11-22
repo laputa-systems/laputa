@@ -82,7 +82,7 @@ export proc discover_package_plan(srcarch: Str) [fs, process, env, time, error] 
 
 type PackageDiscovery = {config: kbuild.Kconfig, discovery: kbuild.KbuildDiscovery}
 
-proc discover_package_with_inputs(srcarch: Str) [fs, process, env, time, error] -> Result[PackageDiscovery, Error] {
+proc discover_package_with_inputs(srcarch: Str) -> Result[PackageDiscovery, Error] {
   let config = kbuild.load_config(p".config")?
   let options = discover_options_from_env()?
 

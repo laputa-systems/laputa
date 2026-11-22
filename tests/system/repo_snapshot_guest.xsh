@@ -26,14 +26,14 @@ proc guest_tool_or_skip(name: Str) [fs, process, error] -> Result[Path, Error] {
   }
 }
 
-proc guest_file_or_skip(path_value: Path, label: Str) [fs, error] {
+proc guest_file_or_skip(path_value: Path, label: Str) {
   guard path_value.exists() else {
     test.skip(f"guest proof needs {label} at {path_value.display()}")
     return
   }
 }
 
-proc guest_kernel() [fs, error] -> Result[Path, Error] {
+proc guest_kernel() -> Result[Path, Error] {
   for candidate in GUEST_KERNEL_CANDIDATES {
     if fp"{candidate}".exists() {
       return fp"{candidate}"
@@ -44,7 +44,7 @@ proc guest_kernel() [fs, error] -> Result[Path, Error] {
   p"/nonexistent"
 }
 
-proc guest_modules_dir() [fs, error] -> Result[Path, Error] {
+proc guest_modules_dir() -> Result[Path, Error] {
   var found = p"/nonexistent"
   for entry in fs.children(p"/lib/modules")? {
     if entry.kind == "dir" {
@@ -95,7 +95,7 @@ proc guest_xsh() [fs, process, env, error] -> Result[Path, Error] {
   }
 }
 
-proc build_initramfs(root: Path, output: Path) [fs, process, error] -> Result[Unit, Error] {
+proc build_initramfs(root: Path, output: Path) -> Result[Unit, Error] {
   var entries = ["."]
   for entry in fs.walk(root, hidden: true)? {
     let rel = entry.path.strip_prefix(root)?
@@ -131,7 +131,7 @@ proc build_store_disk(path_value: Path, size_mb: Int) [fs, process, error] -> Re
   assert status.ok, "mke2fs could not format the guest store disk"
 }
 
-proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] -> Result[Str, Error] {
+proc wait_for_marker(log: Path, marker: Str, attempts: Int) -> Result[Str, Error] {
   var tries = 0
   while tries < attempts {
     if log.exists() {
@@ -154,7 +154,7 @@ proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] ->
   
 }
 
-proc guest_alive(pid: Int) [process, error] -> Result[Bool, Error] {
+proc guest_alive(pid: Int) -> Result[Bool, Error] {
   for entry in process.list()? |> where .pid == pid {
     return entry.status != "Z"
   }
@@ -162,7 +162,7 @@ proc guest_alive(pid: Int) [process, error] -> Result[Bool, Error] {
   false
 }
 
-proc wait_for_exit(pid: Int, attempts: Int) [process, time, error] -> Result[Unit, Error] {
+proc wait_for_exit(pid: Int, attempts: Int) -> Result[Unit, Error] {
   var tries = 0
   while tries < attempts {
     guard guest_alive(pid) else {
@@ -224,7 +224,7 @@ proc stage_initramfs(
   root_name: Str = "repo-guest-root",
   main_script: Str = "",
   provisioned_keys: List[Str] = [],
-) [fs, process, env, error] -> Result[Path, Error] {
+) -> Result[Path, Error] {
   let root = test.temp_dir(ctx, name: root_name)?
   for dir in ["bin", "guest", "lib/guest", "lib/pm", "lib/modules", "etc/laputa", "store", "proc", "sys", "dev", "tmp"] {
     fp"{root}/{dir}".mkdir(parents: true)
@@ -265,7 +265,7 @@ proc stage_initramfs(
   root
 }
 
-proc wait_for_port(port_file: Path) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port(port_file: Path) -> Result[Int, Error] {
   var tries = 0
   while tries < 100 {
     if port_file.exists() {
@@ -557,7 +557,7 @@ proc rotation_boot(
   store: Path,
   url: Str,
   marker: Str,
-) [fs, process, env, time, error] {
+) {
   let staging = stage_initramfs(ctx, xsh, modules_dir, root_name: f"{name}-root", main_script: script, provisioned_keys: keys)?
   let work = test.temp_dir(ctx, name: f"{name}-work")?
   let initramfs = fp"{work}/initramfs.cpio"

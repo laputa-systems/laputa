@@ -13,7 +13,7 @@ proc qualification_detached(command: Command) [process, time, error] -> Result[S
   fail "detached privilege qualification timed out"
 }
 
-proc qualification_payload(marker: Str) [fs, process, error] {
+proc qualification_payload(marker: Str) {
   let identity = unix.id()?
   let root = user.lookup("root")?
   let groups = user.groups("root", primary_gid: root.gid)?
@@ -24,7 +24,7 @@ proc qualification_payload(marker: Str) [fs, process, error] {
   fp"/run/doas-qualification/{marker}".write("executed\n")
 }
 
-proc qualification_laputa(terminal: Bool) [fs, process, error] {
+proc qualification_laputa(terminal: Bool) {
   let identity = unix.id()?
   let laputa = user.lookup("laputa")?
   let groups = user.groups("laputa", primary_gid: laputa.gid)?
@@ -58,7 +58,7 @@ proc qualification_laputa(terminal: Bool) [fs, process, error] {
   assert ! check.ok
 }
 
-proc qualification_nobody() [fs, process, error] {
+proc qualification_nobody() {
   let identity = unix.id()?
   let nobody = user.lookup("nobody")?
   let groups = user.groups("nobody", primary_gid: nobody.gid)?
@@ -75,7 +75,7 @@ proc qualification_nobody() [fs, process, error] {
   assert ! status.ok
 }
 
-proc qualification_denied_command() [fs, process, error] {
+proc qualification_denied_command() {
   let identity = unix.id()?
   let laputa = user.lookup("laputa")?
   assert identity.uid == laputa.uid and identity.euid == laputa.uid
@@ -88,7 +88,7 @@ proc qualification_denied_command() [fs, process, error] {
   assert ! status.ok
 }
 
-proc qualification_restricted_policy() [fs, process, time, error] {
+proc qualification_restricted_policy() {
   let config = p"/etc/doas.conf"
   let original = config.read_text()?
   defer config.write(original)
@@ -102,7 +102,7 @@ proc qualification_restricted_policy() [fs, process, time, error] {
   assert ! p"/run/doas-qualification/unauthorized-command".exists()?
 }
 
-proc qualification_run() [fs, process, time, net, error] {
+proc qualification_run() {
   let executable = p"/usr/bin/doas".metadata()?
   let root_user = user.lookup("root")?
   assert executable.kind == "file" and executable.uid == root_user.uid and executable.setuid

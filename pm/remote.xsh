@@ -56,7 +56,7 @@ export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: 
   net_put_file(util.repo_url_for(repo, rel)?, source, token)
 }
 
-proc upload_immutable_chunks(repo: Str, rel: Path, source: Path, token: Str, size: Int) [fs, net, env, error] -> Result[Int, Error] {
+proc upload_immutable_chunks(repo: Str, rel: Path, source: Path, token: Str, size: Int) -> Result[Int, Error] {
   let upload_id = f"{hash.sha256(source)?.hex()}-{random.bytes(16)?.sha256().hex()}"
   let headers = remote_auth_headers(token)
   var offset = 0

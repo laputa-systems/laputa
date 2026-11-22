@@ -7,17 +7,17 @@ const label = "xinfra-fixture"
 
 type State = {containers: List[Str]}
 
-proc docker_text(...argv: List[Str]) [process, error] -> Result[Str] {
+proc docker_text(...argv: List[Str]) -> Result[Str] {
   let out = run.text docker @argv
   Ok(out.trim())
 }
 
-proc fingerprint(pub: Path) [process, error] -> Result[Str] {
+proc fingerprint(pub: Path) -> Result[Str] {
   let line = run.text ssh-keygen -lf $pub
   Ok(line.fields()[1])
 }
 
-proc wait_for_sshd(container: Str) [process, time, error] -> Result[Unit] {
+proc wait_for_sshd(container: Str) -> Result[Unit] {
   for _ in range(50) {
     let status = run.status docker exec $container nc -z 127.0.0.1 22
     if status.ok {
@@ -30,7 +30,7 @@ proc wait_for_sshd(container: Str) [process, time, error] -> Result[Unit] {
   fail f"sshd in {container} did not start"
 }
 
-proc keygen(file: Path) [process, error] {
+proc keygen(file: Path) {
   run ssh-keygen -q -t ed25519 -N "" -f $file
 }
 

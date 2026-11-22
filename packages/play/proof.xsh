@@ -11,7 +11,7 @@ pure le(value: Int, width: Int) -> List[Int] {
   octets
 }
 
-proc square_wave_wav(wav: Path) [fs, error] {
+proc square_wave_wav(wav: Path) {
   let rate = 8000
   let frames = rate / 2
   var samples: List[Int] = []

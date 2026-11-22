@@ -217,7 +217,7 @@ export pure quiesce_record_from_json(value: Any) -> Result[QuiesceRecord, Error]
   })
 }
 
-proc quiesce_status(qe: QuiesceEnv, service: Str) [fs, error] -> Result[Record?, Error] {
+proc quiesce_status(qe: QuiesceEnv, service: Str) -> Result[Record?, Error] {
   let target = fp"{qe.state_dir}/{service}.json"
   if ! target.exists() {
     return Ok(null)
@@ -244,7 +244,7 @@ pure quiesce_up(value: Record?) -> Bool {
   desired == "up" and state == "running"
 }
 
-proc quiesce_owner(qe: QuiesceEnv, service: Str) [fs, error] -> Result[Str, Error] {
+proc quiesce_owner(qe: QuiesceEnv, service: Str) -> Result[Str, Error] {
   let file = fp"{qe.state_dir}/{service}.control"
   if ! file.exists() {
     return Ok("")
@@ -252,7 +252,7 @@ proc quiesce_owner(qe: QuiesceEnv, service: Str) [fs, error] -> Result[Str, Erro
   Ok(file.read_text()?.trim())
 }
 
-proc quiesce_xinit(qe: QuiesceEnv, args: List[Str]) [fs, process, error] -> Result[Str, Error] {
+proc quiesce_xinit(qe: QuiesceEnv, args: List[Str]) -> Result[Str, Error] {
   qe.scratch.mkdir(parents: true)
   let errors = fp"{qe.scratch}/quiesce-xinit.err"
   errors.remove(missing_ok: true)
@@ -434,7 +434,7 @@ export proc quiesce_release_record(qe: QuiesceEnv, job: Str, timeout_ms: Int) [f
   Ok(true)
 }
 
-proc quiesce_supervised(qe: QuiesceEnv, job: Str, attempt: Int) [fs, process, error] -> Result[Unit, Error] {
+proc quiesce_supervised(qe: QuiesceEnv, job: Str, attempt: Int) -> Result[Unit, Error] {
   let file = fp"{qe.writers}/{job}.json"
   guard file.exists() else {
     return Err(error.failure(f"{job} has no supervised attempt: quiescence runs under the timer supervisor"))
@@ -446,7 +446,7 @@ proc quiesce_supervised(qe: QuiesceEnv, job: Str, attempt: Int) [fs, process, er
   }
 }
 
-proc quiesce_boot_id() [fs] -> Str {
+proc quiesce_boot_id() -> Str {
   match p"/proc/sys/kernel/random/boot_id".read_text() {
     Ok(text) => text.trim()
     Err(_) => ""

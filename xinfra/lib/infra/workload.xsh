@@ -28,7 +28,7 @@ export pure material_key(host: Str, id: Str) -> Str {
   f"{host}/{id}"
 }
 
-proc measure_file(host: Str, resource: model.Resource, spec: model.FileSpec) [fs, env, error] -> Result[compare.Material?, Error] {
+proc measure_file(host: Str, resource: model.Resource, spec: model.FileSpec) -> Result[compare.Material?, Error] {
   guard spec.presence == .Present else {
     return Ok(null)
   }
@@ -55,7 +55,7 @@ proc check_dialect(host: model.Host, resources: List[model.Resource]) -> Result[
   }
 }
 
-proc secret_values(host: Str, resource: model.Resource) [env, error] -> Result[List[Str], Error] {
+proc secret_values(host: Str, resource: model.Resource) -> Result[List[Str], Error] {
   var names: List[Str] = []
   match resource.spec {
     model.File(spec) => {

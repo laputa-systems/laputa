@@ -406,7 +406,7 @@ pure backup_tail(text: Str, limit: Int) -> Str {
   }
 }
 
-proc backup_scratch() [fs, error] -> Result[Path] {
+proc backup_scratch() -> Result[Path] {
   BACKUP_RUN_DIR.mkdir(parents: true)
   Ok(BACKUP_RUN_DIR)
 }
@@ -415,7 +415,7 @@ proc backup_rustic(
   config: BackupConfig,
   args: List[Str],
   label: Str,
-) [fs, process, error] -> Result[Str, Error] {
+) -> Result[Str, Error] {
   let scratch = backup_scratch()?
   let home = fp"{scratch}/home"
   home.mkdir(parents: true)
@@ -450,7 +450,7 @@ proc backup_rustic(
   Ok(text)
 }
 
-proc backup_list_snapshots(config: BackupConfig, label: Str) [fs, process, error] -> Result[List[Str], Error] {
+proc backup_list_snapshots(config: BackupConfig, label: Str) -> Result[List[Str], Error] {
   let text = backup_rustic(config, ["snapshots", "--json"], label)?
   match json.decode(text) {
     Ok(value) => backup_snapshot_ids(value),
@@ -458,7 +458,7 @@ proc backup_list_snapshots(config: BackupConfig, label: Str) [fs, process, error
   }
 }
 
-proc backup_run_hook(hook: BackupHook?, label: Str) [fs, process, io, error] -> Result[Unit, Error] {
+proc backup_run_hook(hook: BackupHook?, label: Str) -> Result[Unit, Error] {
   guard let value = hook else {
     return Ok()
   }
@@ -491,7 +491,7 @@ proc backup_run_hook(hook: BackupHook?, label: Str) [fs, process, io, error] -> 
   Ok()
 }
 
-proc backup_new_snapshot(config: BackupConfig, before: List[Str]) [fs, process, error] -> Result[Str, Error] {
+proc backup_new_snapshot(config: BackupConfig, before: List[Str]) -> Result[Str, Error] {
   let text = backup_rustic(config, ["backup", "--json", "--exclude-if-present", config.exclude_if_present, @config.sources], "backup")?
   match json.decode(text) {
     Ok(value) => {
@@ -511,7 +511,7 @@ proc backup_new_snapshot(config: BackupConfig, before: List[Str]) [fs, process, 
   Err(error.failure("backup produced no new snapshot"))
 }
 
-proc backup_write_receipt(config: BackupConfig, receipt: BackupReceipt) [fs, error] -> Result[Unit, Error] {
+proc backup_write_receipt(config: BackupConfig, receipt: BackupReceipt) -> Result[Unit, Error] {
   let file = fp"{config.receipt}"
   file.parent().mkdir(parents: true)
   let body = json.encode(receipt)? + "\n"
@@ -522,7 +522,7 @@ proc backup_write_receipt(config: BackupConfig, receipt: BackupReceipt) [fs, err
   fs.fsync(file.parent())
 }
 
-proc backup_init(config: BackupConfig) [fs, process, io, error] -> Result[Unit, Error] {
+proc backup_init(config: BackupConfig) -> Result[Unit, Error] {
   let repository = fp"{config.repository}"
   let marker = fp"{repository}/config"
   if marker.exists() {
@@ -579,7 +579,7 @@ proc backup_run(config: BackupConfig) [fs, process, time, io, error] -> Result[U
   Ok()
 }
 
-proc backup_read_config(options: BackupOptions) [fs, error] -> Result[BackupConfig, Error] {
+proc backup_read_config(options: BackupOptions) -> Result[BackupConfig, Error] {
   let file = fp"{options.config}"
   guard file.exists() and file.is_file() else {
     return Err(error.failure(f"backup config is missing: {options.config}"))

@@ -94,7 +94,7 @@ export const filetree = [
 
 error TailscaleBuildError = SourceChanged(path: Str) | BuildFailed(message: Str)
 
-proc patch_go(path_value: Path, original: Str, replacement: Str) [fs, error] {
+proc patch_go(path_value: Path, original: Str, replacement: Str) {
   let contents = path_value.read_text()?
   guard original in contents and contents.replace(original, with: "").byte_len() + original.byte_len() == contents.byte_len() else {
     return Err(TailscaleBuildError.SourceChanged(path_value.display()))

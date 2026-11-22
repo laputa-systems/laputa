@@ -2,7 +2,7 @@ proc fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/trust-update/{name}"
 }
 
-proc wait_for_port(port_file: Path) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port(port_file: Path) -> Result[Int, Error] {
   var attempts = 0
   while attempts < 100 {
     if port_file.exists() {
@@ -20,7 +20,7 @@ proc stop_server(child: ProcessHandle) [process, error] {
   child.cancel(signal: "TERM", kill_after: 5s)
 }
 
-proc verify_connection(ctx: TestContext, root: Path, chain: Str, key: Str, trust: Str, expected: Str) [fs, process, env, time, error] {
+proc verify_connection(ctx: TestContext, root: Path, chain: Str, key: Str, trust: Str, expected: Str) {
   let dir = test.temp_dir(ctx, name: f"tailscale-policy-{chain}-{trust}")?
   let port_file = fp"{dir}/port"
   let routes = fp"{dir}/routes"

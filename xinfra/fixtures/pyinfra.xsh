@@ -51,12 +51,12 @@ pure scenario_of(name: Str) -> Result[Scenario, Error] {
   }
 }
 
-proc docker_text(...argv: List[Str]) [process, error] -> Result[Str] {
+proc docker_text(...argv: List[Str]) -> Result[Str] {
   let out = run.text docker @argv
   Ok(out.trim())
 }
 
-proc address_of(container: Str) [process, error] -> Result[Str] {
+proc address_of(container: Str) -> Result[Str] {
   docker_text("inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container)
 }
 
@@ -64,7 +64,7 @@ pure count_of(output: Str, needle: Str) -> Int {
   output.lines() |> where { |line| needle in line } |> count()
 }
 
-proc pyinfra_run(address: Str, work: Path, deploy: Str, key: Str = "client", port: Int = 22) [process, error] -> Result[Run] {
+proc pyinfra_run(address: Str, work: Path, deploy: Str, key: Str = "client", port: Int = 22) -> Result[Run] {
   let mount = f"{work}:/work"
   let script = f"/work/{deploy}.py"
   let keyfile = f"/work/{key}"
@@ -73,19 +73,19 @@ proc pyinfra_run(address: Str, work: Path, deploy: Str, key: Str = "client", por
   Ok(Run(ok: out.status.ok, changed: count_of(output, "] Success") > 0))
 }
 
-proc xinfra_run(inventory: Path, deploy: Str, host: Str) [process, error] -> Result[Run] {
+proc xinfra_run(inventory: Path, deploy: Str, host: Str) -> Result[Run] {
   let program = f"fixtures/pyinfra/{deploy}.xsh"
   let out = run.capture --text xsh bin/xinfra.xsh apply $inventory $program --limit $host
   let changed = out.stdout.lines() |> where { |line| line.starts_with("apply:") and ! (", 0 changed," in line) } |> count()
   Ok(Run(ok: out.status.ok, changed: changed > 0))
 }
 
-proc probe_of(container: Str, script: Str) [process, error] -> Result[Str] {
+proc probe_of(container: Str, script: Str) -> Result[Str] {
   let out = run.capture --text docker exec $container sh -c $script
   Ok(f"{out.stdout}")
 }
 
-proc fixture_container(inventory: Path, host: Str) [fs, error] -> Result[Str] {
+proc fixture_container(inventory: Path, host: Str) -> Result[Str] {
   let state = json.read(fp"{inventory.parent()}/containers.json")?.require(State)?
   let index = host.replace("fx-", with: "").parse_int()? - 1
   Ok(state.containers[index])
@@ -123,7 +123,7 @@ proc compare_scenario(scenario: Scenario, inventory: Path, host: Str, work: Path
   Ok(agreed)
 }
 
-proc compare_unreachable(inventory: Path, host: Str, work: Path, target: Str, address: Str) [fs, process, error] -> Result[Bool] {
+proc compare_unreachable(inventory: Path, host: Str, work: Path, target: Str, address: Str) -> Result[Bool] {
   let stranger = fp"{work}/stranger"
   stranger.remove(missing_ok: true)
   fp"{work}/stranger.pub".remove(missing_ok: true)

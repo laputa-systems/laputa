@@ -383,7 +383,7 @@ proc qmp_retry_input(socket: Path) -> Result[Unit] {
   assert "QmpRetryOperation" in result.stderr, result.stderr
 }
 
-proc fake_qemu_runs() [process] -> Bool {
+proc fake_qemu_runs() -> Bool {
   match process.which("python3") {
     Ok(_) => true,
     Err(_) => false,

@@ -8,7 +8,7 @@ proc runner() -> Result[Path] {
   process.which("xsh")?
 }
 
-proc stage_layout(root: Path) [fs, error] {
+proc stage_layout(root: Path) {
   let seed_bundle = fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt"
   let seed_policy = fp"{root}/usr/share/laputa/trust/seed/trust-policy"
   let key_path = fp"{root}/etc/laputa/trust-update-key"
@@ -28,7 +28,7 @@ proc stage_layout(root: Path) [fs, error] {
   )
 }
 
-proc prove_ok(ctx: TestContext, name: Str) [fs, process, env, error] {
+proc prove_ok(ctx: TestContext, name: Str) {
   let root = test.temp_dir(ctx, name: name)?
   stage_layout(root)
   let xsh = runner()?
@@ -41,7 +41,7 @@ proc prove_ok(ctx: TestContext, name: Str) [fs, process, env, error] {
   assert active == "1"
 }
 
-proc prove_fails(ctx: TestContext, name: Str, mutate: Path, body: Str, fragment: Str) [fs, process, env, error] {
+proc prove_fails(ctx: TestContext, name: Str, mutate: Path, body: Str, fragment: Str) {
   let root = test.temp_dir(ctx, name: name)?
   stage_layout(root)
   let stderr = fp"{root}/proof.stderr"

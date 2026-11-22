@@ -6,7 +6,7 @@ use system.profile
 use system.qemu
 use system.types
 
-proc record_failed_pending(state: Path) [fs, time, error] {
+proc record_failed_pending(state: Path) {
   let record = activation.activation_status(state)?
   if record.pending != null { activation.activation_boot_failed(state) }
 }

@@ -13,7 +13,7 @@ proc module_root() [fs, env, error] -> Result[Path] {
 
 type TrustCliResult = {ok: Bool, code: Int, err: Str, out: Str}
 
-proc trust_run(args: List[Str], err: Path, out: Path) [fs, process, env, error] -> Result[TrustCliResult, Error] {
+proc trust_run(args: List[Str], err: Path, out: Path) -> Result[TrustCliResult, Error] {
   let xsh = runner()?
   let modules = module_root()?
   let command = process.command_argv(
@@ -107,7 +107,7 @@ proc active_bundle(root: Path) [fs, error] -> Result[Bytes, Error] {
   fp"{root}/var/lib/laputa/trust/active/ca-certificates.crt".read_bytes()
 }
 
-proc wait_for_port_file(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port_file(port_file: Path, attempts: Int) -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
     if port_file.exists() {
@@ -285,7 +285,7 @@ test trust_update_killed_mid_transaction_recovers_cleanly [fs, process, env, tim
   }
 }
 
-proc store_snapshot(root: Path) [fs, error] -> Result[Str, Error] {
+proc store_snapshot(root: Path) -> Result[Str, Error] {
   var entries: List[Str] = []
   for entry in fs.walk(fp"{root}/var/lib/laputa/trust", hidden: true)? {
     let rel = entry.path.strip_prefix(root)?

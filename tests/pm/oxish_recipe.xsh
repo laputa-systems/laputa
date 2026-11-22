@@ -7,7 +7,7 @@ use pm.util
 const executables = ["oxish", "oxish-keygen", "oxish-scp", "oxish-server", "oxish-session", "oxish-sftp"]
 const documents = ["LICENSE-APACHE", "LICENSE-MIT", "THIRD-PARTY.md", "provenance.json"]
 
-proc stage_release(root: Path, omit: Str) [fs, error] -> Result[Path] {
+proc stage_release(root: Path, omit: Str) -> Result[Path] {
   let release = fp"{root}/release"
 
   for tool in executables {

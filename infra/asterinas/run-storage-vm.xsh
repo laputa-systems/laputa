@@ -9,14 +9,14 @@ pure guest_failed(output: Str) -> Bool {
     or "Heap allocation error" in output
 }
 
-proc process_live(pid: Int) [process, error] -> Result[Bool] {
+proc process_live(pid: Int) -> Result[Bool] {
   for entry in process.list()? |> where .pid == pid {
     return entry.status != "Z"
   }
   false
 }
 
-proc log_text(console_log: Path, backend_log: Path) [fs, error] -> Result[Str, Error] {
+proc log_text(console_log: Path, backend_log: Path) -> Result[Str, Error] {
   let console = if console_log.exists() { console_log.read_text()? } else { "" }
   let backend = if backend_log.exists() { backend_log.read_text()? } else { "" }
   f"""{console}

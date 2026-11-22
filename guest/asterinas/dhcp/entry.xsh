@@ -43,7 +43,7 @@ pure significant(state: Str) -> Str {
   if acquiring(state) { "acquiring" } else { state }
 }
 
-proc client_state() [fs, error] -> Str {
+proc client_state() -> Str {
   let status = fp"{WORK}/run/eth0.status"
   guard status.exists() else { return "none" }
   match json.read(status) {
@@ -72,25 +72,25 @@ proc stop_client(client: Client) [process, time, error] {
   let _ = unix.shutdown_process_groups([client.pid], 3s, 100ms)?
 }
 
-proc crash_client(client: Client) [fs, process, time, error] {
+proc crash_client(client: Client) {
   process.kill_group(client.pid, "KILL")
   time.sleep(500ms)
   let status = fp"{WORK}/run/eth0.status"
   if status.exists() { status.remove() }
 }
 
-proc elapsed_ms() [time, error] -> Result[Int] {
+proc elapsed_ms() -> Result[Int] {
   time.monotonic()? / 1000000
 }
 
-proc show_client_log() [fs, error] {
+proc show_client_log() {
   let log = fp"{WORK}/client.log"
   if log.exists() {
     for line in log.read_text()?.lines() { eprint --flush f"NET_DHCP_CLIENT_LOG {line}" }
   }
 }
 
-proc await_state(label: Str, wanted: Str, timeout_ms: Int) [fs, time, error] {
+proc await_state(label: Str, wanted: Str, timeout_ms: Int) {
   let deadline = elapsed_ms()? + timeout_ms
   while elapsed_ms()? < deadline {
     if significant(client_state()) == wanted { return }
@@ -100,7 +100,7 @@ proc await_state(label: Str, wanted: Str, timeout_ms: Int) [fs, time, error] {
   show_client_log()
 }
 
-proc watch_states(label: Str, duration_ms: Int) [fs, time, error] {
+proc watch_states(label: Str, duration_ms: Int) {
   var sequence: List[Str] = []
   let deadline = elapsed_ms()? + duration_ms
   while elapsed_ms()? < deadline {
@@ -160,7 +160,7 @@ pure packet_address(ifindex: Int, protocol: Int) -> Result[Bytes, Error] {
   bytes.concat([bytes.pack_le(17, 2)?, bytes.pack_be(protocol, 2)?, bytes.pack_le(ifindex, 4)?, bytes.zero(12)?])
 }
 
-proc open_capture(ifindex: Int) [process, net, error] -> Result[Int] {
+proc open_capture(ifindex: Int) -> Result[Int] {
   let c = linux.net_constants()
   let socket = linux.socket(c.AF_PACKET, c.SOCK_RAW.bit_or(c.SOCK_NONBLOCK), bytes.unpack_le(bytes.pack_be(ETH_P_ALL, 2)?, 2)?)?
   linux.bind(socket, packet_address(ifindex, ETH_P_ALL)?)
@@ -191,7 +191,7 @@ proc start_tcp_client() [fs, process, error] -> Result[Client] {
   Ok(Client(pid: client.pid))
 }
 
-proc await_file(file: Path, timeout_ms: Int) [fs, time, error] -> Result[Bool] {
+proc await_file(file: Path, timeout_ms: Int) -> Result[Bool] {
   let deadline = elapsed_ms()? + timeout_ms
   while elapsed_ms()? < deadline {
     if file.exists() { return Ok(true) }
@@ -206,7 +206,7 @@ pure static_route(destination: Str, prefix: Int, gateway: Str, metric: Int) -> R
   Ok({destination: destination_address, prefix: prefix, gateway: gateway_address, table: network.TABLE_MAIN, tos: 0, priority: metric, protocol: STATIC_ROUTE_PROTOCOL})
 }
 
-proc add_foreign_routes() [process, net, error] {
+proc add_foreign_routes() {
   let ifindex = fixture.index_of("eth0")
   let routes = [static_route("203.0.113.0", 24, "192.0.2.1", 50)?, static_route("0.0.0.0", 0, "192.0.2.254", 700)?]
   for route in routes {
@@ -267,14 +267,14 @@ pure foreign_route(destination: Str, table: Int, scope: Int, route_type: Int, ho
   {family: .Inet, table: table, destination: destination, prefix: 24, source: null, source_prefix: 0, preferred_source: null, tos: 0, priority: 0, protocol: STATIC_ROUTE_PROTOCOL, scope: scope, route_type: route_type, flags: 0, hops: [hop], other_attributes: []}
 }
 
-proc route_change(label: Str, change: state.Change) [process, net, error] {
+proc route_change(label: Str, change: state.Change) {
   match state.apply(change) {
     Ok(_) => eprint --flush f"NET_DHCP_reject_{label} ok"
     Err(failure) => eprint --flush f"NET_DHCP_reject_{label} {failure.message}"
   }
 }
 
-proc connect_through(label: Str, address: Str) [process, net, error] {
+proc connect_through(label: Str, address: Str) {
   let c = linux.net_constants()
   let fd = linux.socket(c.AF_INET, c.SOCK_DGRAM)?
   defer unix.close_fd(fd)
@@ -302,7 +302,7 @@ proc await_default_route(label: Str, timeout_ms: Int) [process, env, time, net, 
   eprint --flush f"NET_DHCP_{label}_TIMEOUT waiting for the default route"
 }
 
-proc reject_routes() [fs, process, env, time, net, error] {
+proc reject_routes() {
   let none: state.Hop = {ifindex: null, gateway: null}
   let eth0 = fixture.index_of("eth0")
   let rejecting = [RTN_BLACKHOLE, RTN_UNREACHABLE, RTN_PROHIBIT, RTN_THROW]
@@ -370,7 +370,7 @@ proc kmsg_write(label: Str, text: Str) [fs, error] {
   }
 }
 
-proc kmsg_device() [fs, process, net, error] {
+proc kmsg_device() {
   let fd = unix.open_fd(p"/dev/kmsg", nonblock: true)?
   defer unix.close_fd(fd)
   let _ = unix.seek_fd(fd, 0, whence: "end")?
@@ -462,7 +462,7 @@ proc state_lines() [fs, process, env, time, net, error] -> Result[List[Str]] {
   Ok(lines)
 }
 
-proc snapshot(label: Str) [fs, process, env, time, net, error] -> Result[List[Str]] {
+proc snapshot(label: Str) -> Result[List[Str]] {
   let lines = state_lines()?
   for line in lines { eprint --flush f"NET_DHCP_{label}_{line}" }
   Ok(lines)

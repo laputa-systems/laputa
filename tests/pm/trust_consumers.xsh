@@ -2,7 +2,7 @@ proc fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/trust-update/{name}"
 }
 
-proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port(port_file: Path, attempts: Int) -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
     if port_file.exists() {
@@ -45,7 +45,7 @@ proc stop_server(server: ConsumerServer) [process, error] {
   }
 }
 
-proc python_or_skip() [process, error] -> Result[Str, Error] {
+proc python_or_skip() -> Result[Str, Error] {
   match process.which("python3") {
     Ok(found) => found.display(),
     Err(_) => {
@@ -55,13 +55,13 @@ proc python_or_skip() [process, error] -> Result[Str, Error] {
   }
 }
 
-proc root_bundle(ctx: TestContext) [fs, error] -> Result[Path, Error] {
+proc root_bundle(ctx: TestContext) -> Result[Path, Error] {
   let bundle = test.temp_path(ctx, name: "consumer-bundle.pem")
   bundle.write(fixture("tls/cross-r1.crt").read_bytes()?)
   bundle
 }
 
-proc uv_reaches_http(ctx: TestContext, uv: Path, bundle: Path, port: Int, label: Str) [fs, process, error] -> Result[Bool, Error] {
+proc uv_reaches_http(ctx: TestContext, uv: Path, bundle: Path, port: Int, label: Str) -> Result[Bool, Error] {
   let dir = test.temp_dir(ctx, name: f"uv-{label}")?
   let requirements = fp"{dir}/requirements.in"
   requirements.write(bytes.from_text("trust-consumer-fixture-package\n"))
@@ -88,7 +88,7 @@ proc packaged_root() [env, error] -> Result[Str, Error] {
   (e"LAPUTA_TRUST_CONSUMER_ROOT" ?? "").trim()
 }
 
-proc uv_or_skip() [env, process, error] -> Result[Path, Error] {
+proc uv_or_skip() -> Result[Path, Error] {
   let root = packaged_root()?
   return fp"{root}/usr/bin/uv" when root != ""
 
@@ -116,7 +116,7 @@ test uv_accepts_control_and_blocked_intermediate_but_rejects_omitted_root [fs, p
   assert outcomes == [true, true, false]
 }
 
-proc cargo_or_skip() [env, process, error] -> Result[Path, Error] {
+proc cargo_or_skip() -> Result[Path, Error] {
   let root = packaged_root()?
   return fp"{root}/usr/bin/cargo" when root != ""
 
@@ -129,7 +129,7 @@ proc cargo_or_skip() [env, process, error] -> Result[Path, Error] {
   }
 }
 
-proc cargo_reaches_registry(ctx: TestContext, cargo: Path, bundle: Path, port: Int, label: Str) [fs, process, env, error] -> Result[Bool, Error] {
+proc cargo_reaches_registry(ctx: TestContext, cargo: Path, bundle: Path, port: Int, label: Str) -> Result[Bool, Error] {
   let dir = test.temp_dir(ctx, name: f"cargo-{label}")?
   let stderr = fp"{dir}/stderr"
   let command = process.command_argv(

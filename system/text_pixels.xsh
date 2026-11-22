@@ -122,16 +122,16 @@ export pure shows_glyphs(found: List[Run]) -> Bool {
   found.len() >= 2 and ! all_alike
 }
 
-proc require(condition: Bool, message: Str) [error] {
+proc require(condition: Bool, message: Str) {
   return when condition
   Err(TextPixelsError.Failed(message:))?
 }
 
-proc check_line(name: Str, found: List[Run], glyphs: Bool) [error] {
+proc check_line(name: Str, found: List[Run], glyphs: Bool) {
   require(shows_glyphs(found) == glyphs, f"{name} line {if glyphs { "rendered as tofu or blank" } else { "was expected to be tofu" }}: {[f"{word.width}:{word.ink}" for word in found].join(" ")}")
 }
 
-proc check_emoji_line(name: Str, found: List[Run], cluster_limit: Int) [error] {
+proc check_emoji_line(name: Str, found: List[Run], cluster_limit: Int) {
   require(found.len() == 2, f"{name} emoji line has {found.len()} runs, expected a cluster and a party popper")
   require(found[0].width <= cluster_limit, f"{name} ZWJ sequence is {found[0].width} px wide, over the {cluster_limit} px cluster limit")
   require(! similar(found[0], found[1]), f"{name} emoji runs look alike")

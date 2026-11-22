@@ -39,7 +39,7 @@ proc ensure_base(cache: Path) [fs, net, process, error] -> Result[Path] {
   Ok(base)
 }
 
-proc free_port(start: Int) [process, error] -> Result[Int] {
+proc free_port(start: Int) -> Result[Int] {
   var port = start
   while port < 65000 {
     let listeners = process.port(port)? |> collect()
@@ -53,7 +53,7 @@ proc free_port(start: Int) [process, error] -> Result[Int] {
   fail "no free TCP port"
 }
 
-proc start_seed(seed: Path, port: Int, out: Path, err: Path) [fs, process, time, error] -> Result[Int] {
+proc start_seed(seed: Path, port: Int, out: Path, err: Path) -> Result[Int] {
   let argv = ["python3", "-m", "http.server", "--bind", "127.0.0.1", "--directory", f"{seed}", f"{port}"]
   let command = process.command_argv("python3", argv, p".", {}, b"", out, err, detach: true, new_session: true, ignore_hup: true)
   let spawned = process.spawn(command)?
@@ -74,7 +74,7 @@ proc start_seed(seed: Path, port: Int, out: Path, err: Path) [fs, process, time,
   fail f"seed HTTP server on port {port} did not listen: {err.read_text()?.trim()}"
 }
 
-proc stop_process(pid: Int, grace_ms: Int) [fs, process, time, error] -> Result[Unit] {
+proc stop_process(pid: Int, grace_ms: Int) -> Result[Unit] {
   if pid <= 0 {
     return
   }
@@ -93,12 +93,12 @@ proc stop_process(pid: Int, grace_ms: Int) [fs, process, time, error] -> Result[
   time.sleep(200ms)
 }
 
-proc ssh_capture(client: Path, port: Int, account: Str, script: Str) [process, error] -> Result[Capture] {
+proc ssh_capture(client: Path, port: Int, account: Str, script: Str) -> Result[Capture] {
   let out = run.capture --text timeout 30 ssh -i $client -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -p $port f"{account}@127.0.0.1" $script
   Ok({code: out.status.exit_code() ?? -1, stdout: out.stdout, stderr: out.stderr})
 }
 
-proc wait_ready(client: Path, port: Int) [process, time, error] -> Result[Unit] {
+proc wait_ready(client: Path, port: Int) -> Result[Unit] {
   let started = time.now()
   var last = ""
   while time.now() - started < boot_timeout_ms {
@@ -114,7 +114,7 @@ proc wait_ready(client: Path, port: Int) [process, time, error] -> Result[Unit] 
   fail f"guest on port {port} did not finish cloud-init ({last})"
 }
 
-proc verify_guest(client: Path, port: Int) [process, error] -> Result[Unit] {
+proc verify_guest(client: Path, port: Int) -> Result[Unit] {
   let comm = ssh_capture(client, port, "deploy", "cat /proc/1/comm")?
   guard comm.code == 0 and comm.stdout.trim() == "init" else {
     fail f"guest on port {port}: PID 1 is not init: exit {comm.code}: {comm.stdout.trim()} {comm.stderr.trim()}"
@@ -136,7 +136,7 @@ proc verify_guest(client: Path, port: Int) [process, error] -> Result[Unit] {
   }
 }
 
-proc host_key_pin(port: Int, keyfile: Path) [fs, process, time, error] -> Result[Str] {
+proc host_key_pin(port: Int, keyfile: Path) -> Result[Str] {
   let started = time.now()
   while time.now() - started < boot_timeout_ms {
     let out = run.capture --text ssh-keyscan -T 5 -t ed25519 -p $port 127.0.0.1
@@ -157,7 +157,7 @@ proc host_key_pin(port: Int, keyfile: Path) [fs, process, time, error] -> Result
   fail f"no ed25519 host key from 127.0.0.1:{port}"
 }
 
-proc start_qemu(base: Path, vm: Vm) [fs, process, error] -> Result[Int] {
+proc start_qemu(base: Path, vm: Vm) -> Result[Int] {
   let overlay = f"{vm.work}/disk.qcow2"
   let args = [
     "-name", vm.name,
@@ -241,7 +241,7 @@ runcmd:
 """
 }
 
-proc cleanup(vms: List[Vm]) [fs, process, time, error] {
+proc cleanup(vms: List[Vm]) {
   for vm in vms {
     let _ = stop_process(vm.pid, 2000)
     let _ = stop_process(vm.server_pid, 2000)

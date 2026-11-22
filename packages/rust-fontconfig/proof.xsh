@@ -15,7 +15,7 @@ proc defined_exports(readelf: Path, library: Path) [fs, process, env, error] -> 
   names
 }
 
-proc declared_functions(header: Path) [fs, error] -> Result[List[Str], Error] {
+proc declared_functions(header: Path) -> Result[List[Str], Error] {
   var names: List[Str] = []
 
   for line in header.read_text()?.lines() {

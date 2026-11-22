@@ -11,12 +11,12 @@ use trust.update as trust_update
 
 const GUEST_CONTEXT = {marker: "LAPUTA_TRUST_GUEST", phase_file: "/store/trust-phase"}
 
-proc journal_present(paths: trust_store.TrustStorePaths) [fs, error] -> Result[Bool, Error] {
+proc journal_present(paths: trust_store.TrustStorePaths) -> Result[Bool, Error] {
   let journal = trust_store.trust_store_read_journal(paths)?
   journal.present
 }
 
-proc run_phase_zero(paths: trust_store.TrustStorePaths) [fs, process, time, error] {
+proc run_phase_zero(paths: trust_store.TrustStorePaths) {
   let before = trust_update.trust_status(p"/")?
   guard before.initialized.require(Bool)? == false else {
     guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, "FAIL phase0 expected an uninitialized store on first boot")
@@ -44,7 +44,7 @@ proc run_phase_one(
   paths: trust_store.TrustStorePaths,
   url: Str,
   mode: Str,
-) [fs, process, time, net, error] {
+) {
   let active = trust_store.trust_store_read_active(paths)?
   guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, f"ENTRY phase=1 active={active} journal={journal_present(paths)?}")
   guard active == "2" else {
@@ -69,7 +69,7 @@ proc run_phase_one(
   guest_bootstrap.guest_bootstrap_write_phase(GUEST_CONTEXT, "2")
 }
 
-proc run_phase_one_stale(paths: trust_store.TrustStorePaths) [fs, process, time, error] {
+proc run_phase_one_stale(paths: trust_store.TrustStorePaths) {
   let active = trust_store.trust_store_read_active(paths)?
   guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, f"ENTRY phase=1 active={active} journal={journal_present(paths)?}")
   guard active == "2" else {
@@ -116,7 +116,7 @@ proc run_phase_one_stale(paths: trust_store.TrustStorePaths) [fs, process, time,
   guest_bootstrap.guest_bootstrap_write_phase(GUEST_CONTEXT, "2")
 }
 
-proc run_phase_two(paths: trust_store.TrustStorePaths) [fs, time, error] {
+proc run_phase_two(paths: trust_store.TrustStorePaths) {
   let active = trust_store.trust_store_read_active(paths)?
   guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, f"ENTRY phase=2 active={active} journal={journal_present(paths)?}")
   guard active == "3" else {

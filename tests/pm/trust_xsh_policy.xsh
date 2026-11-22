@@ -2,7 +2,7 @@ proc fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/trust-update/{name}"
 }
 
-proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port(port_file: Path, attempts: Int) -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
     if port_file.exists() {
@@ -45,7 +45,7 @@ proc stop_server(server: ConsumerServer) [process, error] {
   }
 }
 
-proc python_or_skip() [process, error] -> Result[Str, Error] {
+proc python_or_skip() -> Result[Str, Error] {
   match process.which("python3") {
     Ok(found) => found.display(),
     Err(_) => {
@@ -55,7 +55,7 @@ proc python_or_skip() [process, error] -> Result[Str, Error] {
   }
 }
 
-proc run_client(ctx: TestContext, name: Str, port: Int, root: Str, verify: Str, expected: Str, with_policy: Bool) [fs, process, env, error] {
+proc run_client(ctx: TestContext, name: Str, port: Int, root: Str, verify: Str, expected: Str, with_policy: Bool) {
   let xsh = (e"XSH_HOST" ?? "").trim()
   assert xsh != "", "XSH_HOST must name the shipped static XSH binary"
   let binary = path.absolute(fp"{xsh}")?

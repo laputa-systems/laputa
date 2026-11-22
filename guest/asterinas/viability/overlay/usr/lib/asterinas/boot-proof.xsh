@@ -23,7 +23,7 @@ proc report_xsh_tests(rows: Stream[Str]) [process, error] -> Result[Bool, Error]
   Ok(nonempty and passed)
 }
 
-proc stream_xsh_tests(source_root: Path, test_selection: Str) [process, env, error] -> Result[Bool, Error] {
+proc stream_xsh_tests(source_root: Path, test_selection: Str) -> Result[Bool, Error] {
   cd (source_root) {
     if test_selection == "all" {
       report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --nocapture ?)?

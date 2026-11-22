@@ -52,7 +52,7 @@ proc active_policy(root: Path) -> Result[Bytes, Error] {
   fp"{root}/var/lib/laputa/trust/active/trust-policy".read_bytes()
 }
 
-proc expect_rejected(input: Result[Record, Error], fragment: Str, root: Path, generation: Str, label: Str) [fs, error] {
+proc expect_rejected(input: Result[Record, Error], fragment: Str, root: Path, generation: Str, label: Str) {
   match input {
     Ok(_) => test.fail(f"{label}: invalid trust release was accepted"),
     Err(problem) => assert fragment in problem.message
@@ -67,7 +67,7 @@ proc expect_rejected(input: Result[Record, Error], fragment: Str, root: Path, ge
 }
 
 ## Captures the observable store state for zero-mutation assertions.
-proc snapshot_store_state(paths: trust_store.TrustStorePaths) [fs, error] -> Result[Record, Error] {
+proc snapshot_store_state(paths: trust_store.TrustStorePaths) -> Result[Record, Error] {
   var generations: List[Str] = []
   for entry in fs.children(paths.generations)? {
     generations += [entry.name]
@@ -92,7 +92,7 @@ proc snapshot_store_state(paths: trust_store.TrustStorePaths) [fs, error] -> Res
   }
 }
 
-proc assert_same_store_state(before: Record, after: Record, label: Str) [error] {
+proc assert_same_store_state(before: Record, after: Record, label: Str) {
   assert before.accepted.require(Bytes)? == after.accepted.require(Bytes)?, label
   assert before.journal.require(Bytes)? == after.journal.require(Bytes)?, label
   assert before.journal_present.require(Bool)? == after.journal_present.require(Bool)?, label

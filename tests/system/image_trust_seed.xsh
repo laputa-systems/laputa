@@ -3,7 +3,7 @@
 use pm.generation as pm_generation
 use system.container_build as container_build
 
-proc seed_overlay(ctx: TestContext, name: Str) [fs, error] -> Result[Path, Error] {
+proc seed_overlay(ctx: TestContext, name: Str) -> Result[Path, Error] {
   let overlay = test.temp_dir(ctx, name: name)?
   container_build.container_seed_overlay_trust_store(
     overlay,

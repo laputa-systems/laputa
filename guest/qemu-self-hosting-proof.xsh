@@ -2,7 +2,7 @@
 use pm.generation
 use pm.types as pm_types
 
-proc run_guest_proof() [fs, process, env, error] -> Result[Unit, Error] {
+proc run_guest_proof() -> Result[Unit, Error] {
   let receipt = generation.read_generation_receipt(p"/")?
   assert receipt.profile.name == "qemu-self-hosting"
   let expected = match system.uname()?.machine {

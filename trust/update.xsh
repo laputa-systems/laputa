@@ -39,7 +39,7 @@ pure update_fail(message: Str) -> Error {
   TrustUpdateError.InvalidData(message)
 }
 
-proc trust_effective_now_seconds(paths: trust_store.TrustStorePaths) [fs, time, error] -> Result[Int, Error] {
+proc trust_effective_now_seconds(paths: trust_store.TrustStorePaths) -> Result[Int, Error] {
   let wall = time.now() / 1000
   let floor = trust_store.trust_store_read_signed_floor(paths)?
   guard floor <= 0 or wall >= floor else {
@@ -53,7 +53,7 @@ proc trust_effective_now_seconds(paths: trust_store.TrustStorePaths) [fs, time, 
   wall
 }
 
-proc trust_read_source_file(dir: Path, name: Str, max_bytes: Int) [fs, error] -> Result[Bytes, Error] {
+proc trust_read_source_file(dir: Path, name: Str, max_bytes: Int) -> Result[Bytes, Error] {
   let target = fp"{dir}/{name}"
   guard target.exists() else {
     return Err(update_fail(f"release directory is missing {name}"))
@@ -77,7 +77,7 @@ proc trust_read_source_file(dir: Path, name: Str, max_bytes: Int) [fs, error] ->
   window
 }
 
-proc trust_read_source_dir(dir: Path) [fs, error] -> Result[TrustReleaseBytes, Error] {
+proc trust_read_source_dir(dir: Path) -> Result[TrustReleaseBytes, Error] {
   guard dir.exists() else {
     return Err(update_fail(f"release directory does not exist: {dir.display()}"))
   }
@@ -94,7 +94,7 @@ proc trust_read_source_dir(dir: Path) [fs, error] -> Result[TrustReleaseBytes, E
   }
 }
 
-proc trust_acquire_from_url(base_url: Str, work: Path) [fs, net, error] -> Result[TrustReleaseBytes, Error] {
+proc trust_acquire_from_url(base_url: Str, work: Path) -> Result[TrustReleaseBytes, Error] {
   guard base_url.starts_with("https://") else {
     return Err(update_fail("trust release URL must use https://"))
   }
@@ -134,7 +134,7 @@ proc trust_verify_candidate(
   key: Bytes,
   release: TrustReleaseBytes,
   now_epoch_seconds: Int,
-) [fs, error] -> Result[TrustVerifiedRelease, Error] {
+) -> Result[TrustVerifiedRelease, Error] {
   let snapshot = trust_store.canonical_policy_path(paths.root).read_bytes()?
   let verified = trust_release.release_verify({
     metadata: release.metadata,
@@ -162,7 +162,7 @@ proc trust_verify_active_release(
   key: Bytes,
   generation: Str,
   now_epoch_seconds: Int,
-) [fs, error] -> Result[TrustVerifiedRelease, Error] {
+) -> Result[TrustVerifiedRelease, Error] {
   let verified = trust_verify_committed_bookkeeping(paths, key, generation)?
   guard verified.issued_at <= now_epoch_seconds else {
     return Err(update_fail(f"active trust release issued-at is in the future: generation {generation}"))
@@ -178,7 +178,7 @@ proc trust_verify_committed_bookkeeping(
   paths: trust_store.TrustStorePaths,
   key: Bytes,
   generation: Str,
-) [fs, error] -> Result[TrustVerifiedRelease, Error] {
+) -> Result[TrustVerifiedRelease, Error] {
   let dir = trust_store.trust_store_generation_dir(paths, generation)
   let metadata = fp"{dir}/{trust_store.TRUST_METADATA_NAME}".read_bytes()?
   let signature = fp"{dir}/{trust_store.TRUST_SIGNATURE_NAME}".read_bytes()?
@@ -375,7 +375,7 @@ proc trust_download_one(
   work: Path,
   name: Str,
   bound: Int,
-) [fs, net, error] -> Result[Bytes, Error] {
+) -> Result[Bytes, Error] {
   let dest = fp"{work}/{name}"
   let result = net.download({
     url: f"{base_url}/{name}",
@@ -601,7 +601,7 @@ proc trust_activate_release(
   verified: TrustVerifiedRelease,
   metadata: Bytes,
   signature: Bytes,
-) [fs, process, time, error] -> Result[Record, Error] {
+) -> Result[Record, Error] {
   let generation = verified.generation
   let staged = trust_store.trust_store_stage_candidate(
     paths,
@@ -700,7 +700,7 @@ proc trust_resume_active_release(
 proc trust_repair_active_pointer(
   paths: trust_store.TrustStorePaths,
   key: Bytes,
-) [fs, error] -> Result[Str, Error] {
+) -> Result[Str, Error] {
   let accepted = match trust_store.trust_store_read_accepted(paths) {
     Ok(found) => found,
     Err(_) => {
@@ -752,7 +752,7 @@ proc trust_repair_active_pointer(
 proc trust_apply_release(
   system_root: Path,
   release: TrustReleaseBytes,
-) [fs, process, time, error] -> Result[Record, Error] {
+) -> Result[Record, Error] {
   let key = trust_key.trust_key_load(system_root)?
   let paths = trust_store.trust_store_paths(system_root)
   let lock = trust_store.trust_store_take_lock(paths)?

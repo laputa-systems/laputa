@@ -55,7 +55,7 @@ proc receipt_named(value: types.BuildResult, name: Str) [error] -> Result[types.
   Err(types.PmError.PackageContract(f"missing execute result artifact {name}"))
 }
 
-proc configured_executor_binary(name: Str) [fs, process, env, error] -> Result[Path] {
+proc configured_executor_binary(name: Str) -> Result[Path] {
   let configured = (e"XSH_HOST" ?? "").trim()
   let runner = if configured != "" {
     let selected = fp"{configured}"
@@ -273,7 +273,7 @@ proc exact_remote_snapshot(
   {target: value.target, index_sha256: "execute-remote-snapshot", packages}
 }
 
-proc executor_fixture_provenance(name: Str) [fs, error] -> Result[types.ExecutorProvenance] {
+proc executor_fixture_provenance(name: Str) -> Result[types.ExecutorProvenance] {
   let root = path.absolute(fixture(f"executor-validity/{name}"))?
   {
     format: "laputa-executor-provenance-1",
@@ -289,7 +289,7 @@ proc remote_snapshot_with_executor(
   value: types.RemoteSnapshot,
   remote_root: Path,
   executor: types.ExecutorProvenance,
-) [fs, error] -> Result[types.RemoteSnapshot] {
+) -> Result[types.RemoteSnapshot] {
   let executor_sha256 = fingerprint.executor_provenance_sha256(executor)?
   var packages: List[types.RemotePlanArtifact] = []
 

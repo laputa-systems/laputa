@@ -1,5 +1,5 @@
 #!/bin/xsh
-proc require_directory(path_value: Path, uid: Int, gid: Int, mode: Int) [fs, error] {
+proc require_directory(path_value: Path, uid: Int, gid: Int, mode: Int) {
   let meta = fs.stat(path_value, follow_symlinks: false)?
   guard meta.kind == "dir" and meta.uid == uid and meta.gid == gid and meta.mode % 4096 == mode else {
     fail f"unsafe runtime directory {path_value}"
