@@ -432,7 +432,7 @@ test test_killed_composition_publishes_nothing_partial [fs, process, env, time, 
     while ! staging_present(value.gens, f"killed-{delay_ms}") and ! output.exists() {
       polls += 1
       assert polls < 30000, "composition never began staging"
-      time.sleep(time.millis(2))
+      time.sleep(2 * 1ms)
     }
 
     time.sleep(time.millis(delay_ms))
