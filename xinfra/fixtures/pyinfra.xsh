@@ -82,7 +82,7 @@ proc xinfra_run(inventory: Path, deploy: Str, host: Str) -> Result[Run] {
 
 proc probe_of(container: Str, script: Str) -> Result[Str] {
   let out = run.capture --text docker exec $container sh -c $script
-  Ok(f"{out.stdout}")
+  Ok(out.stdout)
 }
 
 proc fixture_container(inventory: Path, host: Str) -> Result[Str] {

@@ -311,7 +311,7 @@ proc take_lock(state: HostState, lock_path: Str, secrets: List[Str]) [fs, env, p
     return Locked(host:, held: null, failure: "the host has no connection")
   }
 
-  let target = lock_path.replace(f"{host}", with: host)
+  let target = lock_path.replace(host, with: host)
   match lock.acquire(connection, target) {
     Ok(held) => Locked(host:, held:, failure: null)
     Err(lock.LockError.Contended {holder}) => Locked(host:, held: null, failure: clean(f"another apply holds {target}: {holder}", secrets))
