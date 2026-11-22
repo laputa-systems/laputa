@@ -92,7 +92,7 @@ pure owner_spec(owner: Str?, group_name: Str?) -> Str {
 }
 
 pure changes_field(drift: compare.Drift, field: Str) -> Bool {
-  drift.changes |> any { |change| change.field == field }
+  drift.changes |> any .field == field
 }
 
 proc apply_directory(connection: transport.Connection, spec: model.DirectorySpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
@@ -338,7 +338,7 @@ proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: f
 }
 
 pure notification(drift: compare.Drift) -> Str? {
-  let notices = drift.changes |> where { |change| change.field == "notify" } |> collect()
+  let notices = drift.changes |> where .field == "notify" |> collect()
   if notices.is_empty() { null } else { notices[0].to }
 }
 

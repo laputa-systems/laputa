@@ -4,7 +4,7 @@ use infra.model
 const pin = "SHA256:aBQj3QAmCCdKKRQpB/xpoi4aeSOjR5GkDQiWxZCPq6U"
 
 pure names(hosts: List[model.Host]) -> List[Str] {
-  hosts |> map { |host| host.name } |> collect()
+  hosts |> map .name |> collect()
 }
 
 pure refused(result: Result[inventory.Inventory, Error], needle: Str) -> Bool {

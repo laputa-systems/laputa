@@ -159,7 +159,7 @@ proc inspect_host(host: model.Host, lock_path: Str) [fs, env, process, error] ->
   }
 
   let _ = transport.disconnect(connection)
-  let ok = entries |> all { |entry| entry.status != "failed" }
+  let ok = entries |> all .status != "failed"
   report.HostReport(host: host.name, ok:, phase: null, detail: null, entries:)
 }
 

@@ -18,7 +18,7 @@ proc exists(host: model.Host, target: Str) [fs, env, process, error] -> Result[B
 }
 
 proc host_report(result: report.Report, name: Str) -> report.HostReport {
-  (result.hosts |> where { |item| item.host == name } |> collect())[0]
+  (result.hosts |> where .host == name |> collect())[0]
 }
 
 test an_unreachable_host_is_a_connect_failure_in_every_mode_and_never_a_success { |ctx|

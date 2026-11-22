@@ -30,7 +30,7 @@ const none: List[Str] = []
 
 pure fields(verdict: compare.Verdict) -> List[Str] {
   if let compare.Drifted(drift) = verdict {
-    drift.changes |> map { |change| change.field } |> collect()
+    drift.changes |> map .field |> collect()
   } else {
     []
   }

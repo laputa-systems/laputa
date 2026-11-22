@@ -55,11 +55,11 @@ export pure redact(text: Str, secrets: List[Str]) -> Str {
 }
 
 pure entries_of(report: Report) -> List[Entry] {
-  report.hosts |> flat-map { |host| host.entries } |> collect()
+  report.hosts |> flat-map .entries |> collect()
 }
 
 pure has_status(entries: List[Entry], status: Str) -> Bool {
-  entries |> any { |entry| entry.status == status }
+  entries |> any .status == status
 }
 
 pure needing_attention(entries: List[Entry]) -> Bool {
@@ -67,11 +67,11 @@ pure needing_attention(entries: List[Entry]) -> Bool {
 }
 
 pure with_status(entries: List[Entry], status: Str) -> Int {
-  entries |> where { |entry| entry.status == status } |> count()
+  entries |> where .status == status |> count()
 }
 
 pure failed_hosts(report: Report) -> List[HostReport] {
-  report.hosts |> where { |host| ! host.ok } |> collect()
+  report.hosts |> where ! .ok |> collect()
 }
 
 pure attention(entry: Entry) -> Bool {

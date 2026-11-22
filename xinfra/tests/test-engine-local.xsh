@@ -102,7 +102,7 @@ test a_failing_validator_leaves_the_live_file_and_removes_the_staging_file { |ct
 
   assert entry.phase == "validate"
   assert live.read_text()? == "good\n"
-  let leftovers = fs.children(dir)? |> where { |child| child.name.starts_with(".xinfra.") } |> count()
+  let leftovers = fs.children(dir)? |> where .name.starts_with(".xinfra.") |> count()
   assert leftovers == 0
 }
 

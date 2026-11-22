@@ -253,7 +253,7 @@ export pure select(inventory: Inventory, limit: List[Str]) -> Result[List[model.
   return Ok(inventory.hosts) when limit.is_empty()
 
   for item in limit {
-    let known = inventory.hosts |> any { |host| host.name == item or item in host.groups }
+    let known = inventory.hosts |> any .name == item or item in .groups
     guard known else {
       fail f"--limit {item} matches no host or group"
     }

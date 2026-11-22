@@ -7,7 +7,7 @@ pure dir(id: Str, needs: List[Str] = []) -> model.Resource {
 }
 
 pure ids(resources: List[model.Resource]) -> List[Str] {
-  resources |> map { |resource| resource.id }
+  resources |> map .id
 }
 
 pure refused(result: Result[List[model.Resource], Error], needle: Str) -> Bool {

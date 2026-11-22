@@ -194,7 +194,7 @@ test an_xsh_file_validation_failure_discards_the_stage { |ctx|
   let applied = engine.apply(prepared, settings(dir))
   assert statuses(applied, "local-xsh", ["validated"]) == ["failed"]
   assert ! target.exists()?
-  let leftovers = fs.children(dir)? |> where { |child| child.name.starts_with(".xinfra.") } |> count()
+  let leftovers = fs.children(dir)? |> where .name.starts_with(".xinfra.") |> count()
   assert leftovers == 0
 }
 

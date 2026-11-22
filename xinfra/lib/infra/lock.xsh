@@ -72,7 +72,7 @@ export proc inspect(connection: transport.Connection, lock_path: Str) [fs, proce
   let text = execution.stdout.utf8() ?? ""
   return Ok(null) when text.starts_with("state free")
 
-  let table = text.lines() |> where { |line| line.starts_with("holder ") } |> collect()
+  let table = text.lines() |> where .starts_with("holder ") |> collect()
   Ok(if table.is_empty() { "(unknown holder)" } else { hex_or_raw(table[0].byte_slice(7)) })
 }
 

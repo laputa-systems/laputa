@@ -472,7 +472,7 @@ test test_state_image_uses_existing_account_primary_group [fs, error] { |ctx|
   first_boot.apply(root, base("new"))
   fp"{root}/format".write("laputa-maintained-state-1\n")
   let owners = first_boot.state_ownership(root)?
-  assert owners |> all { |owner| owner.uid == 1001 and owner.gid == 100 }
+  assert owners |> all .uid == 1001 and .gid == 100
   fp"{root}/etc/passwd".write("pazu:x:1001:100::/home/pazu:/bin/false\npazu:x:1002:100::/home/pazu:/bin/false\n")
   assert first_boot.state_ownership(root) is Err(_)
 }

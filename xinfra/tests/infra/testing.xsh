@@ -61,16 +61,16 @@ export proc fixture_hosts() [env, fs, error] -> Result[List[model.Host], Error] 
 ## present.
 export proc fixture_host(name: Str) [env, fs, error] -> Result[model.Host?, Error] {
   let hosts = fixture_hosts()?
-  let matching = hosts |> where { |host| host.name == name } |> collect()
+  let matching = hosts |> where .name == name |> collect()
   if matching.is_empty() { null } else { matching[0] }
 }
 
 ## Look up one entry of a report by host and resource id.
 export pure entry_of(result: report.Report, host: Str, id: Str) -> report.Entry? {
   let found = result.hosts
-    |> where { |item| item.host == host }
-    |> flat-map { |item| item.entries }
-    |> where { |entry| entry.id == id }
+    |> where .host == host
+    |> flat-map .entries
+    |> where .id == id
     |> collect()
   if found.is_empty() { null } else { found[0] }
 }

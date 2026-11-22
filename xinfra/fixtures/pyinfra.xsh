@@ -76,7 +76,7 @@ proc pyinfra_run(address: Str, work: Path, deploy: Str, key = "client", port = 2
 proc xinfra_run(inventory: Path, deploy: Str, host: Str) -> Result[Run] {
   let program = f"fixtures/pyinfra/{deploy}.xsh"
   let out = run.capture --text xsh bin/xinfra.xsh apply $inventory $program --limit $host
-  let changed = out.stdout.lines() |> where { |line| line.starts_with("apply:") and ! (", 0 changed," in line) } |> count()
+  let changed = out.stdout.lines() |> where .starts_with("apply:") and ! (", 0 changed," in .) |> count()
   Ok(Run(ok: out.status.ok, changed: changed > 0))
 }
 

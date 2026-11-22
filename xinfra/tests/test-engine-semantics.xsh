@@ -68,14 +68,14 @@ test the_job_bound_limits_how_many_hosts_run_at_once { |ctx|
   let hosts = ["h1", "h2", "h3"] |> map { |name| on(name, [logged("one", log, name)?]) } |> collect()
   let serial = engine.apply(prepare(hosts)?, settings(dir, jobs: 1))
   assert report.exit_status(serial) == 0
-  let kinds = lines_of(log) |> map { |line| line.split(" ")[0] } |> collect()
+  let kinds = lines_of(log) |> map .split(" ")[0] |> collect()
   assert kinds == ["start", "end", "start", "end", "start", "end"]
 
   let wide = fp"{dir}/wide"
   let wide_hosts = ["h1", "h2", "h3"] |> map { |name| on(name, [logged("one", wide, name)?]) } |> collect()
   let parallel = engine.apply(prepare(wide_hosts)?, settings(dir, jobs: 3))
   assert report.exit_status(parallel) == 0
-  let overlapped = lines_of(wide) |> map { |line| line.split(" ")[0] } |> collect()
+  let overlapped = lines_of(wide) |> map .split(" ")[0] |> collect()
   assert overlapped[0..3] == ["start", "start", "start"]
 }
 

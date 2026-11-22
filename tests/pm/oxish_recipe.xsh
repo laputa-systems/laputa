@@ -46,7 +46,7 @@ test oxish_recipe_pins_one_release_archive_per_architecture [fs, env, error] {
     }
 
     for source in pkg.upstream_sources[1..] {
-      assert source.checksums |> all { |checksum| checksum.sha256 == "SKIP" }
+      assert source.checksums |> all .sha256 == "SKIP"
     }
   }
 }

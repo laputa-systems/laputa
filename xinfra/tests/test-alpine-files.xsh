@@ -181,7 +181,7 @@ test a_wrong_host_key_fails_that_host_and_leaves_the_others_running { |ctx|
   let prepared = workload.prepare(hosts)?
   let result = engine.apply(prepared, settings(dir))
   assert testing.status_of(result, good.name, "base") == "changed"
-  let failed = result.hosts |> where { |item| item.host == other.name } |> collect()
+  let failed = result.hosts |> where .host == other.name |> collect()
   assert ! failed[0].ok
   assert failed[0].phase == "connect"
   assert testing.remote_text(other, "test -e \"$1\" && echo present || echo absent", [base])? == "absent\n"

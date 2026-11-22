@@ -33,7 +33,7 @@ pure clean(text: Str, secrets: List[Str]) -> Str {
 }
 
 pure find_resource(resources: List[model.Resource], id: Str) -> model.Resource? {
-  let found = resources |> where { |resource| resource.id == id } |> collect()
+  let found = resources |> where .id == id |> collect()
   if found.is_empty() { null } else { found[0] }
 }
 
@@ -197,7 +197,7 @@ proc verify(
 }
 
 pure changed_fields(drift: compare.Drift) -> Str {
-  let fields = drift.changes |> map { |change| change.field } |> collect()
+  let fields = drift.changes |> map .field |> collect()
   fields.join(", ")
 }
 
@@ -441,7 +441,7 @@ pure cancelled_entry(host: Str, resource: model.Resource, status: Str, detail: S
 }
 
 pure recorded_ids(entries: List[report.Entry]) -> List[Str] {
-  entries |> map { |entry| entry.id } |> collect()
+  entries |> map .id |> collect()
 }
 
 pure cancelled_host(state: HostState, secrets: List[Str]) -> report.HostReport {
@@ -491,7 +491,7 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     }
   }
 
-  let opened = transport.connect_all(prepared.workloads |> map { |entry| entry.host } |> collect(), settings.jobs)
+  let opened = transport.connect_all(prepared.workloads |> map .host |> collect(), settings.jobs)
   var position = 0
   for entry in prepared.workloads {
     let name = entry.host.name
@@ -503,7 +503,7 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     position += 1
   }
 
-  let lockable = states.values() |> where { |state| state.fatal == null } |> collect()
+  let lockable = states.values() |> where .fatal == null |> collect()
   let locked = lockable |> par-map(jobs: settings.jobs) { |state| take_lock(state, settings.lock_path, secrets) } |> collect()
   for item in locked {
     let state = states.get(item.host) ?? initial_state(prepared.workloads[0])
@@ -552,7 +552,7 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     states[name] = settle_lock(states.get(name) ?? initial_state(prepared.workloads[0]), secrets)
   }
 
-  let hosts = prepared.workloads |> map { |entry| host_report(states.get(entry.host.name) ?? initial_state(entry), secrets) } |> collect()
+  let hosts = prepared.workloads |> map host_report(states.get(.host.name) ?? initial_state(.), secrets) |> collect()
   completed = true
   report.Report(mode: "apply", hosts:)
 }

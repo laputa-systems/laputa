@@ -165,9 +165,9 @@ pure passwd_line(line: Str, groups: List[fact.GroupInfo]) -> Result[fact.UserInf
 
   let name = parts[0]
   let gid = parts[3].parse_int()?
-  let owners = groups |> where { |entry| entry.gid == gid } |> map { |entry| entry.name } |> collect()
+  let owners = groups |> where .gid == gid |> map .name |> collect()
   let primary: Str? = if owners.is_empty() { null } else { owners[0] }
-  let memberships = groups |> where { |entry| name in entry.members } |> map { |entry| entry.name } |> collect()
+  let memberships = groups |> where name in .members |> map .name |> collect()
   Ok(fact.UserInfo(
     name:,
     uid: parts[2].parse_int()?,
@@ -233,13 +233,13 @@ export pure accounts(stdout: Str) -> AccountsState {
 
 ## The state of the named group in a parsed account database.
 export pure group_fact(accounts: Accounts, name: Str) -> fact.GroupState {
-  let found = accounts.groups |> where { |entry| entry.name == name } |> collect()
+  let found = accounts.groups |> where .name == name |> collect()
   if found.is_empty() { fact.NoGroup } else { .GroupFound(found[0]) }
 }
 
 ## The state of the named user in a parsed account database.
 export pure user_fact(accounts: Accounts, name: Str) -> fact.UserState {
-  let found = accounts.users |> where { |entry| entry.name == name } |> collect()
+  let found = accounts.users |> where .name == name |> collect()
   if found.is_empty() { fact.NoUser } else { .UserFound(found[0]) }
 }
 

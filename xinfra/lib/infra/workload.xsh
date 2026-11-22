@@ -115,7 +115,7 @@ export proc prepare(declared: List[Workload]) [fs, env, error] -> Result[Prepare
     }
   }
 
-  let lists = ordered |> map { |entry| entry.resources |> map { |resource| resource.id } |> collect() } |> collect()
+  let lists = ordered |> map { .resources |> map .id |> collect() } |> collect()
   let operations = graph.merge_order(lists)?
   Ok(Prepared(workloads: ordered, operations:, materials:, secrets:))
 }

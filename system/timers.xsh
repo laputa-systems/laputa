@@ -1665,8 +1665,8 @@ proc timer_sleep_wait(
 proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
   config.state_dir.mkdir()
   config.run_dir.mkdir()
-  let lock = fs.lock(fp"{config.run_dir}/{TIMER_LOCK_NAME}", nonblocking: true) ?? { |problem|
-    return Err(error.failure(f"another laputa-timers process owns {config.run_dir}: {problem.message}"))
+  let lock = fs.lock(fp"{config.run_dir}/{TIMER_LOCK_NAME}", nonblocking: true) ?? {
+    return Err(error.failure(f"another laputa-timers process owns {config.run_dir}: {.message}"))
   }
   defer fs.unlock(lock)
 

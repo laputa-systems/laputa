@@ -19,7 +19,7 @@ pure duplicates(resources: List[model.Resource]) -> List[Str] {
 }
 
 pure unknown_dependencies(resources: List[model.Resource]) -> List[Str] {
-  let known = resources |> map { |resource| resource.id } |> collect()
+  let known = resources |> map .id |> collect()
   let problems = collect {
     for resource in resources {
       for dependency in model.dependencies(resource) {
@@ -58,13 +58,13 @@ export pure order(resources: List[model.Resource]) -> Result[List[model.Resource
         model.dependencies(resource) |> all { |dependency| dependency in placed }
       } |> first()
       guard let next = ready else {
-        let stuck = remaining |> map { |resource| resource.id } |> collect()
+        let stuck = remaining |> map .id |> collect()
         fail f"dependency cycle among resources: {stuck.join(", ")}"
       }
 
       yield next
       placed = placed.add(next.id)
-      remaining = remaining |> where { |resource| resource.id != next.id } |> collect()
+      remaining = remaining |> where .id != next.id |> collect()
     }
   }
 
