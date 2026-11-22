@@ -63,7 +63,7 @@ pure has_status(entries: List[Entry], status: Str) -> Bool {
 }
 
 pure needing_attention(entries: List[Entry]) -> Bool {
-  entries |> any { |entry| attention(entry) }
+  entries |> any(attention)
 }
 
 pure with_status(entries: List[Entry], status: Str) -> Int {
@@ -147,7 +147,7 @@ export pure text(report: Report, verbose: Bool) -> Str {
   let entries = entries_of(report)
   let drift = with_status(entries, "drift")
   let changed = with_status(entries, "changed")
-  let bad = entries |> where { |entry| attention(entry) } |> count()
+  let bad = entries |> where(attention) |> count()
   lines += [f"{report.mode}: {report.hosts.len()} host(s), {entries.len()} resource(s), {drift} drift, {changed} changed, {bad} need attention, {failed_hosts(report).len()} host(s) failed"]
   sanitize(lines.join("\n"))
 }
