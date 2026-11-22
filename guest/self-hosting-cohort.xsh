@@ -15,7 +15,7 @@ proc main(repository: Path) [fs, process, env, error] -> Result[Unit, Error] {
       fail f"replacement runner failed {file}" unless tests.ok
     }
   }
-  let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/cohort/build.xsh", "--", repository.display()])
+  let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/cohort/build.xsh", "--", repository])
   let status = process.run(command)?
   fail "closed cohort build failed" unless status.ok
   var artifacts = 0

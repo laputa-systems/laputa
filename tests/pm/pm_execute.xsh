@@ -710,7 +710,7 @@ main(@args)?
   let interrupted_upload = test.run_script(
     ctx,
     interruption_worker,
-    [remote_url, interruption_rel.display(), interrupted_source.display(), interruption_work.display(), "limited"],
+    [remote_url, interruption_rel, interrupted_source, interruption_work, "limited"],
   )?
   assert interrupted_upload.status == 153, f"expected SIGXFSZ status 153, got {interrupted_upload.status}: {interrupted_upload.stderr}"
   assert interrupted_upload.success == false
@@ -729,7 +729,7 @@ main(@args)?
   let retried_upload = test.run_script(
     ctx,
     interruption_worker,
-    [remote_url, interruption_rel.display(), interrupted_source.display(), interruption_work.display(), "retry"],
+    [remote_url, interruption_rel, interrupted_source, interruption_work, "retry"],
   )?
   assert retried_upload.success, retried_upload.stderr
   assert retried_upload.stdout == "true\n"

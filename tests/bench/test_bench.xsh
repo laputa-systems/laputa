@@ -44,7 +44,7 @@ test test_profile_argv_matches_proof_builder [fs, process, env, error] { |ctx|
   let expected = qemu.qemu_command_argv(config, tinyland.profile, selected, types.Test)
   let xsh = process.which("xsh")?
   let output = fp"{root}/argv.json"
-  let result = process.run(process.command_argv(xsh, [xsh.display(), "bench/profile_argv.xsh", "--", image.display()], stdout: output))?
+  let result = process.run(process.command_argv(xsh, [xsh, "bench/profile_argv.xsh", "--", image], stdout: output))?
   assert result.ok
   assert json.decode(output.read_text()?)?.require(List[Str])? == expected
 }

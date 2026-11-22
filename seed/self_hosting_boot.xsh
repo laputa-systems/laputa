@@ -41,7 +41,7 @@ proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, proc
   }
   let output_access = if runtime_proof { qemu.InspectOutput } else { qemu.BuildOutput }
   argv += qemu.qemu_self_hosting_disks_argv(config.target, fp"{output_root}/inputs.ext4", fp"{output_root}/output.ext4", output_access)
-  let child = spawn process.command_argv(config.qemu, argv, output_root, env: {TMPDIR: output_root.display()}, stdout: outputs.console_log, stderr: outputs.qemu_log)?
+  let child = spawn process.command_argv(config.qemu, argv, output_root, env: {TMPDIR: output_root}, stdout: outputs.console_log, stderr: outputs.qemu_log)?
   defer child.cancel(signal: "TERM", kill_after: 5s)
   let start = time.monotonic()?
   var paused = false

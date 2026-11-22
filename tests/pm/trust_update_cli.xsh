@@ -17,10 +17,10 @@ proc trust_run(args: List[Str], err: Path, out: Path) -> Result[TrustCliResult, 
   let xsh = runner()?
   let modules = module_root()?
   let command = process.command_argv(
-    xsh.display(),
+    xsh,
     [xsh.display(), p"trust.xsh".display(), "--"].extend(args),
     modules,
-    {XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display()},
+    {XSH_MODULE_PATH: modules, XSH_HOST: xsh},
     stdout: out,
     stderr: err,
   )
@@ -188,10 +188,10 @@ test trust_update_url_converges_with_from [fs, process, env, time, error] { |ctx
   let xsh = runner()?
   let modules = module_root()?
   let fetch = process.command_argv(
-    xsh.display(),
-    [xsh.display(), fp"{modules}/trust.xsh".display(), "--", "update", "--url", url, "--root", root.display()],
+    xsh,
+    [xsh, fp"{modules}/trust.xsh", "--", "update", "--url", url, "--root", root],
     modules,
-    {XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display(), SSL_CERT_FILE: bundle.display()},
+    {XSH_MODULE_PATH: modules, XSH_HOST: xsh, SSL_CERT_FILE: bundle},
     stdout: out,
     stderr: err,
   )
@@ -237,10 +237,10 @@ test trust_update_interrupted_download_leaves_no_store_mutation [fs, process, en
   let out = test.temp_path(ctx, name: "trust-update-resume.out")
   let err = test.temp_path(ctx, name: "trust-update-resume.err")
   let resume_command = process.command_argv(
-    xsh.display(),
-    [xsh.display(), fp"{modules}/trust.xsh".display(), "--", "update", "--url", url, "--root", root.display()],
+    xsh,
+    [xsh, fp"{modules}/trust.xsh", "--", "update", "--url", url, "--root", root],
     modules,
-    {XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display(), SSL_CERT_FILE: bundle.display()},
+    {XSH_MODULE_PATH: modules, XSH_HOST: xsh, SSL_CERT_FILE: bundle},
     stdout: out,
     stderr: err,
   )
@@ -309,10 +309,10 @@ test trust_update_changes_admissions_without_restarting_services [fs, process, e
   let out = test.temp_path(ctx, name: "trust-update-no-cutover.out")
   let err = test.temp_path(ctx, name: "trust-update-no-cutover.err")
   let command = process.command_argv(
-    xsh.display(),
-    [xsh.display(), fp"{modules}/trust.xsh".display(), "--", "update", "--from", source.display(), "--root", root.display()],
+    xsh,
+    [xsh, fp"{modules}/trust.xsh", "--", "update", "--from", source, "--root", root],
     modules,
-    {PATH: fake_path.display(), XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display()},
+    {PATH: fake_path, XSH_MODULE_PATH: modules, XSH_HOST: xsh},
     stdout: out,
     stderr: err,
   )

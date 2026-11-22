@@ -10,7 +10,7 @@ export proc self_hosting_verify_bundle(bundle: Path, expected_generation: Str, s
   let extracted = handle.host_path()?
   let docker = process.which("docker")?
   let extraction = process.run(process.command_argv(docker, [
-    docker.display(), "run", "--rm", "--network", "none", "--memory", "128m",
+    docker, "run", "--rm", "--network", "none", "--memory", "128m",
     "--mount", f"type=bind,src={bundle}/rootfs.ext4,dst=/rootfs.ext4,readonly",
     "--mount", f"type=bind,src={extracted},dst=/extract",
     tools_image, "/usr/sbin/debugfs", "-R", "dump /var/lib/laputa/generation.json /extract/embedded.json", "/rootfs.ext4",

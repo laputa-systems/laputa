@@ -989,7 +989,7 @@ assert unix.poll_fd(fd, ["readable"], 0)?.is_empty()
 assert fp"{inbox_dir()?}/app".read_text()? == "down"
 """
   let result = test.run_xsh(ctx, source, env: {
-    XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+    XINIT_RUN_DIR: run_dir, XINIT_TEST_ALLOW_NON_PID1: "1",
   }, name: "control-wake.xsh")?
 
   assert result.success, result.stderr
@@ -1084,7 +1084,7 @@ test test_control_read_keeps_the_opened_request_after_replacement [fs, process, 
   }
 """) + "\nlet units: List[ServiceUnit] = []\nlet drained = drain_inbox(units)?\nassert drained.is_empty()\n"
     let result = test.run_xsh(ctx, changed, env: {
-      XINIT_RUN_DIR: root.display(),
+      XINIT_RUN_DIR: root,
       XINIT_REPLACEMENT: replacement,
       XINIT_TEST_ALLOW_NON_PID1: "1",
     }, name: f"control-swap-{replacement}.xsh")?
@@ -1103,7 +1103,7 @@ test test_control_read_refuses_hard_linked_requests [fs, process, error] { |ctx|
   fp"{inbox}/app".write("down")
   fs.link(fp"{inbox}/app", fp"{root}/alias")
   let result = test.run_xsh(ctx, xinit_policy_source()? + "\nlet units: List[ServiceUnit] = []\nlet drained = drain_inbox(units)?\nassert drained.is_empty()\n", env: {
-    XINIT_RUN_DIR: root.display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+    XINIT_RUN_DIR: root, XINIT_TEST_ALLOW_NON_PID1: "1",
   }, name: "control-hardlink.xsh")?
   assert result.success, result.stderr
   assert "reason=not-a-single-regular-file" in result.stderr
@@ -1491,8 +1491,8 @@ proc run_crash_replay(ctx: TestContext, root: Path, script: Str) [fs, process, e
   replay.write(p"xinit/tests/fixtures/crash-replay.txt".read_text()?)
   test.unix_fake(ctx, {log: unix_log, replay: replay})
   let result = test.run_xsh(ctx, script, [], ["supervise", "demo"], {
-    XINIT_SERVICE_DIR: fp"{root}/services".display(),
-    XINIT_RUN_DIR: fp"{root}/run".display(),
+    XINIT_SERVICE_DIR: fp"{root}/services",
+    XINIT_RUN_DIR: fp"{root}/run",
     XINIT_TEST_MAX_EVENTS: "1",
     XINIT_TEST_ALLOW_NON_PID1: "1", XINIT_TEST_FAKE_PIDS: "1",
   }, name: "xinit.xsh")?
@@ -1714,7 +1714,7 @@ for round in range(300) {
 }
 fp"{env_value("XINIT_RUN_DIR", "")}/done".write("")
 """)
-  let launched = process.spawn(process.command_argv(ctx.xsh_bin, [ctx.xsh_bin.display(), writer.display()], env: {XINIT_RUN_DIR: root.display()}))?
+  let launched = process.spawn(process.command_argv(ctx.xsh_bin, [ctx.xsh_bin, writer], env: {XINIT_RUN_DIR: root}))?
   let status = fp"{root}/svc.json"
   let done = fp"{root}/done"
   let deadline = time.monotonic()? + 60000000000
@@ -2111,7 +2111,7 @@ unix.close_fd(writer)
 assert current.read_text()? == "after rotation\\n"
 assert fp"{current}.1".read_text()? == "before rotation\\n"
 """
-  let result = test.run_xsh(ctx, source, env: {XINIT_LOG_ROOT: log_root.display(), XINIT_RUN_DIR: fp"{root}/run".display()}, name: "live-rotation.xsh")?
+  let result = test.run_xsh(ctx, source, env: {XINIT_LOG_ROOT: log_root, XINIT_RUN_DIR: fp"{root}/run"}, name: "live-rotation.xsh")?
   assert result.success, result.stderr
 }
 
@@ -2248,8 +2248,8 @@ assert fp"{root}/sibling-finished".read_text()? == "1"
 print "sibling-reconciled"
 """
   let result = test.run_xsh(ctx, script, [], [root.display()], {
-    XINIT_SERVICE_DIR: services.display(), XINIT_RUN_DIR: fp"{root}/run".display(),
-    XINIT_LOG_ROOT: fp"{root}/logs".display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+    XINIT_SERVICE_DIR: services, XINIT_RUN_DIR: fp"{root}/run",
+    XINIT_LOG_ROOT: fp"{root}/logs", XINIT_TEST_ALLOW_NON_PID1: "1",
   }, name: "stop-sibling-reap.xsh")?
   assert result.success, result.stderr
   assert result.stdout == "sibling-reconciled\n"
@@ -2419,8 +2419,8 @@ units = drain_inbox(units)?
 assert units[0].desired == "up"
 """
   let result = test.run_xsh(ctx, source, env: {
-    XINIT_SERVICE_DIR: service_dir.display(),
-    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_SERVICE_DIR: service_dir,
+    XINIT_RUN_DIR: run_dir,
     XINIT_TEST_ALLOW_NON_PID1: "1",
   }, name: "control-owner.xsh")?
   assert result.success, result.stderr
@@ -2461,7 +2461,7 @@ assert units[0].desired == "down" and units[0].state == "stopped"
 assert read_control_owner("app")? == ""
 """
   let result = test.run_xsh(ctx, changed, env: {
-    XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+    XINIT_SERVICE_DIR: service_dir, XINIT_RUN_DIR: run_dir, XINIT_TEST_ALLOW_NON_PID1: "1",
   }, name: "control-overlap.xsh")?
   assert result.success, result.stderr
 }
@@ -2484,7 +2484,7 @@ assert units[0].desired == "down" and units[0].state == "stopped"
 assert ! fp"{claims}/app".exists()?
 assert ! fp"{inbox_dir()?}/app".exists()?
 """
-  let result = test.run_xsh(ctx, source, env: {XINIT_SERVICE_DIR: services.display(), XINIT_RUN_DIR: runtime.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-recovery.xsh")?
+  let result = test.run_xsh(ctx, source, env: {XINIT_SERVICE_DIR: services, XINIT_RUN_DIR: runtime, XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-recovery.xsh")?
   assert result.success, result.stderr
   assert "verb=up" in result.stdout.lines()[0] and "verb=down" in result.stdout.lines()[1], result.stdout
 }
@@ -2515,7 +2515,7 @@ assert retained[0].path.read_text()? == "keep"
 assert ! fp"{inbox_dir()?}/app".exists()?
 assert ! fp"{run_dir()?}/inbox-processing/app".exists()?
 """
-  let result = test.run_xsh(ctx, source, env: {XINIT_RUN_DIR: root.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-directory.xsh")?
+  let result = test.run_xsh(ctx, source, env: {XINIT_RUN_DIR: root, XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-directory.xsh")?
   assert result.success, result.stderr
   assert "reason=not-a-single-regular-file" in result.stderr
   assert "service=app" in result.stdout and "verb=down" in result.stdout
@@ -2540,7 +2540,7 @@ assert ! fp"{claims}/{name}".exists()?
 let retained = fs.walk(claims, hidden: true)? |> where .kind == "file" |> collect
 assert retained.len() == 1 and retained[0].path.read_text()? == "keep"
 """
-  let result = test.run_xsh(ctx, source, env: {XINIT_RUN_DIR: root.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-long-directory.xsh")?
+  let result = test.run_xsh(ctx, source, env: {XINIT_RUN_DIR: root, XINIT_TEST_ALLOW_NON_PID1: "1"}, name: "control-long-directory.xsh")?
   assert result.success, result.stderr
 }
 
@@ -2565,7 +2565,7 @@ request_desired("app", "up")?
 assert queued.read_text()? == "up"
 """
   let result = test.run_xsh(ctx, source, env: {
-    XINIT_RUN_DIR: run_dir.display(), XINIT_TEST_ALLOW_NON_PID1: "1",
+    XINIT_RUN_DIR: run_dir, XINIT_TEST_ALLOW_NON_PID1: "1",
   }, name: "control-pending.xsh")?
   assert result.success, result.stderr
 }
@@ -2672,7 +2672,7 @@ assert process.kill(outsider.pid, signal: "0") is Ok(_)
 let _ = unix.shutdown_process_groups([outsider.pid], 0ms, 1s)?
 assert sweep_session(leader.pid)?.is_empty()
 """
-  let result = test.run_xsh(ctx, source, [], [], {XINIT_RUN_DIR: root.display()}, name: "session-sweep.xsh")?
+  let result = test.run_xsh(ctx, source, [], [], {XINIT_RUN_DIR: root}, name: "session-sweep.xsh")?
   assert result.success, result.stderr
 }
 
@@ -2735,7 +2735,7 @@ assert process.kill_group(first, "0") is Err(_), "original process group survive
 print "direct-start-cleanup-ok"
 """
   let result = test.run_xsh(ctx, source, [], [marker.display(), gate.display()], {
-    XINIT_SERVICE_DIR: services.display(), XINIT_RUN_DIR: fp"{root}/run".display(), XINIT_LOG_ROOT: fp"{root}/logs".display(),
+    XINIT_SERVICE_DIR: services, XINIT_RUN_DIR: fp"{root}/run", XINIT_LOG_ROOT: fp"{root}/logs",
   }, name: "direct-ready-error.xsh")?
   assert result.success, result.stderr
   assert result.stdout == "direct-start-cleanup-ok\n"

@@ -141,9 +141,9 @@ export proc build(dest: Path) [fs, process, env, error] {
   p"built".mkdir()
   let command = process.command_argv(
     go,
-    [go.display(), "build", "-mod=vendor", "-buildvcs=false", "-trimpath", "-tags=xversion", "-ldflags", flags, "-o", fp"{cwd}/built".display(), "./cmd/tailscale", "./cmd/tailscaled"],
+    [go, "build", "-mod=vendor", "-buildvcs=false", "-trimpath", "-tags=xversion", "-ldflags", flags, "-o", fp"{cwd}/built", "./cmd/tailscale", "./cmd/tailscaled"],
     fp"{cwd}/source",
-    {PATH: e"PATH" ?? "", HOME: cwd.display(), GOCACHE: fp"{cwd}/go-cache".display(), GOPATH: fp"{cwd}/go-path".display(), GOTOOLCHAIN: "local", GOPROXY: "off", GOSUMDB: "off", CGO_ENABLED: "0", GOOS: "linux", GOARCH: goarch},
+    {PATH: e"PATH" ?? "", HOME: cwd, GOCACHE: fp"{cwd}/go-cache", GOPATH: fp"{cwd}/go-path", GOTOOLCHAIN: "local", GOPROXY: "off", GOSUMDB: "off", CGO_ENABLED: "0", GOOS: "linux", GOARCH: goarch},
   )
   let status = process.run(command)?
   guard status.ok else {

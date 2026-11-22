@@ -10,10 +10,10 @@ proc ask(ctx: TestContext, home: Path, request: Str, payload: Bytes = bytes.from
   let output = fp"{home}/reply.json"
   let status = process.run(process.command_argv(
     ctx.xsh_bin,
-    [ctx.xsh_bin.display(), program.display()],
+    [ctx.xsh_bin, program],
     stdin: input,
     stdout: output,
-    env: {HOME: home.display()},
+    env: {HOME: home},
     timeout: 20s,
   ))?
   guard status.ok else { fail "the remote program must always answer with exit status zero" }

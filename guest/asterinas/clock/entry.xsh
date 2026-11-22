@@ -143,7 +143,7 @@ minimum-agreeing-sources = 1
   run_dir.mkdir(true)
   let supervisor = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
     XINIT_SERVICE_DIR: "/usr/lib/xinit/services",
-    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_RUN_DIR: run_dir,
     XINIT_LOG_ROOT: "/run/ntp-proof-logs",
   })
   let scanner = unix.spawn_process_group(supervisor)?
@@ -257,7 +257,7 @@ minimum-agreeing-sources = 1
   run_dir.mkdir(true)
   let supervisor = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
     XINIT_SERVICE_DIR: "/usr/lib/xinit/services",
-    XINIT_RUN_DIR: run_dir.display(),
+    XINIT_RUN_DIR: run_dir,
     XINIT_LOG_ROOT: "/run/ntp-proof-logs",
   })
   let scanner = unix.spawn_process_group(supervisor)?

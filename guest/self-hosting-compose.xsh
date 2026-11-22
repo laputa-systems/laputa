@@ -53,7 +53,7 @@ proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86
     {source: fp"{runners}/xsh", destination: fp"{root}/bin/xsh"},
     {source: fp"{runners}/xsht", destination: fp"{root}/bin/xsht"},
   ] {
-    linux.mount(bytes.from_text(pair.source.display()), pair.destination, options: ["bind"])
+    linux.mount(pair.source.bytes(), pair.destination, options: ["bind"])
   }
   linux.mount(b"", fp"{root}/src/laputa", options: ["remount", "bind", "ro"])
   let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/src/laputa/guest/self-hosting-compose-inner.xsh"], env: {

@@ -66,9 +66,9 @@ proc uv_reaches_http(ctx: TestContext, uv: Path, bundle: Path, port: Int, label:
   let stderr = fp"{dir}/stderr"
   let command = process.command_argv(
     uv,
-    [uv.display(), "pip", "compile", requirements.display(), "--no-cache", "--index-url", f"https://127.0.0.1:{port}/simple/"],
+    [uv, "pip", "compile", requirements, "--no-cache", "--index-url", f"https://127.0.0.1:{port}/simple/"],
     dir,
-    {SSL_CERT_FILE: bundle.display(), UV_NO_CONFIG: "1", HOME: dir.display(), PATH: "/usr/bin:/bin"},
+    {SSL_CERT_FILE: bundle, UV_NO_CONFIG: "1", HOME: dir, PATH: "/usr/bin:/bin"},
     stderr:,
     timeout: 60s,
   )
@@ -130,9 +130,9 @@ proc cargo_reaches_registry(ctx: TestContext, cargo: Path, bundle: Path, port: I
   let stderr = fp"{dir}/stderr"
   let command = process.command_argv(
     cargo,
-    [cargo.display(), "search", "--index", f"sparse+https://127.0.0.1:{port}/", "zzz"],
+    [cargo, "search", "--index", f"sparse+https://127.0.0.1:{port}/", "zzz"],
     dir,
-    {CARGO_HOME: dir.display(), CARGO_HTTP_CAINFO: bundle.display(), HOME: e"HOME" ?? dir.display(), PATH: "/usr/bin:/bin"},
+    {CARGO_HOME: dir, CARGO_HTTP_CAINFO: bundle, HOME: e"HOME" ?? dir.display(), PATH: "/usr/bin:/bin"},
     stderr:,
     timeout: 60s,
   )

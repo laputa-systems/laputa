@@ -57,7 +57,7 @@ proc start_client() [fs, process, error] -> Result[Client] {
   let log = fp"{WORK}/client.log"
   let command = process.command_argv(
     p"/usr/bin/xsh",
-    [p"/usr/bin/xsh", p"/usr/lib/xsh/core/dhcpc", "--lease-dir", fp"{WORK}/lease".display(), "--run-dir", fp"{WORK}/run".display(), "--resolv-dir", fp"{WORK}/etc".display(), "--static-file", fp"{WORK}/etc/resolv.static".display(), "eth0"],
+    [p"/usr/bin/xsh", p"/usr/lib/xsh/core/dhcpc", "--lease-dir", fp"{WORK}/lease", "--run-dir", fp"{WORK}/run", "--resolv-dir", fp"{WORK}/etc", "--static-file", fp"{WORK}/etc/resolv.static", "eth0"],
     WORK,
     {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"},
     b"",
@@ -405,7 +405,7 @@ proc kmsg_device() {
 proc syslog_consumer() [fs, process, env, time, net, error] {
   let log = fp"{WORK}/syslog.out"
   let errors = fp"{WORK}/syslog.err"
-  let command = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/lib/xsh/core/syslogd", "--state", WORK.display(), "--socket", "/dev/log", "--kmsg", "/dev/kmsg"], WORK, {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", log, errors, timeout: 600s)
+  let command = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/lib/xsh/core/syslogd", "--state", WORK, "--socket", "/dev/log", "--kmsg", "/dev/kmsg"], WORK, {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", log, errors, timeout: 600s)
   let receiver = unix.spawn_process_group_log(command, log)?
   let deadline = elapsed_ms()? + 15000
   while elapsed_ms()? < deadline and !p"/dev/log".exists() { time.sleep(50ms) }

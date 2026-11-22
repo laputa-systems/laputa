@@ -70,10 +70,10 @@ proc play_international_text(runtime: Path) [fs, process, env, time, error] {
   )
   let launched = spawn process.command_argv(
     player,
-    ["player", "--no-config", "--vo=gpu-next", "--gpu-context=waylandvk", "--gpu-sw=yes", "--ao=null", "--hwdec=no", "--keep-open=no", f"--sub-file={subtitles}", "--term-playing-msg=PLAY_TEXT_PLAYING", video.display()],
+    ["player", "--no-config", "--vo=gpu-next", "--gpu-context=waylandvk", "--gpu-sw=yes", "--ao=null", "--hwdec=no", "--keep-open=no", f"--sub-file={subtitles}", "--term-playing-msg=PLAY_TEXT_PLAYING", video],
     stdout: output,
     stderr: output,
-    env: {XDG_RUNTIME_DIR: runtime.display(), WAYLAND_DISPLAY: "wayland-0"},
+    env: {XDG_RUNTIME_DIR: runtime, WAYLAND_DISPLAY: "wayland-0"},
     timeout: 60s,
   )?
   var waited = 0

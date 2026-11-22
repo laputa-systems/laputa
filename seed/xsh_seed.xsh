@@ -348,7 +348,7 @@ export proc xsh_seed_build(
   xsh_seed_require_checkout(xsh_root)
   let locked = (run.text bash seed/locked-xsh.sh $laputa_root).trim()
   let head = xsh_seed_git_text(xsh_root, ["rev-parse", "HEAD"])?
-  let status = process.run(process.command_argv(p"git", ["git", "-C", xsh_root.display(), "merge-base", "--is-ancestor", locked, head], laputa_root))?
+  let status = process.run(process.command_argv(p"git", ["git", "-C", xsh_root, "merge-base", "--is-ancestor", locked, head], laputa_root))?
   if ! status.ok {
     return Err(SeedError.Failed(f"XSH checkout commit {head} does not contain locked XSH commit {locked}; update XSH_ROOT to a descendant of {locked}"))
   }

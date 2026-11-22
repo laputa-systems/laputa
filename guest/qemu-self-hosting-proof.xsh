@@ -19,7 +19,7 @@ proc run_guest_proof() -> Result[Unit, Error] {
   let entry = fp"{root}/inputs/entry.xsh"
   let status = process.run(process.command_argv(
     p"/usr/bin/xsh",
-    ["/usr/bin/xsh", entry.display(), root.display()],
+    ["/usr/bin/xsh", entry, root],
     env: {XSH_MODULE_PATH: f"{root}/inputs/laputa:/usr/lib/pm:/usr/lib/xsh/core"},
   ))?
   fail "self-hosting guest entry failed" unless status.ok

@@ -165,7 +165,7 @@ proc stage_initramfs(
   for name in GUEST_MODULES {
     let command = process.command_argv(
       "gzip",
-      ["gzip", "-dc", fp"{modules_dir}/kernel/{guest_module_path(name)}.ko.gz".display()],
+      ["gzip", "-dc", fp"{modules_dir}/kernel/{guest_module_path(name)}.ko.gz"],
       root,
       {PATH: "/usr/bin:/bin"},
       stdout: fp"{root}/lib/modules/{name}.ko",
@@ -208,7 +208,7 @@ proc build_initramfs(root: Path, output: Path) -> Result[Unit, Error] {
 proc build_store_disk(path_value: Path, size_mb: Int) [fs, process, error] -> Result[Unit, Error] {
   let command = process.command_argv(
     "mke2fs",
-    ["mke2fs", "-F", "-q", "-t", "ext4", "-L", "LAPUTA_TRUST_STORE", path_value.display(), f"{size_mb}M"],
+    ["mke2fs", "-F", "-q", "-t", "ext4", "-L", "LAPUTA_TRUST_STORE", path_value, f"{size_mb}M"],
     p"/",
     {PATH: "/usr/bin:/bin:/sbin"},
   )
@@ -350,7 +350,7 @@ proc launch_guest(
     "-display", "none",
     "-serial", f"file:{log.display()}",
   ]
-  let spawned = process.spawn(process.command_argv(qemu.display(), argv, dir))?
+  let spawned = process.spawn(process.command_argv(qemu, argv, dir))?
   {pid: spawned.pid, log}
 }
 

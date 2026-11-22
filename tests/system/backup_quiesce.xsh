@@ -261,7 +261,7 @@ let qe: quiesce.QuiesceEnv = {
   records: Path(args[3]), writers: Path(args[4]), scratch: Path(args[5]),
 }
 assert quiesce.quiesce_release_record(qe, "backup", 0)?
-""", [@r.env.xinit, r.env.records.display(), r.env.writers.display(), r.env.scratch.display()])?
+""", [@r.env.xinit, r.env.records, r.env.writers, r.env.scratch])?
   assert release.success, release.stderr
   assert "did not reach up" not in release.stdout, release.stdout
   assert transitions(r)? == ["logger down", "dhcp-eth0 down", "logger down", "dhcp-eth0 up"]

@@ -176,13 +176,13 @@ export proc build(dest: Path) [fs, process, env, error] {
   let jobs = make.jobs()?
   let command = process.command_argv(
     cargo,
-    [cargo.display(), "rustc", "--offline", "--locked", "--jobs", f"{jobs}", "--no-default-features", "--features", "ffi", "--config", "source.crates-io.replace-with=\"vendored-sources\"", "--config", "source.vendored-sources.directory=\"vendor\"", "--config", "profile.release.lto=\"fat\"", "--config", "profile.release.opt-level=\"s\"", "--config", "profile.release.codegen-units=1", "--release", "--target", triple, "--lib", "--crate-type", "cdylib"],
+    [cargo, "rustc", "--offline", "--locked", "--jobs", f"{jobs}", "--no-default-features", "--features", "ffi", "--config", "source.crates-io.replace-with=\"vendored-sources\"", "--config", "source.vendored-sources.directory=\"vendor\"", "--config", "profile.release.lto=\"fat\"", "--config", "profile.release.opt-level=\"s\"", "--config", "profile.release.codegen-units=1", "--release", "--target", triple, "--lib", "--crate-type", "cdylib"],
     project,
     {
       PATH: cargo_path,
-      CC: host_cc.display(),
-      HOST_CC: host_cc.display(),
-      CARGO_HOME: fp"{root}/.cargo-home".display(),
+      CC: host_cc,
+      HOST_CC: host_cc,
+      CARGO_HOME: fp"{root}/.cargo-home",
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64_linker,
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: aarch64_rustflags,
       CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: x86_64_linker,

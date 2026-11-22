@@ -148,13 +148,13 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let command = process.command_argv(
     cargo,
-    [cargo.display(), "build", "--offline", "--locked", "--no-default-features", "--config", "source.crates-io.replace-with=\"vendored-sources\"", "--config", "source.vendored-sources.directory=\"vendor\"", "--release", "--target", triple, "--bin", "rustic"],
+    [cargo, "build", "--offline", "--locked", "--no-default-features", "--config", "source.crates-io.replace-with=\"vendored-sources\"", "--config", "source.vendored-sources.directory=\"vendor\"", "--release", "--target", triple, "--bin", "rustic"],
     project,
     {
       PATH: cargo_path,
-      CC: host_cc.display(),
-      HOST_CC: host_cc.display(),
-      CARGO_HOME: fp"{root}/.cargo-home".display(),
+      CC: host_cc,
+      HOST_CC: host_cc,
+      CARGO_HOME: fp"{root}/.cargo-home",
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64_linker,
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: aarch64_rustflags,
       CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: x86_64_linker,

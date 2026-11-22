@@ -40,10 +40,10 @@ proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
     fs.set_owner(store, uid: 65534, gid: 65534)
     if pass == "replacement" {
       for name in ["xsh", "xsht"] {
-        linux.mount(bytes.from_text(fp"{runners}/{name}".display()), fp"{root}/bin/{name}", options: ["bind"])
+        linux.mount(fp"{runners}/{name}".bytes(), fp"{root}/bin/{name}", options: ["bind"])
       }
     }
-    linux.mount(bytes.from_text(store.display()), fp"{root}/output", options: ["bind"])
+    linux.mount(store.bytes(), fp"{root}/output", options: ["bind"])
     run_closed(root, "/inputs/laputa/guest/self-hosting-cohort.xsh", [if pass == "baseline" { "/checkout-one" } else { "/checkout-two" }])
     assert p"/run/self-hosting-sentinel".read_text()? == "guest boundary sentinel\n"
     linux.umount(fp"{root}/output")
