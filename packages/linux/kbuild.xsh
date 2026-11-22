@@ -1314,7 +1314,7 @@ proc kbuild_compile_flags_for_dirs(
   srcarch: Str,
 ) -> Result[CompileFlagsForDirs] {
   var by_dir: Map[Map[List[Str]]] = {}
-  var input_lines: List[Str] = []
+  var input_lines = []
   var dir_index = 0
 
   for dir in dirs {
@@ -6490,7 +6490,7 @@ proc resolve_item_compile_flags(
   var resolved: List[PreparedArchiveItem] = []
 
   for item in items {
-    var member_flags: List[List[Str]] = [
+    var member_flags = [
       resolve_compile_flags(item.object, member, verdicts)?
       for member in item.member_flags
     ]
