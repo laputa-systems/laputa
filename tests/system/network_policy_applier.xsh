@@ -1,6 +1,6 @@
+use lib.net_state
 use packages.laputa-net.network_kernel as kernel
 use packages.laputa-net.network_plan as policy
-use lib.net_state
 
 const expected_transcript = """== a refused operation keeps its managed address and asks for observation
 refused reobserve plans=3 attempts=3 reason=operation 2 denied; partial state requires observation

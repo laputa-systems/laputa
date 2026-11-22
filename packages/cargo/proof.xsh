@@ -1,7 +1,7 @@
 ##! XSH module `proof` package and build operations.
 use pm.proof
-use pm.util as pm_util
 use pm.target as pm_target
+use pm.util as pm_util
 
 proc main(rootfs = p"/rootfs") [fs, process, env, error] {
   proof.target_elf(rootfs, p"usr/bin/cargo", "cargo")

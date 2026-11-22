@@ -1,6 +1,6 @@
 ##! Fail-closed virtual-interface projection from typed network state and the mapping of plan operations onto typed changes, for IPv4 and IPv6.
-use network_plan as policy
 use lib.net_state
+use network_plan as policy
 
 const IFA_F_NODAD = 2
 const IFA_F_OPTIMISTIC = 4

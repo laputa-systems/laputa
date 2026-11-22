@@ -1,5 +1,5 @@
-use packages.linux.kbuild
 use packages.linux.PKGBUILD-shared as linux_shared
+use packages.linux.kbuild
 use pm.make
 
 type ArchiveTaskReport = {argv: List[Str], outputs: List[Str]}

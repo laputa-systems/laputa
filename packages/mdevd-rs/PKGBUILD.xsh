@@ -1,6 +1,6 @@
 ##! XSH module `mdevd-rs` package and build operations.
-use pm.target as pm_target
 use pm.rust as pm_rust
+use pm.target as pm_target
 use pm.types
 
 error MdevdRsBuildError = MissingRustStd(path: Str)

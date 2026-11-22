@@ -1,6 +1,6 @@
-use packages.laputa-net.network_plan as policy
-use packages.laputa-net.network_kernel as kernel
 use lib.net_state
+use packages.laputa-net.network_kernel as kernel
+use packages.laputa-net.network_plan as policy
 
 pure request_of(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Request, Error] {
   Ok(net_state.request(kernel.network_change(plan, index)?)?)

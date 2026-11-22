@@ -1,6 +1,6 @@
 ##! Package recipe for crabtables, the pure-Rust nftables stack (`nfcrt`) and the firewall service.
-use pm.target as pm_target
 use pm.rust as pm_rust
+use pm.target as pm_target
 use pm.types
 
 error CrabtablesBuildError = MissingRustStd(path: Str)

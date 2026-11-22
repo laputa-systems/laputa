@@ -1,7 +1,7 @@
 ##! XSH module `doas-rs` package and build operations.
 use packages.upstream_pins as upstream_pins
-use pm.target as pm_target
 use pm.rust as pm_rust
+use pm.target as pm_target
 use pm.types
 
 error DoasRsBuildError = MissingRustStd(path: Str)

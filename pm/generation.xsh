@@ -1,7 +1,7 @@
 ##! Deterministic runtime-only system generations assembled from verified BuildPlan artifacts.
-use pm.digest as pm_digest
 use confined
 use plan as build_plan
+use pm.digest as pm_digest
 use root as pm_root
 use store as artifact_store
 use types

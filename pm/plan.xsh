@@ -1,8 +1,8 @@
 ##! Deterministic typed package build-plan resolution and canonical fingerprints.
-use pm.digest as pm_digest
 use catalog
 use fingerprint as pm_fingerprint
 use graph
+use pm.digest as pm_digest
 use policy as build_policy
 use types
 use util

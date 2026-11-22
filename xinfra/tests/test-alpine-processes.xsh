@@ -1,11 +1,11 @@
 use infra.declare
 use infra.engine
 use infra.lock
-use infra.report
-use infra.workload
 use infra.model
+use infra.report
 use infra.testing
 use infra.transport
+use infra.workload
 
 const slow_deploy = r"""
 ##! A deployment whose single command holds the host for a while.

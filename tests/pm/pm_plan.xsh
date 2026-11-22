@@ -1,8 +1,8 @@
 ##! Behavior coverage for package fingerprints, artifact keys, and build-plan resolution.
 use pm.catalog
 use pm.fingerprint
-use pm.plan
 use pm.payload_archive
+use pm.plan
 use pm.plan_json
 use pm.policy
 use pm.recipe

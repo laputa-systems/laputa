@@ -1,9 +1,9 @@
+use packages.linux.PKGBUILD-shared as linux_shared
 use packages.linux.kbuild
+use packages.linux.kbuild_verify
 use pm.make
 use pm.recipe
 use pm.types
-use packages.linux.kbuild_verify
-use packages.linux.PKGBUILD-shared as linux_shared
 
 error PyramidStopError = Failed(message: Str)
 

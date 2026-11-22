@@ -1,7 +1,7 @@
 ##! Behavior coverage for the local XSH seed and the content-keyed Laputa images.
 use pm.fingerprint as pm_fingerprint
-use pm.recipe as pm_recipe
 use pm.plan_json as pm_plan_json
+use pm.recipe as pm_recipe
 use pm.types as pm_types
 use seed.images
 use seed.world

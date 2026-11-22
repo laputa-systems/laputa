@@ -1,7 +1,7 @@
 ##! Immutable package artifacts addressed by semantic SHA-256 keys; finals appear only after a temporary-directory rename, and XSH reserves standard `path`, so exports use `artifact_path`.
-use pm.digest as pm_digest
 use confined
 use local
+use pm.digest as pm_digest
 use remote
 use types
 use util

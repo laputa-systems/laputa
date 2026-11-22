@@ -1,6 +1,6 @@
 ##! Verification of intentional kernel recipe stops and their completed stage artifacts.
-use packages.linux.kbuild
 use packages.linux.PKGBUILD-shared as linux_shared
+use packages.linux.kbuild
 use pm.sources
 use pm.types
 use pm.util

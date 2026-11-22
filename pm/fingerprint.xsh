@@ -1,6 +1,6 @@
 ##! Exact semantic fingerprints for package inputs and executor provenance.
-use pm.digest as pm_digest
 use payload_archive
+use pm.digest as pm_digest
 use types
 use util
 

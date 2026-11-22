@@ -1,8 +1,8 @@
 ##! Package recipe metadata and build operations.
 use pm.make
-use pm.util as pm_util
-use pm.types
 use pm.target as pm_target
+use pm.types
+use pm.util as pm_util
 
 ## Package recipe export.
 export const name = "strace"

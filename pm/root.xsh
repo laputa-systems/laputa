@@ -1,6 +1,6 @@
 ##! Deterministic immutable root plans composed only from verified artifact-store receipts.
-use pm.digest as pm_digest
 use confined
+use pm.digest as pm_digest
 use store as artifact_store
 use types
 use util

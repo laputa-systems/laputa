@@ -1,8 +1,8 @@
 ##! XSH module `PKGBUILD` package and build operations.
 use pm.make
-use pm.util as pm_util
-use pm.types
 use pm.target as pm_target
+use pm.types
+use pm.util as pm_util
 
 ## Exported declaration `name`.
 export const name = "libffi"

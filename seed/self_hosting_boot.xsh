@@ -1,9 +1,9 @@
-use system.build
 use system.activation
+use system.build
 use system.launcher
-use system.self_hosting
 use system.profile
 use system.qemu
+use system.self_hosting
 use system.types
 
 proc record_failed_pending(state: Path) {

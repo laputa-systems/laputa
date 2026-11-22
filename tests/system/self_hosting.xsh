@@ -1,5 +1,5 @@
-use system.self_hosting as boot
 use system.activation
+use system.self_hosting as boot
 
 pure receipt() -> activation.GenerationReceipt {
   {id: "successor", kernel: "boot/vmlinuz", root_digest: bytes.from_text("successor").sha256().hex()}

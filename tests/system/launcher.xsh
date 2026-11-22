@@ -1,10 +1,10 @@
 ##! Host launcher selection from the activation record.
+use profiles.qemu-maintained as maintained
 use system.activation
 use system.build
 use system.launcher
 use system.qemu
 use system.types
-use profiles.qemu-maintained as maintained
 
 proc sha256_text(text: Str) -> Str {
   bytes.from_text(text).sha256().hex()

@@ -1,6 +1,6 @@
 ##! Package recipe for ntpd-rs.
-use pm.target as pm_target
 use pm.rust as pm_rust
+use pm.target as pm_target
 use pm.types
 
 error NtpdRsBuildError = MissingRustStd(path: Str)
