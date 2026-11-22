@@ -109,8 +109,7 @@ proc qualification_run() {
   var mount_options = ""
   for line in p"/proc/self/mountinfo".read_text()?.split("\n") {
     let fields = line.split(" ")
-    if fields.len() >= 6 {
-      let point = fields[4]
+    if let [_, _, _, _, point, _, ..] = fields {
       if (point == "/" or point == "/usr/bin/doas" or "/usr/bin/doas".starts_with(f"{point}/")) and point.byte_len() > mount.byte_len() {
         mount = point
         mount_options = fields[5]
