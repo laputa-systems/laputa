@@ -5,8 +5,8 @@ use pm.repo_snapshot
 const GUEST_CONTEXT = {marker: "LAPUTA_REPO_GUEST", phase_file: "/store/repo-phase"}
 
 proc main() [fs, process, time, net, error, io] {
-  p"/proc".mkdir(parents: true)
-  p"/sys".mkdir(parents: true)
+  p"/proc".mkdir()
+  p"/sys".mkdir()
   linux.mount(bytes.from_text("devtmpfs"), p"/dev", fstype: "devtmpfs")
   linux.mount(bytes.from_text("proc"), p"/proc", fstype: "proc")
   linux.mount(bytes.from_text("sysfs"), p"/sys", fstype: "sysfs")

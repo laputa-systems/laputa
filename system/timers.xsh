@@ -982,14 +982,14 @@ export proc timer_load_cancels(dir: Path) [fs, error] -> Result[Set[Str], Error]
 proc timer_write_cancel(dir: Path, name: Str, active: Bool) -> Result[Unit, Error] {
   let marker = fp"{dir}/{name}"
   if active {
-    dir.mkdir(parents: true)
+    dir.mkdir()
     atomically replace marker as next {
       next.write("cancelled\n", mode: 0o644)
       fs.fsync(next)
     }
     fs.fsync(dir)
   } else {
-    marker.remove(missing_ok: true)
+    marker.remove()
     fs.fsync(dir)
   }
 }
@@ -1151,7 +1151,7 @@ export proc timer_process_start_ms(pid: Int) [process, error] -> Result[Int, Err
 
 ## Durably record one attempt's writer identity, replacing any previous record of the job.
 export proc timer_writer_save(store: TimerWriterStore, record: TimerWriter) [fs, error] -> Result[Unit, Error] {
-  store.dir.mkdir(parents: true)
+  store.dir.mkdir()
   let file = timer_writer_file(store, record.name)
   let body = json.encode({
     format: TIMER_WRITER_FORMAT,
@@ -1267,7 +1267,7 @@ export proc timer_writer_settle(store: TimerWriterStore, name: Str) [fs, process
     timer_log(f"event=writer-unproven name={name} attempt={record.attempt} pid={record.pid}")
     return Ok("unproven")
   }
-  file.remove(missing_ok: true)
+  file.remove()
   fs.fsync(store.dir)
   timer_log(f"event=writer-settled name={name} attempt={record.attempt} pid={record.pid} result={outcome}")
   Ok("settled")
@@ -1663,8 +1663,8 @@ proc timer_sleep_wait(
 }
 
 proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> Result[Unit, Error] {
-  config.state_dir.mkdir(parents: true)
-  config.run_dir.mkdir(parents: true)
+  config.state_dir.mkdir()
+  config.run_dir.mkdir()
   let lock = fs.lock(fp"{config.run_dir}/{TIMER_LOCK_NAME}", nonblocking: true) ?? { |problem|
     return Err(error.failure(f"another laputa-timers process owns {config.run_dir}: {problem.message}"))
   }
@@ -1860,7 +1860,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
       var state = states.get(job.name) ?? timer_state_new(job.name)
       var runtime = runtimes.get(job.name) ?? timer_initial_runtime(job, state, now)
       if job.name in cancelled {
-        fp"{config.state_dir}/{TIMER_TRIGGER_DIR}/{job.name}".remove(missing_ok: true)
+        fp"{config.state_dir}/{TIMER_TRIGGER_DIR}/{job.name}".remove()
         var changed = false
         if timer_is_running(running, job.name) {
           runtime.running = false
@@ -1907,7 +1907,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
       }
       let trigger = fp"{config.state_dir}/{TIMER_TRIGGER_DIR}/{job.name}"
       if trigger.exists() and ! runtime.running and ! runtime.queued and ! runtime.pending_start and runtime.retry_at_mono_ms == 0 {
-        trigger.remove(missing_ok: true)
+        trigger.remove()
         fs.fsync(trigger.parent())
         runtime.pending_start = true
         runtime.pending_missed = 0
@@ -2054,7 +2054,7 @@ proc timers_run_now(config: SchedulerConfig, name: Str) [fs, io, error] -> Resul
     return Err(error.failure(f"unknown timer job {name}"))
   }
   let dir = fp"{config.state_dir}/{TIMER_TRIGGER_DIR}"
-  dir.mkdir(parents: true)
+  dir.mkdir()
   atomically replace fp"{dir}/{name}" as next {
     next.write("run-now\n", mode: 0o644)
     fs.fsync(next)

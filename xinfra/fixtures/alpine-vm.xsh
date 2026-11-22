@@ -22,7 +22,7 @@ type State = {vms: List[Vm]}
 type Capture = {code: Int, stdout: Str, stderr: Str}
 
 proc ensure_base(cache: Path) [fs, net, process, error] -> Result[Path] {
-  cache.mkdir(parents: true)
+  cache.mkdir()
   let base = fp"{cache}/{base_name}"
   if ! base.exists() {
     let downloaded = net.download({url: base_url, dest: base, overwrite: true})?
@@ -250,7 +250,7 @@ cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [f
     fail "first must be at least 1"
   }
 
-  fp"{dir}".mkdir(parents: true)
+  fp"{dir}".mkdir()
   let root = fp"{dir}".resolve()?
   let cache = fp"{root}/cache"
   let base = ensure_base(cache)?
@@ -282,7 +282,7 @@ cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [f
     let name = f"fx-{number}"
     let work = f"{root}/vm-{run_id}-{name}"
     let seed = fp"{work}/seed"
-    seed.mkdir(parents: true)
+    seed.mkdir()
     fp"{seed}/meta-data".write(f"instance-id: iid-{run_id}-{name}\nlocal-hostname: {name}\n")
     fp"{seed}/user-data".write(seed_text(name, run_id, pubkey))
     fp"{seed}/vendor-data".write("")

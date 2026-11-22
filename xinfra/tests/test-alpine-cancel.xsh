@@ -66,8 +66,8 @@ proc spawn_apply(
 ) [fs, process, error] -> Result[ProcessHandle, ProcessError] {
   let out = fp"{dir}/apply.out"
   let err = fp"{dir}/apply.err"
-  out.remove(missing_ok: true)
-  err.remove(missing_ok: true)
+  out.remove()
+  err.remove()
   let command = process.command_argv(
     "xsh",
     ["xsh"] + apply_args(inventory, deploy, limit, lock_path),

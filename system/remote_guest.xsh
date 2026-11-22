@@ -178,34 +178,34 @@ proc stage(header: Record) [env, fs, io, error] -> Result[Record, Error] {
     return Err(refuse("sha256", "sha256 must be 64 hexadecimal digits"))
   }
   let root = staging_root()?
-  root.mkdir(parents: true)
+  root.mkdir()
   let target = fp"{root}/{name}"
   let scratch = fp"{root}/.incoming-{name}"
-  scratch.remove(missing_ok: true)
+  scratch.remove()
   var received = 0
   let created = bytes.write_at(scratch, 0, bytes.zero(0)?, create: true)?
   while received < size {
     let want = if size - received < chunk { size - received } else { chunk }
     let data = io.stdin_read(want)?
     if data.is_empty() {
-      scratch.remove(missing_ok: true)
+      scratch.remove()
       return Err(refuse("short-payload", f"payload ended after {received} of {size} bytes"))
     }
     let _ = bytes.write_at(scratch, received, data)?
     received += data.len()
   }
   if ! io.stdin_read(1)?.is_empty() {
-    scratch.remove(missing_ok: true)
+    scratch.remove()
     return Err(refuse("long-payload", "payload is longer than size"))
   }
   fs.fsync(scratch)
   let actual = hash.sha256(scratch)?.hex()
   if actual != sha256.lower() {
-    scratch.remove(missing_ok: true)
+    scratch.remove()
     return Err(refuse("digest-mismatch", f"payload digest is {actual}"))
   }
   if target.exists() {
-    scratch.remove(missing_ok: true)
+    scratch.remove()
     if hash.sha256(target)?.hex() == actual {
       return {outcome: "present", path: target.display(), size: size, sha256: actual}
     }

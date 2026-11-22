@@ -75,10 +75,10 @@ proc expect_stage_error(pkg: types.Package, src: Path, expected: List[Str]) {
 test test_repository_staging_excludes_build_and_harness_outputs [fs, net, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "repository-staging-scratch")?
   let source = fp"{root}/tool"
-  fp"{source}/src".mkdir(parents: true)
+  fp"{source}/src".mkdir()
   fp"{source}/src/main.rs".write("fn main() {}\n")
-  fp"{source}/.work/tmp".mkdir(parents: true)
-  fp"{source}/target/debug".mkdir(parents: true)
+  fp"{source}/.work/tmp".mkdir()
+  fp"{source}/target/debug".mkdir()
   fp"{source}/target/debug/tool".write("stale executable\n")
   let python = if let Ok(found) = process.which("python3") {
     found
@@ -597,7 +597,7 @@ test test_git_workspace_source_preserves_the_locked_git_identity_offline [fs, ne
   let git_source = f"git+https://github.com/example/fork?rev={revision}#{revision}"
   let tree = test.temp_dir(ctx, name: "git-workspace-tree")?
   let checkout = fp"{tree}/fork-{revision}"
-  fp"{checkout}/forked/src".mkdir(parents: true)
+  fp"{checkout}/forked/src".mkdir()
   fp"{checkout}/Cargo.toml".write("[workspace]\nmembers = [\"forked\"]\n")
   fp"{checkout}/forked/Cargo.toml".write("[package]\nname = \"forked\"\nversion = \"0.1.0\"\nedition = \"2021\"\n")
   fp"{checkout}/forked/src/lib.rs".write("pub fn answer() -> u32 { 42 }\n")

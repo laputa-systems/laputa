@@ -55,7 +55,7 @@ export proc build(dest: Path) [fs, process, env, error] {}
   let node = build_value.nodes[0]
   let stage = test.temp_dir(ctx, name: "manual-index-artifact")?
   let contents = fp"{stage}/contents"
-  let _ = fs.copy_tree(tools, contents, parents: true)?
+  let _ = fs.copy_tree(tools, contents)?
   let page = fp"{contents}/usr/share/man/man1/laputa-island.1"
   page.parent.mkdir()
   page.write(".TH LAPUTA-ISLAND 1\n.SH NAME\nlaputa-island \\- original description\n")
@@ -106,7 +106,7 @@ export proc build(dest: Path) [fs, process, env, error] {}
   gate.copy(to: selected_loader)
   selected_loader.chmod(0o755)
   let race_repo = fp"{test.temp_dir(ctx, name: "manual-index-race-repository")?}/repo"
-  let _ = fs.copy_tree(repo, race_repo, parents: true)?
+  let _ = fs.copy_tree(repo, race_repo)?
   let race_recipe = fp"{race_repo}/packages/mandoc/PKGBUILD.xsh"
   race_recipe.write(race_recipe.read_text()?.replace("ver = \"1\"", with: "ver = \"2\""))
   let race_build = plan.resolve(catalog.load(race_repo)?, {target, index_sha256: "", packages: []}, build_policy, ["mandoc"], false)?
@@ -125,7 +125,7 @@ export proc build(dest: Path) [fs, process, env, error] {}
     let publication = fp"{race}/publication"
     publication.mkdir()
     let outside = fp"{race}/outside"
-    fp"{outside}/manuals/man1".mkdir(parents: true)
+    fp"{outside}/manuals/man1".mkdir()
     fp"{outside}/manuals/man1/outside.1".write("OUTSIDE_MANUAL_DATA\n.TH OUTSIDE 1\n.SH NAME\noutside \\- outside page\n")
     fp"{outside}/manuals/mandoc.db".write("outside database unchanged\n")
     fp"{outside}/sentinel".write("outside unchanged\n")

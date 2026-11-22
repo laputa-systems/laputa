@@ -334,7 +334,7 @@ test test_only_a_supervised_attempt_may_quiesce [fs, process, time, io, error] {
   assert quiesce.quiesce_acquire(r.env, "", 1, opts) is Err(_)
   assert quiesce.quiesce_acquire(r.env, "backup", 1, opts) is Err(_)
 
-  r.env.writers.mkdir(parents: true)
+  r.env.writers.mkdir()
   let session = process.session_id()?
   fp"{r.env.writers}/backup.json".write(json.encode({pid: session + 1, attempt: 1})?)
   assert quiesce.quiesce_acquire(r.env, "backup", 1, opts) is Err(_)
@@ -355,7 +355,7 @@ test test_only_a_supervised_attempt_may_quiesce [fs, process, time, io, error] {
 test test_the_record_is_durable_before_the_first_stop [fs, process, time, io, error] { |ctx|
   test.timeout(ctx, 60s)
   let r = rig(ctx, "quiesce-record-first", {logger: "up", "dhcp-eth0": "up"})?
-  r.env.writers.mkdir(parents: true)
+  r.env.writers.mkdir()
   fp"{r.env.writers}/backup.json".write(json.encode({pid: process.session_id()?, attempt: 1})?)
   fp"{r.env.state_dir}/fail-stop-dhcp-eth0".write("x")
   assert quiesce.quiesce_acquire(r.env, "backup", 1, options(["logger", "dhcp-eth0"])?) is Err(_)

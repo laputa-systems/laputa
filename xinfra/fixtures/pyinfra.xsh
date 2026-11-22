@@ -125,8 +125,8 @@ proc compare_scenario(scenario: Scenario, inventory: Path, host: Str, work: Path
 
 proc compare_unreachable(inventory: Path, host: Str, work: Path, target: Str, address: Str) -> Result[Bool] {
   let stranger = fp"{work}/stranger"
-  stranger.remove(missing_ok: true)
-  fp"{work}/stranger.pub".remove(missing_ok: true)
+  stranger.remove()
+  fp"{work}/stranger.pub".remove()
   run ssh-keygen -q -t ed25519 -N "" -f $stranger
   let theirs_refused = pyinfra_run("127.0.0.1", work, "failures-fixed", port: 1)?
   let theirs_denied = pyinfra_run(address, work, "failures-fixed", key: "stranger")?
@@ -157,7 +157,7 @@ cli main diff(scenario: Str = "all", inventory: Path = p".work/fixtures/inventor
     chosen += [scenario_of(name)?]
   }
 
-  dir.mkdir(parents: true)
+  dir.mkdir()
   let client = fp"{inventory.parent()}/client"
   let work = dir.resolve()?
   fp"{work}/client".write(client.read_bytes()?)
@@ -170,8 +170,8 @@ cli main diff(scenario: Str = "all", inventory: Path = p".work/fixtures/inventor
   }
 
   let host_key = fp"{work}/host_ed25519"
-  host_key.remove(missing_ok: true)
-  fp"{work}/host_ed25519.pub".remove(missing_ok: true)
+  host_key.remove()
+  fp"{work}/host_ed25519.pub".remove()
   run ssh-keygen -q -t ed25519 -N "" -f $host_key -C pyinfra-target
   let target = docker_text(
     "run", "-d", "--rm", "--label", "xinfra-fixture=pyinfra",

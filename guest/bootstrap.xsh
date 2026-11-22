@@ -62,7 +62,7 @@ export proc guest_bootstrap_load_drivers(ctx: GuestBootstrap, phase: Str) [fs, p
 ## guest bootstrap mount store.
 export proc guest_bootstrap_mount_store(ctx: GuestBootstrap, phase: Str) [fs, process, time, error] {
   guest_bootstrap_wait_for_dev_vda(ctx, phase)
-  fp"{GUEST_STORE_MNT}".mkdir(parents: true)
+  fp"{GUEST_STORE_MNT}".mkdir()
   match linux.mount(bytes.from_text(GUEST_STORE_DEV), fp"{GUEST_STORE_MNT}", fstype: "ext4") {
     Ok(_) => {},
     Err(problem) => return guest_bootstrap_fail_phase(ctx, phase, f"mount store: {problem.message}"),

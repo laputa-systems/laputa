@@ -496,8 +496,8 @@ test test_state_image_publication_preserves_old_output_on_invalid_state [fs, pro
 
 test test_apply_tightens_preexisting_operator_paths_and_replaces_a_stale_accounts_file [fs, error] { |ctx|
   let root = prepare(ctx, name: "oxish-modes")?
-  fp"{root}/etc/oxish".mkdir(parents: true)
-  fp"{root}/home/pazu".mkdir(parents: true)
+  fp"{root}/etc/oxish".mkdir()
+  fp"{root}/home/pazu".mkdir()
   fp"{root}/home/pazu".chmod(0o777)
   fp"{root}/etc/oxish/accounts".write("stale\n")
   fp"{root}/etc/oxish/accounts".chmod(0o666)

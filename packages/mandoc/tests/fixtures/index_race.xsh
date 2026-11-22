@@ -52,11 +52,11 @@ if kind == "program" {
   root.symlink(target: fp"{outside}/manuals", path: p"usr/share/man")
 } else {
   let replacement = fp"{outside}/{stage.name}"
-  fp"{replacement}/usr/bin".mkdir(parents: true)
+  fp"{replacement}/usr/bin".mkdir()
   evil.copy(to: fp"{replacement}/usr/bin/makewhatis")
-  fp"{replacement}/usr/lib".mkdir(parents: true)
+  fp"{replacement}/usr/lib".mkdir()
   fp"{outside}/library".copy(to: fp"{replacement}/usr/lib/libz.so.1")
-  fp"{replacement}/usr/share/man/man1".mkdir(parents: true)
+  fp"{replacement}/usr/share/man/man1".mkdir()
   fp"{outside}/manuals/man1/outside.1".copy(to: fp"{replacement}/usr/share/man/man1/outside.1")
   parent.rename(to: fp"{parent}.retained")
   parent.symlink(to: outside)

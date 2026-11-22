@@ -478,7 +478,7 @@ proc require_state(label: Str, lines: List[Str], present: List[Str], absent: Lis
 proc main() [fs, process, env, time, net, io, error] {
   let mode = p"/usr/lib/asterinas/case/mode".read_text()?.trim()
   eprint --flush f"NET_BEGIN {mode}"
-  fp"{WORK}/etc".mkdir(parents: true)
+  fp"{WORK}/etc".mkdir()
   fp"{WORK}/etc/resolv.static".write(f"nameserver {FOREIGN_RESOLVER}\n")
   fixture.link_up("eth0")
   fixture.address_add4("lo", FOREIGN, 32, FOREIGN, "")

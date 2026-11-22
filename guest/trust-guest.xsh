@@ -134,8 +134,8 @@ proc run_phase_two(paths: trust_store.TrustStorePaths) {
 }
 
 proc main() [fs, process, time, net, error, io] {
-  p"/proc".mkdir(parents: true)
-  p"/sys".mkdir(parents: true)
+  p"/proc".mkdir()
+  p"/sys".mkdir()
   match linux.mount(bytes.from_text("devtmpfs"), p"/dev", fstype: "devtmpfs") {
     Ok(_) => {},
     Err(problem) => return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "boot", f"mount devtmpfs: {problem.message}"),
@@ -153,7 +153,7 @@ proc main() [fs, process, time, net, error, io] {
 
   guest_bootstrap.guest_bootstrap_load_drivers(GUEST_CONTEXT, "boot")
   guest_bootstrap.guest_bootstrap_mount_store(GUEST_CONTEXT, "boot")
-  fp"/store/trust".mkdir(parents: true)
+  fp"/store/trust".mkdir()
   guest_bootstrap.guest_bootstrap_bring_up_net(GUEST_CONTEXT, "boot")
 
   let url = guest_bootstrap.guest_bootstrap_cmdline_value(GUEST_CONTEXT, "trust_url")?

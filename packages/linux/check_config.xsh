@@ -43,7 +43,7 @@ cli main(source: Path, llvm_bin: Path, output: Path, host_cc: Path) [fs, process
       return Err(error.failure(f"configuration output must be fresh: {build}"))?
     }
 
-    build.mkdir(parents: true)
+    build.mkdir()
     let original = fragment.read_text()?
     fp"{build}/.config".write(original)
     let unavailable = fp"{build}/unavailable-tool"

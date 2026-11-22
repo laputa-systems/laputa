@@ -15,12 +15,12 @@ proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86
   work.mkdir()
   linux.mount(b"successor", work, fstype: "tmpfs", options: ["size=1G", "nosuid", "nodev"])
   let repository = fp"{work}/repository"
-  let _ = fs.copy_tree(fp"{root}/inputs/laputa", repository, parents: true)?
+  let _ = fs.copy_tree(fp"{root}/inputs/laputa", repository)?
   if development_os_release != null {
     fs.install(development_os_release, fp"{repository}/packages/baselayout/files/rootfs/etc/os-release", 0o644, overwrite: true)
   }
   let seed = fp"{repository}/.out/seed/x86_64"
-  let _ = fs.copy_tree(fp"{root}/inputs/seed-A", seed, parents: true)?
+  let _ = fs.copy_tree(fp"{root}/inputs/seed-A", seed)?
   let runners = fp"{work}/runners"
   runners.mkdir()
   for name in ["xsh", "xsht"] {

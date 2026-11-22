@@ -606,7 +606,7 @@ export proc apply(root: Path, document: Str, crash_at: Str = "") [fs, error] -> 
   identity_ok(key_present, config.identity)
 
   let staging = fs.temp_sibling(root)?
-  defer staging.remove(missing_ok: true)
+  defer staging.remove()
   if live_present {
     let _ = fs.copy_tree(root, staging)?
   } else {

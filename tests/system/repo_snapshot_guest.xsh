@@ -221,7 +221,7 @@ proc stage_initramfs(
 ) -> Result[Path, Error] {
   let root = test.temp_dir(ctx, name: root_name)?
   for dir in ["bin", "guest", "lib/guest", "lib/pm", "lib/modules", "etc/laputa", "store", "proc", "sys", "dev", "tmp"] {
-    fp"{root}/{dir}".mkdir(parents: true)
+    fp"{root}/{dir}".mkdir()
   }
   xsh.copy(to: fp"{root}/bin/xsh", overwrite: true)
   fp"{root}/bin/xsh".chmod(0o755)

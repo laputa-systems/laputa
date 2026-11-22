@@ -120,7 +120,7 @@ proc stage_initramfs(
   }
 
   for dir in ["bin", "guest", "lib/trust", "lib/guest", "lib/pm", "lib/modules", "etc/laputa", "etc/ssl/certs", "var/lib/laputa", "usr/share/laputa/trust/seed", "releases/release-b", "store", "proc", "sys", "dev", "tmp"] {
-    fp"{root}/{dir}".mkdir(parents: true)
+    fp"{root}/{dir}".mkdir()
   }
 
   xsh.copy(to: fp"{root}/bin/xsh", overwrite: true)
@@ -157,7 +157,7 @@ proc stage_initramfs(
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
     fp"{fixture("release-b")}/{file}".copy(to: fp"{root}/releases/release-b/{file}", overwrite: true)
   }
-  fp"{root}/releases/release-c".mkdir(parents: true)
+  fp"{root}/releases/release-c".mkdir()
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
     fp"{fixture("release-c")}/{file}".copy(to: fp"{root}/releases/release-c/{file}", overwrite: true)
   }

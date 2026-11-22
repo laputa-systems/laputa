@@ -301,7 +301,7 @@ proc stage_snapshot_remote(ctx: TestContext, index_source: Path) -> Result[Path]
 
 proc stage_snapshot_dir(ctx: TestContext, name: Str, which: Str) -> Result[Path] {
   let dir = fp"{test.temp_dir(ctx, name: name)?}/snapshot"
-  dir.mkdir(parents: true)
+  dir.mkdir()
   fixture(f"{which}/metadata").copy(to: fp"{dir}/snapshot.json")
   fixture(f"{which}/metadata.sig").copy(to: fp"{dir}/snapshot.sig")
   dir

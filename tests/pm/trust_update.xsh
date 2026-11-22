@@ -21,7 +21,7 @@ proc stage_system(ctx: TestContext, name: Str, key: Str) -> Result[Path, Error] 
   let seed_policy = fp"{root}/usr/share/laputa/trust/seed/trust-policy"
   let key_path = fp"{root}/etc/laputa/trust-update-key"
   for parent in [seed_bundle.parent, key_path.parent, fp"{root}/etc/ssl/certs"] {
-    parent.mkdir(parents: true)
+    parent.mkdir()
   }
 
   seed_bundle.write(p"packages/ca-certificates/files/cacert.pem".read_bytes()?)
@@ -36,7 +36,7 @@ proc stage_system(ctx: TestContext, name: Str, key: Str) -> Result[Path, Error] 
 ## Stages a release source directory from fixtures without touching them.
 proc stage_release(ctx: TestContext, name: Str, which: Str) -> Result[Path, Error] {
   let out = fp"{test.temp_dir(ctx, name: name)?}/release"
-  out.mkdir(parents: true)
+  out.mkdir()
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
     fp"{fixture(which)}/{file}".copy(to: fp"{out}/{file}")
   }
@@ -111,7 +111,7 @@ test trust_bootstrap_records_accepted_before_activation [fs, process, time, erro
   let root = stage_system(ctx, "trust-bootstrap-activation-failure", "signing-key")?
   let source = stage_release(ctx, "trust-bootstrap-activation-failure-source", "release-b")?
   let paths = trust_store.trust_store_paths(root)
-  paths.store.mkdir(parents: true)
+  paths.store.mkdir()
   let scratch = fp"{paths.store}/active.new"
   scratch.write("block activation")
 
@@ -194,9 +194,9 @@ test trust_update_rejects_bad_signatures_and_keys [fs, process, time, error] { |
   let unkeyed = test.temp_dir(ctx, name: "trust-update-unkeyed")?
   let seed_bundle = fp"{unkeyed}/usr/share/laputa/trust/seed/ca-certificates.crt"
   let seed_policy = fp"{unkeyed}/usr/share/laputa/trust/seed/trust-policy"
-  seed_bundle.parent.mkdir(parents: true)
-  fp"{unkeyed}/etc/laputa".mkdir(parents: true)
-  fp"{unkeyed}/etc/ssl/certs".mkdir(parents: true)
+  seed_bundle.parent.mkdir()
+  fp"{unkeyed}/etc/laputa".mkdir()
+  fp"{unkeyed}/etc/ssl/certs".mkdir()
   seed_bundle.write(p"packages/ca-certificates/files/cacert.pem".read_bytes()?)
   seed_policy.write(p"packages/ca-certificates/files/trust-policy".read_bytes()?)
   fp"{unkeyed}/etc/ssl/certs/ca-certificates.crt".symlink(to: p"../../../var/lib/laputa/trust/active/ca-certificates.crt")
@@ -411,7 +411,7 @@ test trust_update_serializes_concurrent_attempts [fs, process, time, error] { |c
 test trust_update_never_replaces_an_existing_generation [fs, process, time, error] { |ctx|
   let root = stage_system(ctx, "trust-update-conflict", "signing-key")?
   let blocker = fp"{root}/var/lib/laputa/trust/generations/2"
-  blocker.parent.mkdir(parents: true)
+  blocker.parent.mkdir()
   blocker.mkdir()
   fp"{blocker}/sentinel".write("foreign generation\n")
 
@@ -473,7 +473,7 @@ test trust_update_recovers_interrupted_staging [fs, process, time, error] { |ctx
 
   let paths = trust_store.trust_store_paths(root)
   let staging = "staging/candidate-3-orphan"
-  fp"{paths.store}/{staging}".mkdir(parents: true)
+  fp"{paths.store}/{staging}".mkdir()
   fp"{paths.store}/{staging}/owner".write(bytes.from_text("orphan-token"))
   let key = key_bytes("signing-key")?
   trust_store.trust_store_write_journal(paths, "staged", "3", staging, "orphan-token")
@@ -818,7 +818,7 @@ test trust_update_rejects_stale_staged_journal_without_mutation [fs, process, ti
 
   let paths = trust_store.trust_store_paths(root)
   let staging = "staging/candidate-2-stale"
-  fp"{paths.store}/{staging}".mkdir(parents: true)
+  fp"{paths.store}/{staging}".mkdir()
   fp"{paths.store}/{staging}/owner".write(bytes.from_text("stale-token"))
   trust_store.trust_store_write_journal(paths, "staged", "2", staging, "stale-token")
   let before = snapshot_store_state(paths)?

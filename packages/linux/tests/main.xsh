@@ -916,7 +916,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
       assert first.missing_sources.is_empty()
       let base = p".xsh-kbuild/obj/drivers/firmware/efi/libstub/gop.o"
       let output = p".xsh-kbuild/obj/drivers/firmware/efi/libstub/gop.stub.o"
-      base.parent.mkdir(parents: true)
+      base.parent.mkdir()
       base.write("compiled object\n")
       let copies = [task for task in first.tasks if task.name == output.display()]
       assert copies.len() == 1

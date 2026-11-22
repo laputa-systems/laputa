@@ -1227,7 +1227,7 @@ proc rotate_log(name: Str, keep: Int) {
     Ok(_) => {}
     Err(failure) => {
       if ! had_first {
-        first.remove(missing_ok: true)
+        first.remove()
       }
 
       return Err(failure)
@@ -1512,7 +1512,7 @@ proc request_desired(name: Str, desired: Str, qualifier: Str = "") {
   let text = if qualifier == "" { desired } else { f"{desired} {qualifier}" }
 
   scratch.write(text, mode: 0o770)
-  defer scratch.remove(missing_ok: true)
+  defer scratch.remove()
   fs.set_owner(scratch, gid: group_gid)
 
   if qualifier == "" {

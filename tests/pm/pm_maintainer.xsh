@@ -10,7 +10,7 @@ use pm.types
 
 proc maintainer_repository(ctx: TestContext) -> Result[Path] {
   let repository = test.temp_dir(ctx, name: "maintainer-repository")?
-  let _ = fs.copy_tree(p"tests/pm/fixtures/graph-catalog/packages", fp"{repository}/packages", parents: true)?
+  let _ = fs.copy_tree(p"tests/pm/fixtures/graph-catalog/packages", fp"{repository}/packages")?
   let source = fp"{repository}/packages/runtime-lib/PKGBUILD.xsh"
   source.write(source.read_text()?.replace("\"meta\"", with: "\"payload\"").replace("export let filetree = []", with: "export let filetree = [{path: p\"usr/old\", kind: \"file\"}]") + "\n## Restrict the fixture to its saved plan target.\nexport const architectures = [\"aarch64\"]\n## Create the fixture payload destination.\nexport proc build(dest: Path) [fs, error] { dest.mkdir() }\n")
   p"tests/pm/fixtures/recipe-valid-payload/proof.xsh".copy(to: fp"{repository}/packages/runtime-lib/proof.xsh")

@@ -17,7 +17,7 @@ test test_rewrite_refuses_a_path_no_command_uses [error] {
 
 test test_helper_changes_invalidate_each_consumer [fs, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "ninja-helper-input")?
-  fp"{root}/pm".mkdir(parents: true)
+  fp"{root}/pm".mkdir()
   let helper = fp"{root}/pm/ninja.xsh"
   helper.write("first\n")
   let names = ["wayland-dev", "wayland-libs-client", "wayland-libs-server", "wayland-libs-cursor", "wl-clipboard", "libva"]

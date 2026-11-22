@@ -81,7 +81,7 @@ proc stage_system(ctx: TestContext, name: Str, key: Str) -> Result[Path, Error] 
   let seed_policy = fp"{root}/usr/share/laputa/trust/seed/trust-policy"
   let key_path = fp"{root}/etc/laputa/trust-update-key"
   for parent in [seed_bundle.parent, key_path.parent, fp"{root}/etc/ssl/certs", fp"{root}/var/lib/xsh-pm/packages/ca-certificates"] {
-    parent.mkdir(parents: true)
+    parent.mkdir()
   }
 
   seed_bundle.write(p"packages/ca-certificates/files/cacert.pem".read_bytes()?)
@@ -95,7 +95,7 @@ proc stage_system(ctx: TestContext, name: Str, key: Str) -> Result[Path, Error] 
 
 proc stage_release(ctx: TestContext, name: Str, which: Str) -> Result[Path, Error] {
   let out = fp"{test.temp_dir(ctx, name: name)?}/release"
-  out.mkdir(parents: true)
+  out.mkdir()
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
     fp"{fixture(which)}/{file}".copy(to: fp"{out}/{file}")
   }

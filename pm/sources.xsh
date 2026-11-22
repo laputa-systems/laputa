@@ -414,7 +414,7 @@ export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result
 proc stage_cargo_git_workspace(line: types.SourceLine, checksum: Str, source_path: Path, dest: Path) {
   let pinned = cargo_git_workspace(fp"{line.source} => {line.dest}", checksum)?
   dest.remove()
-  dest.parent.mkdir(parents: true)
+  dest.parent.mkdir()
   archive.extract(source_path, dest, .Tar, strip_components: tar_source_strip_components(source_path)?, collision: .Replace)
 
   for entry in fs.walk(dest, gitignore: false)? {
@@ -469,10 +469,10 @@ proc stage_resolved_source(
         let output = fp"{dest}/{relative}"
         let metadata = input.metadata()?
         match metadata.kind {
-          "dir" => { output.mkdir(parents: true) },
+          "dir" => { output.mkdir() },
           "file" => { fs.install(input, output, util.checkout_mode("file", metadata.mode), parents: true, overwrite: true) },
           "symlink" => {
-            output.parent.mkdir(parents: true)
+            output.parent.mkdir()
             output.remove()
             output.symlink(to: input.readlink()?)
           },

@@ -238,9 +238,9 @@ proc quiesce_owner(qe: QuiesceEnv, service: Str) -> Result[Str, Error] {
 }
 
 proc quiesce_xinit(qe: QuiesceEnv, args: List[Str]) -> Result[Str, Error] {
-  qe.scratch.mkdir(parents: true)
+  qe.scratch.mkdir()
   let errors = fp"{qe.scratch}/quiesce-xinit.err"
-  errors.remove(missing_ok: true)
+  errors.remove()
   let status = process.run(process.command_argv(
     qe.xinit[0],
     qe.xinit + args,
@@ -250,7 +250,7 @@ proc quiesce_xinit(qe: QuiesceEnv, args: List[Str]) -> Result[Str, Error] {
     stderr: errors,
   ))?
   let text = if errors.exists() { errors.read_text()?.trim() } else { "" }
-  errors.remove(missing_ok: true)
+  errors.remove()
   guard status.ok else {
     return Err(error.failure(f"xinit {args.join(" ")} failed: {text}"))
   }
@@ -291,7 +291,7 @@ proc quiesce_record_file(qe: QuiesceEnv, job: Str) -> Path {
 
 ## Durably write the record. It must exist before the first service is stopped.
 export proc quiesce_write_record(qe: QuiesceEnv, record: QuiesceRecord) [fs, error] -> Result[Unit, Error] {
-  qe.records.mkdir(parents: true)
+  qe.records.mkdir()
   let file = quiesce_record_file(qe, record.job)
   let body = json.encode({
     format: QUIESCE_RECORD_FORMAT,
@@ -402,7 +402,7 @@ export proc quiesce_release_record(qe: QuiesceEnv, job: Str, timeout_ms: Int) [f
   guard failures.is_empty() else {
     return Err(error.failure(failures.join("; ")))
   }
-  quiesce_record_file(qe, job).remove(missing_ok: true)
+  quiesce_record_file(qe, job).remove()
   fs.fsync(qe.records)
   for name in restored {
     match quiesce_wait(qe, name, true, record.timeout_ms) {

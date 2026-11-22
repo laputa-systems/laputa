@@ -8,7 +8,7 @@ proc stage_target(ctx: TestContext, name: Str) -> Result[Path, Error] {
   let seed_policy = fp"{root}/usr/share/laputa/trust/seed/trust-policy"
   let key_path = fp"{root}/etc/laputa/trust-update-key"
   for parent in [seed_bundle.parent, key_path.parent, fp"{root}/etc/ssl/certs"] {
-    parent.mkdir(parents: true)
+    parent.mkdir()
   }
 
   seed_bundle.write(p"packages/ca-certificates/files/cacert.pem".read_bytes()?)

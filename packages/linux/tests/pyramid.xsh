@@ -262,10 +262,10 @@ test test_pyramid_kernel_graph_medium [fs, process, env, time, error] { |ctx|
 
 proc pyramid_discovery_source(ctx: TestContext) -> Result[Path] {
   let scratch = fp"{fs.cwd()?}/.work/tmp"
-  scratch.mkdir(parents: true)
+  scratch.mkdir()
   let unique = test.temp_dir(ctx, name: "pyramid-prepared-discovery")?
   let source = fp"{scratch}/{unique.parent.name()}/{unique.name()}"
-  source.mkdir(parents: true)
+  source.mkdir()
   fp"{source}/Kbuild".write("obj-y += main.o\n")
   fp"{source}/main.c".write("int main(void) { return 0; }\n")
   source

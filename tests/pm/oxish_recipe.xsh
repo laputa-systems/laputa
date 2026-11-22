@@ -12,14 +12,14 @@ proc stage_release(root: Path, omit: Str) -> Result[Path] {
 
   for tool in executables {
     if f"bin/{tool}" != omit {
-      fp"{release}/bin/{tool}".parent.mkdir(parents: true)
+      fp"{release}/bin/{tool}".parent.mkdir()
       fp"{release}/bin/{tool}".write(bytes.from_text(f"#!{tool}\n"))
     }
   }
 
   for document in documents {
     if document != omit {
-      fp"{release}/{document}".parent.mkdir(parents: true)
+      fp"{release}/{document}".parent.mkdir()
       fp"{release}/{document}".write(bytes.from_text(f"{document}\n"))
     }
   }

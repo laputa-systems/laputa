@@ -403,7 +403,7 @@ pure backup_tail(text: Str, limit: Int) -> Str {
 }
 
 proc backup_scratch() -> Result[Path] {
-  BACKUP_RUN_DIR.mkdir(parents: true)
+  BACKUP_RUN_DIR.mkdir()
   Ok(BACKUP_RUN_DIR)
 }
 
@@ -414,11 +414,11 @@ proc backup_rustic(
 ) -> Result[Str, Error] {
   let scratch = backup_scratch()?
   let home = fp"{scratch}/home"
-  home.mkdir(parents: true)
+  home.mkdir()
   let out = fp"{scratch}/rustic-{label}.out"
   let errors = fp"{scratch}/rustic-{label}.err"
-  out.remove(missing_ok: true)
-  errors.remove(missing_ok: true)
+  out.remove()
+  errors.remove()
   let environment = {
     RUSTIC_REPOSITORY: config.repository,
     RUSTIC_PASSWORD_FILE: config.password_file,
@@ -436,13 +436,13 @@ proc backup_rustic(
   ))?
   let errors_text = if errors.exists() { errors.read_text()? } else { "" }
   guard status.ok else {
-    out.remove(missing_ok: true)
-    errors.remove(missing_ok: true)
+    out.remove()
+    errors.remove()
     return Err(error.failure(f"{label} failed: {backup_tail(errors_text, 2000)}"))
   }
   let text = if out.exists() { out.read_text()? } else { "" }
-  out.remove(missing_ok: true)
-  errors.remove(missing_ok: true)
+  out.remove()
+  errors.remove()
   Ok(text)
 }
 
@@ -461,8 +461,8 @@ proc backup_run_hook(hook: BackupHook?, label: Str) -> Result[Unit, Error] {
   let scratch = backup_scratch()?
   let out = fp"{scratch}/hook-{label}.out"
   let errors = fp"{scratch}/hook-{label}.err"
-  out.remove(missing_ok: true)
-  errors.remove(missing_ok: true)
+  out.remove()
+  errors.remove()
   let status = match process.run(process.command_argv(
     value.command[0],
     value.command,
@@ -478,8 +478,8 @@ proc backup_run_hook(hook: BackupHook?, label: Str) -> Result[Unit, Error] {
     }
   }
   let errors_text = if errors.exists() { errors.read_text()? } else { "" }
-  out.remove(missing_ok: true)
-  errors.remove(missing_ok: true)
+  out.remove()
+  errors.remove()
   guard status.ok else {
     return Err(error.failure(f"{label} hook failed: {backup_tail(errors_text, 2000)}"))
   }
@@ -503,7 +503,7 @@ proc backup_new_snapshot(config: BackupConfig, before: List[Str]) -> Result[Str,
 
 proc backup_write_receipt(config: BackupConfig, receipt: BackupReceipt) -> Result[Unit, Error] {
   let file = fp"{config.receipt}"
-  file.parent().mkdir(parents: true)
+  file.parent().mkdir()
   let body = json.encode(receipt)? + "\n"
   atomically replace file as next {
     next.write(body, mode: 0o600)
@@ -519,7 +519,7 @@ proc backup_init(config: BackupConfig) -> Result[Unit, Error] {
     backup_log(f"event=backup-init repository={config.repository} state=already-initialized")
     return Ok()
   }
-  repository.mkdir(parents: true)
+  repository.mkdir()
   let text = backup_rustic(config, ["init"], "init")?
   backup_log(f"event=backup-init repository={config.repository} state=initialized bytes={text.byte_len()}")
   Ok()
