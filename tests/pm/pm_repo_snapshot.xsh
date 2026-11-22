@@ -190,7 +190,7 @@ test test_snapshot_verify_rejects_malformed_metadata_and_inputs [fs, error] { |_
   }
 
   expect_snapshot_rejected({...base, metadata: bytes.from_text(good_text.replace("generation 1", with: "generation 9")), signature: good_sig}, "signature is invalid")
-  expect_snapshot_rejected({...base, signature: good_sig.slice(0, 63)}, "64 raw Ed25519 bytes")
+  expect_snapshot_rejected({...base, signature: good_sig[..63]}, "64 raw Ed25519 bytes")
   expect_snapshot_rejected({...base, signature: bytes.from_text("")}, "64 raw Ed25519 bytes")
   expect_snapshot_rejected({...base, keys: []}, "no repository snapshot verification key")
   expect_snapshot_rejected({...base, keys: [key_bytes("signing-key")?.slice(0, 31)]}, "exactly 32 raw Ed25519 bytes")
