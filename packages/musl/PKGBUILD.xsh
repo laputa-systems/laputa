@@ -1,7 +1,7 @@
 ##! musl libc package definition and build operations.
 use pm.make
-use pm.target as pm_target
 use pm.types
+use pm.target as pm_target
 
 ## Package name.
 export const name = "musl"

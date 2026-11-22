@@ -1,5 +1,5 @@
 ##! XSH module `PKGBUILD` package and build operations.
-use packages.upstream_pins
+use packages.upstream_pins as upstream_pins
 use pm.rust as pm_rust
 use pm.target as pm_target
 use pm.types
@@ -122,7 +122,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported rustic target")) }
   }
 
-  let x86_64_rustflags = if build_target == .X86_64LinuxMusl and target != build_target {
+  let x86_64_rustflags = if build_target == types.X86_64LinuxMusl and target != build_target {
     host_rustflags
   } else {
     target_rustflags
@@ -148,13 +148,13 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let command = process.command_argv(
     cargo,
-    [cargo, "build", "--offline", "--locked", "--no-default-features", "--config", "source.crates-io.replace-with=\"vendored-sources\"", "--config", "source.vendored-sources.directory=\"vendor\"", "--release", "--target", triple, "--bin", "rustic"],
+    [cargo.display(), "build", "--offline", "--locked", "--no-default-features", "--config", "source.crates-io.replace-with=\"vendored-sources\"", "--config", "source.vendored-sources.directory=\"vendor\"", "--release", "--target", triple, "--bin", "rustic"],
     project,
     {
       PATH: cargo_path,
-      CC: host_cc,
-      HOST_CC: host_cc,
-      CARGO_HOME: fp"{root}/.cargo-home",
+      CC: host_cc.display(),
+      HOST_CC: host_cc.display(),
+      CARGO_HOME: fp"{root}/.cargo-home".display(),
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64_linker,
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: aarch64_rustflags,
       CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: x86_64_linker,

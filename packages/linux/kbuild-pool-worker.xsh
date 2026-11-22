@@ -14,7 +14,7 @@ proc main(...argv: List[Str]) [fs, time, error] {
   var values: Map[Str] = {}
   for item in initial.config_enabled { enabled[item.name] = item.value }
   for item in initial.config_values { values[item.name] = item.value }
-  let config: kbuild.Kconfig = kbuild.Kconfig(enabled:, values:)
+  let config: kbuild.Kconfig = {enabled: enabled, values: values}
   var records: List[kbuild.ScanRecord] = []
 
   while true {

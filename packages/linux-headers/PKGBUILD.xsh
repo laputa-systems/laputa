@@ -1,5 +1,5 @@
 ##! Linux userspace API headers, built from the kernel source without building the kernel.
-use packages.upstream_pins
+use packages.upstream_pins as upstream_pins
 ## Package recipe export.
 export const name = "linux-headers"
 

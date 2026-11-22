@@ -436,7 +436,7 @@ proc nvhe_ld_task(
   out: Path,
   inputs: List[Path],
   deps: List[Str],
-  linker_script = p"",
+  linker_script: Path = p"",
 ) -> make.MakeTask {
   var argv = [ld.display(), "-r"]
 

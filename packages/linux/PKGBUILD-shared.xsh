@@ -82,7 +82,7 @@ export proc discover_package_plan(srcarch: Str) [fs, process, env, time, error] 
 
 type PackageDiscovery = {config: kbuild.Kconfig, discovery: kbuild.KbuildDiscovery}
 
-proc discover_package_with_inputs(srcarch: Str) -> Result[PackageDiscovery, Error] {
+proc discover_package_with_inputs(srcarch: Str) [fs, process, env, time, error] -> Result[PackageDiscovery, Error] {
   let config = kbuild.load_config(p".config")?
   let options = discover_options_from_env()?
 
@@ -193,7 +193,9 @@ proc archive_plan_cache_fingerprint(
   cflags: List[Str],
   includes: List[Str],
 ) -> Result[Str] {
-  let {plan, triple, items, ..} = prepared
+  let plan = prepared.plan
+  let triple = prepared.triple
+  let items = prepared.items
   let efi_stubs = [item for item in items if srcarch == "x86" and item.library and
     item.object.starts_with("drivers/firmware/efi/libstub/") and item.object.ends_with(".stub.o")]
   let helper = if efi_stubs.is_empty() {
@@ -240,11 +242,9 @@ proc read_archive_plan_cache(path_value: Path, fingerprint: Str, report: Path, p
 proc write_archive_plan_cache(report: Path, path_value: Path, fingerprint: Str, payloads: kbuild.ArchivePlanPayloads) {
   kbuild.write_text_if_changed(report, payloads.report)
   kbuild.write_text_if_changed(kbuild.archive_plan_summary_path(report), payloads.summary)
-  let manifest: ArchiveCacheManifest = ArchiveCacheManifest(
-    fingerprint:,
-    report_hash: archive_payload_hash(payloads.report),
-    summary_hash: archive_payload_hash(payloads.summary),
-  )
+  let manifest: ArchiveCacheManifest = {
+    fingerprint: fingerprint, report_hash: archive_payload_hash(payloads.report), summary_hash: archive_payload_hash(payloads.summary),
+  }
   kbuild.write_text_if_changed(path_value, json.encode(manifest)?)
 }
 

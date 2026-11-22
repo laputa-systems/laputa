@@ -109,7 +109,7 @@ export proc build(dest: Path) [fs, error] {
   fs.install(p"cacert.pem", fp"{dest}/usr/share/laputa/trust/seed/ca-certificates.crt", 0o644, parents: true, overwrite: true)
   fs.install(p"trust-policy", fp"{dest}/usr/share/laputa/trust/seed/trust-policy", 0o644, parents: true, overwrite: true)
   fs.install(key_source, fp"{dest}/etc/laputa/trust-update-key", 0o444, parents: true, overwrite: true)
-  fp"{dest}/etc/ssl/certs".mkdir()
+  fp"{dest}/etc/ssl/certs".mkdir(parents: true)
   fp"{dest}/etc/ssl/cert.pem".symlink(to: p"certs/ca-certificates.crt")
   fp"{dest}/etc/ssl/certs/ca-certificates.crt".symlink(to: p"../../../var/lib/laputa/trust/active/ca-certificates.crt")
   fp"{dest}/etc/laputa/trust-policy".symlink(to: p"../../var/lib/laputa/trust/active/trust-policy")

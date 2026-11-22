@@ -174,7 +174,7 @@ proc build_wayland(dest: Path) {
     }) {
       run $meson "install" "-C" "build"
     }
-  }
+  }?
 }
 
 ## Package recipe export.

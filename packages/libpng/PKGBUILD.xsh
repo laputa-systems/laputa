@@ -55,7 +55,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     cd (p"build") {
       run $cmake "-P" "cmake_install.cmake"
     }
-  }
+  }?
   fp"{dest}/usr/bin/libpng-config".remove()
   fp"{dest}/usr/bin/libpng16-config".remove()
 }

@@ -1,20 +1,20 @@
-use packages.linux.PKGBUILD-shared as linux_shared
 use packages.linux.kbuild
-use packages.linux.kbuild_verify
 use pm.make
 use pm.recipe
 use pm.types
+use packages.linux.kbuild_verify
+use packages.linux.PKGBUILD-shared as linux_shared
 
-error PyramidStopError = Failed
+error PyramidStopError = Failed(message: Str)
 
-proc pyramid_plan_archives(plan: kbuild.KbuildPlan, cache: Path) -> Result[kbuild.BuiltinArchivePlan] {
+proc pyramid_plan_archives(plan: kbuild.KbuildPlan, cache: Path) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
   env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
     XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives(plan, p"/usr/bin/cc", "x86_64-linux-gnu", [], [], [])?
   }
 }
 
-proc pyramid_kernel_source(ctx: TestContext) -> Result[Path] {
+proc pyramid_kernel_source(ctx: TestContext) [fs, env, time, process, error] -> Result[Path] {
   let source = test.temp_dir(ctx, name: "pyramid-kernel")?
   fp"{source}/.config".write("CONFIG_TEST=y\n")
   fp"{source}/include/generated".mkdir()
@@ -37,14 +37,14 @@ proc pyramid_kernel_source(ctx: TestContext) -> Result[Path] {
   source
 }
 
-proc pyramid_stop(stage: kbuild_verify.LinuxKbuildStop) {
+proc pyramid_stop(stage: kbuild_verify.LinuxKbuildStop) [env, error] -> Result[Unit, Error] {
   let requested = kbuild_verify.linux_kbuild_stop_name(stage)
   env ({XSH_LINUX_KBUILD_STOP_AFTER: requested}) {
     linux_shared.stop_after(requested)
   }
 }
 
-proc pyramid_reject_stop(stage: kbuild_verify.LinuxKbuildStop, outcome: Result[Unit, Error], source: Path) {
+proc pyramid_reject_stop(stage: kbuild_verify.LinuxKbuildStop, outcome: Result[Unit, Error], source: Path) [fs, error] {
   match kbuild_verify.linux_kbuild_verify_stopped(stage, outcome, source) {
     Ok(_) => test.fail("invalid kernel stop passed verification")
     Err(_) => {}
@@ -53,16 +53,10 @@ proc pyramid_reject_stop(stage: kbuild_verify.LinuxKbuildStop, outcome: Result[U
 
 test test_pyramid_kernel_stop_requires_exact_kind_and_stage [fs, env, time, process, error] { |ctx|
   let source = pyramid_kernel_source(ctx)?
-  if let Err(PyramidStopError.Failed {message}) = kbuild_verify.linux_kbuild_verify_stopped(
-    kbuild_verify.Prepare,
-    Err(PyramidStopError.Failed("original cause")),
-    source,
-  ) {
-    assert message == "original cause"
-  } else {
-    test.fail("kernel stop verification lost the original error family")
+  match kbuild_verify.linux_kbuild_verify_stopped(kbuild_verify.Prepare, Err(PyramidStopError.Failed("original cause")), source) {
+    Err(PyramidStopError.Failed {message}) => assert message == "original cause"
+    else => test.fail("kernel stop verification lost the original error family")
   }
-
   for stage in [kbuild_verify.Prepare, kbuild_verify.Discover, kbuild_verify.Plan] {
     kbuild_verify.linux_kbuild_verify_stopped(stage, pyramid_stop(stage), source)
     pyramid_reject_stop(stage, Ok(), source)
@@ -114,17 +108,16 @@ proc pyramid_kernel_graph(
   fp"{source}/.config".write("CONFIG_TEST=y\n")
   let groups = [f"directory{index}" for index in range(group_count)]
   fp"{source}/Kbuild".write("obj-y += " + [f"{directory}/" for directory in groups].join(" ") + "\n")
-  let objects = collect {
-    for directory in groups {
-      fp"{source}/{directory}".mkdir()
-      let names = [f"unit{index}" for index in range(objects_per_group)]
-      fp"{source}/{directory}/Kbuild".write("obj-y += " + [f"{name}.o" for name in names].join(" ") + "\n")
-      for name in names {
-        let input = fp"{source}/{directory}/{name}.c"
-        input.write(f"int {directory}_{name}(void) {{ return 0; }}\n")
-        fs.set_times(input, mtime_sec: 1)
-        yield fp"{directory}/{name}.o"
-      }
+  var objects: List[Path] = []
+  for directory in groups {
+    fp"{source}/{directory}".mkdir()
+    let names = [f"unit{index}" for index in range(objects_per_group)]
+    fp"{source}/{directory}/Kbuild".write("obj-y += " + [f"{name}.o" for name in names].join(" ") + "\n")
+    for name in names {
+      let input = fp"{source}/{directory}/{name}.c"
+      input.write(f"int {directory}_{name}(void) {{ return 0; }}\n")
+      fs.set_times(input, mtime_sec: 1)
+      objects += [fp"{directory}/{name}.o"]
     }
   }
   let discovered = kbuild.discover_plan(source, kbuild.load_config(fp"{source}/.config")?, "x86")?
@@ -136,8 +129,11 @@ proc pyramid_kernel_graph(
   {source, discovered, directories: groups, objects, objects_per_directory: objects_per_group}
 }
 
-proc pyramid_archive_graph(fixture: PyramidKernelGraph, cache: Path) -> Result[kbuild.BuiltinArchivePlan] {
-  let {discovered, directories: groups, objects, objects_per_directory: objects_per_group, ..} = fixture
+proc pyramid_archive_graph(fixture: PyramidKernelGraph, cache: Path) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+  let discovered = fixture.discovered
+  let groups = fixture.directories
+  let objects = fixture.objects
+  let objects_per_group = fixture.objects_per_directory
   let planned = pyramid_plan_archives(discovered, cache)?
   let archive_names = [p".xsh-kbuild/built-in.a", @[fp".xsh-kbuild/{directory}/built-in.a" for directory in groups]]
   let object_names = [fp".xsh-kbuild/obj/{object}" for object in objects]
@@ -165,7 +161,7 @@ proc pyramid_archive_graph(fixture: PyramidKernelGraph, cache: Path) -> Result[k
   planned
 }
 
-proc pyramid_graph_runner(source: Path) -> Result[Path] {
+proc pyramid_graph_runner(source: Path) [fs, error] -> Result[Path] {
   let script = fp"{source}/synthetic-task.xsh"
   script.write(r"""let counter = fp"{args[0]}"
 let output = fp"{args[1]}"
@@ -188,16 +184,16 @@ fs.set_times(output, mtime_ns: latest + 1000000000)?
   script
 }
 
-proc pyramid_graph_counts(source: Path, tasks: List[make.MakeTask]) -> Result[Map[Int]] {
+proc pyramid_graph_counts(source: Path, tasks: List[make.MakeTask]) [fs, error] -> Result[Map[Int]] {
   var counts: Map[Int] = {}
   for task in tasks {
     let counter = fp"{source}/executions/{task.name}"
-    counts[task.name] = if counter.exists() { counter.read_text()?.byte_len() } else { 0 }
+    counts[task.name] = if counter.exists()? { counter.read_text()?.byte_len() } else { 0 }
   }
   counts
 }
 
-proc pyramid_graph_behavior(ctx: TestContext, groups: Int, objects: Int) {
+proc pyramid_graph_behavior(ctx: TestContext, groups: Int, objects: Int) [fs, process, env, time, error] {
   let fixture = pyramid_kernel_graph(ctx, groups, objects)?
   let source = fixture.source
   let script = pyramid_graph_runner(source)?
@@ -258,12 +254,12 @@ test test_pyramid_kernel_graph_medium [fs, process, env, time, error] { |ctx|
 }
 
 
-proc pyramid_discovery_source(ctx: TestContext) -> Result[Path] {
+proc pyramid_discovery_source(ctx: TestContext) [fs, error] -> Result[Path] {
   let scratch = fp"{fs.cwd()?}/.work/tmp"
-  scratch.mkdir()
+  scratch.mkdir(parents: true)
   let unique = test.temp_dir(ctx, name: "pyramid-prepared-discovery")?
   let source = fp"{scratch}/{unique.parent.name()}/{unique.name()}"
-  source.mkdir()
+  source.mkdir(parents: true)
   fp"{source}/Kbuild".write("obj-y += main.o\n")
   fp"{source}/main.c".write("int main(void) { return 0; }\n")
   source
@@ -297,7 +293,7 @@ test test_pyramid_prepared_discovery_rejects_checksum_before_writes [fs, env, er
     ],
   }
   let source = pyramid_discovery_source(ctx)?
-  test.error_kind(kbuild_verify.linux_kbuild_discover_prepared(source, pkg, types.X86_64LinuxMusl), "checksum-mismatch")
+  test.error_kind(kbuild_verify.linux_kbuild_discover_prepared(source, pkg, types.X86_64LinuxMusl), "checksum-mismatch")?
   assert fp"{source}/.config".exists()? == false
   assert fp"{source}/include".exists()? == false
   assert fp"{source}/.xsh-kbuild-plan.json".exists()? == false

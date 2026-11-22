@@ -1,6 +1,6 @@
 ##! Package recipe for ntpd-rs.
-use pm.rust as pm_rust
 use pm.target as pm_target
+use pm.rust as pm_rust
 use pm.types
 
 error NtpdRsBuildError = MissingRustStd(path: Str)
@@ -147,7 +147,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported ntpd-rs target")) }
   }
 
-  let x86_64_rustflags = if build_target == .X86_64LinuxMusl and target != build_target {
+  let x86_64_rustflags = if build_target == types.X86_64LinuxMusl and target != build_target {
     host_rustflags
   } else {
     target_rustflags

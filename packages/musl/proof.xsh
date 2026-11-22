@@ -58,7 +58,7 @@ proc compile_hello(
     run $cc f"--target={triple}" f"--sysroot={rootfs}" "-fuse-ld=lld" "-nostdlib" fp"{lib_dir}/Scrt1.o" \
       fp"{lib_dir}/crti.o" $hello_src f"-L{lib_dir}" "-lc" fp"{lib_dir}/crtn.o" f"-Wl,-rpath,{lib_dir}" \
       f"-Wl,-dynamic-linker,{dynlinker}" "-o" $hello
-  }
+  }?
 }
 
 proc main(rootfs = p"/rootfs") [fs, process, env, error] -> Result[Unit, Error] {

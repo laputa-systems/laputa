@@ -22,3 +22,4 @@ proc main(...argv: List[Str]) [fs, process, time, env, io, error] {
   scheduler.timers_main(@argv)
 }
 
+main(@args)?

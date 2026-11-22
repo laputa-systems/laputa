@@ -2,23 +2,23 @@ use pm.proof
 use pm.util as pm_util
 
 proc defined_exports(readelf: Path, library: Path) [fs, process, env, error] -> Result[List[Str], Error] {
-  let names = collect {
-    for line in (run.text $readelf "--dyn-syms" "-W" $library).lines() {
-      let fields = line.fields()
+  var names: List[Str] = []
 
-      if fields.len() == 8 and fields[4] == "GLOBAL" and fields[6] != "UND" {
-        yield fields[7].split("@")[0]
-      }
+  for line in (run.text $readelf "--dyn-syms" "-W" $library).lines() {
+    let fields = line.fields()
+
+    if fields.len() == 8 and fields[4] == "GLOBAL" and fields[6] != "UND" {
+      names += [fields[7].split("@")[0]]
     }
   }
 
   names
 }
 
-proc declared_functions(header: Path) -> Result[List[Str], Error] {
-  var names = []
+proc declared_functions(header: Path) [fs, error] -> Result[List[Str], Error] {
+  var names: List[Str] = []
 
-  for line in header.read_lines()? {
+  for line in header.read_text()?.lines() {
     if let [_, name] = rx"""\b(fc_[a-z0-9_]+)\(""".captures(line) {
       if name not in names {
         names += [name]

@@ -100,21 +100,22 @@ proc ipv6_policy_report() [fs, process, env, error] -> Result[Str, Error] {
   var addresses = 0
   var routes = 0
   var enumerated = false
-  if let Ok(dump) = linux.network_dump() {
-    enumerated = true
-    for address in dump.addresses {
-      if address.family == "inet6" {
-        addresses += 1
+  match linux.network_dump() {
+    Ok(dump) => {
+      enumerated = true
+      for address in dump.addresses {
+        if address.family == "inet6" {
+          addresses += 1
+        }
+      }
+      for route in dump.routes {
+        if route.family == "inet6" {
+          routes += 1
+        }
       }
     }
-  
-    for route in dump.routes {
-      if route.family == "inet6" {
-        routes += 1
-      }
-    }
+    Err(_) => {}
   }
-
   let applied = ipv6_sysctl.exists()? and ipv6_sysctl.read_text()?.trim() == "1"
   let disabled = declared and applied and enumerated and addresses == 0 and routes == 0
   let verdict = if disabled { "ipv6=unsupported" } else { "ipv6=unexpected" }

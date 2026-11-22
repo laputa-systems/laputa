@@ -1,7 +1,7 @@
 use pm.proof
 use pm.util as pm_util
 
-proc main(rootfs = p"/rootfs") [fs, process, env, error] {
+proc main(rootfs = p"/rootfs") [fs, process, env, error] -> Result[Unit, Error] {
   proof.package_metadata(rootfs, "gluon")
   proof.target_elf(rootfs, p"usr/bin/meson", "gluon")
   proof.target_elf(rootfs, p"usr/bin/ninja", "gluon")

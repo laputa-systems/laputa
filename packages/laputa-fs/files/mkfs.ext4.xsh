@@ -917,7 +917,7 @@ proc format_ext_image(image: Path, source_root_path: Path, label: Str, owners: L
 
 type MkfsExt4Options = {label: Str, source_root: Str, features: Str, inode_owners: Str, image: List[Str]}
 
-proc main(...argv: List[Str]) [fs, error] {
+proc main(...argv: List[Str]) [fs, error] -> Result[Unit, Error] {
   let opts: MkfsExt4Options = cli.applet(
     argv,
     {
@@ -969,6 +969,6 @@ proc main(...argv: List[Str]) [fs, error] {
     source_root = empty_dir
   }
 
-  let owners: List[InodeOwner] = if opts.inode_owners == "" { [] } else { json.read(fp"{opts.inode_owners}")?.require_exact()? }
+  let owners: List[InodeOwner] = if opts.inode_owners == "" { [] } else { json.read(fp"{opts.inode_owners}")?.require_exact(List[InodeOwner])? }
   format_ext_image(fp"{image}", source_root, label, owners)
 }

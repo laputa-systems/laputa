@@ -479,7 +479,7 @@ proc load_config_if_present(path_value: Path) -> Result[Kconfig] {
 }
 
 ## Exported declaration `write_config_headers`.
-export proc write_config_headers(config_path: Path, root: Path, release: Str, arch = "arm64") [fs, error] {
+export proc write_config_headers(config_path: Path, root: Path, release: Str, arch: Str = "arm64") [fs, error] {
   let config = load_config(config_path)?
 
   var autoconf = [
@@ -534,7 +534,7 @@ proc version_header(release: Str) -> Result[Str] {
 }
 
 ## Exported declaration `write_build_headers`.
-export proc write_build_headers(root: Path, release: Str, arch = "arm64") [fs, error] {
+export proc write_build_headers(root: Path, release: Str, arch: Str = "arm64") [fs, error] {
   fp"{root}/include/generated/uapi/linux".mkdir()
   let uts_machine = if arch == "x86" { "x86_64" } else { "aarch64" }
 
@@ -754,48 +754,46 @@ pure expand_config_refs(raw: Str, config: Kconfig) -> Str {
 }
 
 pure make_arguments(raw: Str) -> List[Str] {
+  var arguments: List[Str] = []
   var depth = 0
   var start = 0
-  let arguments: List[Str] = collect {
-    for index in range(raw.byte_len()) {
-      let byte = raw.byte_at(index)
-      if byte == 40 { depth += 1 }
-      if byte == 41 { depth -= 1 }
-      if byte == 44 and depth == 0 {
-        yield raw.byte_slice(start, index - start)
-        start = index + 1
-      }
+  for index in range(raw.byte_len()) {
+    let byte = raw.byte_at(index)
+    if byte == 40 { depth += 1 }
+    if byte == 41 { depth -= 1 }
+    if byte == 44 and depth == 0 {
+      arguments += [raw.byte_slice(start, index - start)]
+      start = index + 1
     }
-    yield raw.byte_slice(start)
   }
+  arguments += [raw.byte_slice(start)]
   arguments
 }
 
 pure make_fields(raw: Str) -> List[Str] {
+  var fields: List[Str] = []
   var depth = 0
   var start = -1
-  let fields: List[Str] = collect {
-    for index in range(raw.byte_len()) {
-      let byte = raw.byte_at(index)
-      if byte == 40 and (depth > 0 or (index > 0 and raw.byte_at(index - 1) == 36)) { depth += 1 }
-      if byte == 41 and depth > 0 { depth -= 1 }
-      if depth == 0 and (byte == 32 or byte == 9 or byte == 10) {
-        if start >= 0 {
-          yield raw.byte_slice(start, index - start)
-          start = -1
-        }
-      } else if start < 0 {
-        start = index
+  for index in range(raw.byte_len()) {
+    let byte = raw.byte_at(index)
+    if byte == 40 and (depth > 0 or (index > 0 and raw.byte_at(index - 1) == 36)) { depth += 1 }
+    if byte == 41 and depth > 0 { depth -= 1 }
+    if depth == 0 and (byte == 32 or byte == 9 or byte == 10) {
+      if start >= 0 {
+        fields += [raw.byte_slice(start, index - start)]
+        start = -1
       }
+    } else if start < 0 {
+      start = index
     }
-    yield raw.byte_slice(start) when start >= 0
   }
+  if start >= 0 { fields += [raw.byte_slice(start)] }
   fields
 }
 
 pure make_patsubst_word(pattern: Str, replacement: Str, word: Str) -> Str {
   let parts = pattern.split("%")
-  return if word == pattern { replacement } else { word } when parts.len() == 1
+  if parts.len() == 1 { return if word == pattern { replacement } else { word } }
   let prefix = parts[0]
   let suffix = parts |> drop(1).join("%")
   return word when ! word.starts_with(prefix) or ! word.ends_with(suffix) or word.byte_len() < prefix.byte_len() + suffix.byte_len()
@@ -823,12 +821,11 @@ pure expand_make_expression(expression: Str, vars: Map[Str]) -> Str {
     return f"$({expression})" when arguments.len() != 3
     let name = expand_make_vars(arguments[0], vars).trim()
     let words = expand_make_vars(arguments[1], vars).fields()
-    let output: List[Str] = collect {
-      for word in words {
-        var local = vars
-        local[name] = word
-        yield expand_make_vars(arguments[2], local)
-      }
+    var output: List[Str] = []
+    for word in words {
+      var local = vars
+      local[name] = word
+      output += [expand_make_vars(arguments[2], local)]
     }
     return output.join(" ")
   }
@@ -842,7 +839,7 @@ pure expand_make_vars(raw: Str, vars: Map[Str]) -> Str {
   while cursor < raw.byte_len() {
     let remaining = raw.byte_slice(cursor)
     let offset = remaining.find("$(") ?? -1
-    return output + remaining when offset < 0
+    if offset < 0 { return output + remaining }
     output += remaining.byte_slice(0, offset)
     let start = cursor + offset
     var index = start + 2
@@ -955,7 +952,8 @@ proc included_kbuild_file(root: Path, line: Str, vars: Map[Str], config: Kconfig
 
   return null when spec == "" or " " in spec or "$(" in spec or spec.starts_with("/")
 
-  normalize_rel_path(fp"{spec}") |> join_root(root, _)
+  let rel = normalize_rel_path(fp"{spec}")
+  join_root(root, rel)
 }
 
 pure parse_assignment_at(line: Str, marker: Str, marker_len: Int, index: Int) -> ParsedAssignment {
@@ -999,8 +997,8 @@ pure active_var_lhs(expanded: Str) -> Str {
 }
 
 pure assigned_make_value(current: Str, exists: Bool, op: Str, rhs: Str) -> Str {
-  return f"{current} {rhs}".trim() when op == "+="
-  return current when op == "?=" and exists
+  if op == "+=" { return f"{current} {rhs}".trim() }
+  if op == "?=" and exists { return current }
   rhs
 }
 
@@ -1279,7 +1277,7 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
         let key = join_rel(dir, object_name) |> path_key(_)
         let current = flags.get(key) ?? []
 
-        continue when assign.op == "?=" and key in flags
+        if assign.op == "?=" and key in flags { continue }
         if assign.op == "+=" {
           flags[key] = current.extend(make_fields(rhs))
         } else {
@@ -1314,7 +1312,7 @@ proc kbuild_compile_flags_for_dirs(
   srcarch: Str,
 ) -> Result[CompileFlagsForDirs] {
   var by_dir: Map[Map[List[Str]]] = {}
-  var input_lines = []
+  var input_lines: List[Str] = []
   var dir_index = 0
 
   for dir in dirs {
@@ -1501,7 +1499,7 @@ export proc augment_missing_composites(
   root: Path,
   config: Kconfig,
   plan: KbuildPlan,
-  srcarch = "arm64",
+  srcarch: Str = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   var composites = plan.composites
   var dirs = []
@@ -1558,7 +1556,7 @@ export proc prune_inactive_objects(
   root: Path,
   config: Kconfig,
   plan: KbuildPlan,
-  srcarch = "arm64",
+  srcarch: Str = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   var active: Map[Bool] = {}
 
@@ -1991,8 +1989,8 @@ proc apply_item(
   dir: Path,
   item: Str,
   vars: Map[Str],
-  as_lib = false,
-  build_plan = true,
+  as_lib: Bool = false,
+  build_plan: Bool = true,
 ) -> ItemResult {
   return {plan: plan, dirs: [], entries: []} when item == ""
 
@@ -2035,8 +2033,8 @@ proc apply_words(
   dir: Path,
   words: List[Str],
   vars: Map[Str],
-  as_lib = false,
-  build_plan = true,
+  as_lib: Bool = false,
+  build_plan: Bool = true,
 ) -> ItemResult {
   var current = plan
   var dirs = []
@@ -2228,7 +2226,8 @@ proc scan_flat_kbuild(
 
     if eligible_plan_assignment(line) {
       if let Ok(assign) = parse_assignment(line) {
-        let lhs = expand_vars(assign.lhs, vars, config, srcarch) |> active_var_lhs(_)
+        let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
+        let lhs = active_var_lhs(expanded_lhs)
 
         if lhs != "" {
           let rhs = expand_vars(assign.rhs, vars, config, srcarch)
@@ -2340,7 +2339,8 @@ proc scan_discover_dir(
 
     if eligible_plan_assignment(line) {
       if let Ok(assign) = parse_assignment(line) {
-        let lhs = expand_vars(assign.lhs, vars, config, srcarch) |> active_var_lhs(_)
+        let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
+        let lhs = active_var_lhs(expanded_lhs)
 
         if lhs != "" {
           let rhs = expand_vars(assign.rhs, vars, config, srcarch)
@@ -2821,7 +2821,7 @@ proc merge_local_record_graph_with_options(
 export proc discover_plan(
   root: Path,
   config: Kconfig,
-  srcarch = "arm64",
+  srcarch: Str = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   discover_plan_with_options(root, config, srcarch, default_discover_options())
 }
@@ -3401,7 +3401,7 @@ export proc select_archive_tasks_outputs(
 export proc run_archive_tasks_output(
   tasks: List[make.MakeTask],
   output: Path,
-  jobs_count = 1,
+  jobs_count: Int = 1,
 ) [fs, process, env, error] {
   make.run_tasks(select_archive_tasks_outputs(tasks, [output])?, jobs_count)
 }
@@ -3410,13 +3410,13 @@ export proc run_archive_tasks_output(
 export proc run_archive_tasks_outputs(
   tasks: List[make.MakeTask],
   outputs: List[Path],
-  jobs_count = 1,
+  jobs_count: Int = 1,
 ) [fs, process, env, error] {
   make.run_tasks(select_archive_tasks_outputs(tasks, outputs)?, jobs_count)
 }
 
 ## Exported declaration `run_archive_plan_output`.
-export proc run_archive_plan_output(plan_path: Path, output: Path, jobs_count = 1) [fs, process, env, error] {
+export proc run_archive_plan_output(plan_path: Path, output: Path, jobs_count: Int = 1) [fs, process, env, error] {
   let tasks = read_archive_plan_tasks(plan_path)?
   run_archive_tasks_output(tasks, output, jobs_count)
 }
@@ -3426,7 +3426,7 @@ export proc write_plan(
   root: Path,
   config_path: Path,
   out: Path,
-  srcarch = "arm64",
+  srcarch: Str = "arm64",
 ) [fs, error] -> Result[KbuildPlan, Error] {
   let config = load_config(config_path)?
   let plan = discover_plan(root, config, srcarch)?
@@ -3517,30 +3517,29 @@ pure efi_stub_base_object(obj: Path) -> Path {
 
 proc archive_item_sources(item: ArchiveAnalysisItem, triple: Str) -> Result[PreparedArchiveItem] {
   var source = ""
+  var members: List[Str] = []
   var output_exists = false
-  let members: List[Str] = collect {
-    if item.composite != "" {
-      for member in item.member_objects {
-        if let Ok(found) = source_for_object(fp"{member}") {
-          yield path_key(found)
-        } else {
-          yield ""
-        }
-      }
-    } else if item.pi {
-      let found = pi_source(fp"{item.object}")
-      source = path_key(found) when found.exists()
-    } else if is_x86_efi_stub(fp"{item.object}", item.library, triple) {
-      if let Ok(found) = source_for_object(efi_stub_base_object(fp"{item.object}")) {
-        source = path_key(found)
+  if item.composite != "" {
+    for member in item.member_objects {
+      if let Ok(found) = source_for_object(fp"{member}") {
+        members += [path_key(found)]
       } else {
-        output_exists = obj_out_path(fp"{item.object}").exists()?
+        members += [""]
       }
-    } else if let Ok(found) = source_for_object(fp"{item.object}") {
+    }
+  } else if item.pi {
+    let found = pi_source(fp"{item.object}")
+    source = path_key(found) when found.exists()
+  } else if is_x86_efi_stub(fp"{item.object}", item.library, triple) {
+    if let Ok(found) = source_for_object(efi_stub_base_object(fp"{item.object}")) {
       source = path_key(found)
     } else {
       output_exists = obj_out_path(fp"{item.object}").exists()?
     }
+  } else if let Ok(found) = source_for_object(fp"{item.object}") {
+    source = path_key(found)
+  } else {
+    output_exists = obj_out_path(fp"{item.object}").exists()?
   }
   {...item, source: source, member_sources: members, output_exists: output_exists}
 }
@@ -4244,7 +4243,7 @@ export proc generate_syscall_numbers(
   out: Path,
   header_guard: Str,
   syscall_count_name: Str,
-  prefix = "",
+  prefix: Str = "",
   abis: List[Str] = [],
 ) [fs, error] {
   var lines = [f"#ifndef {header_guard}", f"#define {header_guard}", ""]
@@ -5453,7 +5452,7 @@ export proc build_scratch_x86_final(
   defs: List[Str],
   includes: List[Str],
   link_inputs: List[Path],
-  jobs_count = 1,
+  jobs_count: Int = 1,
 ) [fs, process, env, error] {
   write_minimal_vmlinux_export(p".")
   let _ = cc
@@ -5844,7 +5843,7 @@ export proc build_scratch_arm64_final(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-  jobs_count = 1,
+  jobs_count: Int = 1,
 ) [fs, process, env, error] {
   write_minimal_vmlinux_export(p".")
   let _ = cc
@@ -5971,12 +5970,12 @@ export proc build_scratch_arm64_final(
 }
 
 ## Exported declaration `relink_existing_arm64`.
-export proc relink_existing_arm64(ar: Path, ld: Path, objcopy: Path, jobs_count = 1) [fs, process, env, error] {
+export proc relink_existing_arm64(ar: Path, ld: Path, objcopy: Path, jobs_count: Int = 1) [fs, process, env, error] {
   relink_existing_arm64_argv([ar.display()], [ld.display()], [objcopy.display()], jobs_count)
 }
 
 ## Exported declaration `relink_existing_arm64_llvm`.
-export proc relink_existing_arm64_llvm(jobs_count = 1) [fs, process, env, error] {
+export proc relink_existing_arm64_llvm(jobs_count: Int = 1) [fs, process, env, error] {
   relink_existing_arm64_argv(["llvm-ar"], ["ld.lld"], ["llvm-objcopy"], jobs_count)
 }
 
@@ -5985,7 +5984,7 @@ export proc relink_existing_arm64_argv(
   ar_argv: List[Str],
   ld_argv: List[Str],
   objcopy_argv: List[Str],
-  jobs_count = 1,
+  jobs_count: Int = 1,
 ) [fs, process, env, error] {
   let vmlinux_a = p"vmlinux.a"
   let vmlinux_o = p"vmlinux.o"
@@ -6460,19 +6459,17 @@ proc probe_compiler_options(
 }
 
 pure resolve_compile_flags(object: Str, flags: List[Str], verdicts: Map[Str]) -> Result[List[Str]] {
-  let resolved: List[Str] = collect {
-    for flag in flags {
-      let words = if flag in verdicts { (verdicts.get(flag) ?? "").fields() } else { [flag] }
+  var resolved: List[Str] = []
 
-      for word in words {
-        if "$(" in word {
-          return Err(
-            ScriptError.Failed(kind: "kbuild-unexpanded-flag", message: f"{object}: compile argument {word} was not expanded"),
-          )
-        }
+  for flag in flags {
+    let words = if flag in verdicts { (verdicts.get(flag) ?? "").fields() } else { [flag] }
 
-        yield word
+    for word in words {
+      if "$(" in word {
+        return Err(ScriptError.Failed(kind: "kbuild-unexpanded-flag", message: f"{object}: compile argument {word} was not expanded"))
       }
+
+      resolved += [word]
     }
   }
 
@@ -6487,14 +6484,16 @@ proc resolve_item_compile_flags(
   defs: List[Str],
 ) -> Result[List[PreparedArchiveItem]] {
   let verdicts = probe_compiler_options(items, cc, triple, cflags, defs)?
-  let resolved: List[PreparedArchiveItem] = collect {
-    for item in items {
-      var member_flags = [
-        resolve_compile_flags(item.object, member, verdicts)?
-        for member in item.member_flags
-      ]
-      yield {...item, flags: resolve_compile_flags(item.object, item.flags, verdicts)?, member_flags: member_flags}
+  var resolved: List[PreparedArchiveItem] = []
+
+  for item in items {
+    var member_flags: List[List[Str]] = []
+
+    for member in item.member_flags {
+      member_flags += [resolve_compile_flags(item.object, member, verdicts)?]
     }
+
+    resolved += [{...item, flags: resolve_compile_flags(item.object, item.flags, verdicts)?, member_flags: member_flags}]
   }
 
   resolved
@@ -7176,7 +7175,8 @@ export proc plan_builtin_archives_with_analysis_workers(
   xsh_bin: Path,
   worker: Path,
 ) [fs, process, env, time, error] -> Result[BuiltinArchivePlan, Error] {
-  let {plan, triple, ..} = prepared
+  let plan = prepared.plan
+  let triple = prepared.triple
   archive_plan_progress(
     f"xsh-kbuild-archive-plan analysis-start {plan.objects.len() + plan.lib_objects.len()} items {analysis_jobs} requested-workers",
   )

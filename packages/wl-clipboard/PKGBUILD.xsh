@@ -1,7 +1,7 @@
 ##! Package recipe metadata and build operations.
 use pm.env as pm_env
-use pm.make
 use pm.ninja as pm_ninja
+use pm.make
 use pm.util as pm_util
 
 ## Package recipe export.
