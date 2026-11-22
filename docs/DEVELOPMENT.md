@@ -39,7 +39,7 @@ sudo chmod 755 /usr/local/bin/jaq
 A few tests also need host `cargo`,
 `python3`, `clang` or a `readelf`, and skip with the missing tool named when
 it is absent; `sudo apt-get install cargo python3 clang binutils` runs them
-too. Run as
+too. The XSH trust policy test also needs `docker pull debian:stable-slim`. Run as
 root, the three tests that make a directory read-only skip, because root
 writes through it. You don't need a Rust toolchain or a pre-built XSH. `make
 host-xsh` builds static XSH binaries and `make mirror` builds the mirror, both
