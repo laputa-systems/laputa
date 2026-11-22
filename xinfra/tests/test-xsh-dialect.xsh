@@ -152,7 +152,7 @@ test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
   let file = fp"{root}/motd"
   file.write("hello\n", mode: 0o640)
   let link = fp"{root}/current"
-  fs.symlink(p"motd", link)
+  link.symlink(to: p"motd")
   let blocker = fp"{root}/blocker"
   blocker.write("x")
 
