@@ -131,12 +131,12 @@ mirror-bin:
 test-system: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test tests/system
 	$(HOST_XSH_ENV) $(XSHT) test tests/integration
-	bash tests/system/asterinas_host.sh
-	bash tests/system/asterinas_runners.sh
-	bash tests/system/asterinas_cpu_budget.sh
+	$(HOST_XSH_ENV) bash tests/system/asterinas_host.sh
+	$(HOST_XSH_ENV) bash tests/system/asterinas_runners.sh
+	$(HOST_XSH_ENV) bash tests/system/asterinas_cpu_budget.sh
 
 test-xinit: need-xsh
-	$(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
+	umask 022 && $(HOST_XSH_ENV) $(XSHT) test --fail-fast xinit/tests
 
 test-linux: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) test packages/linux/tests
@@ -189,7 +189,7 @@ need-host-xsh:
 
 # Host tools for a Linux host with only git, make, and Docker: static musl
 # xsh/xshi/xsht for the host architecture, built in XSH's `xsh-test` image
-# (XSH_ROOT's Dockerfile.test) with plain docker, so no XSH or Rust is needed
+# (XSH_ROOT's Dockerfile.test) with Docker Buildx, so no XSH or Rust is needed
 # to start. The cargo invocation is the seed build's
 # (seed/xsh_seed.xsh::xsh_seed_cargo_build_argv) for the host triple, with the
 # same target dir, crate registry, flags, and features: keep them identical,
@@ -228,8 +228,10 @@ host-xsh:
 	    *) echo "make host-xsh: unsupported host $(HOST_OS)/$(HOST_ARCH)" >&2; exit 1 ;; esac
 	@test -f "$(XSH_ROOT_ABS)/Dockerfile.test" -a -f "$(XSH_ROOT_ABS)/Cargo.lock" -a -f "$(XSH_ROOT_ABS)/.cargo/config.toml" || \
 	    { echo "make host-xsh: XSH_ROOT=$(XSH_ROOT_ABS) is not an XSH checkout" >&2; exit 1; }
+	@docker image inspect $(XSH_TEST_IMAGE) >/dev/null 2>&1 || docker buildx version >/dev/null 2>&1 || \
+	    { echo "make host-xsh: building $(XSH_TEST_IMAGE) needs Docker Buildx (Ubuntu and Debian: apt-get install docker-buildx)" >&2; exit 1; }
 	docker image inspect $(XSH_TEST_IMAGE) >/dev/null 2>&1 || \
-	    docker build --platform $(HOST_DOCKER_PLATFORM) --tag $(XSH_TEST_IMAGE) --file "$(XSH_ROOT_ABS)/Dockerfile.test" "$(XSH_ROOT_ABS)"
+	    docker buildx build --load --platform $(HOST_DOCKER_PLATFORM) --tag $(XSH_TEST_IMAGE) --file "$(XSH_ROOT_ABS)/Dockerfile.test" "$(XSH_ROOT_ABS)"
 	mkdir -p "$(CARGO_REGISTRY)" "$(CARGO_GIT)" "$(XSH_CARGO_TARGET)" "$(HOST_TOOLS_DIR)"
 	@lock="$$($(SHA256) "$(XSH_ROOT_ABS)/Cargo.lock" | cut -d ' ' -f 1):$$($(SHA256) "$(XSH_ROOT_ABS)/.cargo/config.toml" | cut -d ' ' -f 1)"; \
 	    if [ "$$(cat "$(CARGO_REGISTRY_STAMP)" 2>/dev/null)" != "$$lock" ]; then \

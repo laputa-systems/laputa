@@ -14,8 +14,34 @@ targets select `qemu-tinyland-ghostty`. The typed CLI also loads
 ## Host requirements
 
 On a Linux host (aarch64 or x86_64) you need only `git`, `make`, Docker
-(the daemon running and usable by your user), and network access for the
-fetch steps. You don't need a Rust toolchain or a pre-built XSH. `make
+with the Buildx plugin (the daemon running and usable by your user), and
+network access for the fetch steps. On Ubuntu or Debian:
+
+```sh
+sudo apt-get install git make docker.io docker-buildx
+sudo usermod -aG docker "$USER"   # then log in again
+```
+
+The image builds read the `TARGETARCH` that BuildKit sets, so Docker's legacy
+builder cannot build them.
+
+`make test` runs on the host and also needs `rg` and `jaq`, which the
+Asterinas scripts use. Ubuntu 24.04 packages ripgrep but not jaq; take jaq from
+its [releases](https://github.com/01mf02/jaq/releases):
+
+```sh
+sudo apt-get install ripgrep
+sudo curl -fsSLo /usr/local/bin/jaq \
+  https://github.com/01mf02/jaq/releases/download/v3.2.0/jaq-$(uname -m)-unknown-linux-musl
+sudo chmod 755 /usr/local/bin/jaq
+```
+
+A few tests also need host `cargo`,
+`python3`, `clang` or a `readelf`, and skip with the missing tool named when
+it is absent; `sudo apt-get install cargo python3 clang binutils` runs them
+too. Run as
+root, the three tests that make a directory read-only skip, because root
+writes through it. You don't need a Rust toolchain or a pre-built XSH. `make
 host-xsh` builds static XSH binaries and `make mirror` builds the mirror, both
 in XSH's own build image.
 
@@ -197,6 +223,13 @@ make publish         # the same plan's artifacts into the local mirror
 make root PKGS=baselayout   # import from the mirror, compose a root, check it runs
 kill %1              # stop the mirror
 ```
+
+To check a fresh checkout without building the world, stop after the seed and
+run the tests: `make host-xsh fetch seed test`. On a fresh Ubuntu 24.04
+container with 8 CPUs (2026-11-22), `make host-xsh` took 11 to 20 minutes,
+`make fetch` 1 to 9 minutes for about 1 GB of sources and 931 crates, `make
+seed` under a minute and `make test` about 3 minutes; it passes as root and as
+an unprivileged user with umask 002. `make lint` does not pass yet (LAP-84).
 
 PM has no default remote; these make targets use the loopback mirror.
 

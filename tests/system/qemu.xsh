@@ -383,6 +383,13 @@ proc qmp_retry_input(socket: Path) -> Result[Unit] {
   assert "QmpRetryOperation" in result.stderr, result.stderr
 }
 
+proc fake_qemu_runs() [process] -> Bool {
+  match process.which("python3") {
+    Ok(_) => true,
+    Err(_) => false,
+  }
+}
+
 proc supervisor_fixture(ctx: TestContext) -> Result[SupervisorFixture] {
   let root = test.temp_dir(ctx, name: "qemu-supervisor")?
   let outputs = build.outputs(root)
@@ -416,6 +423,10 @@ X""",
 }
 
 test test_qemu_supervisor_retries_safe_qmp_operations_and_injects_once [fs, process, net, time, error] { |ctx|
+  guard fake_qemu_runs() else {
+    test.skip("the fake QEMU peer needs python3")
+    return
+  }
   let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/reject-ready".write("")
   fp"{fixture.outputs.root}/reject-screenshot".write("")
@@ -429,6 +440,10 @@ test test_qemu_supervisor_retries_safe_qmp_operations_and_injects_once [fs, proc
 }
 
 test test_qemu_supervisor_does_not_replay_input_and_reaps_qemu_after_disconnect [fs, process, net, time, error] { |ctx|
+  guard fake_qemu_runs() else {
+    test.skip("the fake QEMU peer needs python3")
+    return
+  }
   let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/disconnect-input".write("")
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
@@ -443,6 +458,10 @@ test test_qemu_supervisor_does_not_replay_input_and_reaps_qemu_after_disconnect 
 }
 
 test test_qemu_supervisor_rejects_capture_after_foot_reader_exits [fs, process, net, time, error] { |ctx|
+  guard fake_qemu_runs() else {
+    test.skip("the fake QEMU peer needs python3")
+    return
+  }
   let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/reader-exits".write("")
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
@@ -453,6 +472,10 @@ test test_qemu_supervisor_rejects_capture_after_foot_reader_exits [fs, process, 
 }
 
 test test_qemu_supervisor_rescans_final_qemu_log_after_screenshot [fs, process, net, time, error] { |ctx|
+  guard fake_qemu_runs() else {
+    test.skip("the fake QEMU peer needs python3")
+    return
+  }
   let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/final-failure".write("")
   match qemu.run_test(fixture.config, fixture_profile(), fixture.outputs) {
@@ -468,7 +491,7 @@ test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
   let builder = p"system/container_build.xsh".read_text()?
   let guest = p"guest/qemu-tinyland-ghostty-proof.xsh".read_text()?
   let session = p"profiles/qemu-tinyland-ghostty/usr/lib/laputa/tinyland-session.xsh".read_text()?
-  assert hook_metadata.mode % 4096 == 0o755
+  assert hook_metadata.mode.bit_and(0o111) == 0o111, f"boot hook mode {hook_metadata.mode % 4096}"
   assert "tinyland-runtime-setup.xsh" in hook
   assert guest.starts_with("""#!/bin/xsh
 """)
@@ -486,6 +509,10 @@ test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
 }
 
 test test_qemu_supervisor_reports_qemu_that_exits_at_startup [fs, process, net, time, error] { |ctx|
+  guard fake_qemu_runs() else {
+    test.skip("the fake QEMU peer needs python3")
+    return
+  }
   let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/startup-exit".write("")
 

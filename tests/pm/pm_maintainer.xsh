@@ -27,7 +27,7 @@ proc maintainer_artifact(ctx: TestContext, value: types.BuildPlan, metadata_name
   let stage = test.temp_dir(ctx, name: f"maintainer-stage-{metadata_name}-{inventory}")?
   let contents = fp"{stage}/contents"
   fp"{contents}/usr".mkdir()
-  fp"{contents}/usr/new".write("new output\n")
+  fp"{contents}/usr/new".write("new output\n", mode: 0o644)
   if inventory == "extra" { fp"{contents}/usr/extra".write("extra\n") }
   let payload = fp"{stage}/payload.tar.gz"
   archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)

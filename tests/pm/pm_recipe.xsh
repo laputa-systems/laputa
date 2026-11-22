@@ -164,6 +164,17 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
     test.skip("cargo's ELF proof runs in the pinned Linux build environment")
     return
   }
+  let readelf_found = match process.which("readelf") {
+    Ok(_) => true,
+    Err(_) => match process.which("llvm-readelf") {
+      Ok(_) => true,
+      Err(_) => false,
+    },
+  }
+  guard readelf_found else {
+    test.skip("readelf or llvm-readelf is unavailable for cargo's ELF proof")
+    return
+  }
 
   let target_arch = util.normalize_arch(system.uname()?.machine)
   let build_arch = if target_arch == "aarch64" { "x86_64" } else { "aarch64" }

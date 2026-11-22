@@ -387,6 +387,25 @@ test test_host_xsh_build_is_the_seed_cargo_build_for_the_host_arch [fs, process,
   }
 }
 
+test test_host_xsh_builds_the_xsh_test_image_with_buildkit_as_the_seed_fetch_does [fs, process, error] { |ctx|
+  let xsh_root = test.temp_dir(ctx, name: "host-xsh-image")?
+  fp"{xsh_root}/Dockerfile.test".write("FROM alpine\n")
+  let image = xsh_seed.xsh_seed_build_image(xsh_root)?
+  let xsh_root_arg = f"XSH_ROOT={xsh_root}"
+
+  for arch in ["aarch64", "x86_64"] {
+    let host_arch = f"HOST_ARCH={arch}"
+    let dry_run = run.text make -n --no-print-directory host-xsh HOST_OS=Linux $host_arch $xsh_root_arg
+    let builds = dry_run.replace("\\\n", with: " ").lines() |> where "--tag" in .
+    assert builds.len() == 1, dry_run
+    let seed_argv = xsh_seed.xsh_seed_image_build_argv(p"docker", image, xsh_root, xsh_seed.xsh_seed_arch(arch)?)
+    let seed_build = seed_argv.join(" ")
+    let made_build = builds[0].replace("\"", with: "")
+    assert seed_build.starts_with("docker buildx build --load "), seed_build
+    assert made_build.ends_with(seed_build), f"{made_build}\n{seed_build}"
+  }
+}
+
 test test_world_host_plan_scopes_the_mirror_and_keeps_typed_selection [fs, net, process, env, time, error] { |ctx|
   let repository = test.temp_dir(ctx, name: "world-host-plan")?
   let _ = fs.copy_tree(p"tests/pm/fixtures/graph-catalog/packages", fp"{repository}/packages", parents: true, overwrite: true)?

@@ -198,6 +198,23 @@ proc xsh_seed_require_checkout(xsh_root: Path) {
   }
 }
 
+## Build the `xsh-test` image with BuildKit, whose Dockerfile.test reads the TARGETARCH it sets; the Makefile's host-xsh runs the same command.
+export pure xsh_seed_image_build_argv(docker: Path, image: Str, xsh_root: Path, value: SeedArch) -> List[Str] {
+  [
+    docker.display(),
+    "buildx",
+    "build",
+    "--load",
+    "--platform",
+    value.docker_platform,
+    "--tag",
+    image,
+    "--file",
+    fp"{xsh_root}/Dockerfile.test".display(),
+    xsh_root.display(),
+  ]
+}
+
 ## Fetch the seed's networked inputs: the `xsh-test` image and the crate registry for XSH_ROOT's Cargo.lock.
 export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, value: SeedArch) [fs, process, error] {
   xsh_seed_require_checkout(xsh_root)
@@ -206,17 +223,7 @@ export proc xsh_seed_fetch(docker: Path, laputa_root: Path, xsh_root: Path, valu
   if ! xsh_seed_image_exists(docker, image, laputa_root) {
     xsh_seed_run(
       docker,
-      [
-        docker.display(),
-        "build",
-        "--platform",
-        value.docker_platform,
-        "--tag",
-        image,
-        "--file",
-        fp"{xsh_root}/Dockerfile.test".display(),
-        xsh_root.display(),
-      ],
+      xsh_seed_image_build_argv(docker, image, xsh_root, value),
       laputa_root,
       f"building {image} from {xsh_root}/Dockerfile.test",
     )

@@ -294,6 +294,7 @@ export proc download_file(url: Str, dest: Path, timeout = 1800s) [fs, net, error
     connect_timeout: 10s,
     timeout,
     fail_status: true,
+    headers: [{name: "User-Agent", value: "laputa-pm"}],
   }) {
     Ok(_) => ""
     Err(problem) => f"{url}: {problem.message}"

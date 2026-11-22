@@ -451,7 +451,11 @@ test test_stage_rejects_invalid_receipts_without_mutation [fs, time, error] { |c
   assert record_text(state)? == installed
 }
 
-test test_unwritable_state_directory_leaves_the_record [fs, time, error] { |ctx|
+test test_unwritable_state_directory_leaves_the_record [fs, process, time, error] { |ctx|
+  guard unix.id()?.euid != 0 else {
+    test.skip("root writes through the read-only directory mode this test relies on")
+    return
+  }
   let state = state_dir(ctx, "activation-unwritable")?
   install(state, generation("a"))
   prepare_image(state, generation("b"))
@@ -582,7 +586,11 @@ test test_operator_rollback_uses_retained_pins_without_lowering_policy [fs, time
   assert record.admission_policy.revision == 2
 }
 
-test test_failed_terminal_write_cannot_reopen_health_confirmation [fs, time, error] { |ctx|
+test test_failed_terminal_write_cannot_reopen_health_confirmation [fs, process, time, error] { |ctx|
+  guard unix.id()?.euid != 0 else {
+    test.skip("root writes through the read-only directory mode this test relies on")
+    return
+  }
   let state = state_dir(ctx, "activation-terminal-write-failed")?
   install(state, generation("a"))
   stage(state, generation("b"))

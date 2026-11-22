@@ -24,13 +24,13 @@ export const mkdeps_host: List[Str] = []
 ## Package recipe export.
 export const upstream_sources = [
   {
-    source: p"https://distfiles.gentoo.org/distfiles/c7/tailscale-1.104.2.tar.gz => source",
+    source: p"https://github.com/tailscale/tailscale/archive/v1.104.2.tar.gz => source",
     kind: "auto",
     architectures: ["all"],
     checksums: [{arch: "all", sha256: "4c1c806e16507414a1459afcdc399f6a1323c21a1ac90f07bea0465fd8fd7e1d"}],
   },
   {
-    source: p"https://distfiles.gentoo.org/distfiles/eb/tailscale-1.104.2-vendor.tar.xz => vendored",
+    source: p"https://github.com/gentoo-golang-dist/tailscale/releases/download/v1.104.2/tailscale-1.104.2-vendor.tar.xz => vendored",
     kind: "auto",
     architectures: ["all"],
     checksums: [{arch: "all", sha256: "65b3998c67bc94755d568a4dbc6ca89241b5c907283ca5dec055daf4fb2c8aa3"}],

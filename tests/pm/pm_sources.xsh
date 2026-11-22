@@ -80,7 +80,13 @@ test test_repository_staging_excludes_build_and_harness_outputs [fs, net, proces
   fp"{source}/.work/tmp".mkdir(parents: true)?
   fp"{source}/target/debug".mkdir(parents: true)?
   fp"{source}/target/debug/tool".write("stale executable\n")?
-  let python = process.which("python3")?
+  let python = match process.which("python3") {
+    Ok(found) => found,
+    Err(_) => {
+      test.skip("python3 is unavailable to bind the fixture socket")
+      return
+    },
+  }
   run $python "-c" "import os,socket,sys; os.chdir(sys.argv[1]); s=socket.socket(socket.AF_UNIX); s.bind('test.sock')" fp"{source}/.work/tmp"
   let dest = fp"{root}/staged"
   env ({XSH_PM_REPOSITORY_ROOT: root.display()}) {
@@ -514,7 +520,13 @@ version = "1.0.0"
 source = "{owned_crate.item.source}"
 checksum = "{owned_crate.item.checksum}"
 """)
-  let cargo = process.which("cargo")?
+  let cargo = match process.which("cargo") {
+    Ok(found) => found,
+    Err(_) => {
+      test.skip("cargo is unavailable to read the vendored lockfile")
+      return
+    },
+  }
   let cargo_home = test.temp_dir(ctx, name: "registry-empty-cargo-home")?
   let vendor_config = f"source.vendored-sources.directory=\"{src}/vendor\""
   let output = run.text CARGO_HOME=$cargo_home $cargo "metadata" "--offline" "--locked" "--format-version" "1" \
@@ -638,7 +650,13 @@ forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
   fp"{src}/src".mkdir()
   fp"{src}/src/lib.rs".write("pub fn answer() -> u32 { forked::answer() }\n")
   lockfile.copy(to: fp"{src}/Cargo.lock")?
-  let cargo = process.which("cargo")?
+  let cargo = match process.which("cargo") {
+    Ok(found) => found,
+    Err(_) => {
+      test.skip("cargo is unavailable to read the staged git workspace")
+      return
+    },
+  }
   let cargo_home = test.temp_dir(ctx, name: "git-workspace-empty-cargo-home")?
   let config = fp"{src}/git-fork/.cargo-source.toml"
   let output = run.text CARGO_HOME=$cargo_home $cargo "metadata" "--offline" "--locked" "--format-version" "1" \
@@ -655,4 +673,31 @@ forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
   let retained: Str = from_git[0].get("source")?.require()?
   assert retained == git_source
   assert fp"{src}/Cargo.lock".read_text()? == lockfile.read_text()?
+}
+
+test test_source_downloads_name_their_client_to_hosts_that_require_one [fs, net, process, time, error] { |ctx|
+  let python = match process.which("python3") {
+    Ok(found) => found,
+    Err(_) => {
+      test.skip("python3 is unavailable for the fixture HTTP server")
+      return
+    },
+  }
+  let root = test.temp_dir(ctx, name: "agent-download")?
+  let port_file = fp"{root}/port"
+  let server = spawn run $python p"tests/pm/fixtures/sources/agent_server.py" $port_file ?
+  defer {
+    let _ = process.kill(server.pid, signal: "KILL")
+    let _ = process.wait_any([server])
+  }
+  var tries = 0
+  while ! port_file.exists()? or port_file.read_text()?.trim() == "" {
+    assert tries < 100, "fixture HTTP server did not start"
+    time.sleep(100ms)?
+    tries += 1
+  }
+  let port = port_file.read_text()?.trim()
+  let dest = fp"{root}/source"
+  test.eq(util.download_file(f"http://127.0.0.1:{port}/source", dest)?, "")
+  test.eq(dest.read_text()?, "payload\n")
 }

@@ -139,6 +139,7 @@ setup_checksum="$scratch/$setup_archive_name.sha256.txt"
 mkdir -p "$setup_root/infra/asterinas" "$setup_source/osdk" \
     "$setup_toolchain/lib/rustlib/src/rust/library" "$setup_fake_bin"
 cp "$repo_root/infra/asterinas/setup.sh" "$setup_root/infra/asterinas/setup.sh"
+cp "$repo_root/infra/asterinas/cpu-budget.sh" "$setup_root/infra/asterinas/cpu-budget.sh"
 printf '%s\n' '[toolchain]' "channel = \"nightly-2026-09-01\"" > "$setup_source/rust-toolchain.toml"
 printf '%s\n' '0.18.1-test' > "$setup_source/DOCKER_IMAGE_VERSION"
 printf '%s\n' 'version = 4' > "$setup_source/Cargo.lock"

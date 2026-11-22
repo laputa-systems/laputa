@@ -286,7 +286,13 @@ proc authorize_control(uid: Int) {
 proc prepare_control_inbox() {
   let owner = control_owner_uid()?
   let dir = run_dir()?
-  dir.mkdir()
+  if ! dir.exists() {
+    dir.parent.mkdir()
+    let leaf: RelPath = fp"{dir.name()}".require()?
+    with parent_root = fs.open_root(dir.parent)? {
+      parent_root.mkdir(leaf, mode: 0o755)
+    }
+  }
   let run_info = dir.metadata()?
   let group_gid = control_group_gid()?
   guard run_info.kind == "dir" else {
