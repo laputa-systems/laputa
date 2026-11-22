@@ -250,8 +250,8 @@ cli main up(count = 2, first = 1, dir = p".work/fixtures/vm") [fs, net, process,
     fail "first must be at least 1"
   }
 
-  fp"{dir}".mkdir()
-  let root = fp"{dir}".resolve()?
+  dir.mkdir()
+  let root = dir.resolve()?
   let cache = fp"{root}/cache"
   let base = ensure_base(cache)?
   let client = fp"{root}/client"

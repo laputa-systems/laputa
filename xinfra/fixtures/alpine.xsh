@@ -44,9 +44,9 @@ cli main up(count: UInt = 3, dir = p".work/fixtures") [fs, process, time, error]
   }
 
   let run_id = f"{time.now()}"
-  fp"{dir}".mkdir()
+  dir.mkdir()
   let client = fp"{dir}/client"
-  if ! fp"{client}".exists() {
+  if ! client.exists() {
     keygen(client)
   }
 

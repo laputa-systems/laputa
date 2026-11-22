@@ -73,7 +73,7 @@ proc guest_pci_of_input(event_name: Str, phase: Str) -> Result[Str, Error] {
   let link = fp"/sys/class/input/{event_name}"
   let target = link.readlink()?
   let physical = if target.starts_with("/") {
-    fp"{target}"
+    target
   } else {
     fp"{link.parent}/{target}".normalize()
   }
