@@ -124,7 +124,7 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
     Err(_) => {}
   }
 
-  match profile.validate_system_profile({...valid, proof: {...valid.proof, success_marker: ""}}) {
+  match profile.validate_system_profile({...valid, proof.success_marker: ""}) {
     Ok(_) => assert false
     Err(_) => {}
   }
@@ -150,7 +150,7 @@ test test_profile_digest_is_deterministic [fs, error] {
   assert profile.digest(value)? == profile.digest(value)?
   assert profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?
   assert profile.digest(value)? != profile.digest({...value, qemu_gpu: .Virtio2d})?
-  assert profile.digest(value)? != profile.digest({...value, proof: {...value.proof, input_mode: .ProofPlain}})?
+  assert profile.digest(value)? != profile.digest({...value, proof.input_mode: .ProofPlain})?
 }
 
 test test_profile_rejects_forbidden_packages_in_its_runtime_closure [fs, error] {

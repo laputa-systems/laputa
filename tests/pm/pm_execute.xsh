@@ -298,11 +298,7 @@ proc remote_snapshot_with_executor(
     let extended = json.read(metadata)?.require(local.PackageMetadataDto)?
     json.write(metadata, {...extended, executor, executor_sha256})
     packages += [
-      {
-        ...artifact,
-        executor_sha256,
-        retrieval: {...artifact.retrieval, metadata_sha256: hash.sha256(metadata)?.hex()},
-      },
+      {...artifact, executor_sha256: executor_sha256, retrieval.metadata_sha256: hash.sha256(metadata)?.hex()},
     ]
   }
 

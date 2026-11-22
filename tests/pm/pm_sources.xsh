@@ -468,7 +468,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, net, process, env, error] { |ctx|
   let crate_file = demo_crate(ctx, "demo_crate", "0.1.0")?
   let owned_demo = demo_crate(ctx, "owned_crate", "1.0.0")?
-  let owned_crate = {...owned_demo, item: {...owned_demo.item, source: "sparse+https://crates.17166969.xyz/current/registry/"}}
+  let owned_crate = {...owned_demo, item.source: "sparse+https://crates.17166969.xyz/current/registry/"}
   let cache = test.temp_dir(ctx, name: "crate-set-cache")?
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
   lockfile.write(crate_set_lock([crate_file.item, owned_crate.item]))
