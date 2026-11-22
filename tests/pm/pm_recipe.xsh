@@ -166,10 +166,7 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
   }
   let readelf_found = match process.which("readelf") {
     Ok(_) => true,
-    Err(_) => match process.which("llvm-readelf") {
-      Ok(_) => true,
-      Err(_) => false,
-    },
+    Err(_) => process.which("llvm-readelf") is Ok(_),
   }
   guard readelf_found else {
     test.skip("readelf or llvm-readelf is unavailable for cargo's ELF proof")
