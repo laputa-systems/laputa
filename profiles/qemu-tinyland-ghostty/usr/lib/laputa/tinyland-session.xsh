@@ -14,9 +14,7 @@ proc deny_open(path_value: Path, write: Bool, runtime: Path) {
     },
     Err(error) => {
       let code = error.errno ?? -1
-      if code != 1 and code != 13 {
-        return Err(error)
-      }
+      return Err(error) when code != 1 and code != 13
     },
   }
 }

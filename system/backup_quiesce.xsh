@@ -130,9 +130,7 @@ export pure quiesce_options(argv: List[Str]) -> Result[QuiesceOptions, Str] {
       index += 1
       continue
     }
-    if word.starts_with("-") {
-      return Err(f"unknown option {word}")
-    }
+    return Err(f"unknown option {word}") when word.starts_with("-")
     if options.action == "" {
       guard word == "stop" or word == "start" or word == "reconcile" else {
         return Err("action must be stop, start, or reconcile")
@@ -145,9 +143,7 @@ export pure quiesce_options(argv: List[Str]) -> Result[QuiesceOptions, Str] {
     }
     options.services += [word]
   }
-  if options.help {
-    return Ok(options)
-  }
+  return Ok(options) when options.help
   guard options.action != "" else {
     return Err("an action is required")
   }
@@ -169,12 +165,8 @@ export pure quiesce_token(wall_ms: Int, attempt: Int) -> Str {
 ## (or no longer) this attempt's and nothing is queued, `wait` while a request is queued, and
 ## `request` to hand the stop back with a conditional start.
 export pure quiesce_release_step(token: Str, owner: Str, queued: Bool) -> Str {
-  if queued {
-    return "wait"
-  }
-  if owner == token {
-    return "request"
-  }
+  return "wait" when queued
+  return "request" when owner == token
   "done"
 }
 
@@ -220,26 +212,20 @@ export pure quiesce_record_from_json(value: Any) -> Result[QuiesceRecord, Error]
 
 proc quiesce_status(qe: QuiesceEnv, service: Str) -> Result[Record?, Error] {
   let target = fp"{qe.state_dir}/{service}.json"
-  if ! target.exists() {
-    return Ok(null)
-  }
+  return Ok(null) unless target.exists()
   let value = json.read(target)?
   Ok(value.require(Record)?)
 }
 
 pure quiesce_down(value: Record?) -> Bool {
-  if value == null {
-    return true
-  }
+  return true when value == null
   let desired = json.get(value, ["desired"], "down").require(Str) ?? "down"
   let state = json.get(value, ["state"], "down").require(Str) ?? "down"
   desired == "down" and (state == "down" or state == "stopped" or state == "dead")
 }
 
 pure quiesce_up(value: Record?) -> Bool {
-  if value == null {
-    return false
-  }
+  return false when value == null
   let desired = json.get(value, ["desired"], "down").require(Str) ?? "down"
   let state = json.get(value, ["state"], "down").require(Str) ?? "down"
   desired == "up" and state == "running"
@@ -247,9 +233,7 @@ pure quiesce_up(value: Record?) -> Bool {
 
 proc quiesce_owner(qe: QuiesceEnv, service: Str) -> Result[Str, Error] {
   let file = fp"{qe.state_dir}/{service}.control"
-  if ! file.exists() {
-    return Ok("")
-  }
+  return Ok("") unless file.exists()
   Ok(file.read_text()?.trim())
 }
 
@@ -332,9 +316,7 @@ export proc quiesce_write_record(qe: QuiesceEnv, record: QuiesceRecord) [fs, err
 ## Read one job's record, or null when none is outstanding.
 export proc quiesce_read_record(qe: QuiesceEnv, job: Str) [fs, error] -> Result[QuiesceRecord?, Error] {
   let file = quiesce_record_file(qe, job)
-  if ! file.exists() {
-    return Ok(null)
-  }
+  return Ok(null) unless file.exists()
   Ok(quiesce_record_from_json(json.read(file)?)?)
 }
 
@@ -383,9 +365,7 @@ export proc quiesce_release_service(qe: QuiesceEnv, record: QuiesceRecord, servi
     let owner = quiesce_owner(qe, service)?
     let queued = fp"{qe.state_dir}/inbox/{service}".exists()?
     let step = quiesce_release_step(record.token, owner, queued)
-    if step == "done" {
-      return Ok()
-    }
+    return Ok() when step == "done"
     if step == "request" {
       match quiesce_xinit(qe, ["start", "--if-owner", record.token, service]) {
         Ok(_) => {}
@@ -413,9 +393,7 @@ export proc quiesce_release_record(qe: QuiesceEnv, job: Str, timeout_ms: Int) [f
   var failures: List[Str] = []
   var restored: List[Str] = []
   for service in record.services {
-    if ! service.acquired {
-      continue
-    }
+    continue unless service.acquired
     match quiesce_release_service(qe, record, service.name, bound) {
       Ok(_) => { restored += [service.name] }
       Err(problem) => { failures += [problem.message] }

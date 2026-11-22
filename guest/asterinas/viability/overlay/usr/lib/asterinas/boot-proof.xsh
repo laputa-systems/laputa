@@ -244,7 +244,7 @@ proc main() [fs, process, env, time, net, error] {
     var failed_selections = []
 
     for test_selection in test_selection_path.read_text()?.lines() {
-      if test_selection.trim() == "" { continue }
+      continue when test_selection.trim() == ""
       eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
       let test_run = try { stream_xsh_tests(source_root, test_selection)? }
       match test_run {

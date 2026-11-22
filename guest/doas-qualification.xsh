@@ -5,9 +5,7 @@ type ChildEvent = {pid: Int, status: Status}
 proc qualification_detached(command: Command) [process, time, error] -> Result[Status, Error] {
   let child = spawn command?
   let event = process.wait_timeout([child], 30s)?
-  if event != null {
-    return event.status
-  }
+  return event.status when event != null
   process.kill(child.pid, signal: "KILL")
   let _ = process.wait_any([child])?
   fail "detached privilege qualification timed out"
@@ -156,7 +154,7 @@ proc qualification_run() {
     events = unix.reap_child_events()?.collect()
     for chunk in range(0, 16) {
       let _ = chunk
-      if ! ("readable" in unix.poll_fd(pty.master, ["readable"], timeout_ms: 0)?) { break }
+      break unless "readable" in unix.poll_fd(pty.master, ["readable"], timeout_ms: 0)?
       p"/dev/console".write(unix.read_fd(pty.master, 4096)?)
     }
     tries += 1

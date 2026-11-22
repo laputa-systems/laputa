@@ -43,9 +43,7 @@ proc free_port(start: Int) -> Result[Int] {
   var port = start
   while port < 65000 {
     let listeners = process.port(port)? |> collect()
-    if listeners.is_empty() {
-      return Ok(port)
-    }
+    return Ok(port) when listeners.is_empty()
 
     port += 1
   }
@@ -63,9 +61,7 @@ proc start_seed(seed: Path, port: Int, out: Path, err: Path) -> Result[Int] {
     }
 
     let listeners = process.port(port)? |> collect()
-    if ! listeners.is_empty() {
-      return Ok(spawned.pid)
-    }
+    return Ok(spawned.pid) unless listeners.is_empty()
 
     time.sleep(100ms)
   }
@@ -75,16 +71,12 @@ proc start_seed(seed: Path, port: Int, out: Path, err: Path) -> Result[Int] {
 }
 
 proc stop_process(pid: Int, grace_ms: Int) -> Result[Unit] {
-  if pid <= 0 {
-    return
-  }
+  return when pid <= 0
 
   let _ = process.kill(pid, signal: "TERM")
   let started = time.now()
   while time.now() - started < grace_ms {
-    if ! fp"/proc/{pid}".exists() {
-      return
-    }
+    return unless fp"/proc/{pid}".exists()
 
     time.sleep(100ms)
   }
@@ -104,9 +96,7 @@ proc wait_ready(client: Path, port: Int) -> Result[Unit] {
   while time.now() - started < boot_timeout_ms {
     let probe = ssh_capture(client, port, "deploy", "cloud-init status 2>/dev/null")?
     last = f"exit {probe.code}: {probe.stdout.trim()} {probe.stderr.trim()}"
-    if "status: done" in probe.stdout {
-      return
-    }
+    return when "status: done" in probe.stdout
 
     time.sleep(2s)
   }
@@ -347,9 +337,7 @@ cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [f
 ## Stop the VMs recorded in DIR/vms.json and remove their work directories.
 cli main down(dir: Path = p".work/fixtures/vm") [fs, process, time, error] {
   let record = fp"{dir}/vms.json"
-  if ! record.exists() {
-    return
-  }
+  return unless record.exists()
 
   let state = json.read(record)?.require(State)?
   for vm in state.vms {

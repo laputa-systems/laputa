@@ -105,7 +105,7 @@ proc delete_route(label: Str, name: Str, item: Route) {
 }
 
 proc ifindex_of(name: Str) [fs, process, env, time, net, error] -> Result[Int] {
-  for link in linux.network_dump()?.links { if link.name == name { return link.ifindex } }
+  for link in linux.network_dump()?.links { return link.ifindex when link.name == name }
   Err(NetworkStateError.Failed(f"no link {name}"))
 }
 
@@ -126,7 +126,7 @@ proc wait_for_operstate(name: Str, expected: Int) [fs, process, env, time, net, 
   let deadline = time.monotonic()? + 5000000000
   while time.monotonic()? < deadline {
     for link in linux.network_dump()?.links {
-      if link.name == name and (link.operstate ?? 0) == expected { return }
+      return when link.name == name and (link.operstate ?? 0) == expected
     }
     time.sleep(50ms)
   }
@@ -243,7 +243,7 @@ pure describe_frame(frame: Bytes) -> Result[Str?, Error] {
     let sender = ip_text(frame, 28)
     let peer_checks_neighbor = operation == 1 and sender == "192.0.2.1"
     let answer_to_peer_check = operation == 2 and sender == "192.0.2.10" and destination == "unicast"
-    if peer_checks_neighbor or answer_to_peer_check { return Ok(null) }
+    return Ok(null) when peer_checks_neighbor or answer_to_peer_check
     return Ok(f"ARP op={bytes.unpack_be(frame, 2, 20)?} {ip_text(frame, 28)}>{ip_text(frame, 38)} dst={destination} len={frame.len()}")
   }
   if ethertype == 2048 {

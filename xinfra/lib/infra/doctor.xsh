@@ -85,9 +85,7 @@ export pure unsupported(dialect: model.Dialect, absent: List[Str]) -> List[Str] 
 ## The baseline utilities missing from a capability report. An xsh target runs
 ## the catalogue's XSH sources, so it has no POSIX utility baseline.
 export pure missing_required(dialect: model.Dialect, absent: List[Str]) -> List[Str] {
-  if dialect == .Xsh {
-    return []
-  }
+  return [] when dialect == .Xsh
 
   required |> where { |tool| tool in absent } |> collect()
 }

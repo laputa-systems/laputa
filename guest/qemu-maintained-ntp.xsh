@@ -21,9 +21,7 @@ proc console(text: Str) {
 
 proc phase() -> Result[Str] {
   for token in p"/proc/cmdline".read_text()?.words() {
-    if token.starts_with("LAPUTA_NTP_DRILL=") {
-      return token.split("=")[1]
-    }
+    return token.split("=")[1] when token.starts_with("LAPUTA_NTP_DRILL=")
   }
   ""
 }
@@ -72,9 +70,7 @@ proc wait_synchronized() -> Result[Int] {
   var waited = 0
   while waited < sync_seconds {
     let level = stratum(status_text()?)?
-    if level < 16 {
-      return level
-    }
+    return level when level < 16
     time.sleep(1s)
     waited += 1
   }

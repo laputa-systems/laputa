@@ -793,7 +793,7 @@ pure make_fields(raw: Str) -> List[Str] {
 
 pure make_patsubst_word(pattern: Str, replacement: Str, word: Str) -> Str {
   let parts = pattern.split("%")
-  if parts.len() == 1 { return if word == pattern { replacement } else { word } }
+  return if word == pattern { replacement } else { word } when parts.len() == 1
   let prefix = parts[0]
   let suffix = parts |> drop(1).join("%")
   return word when ! word.starts_with(prefix) or ! word.ends_with(suffix) or word.byte_len() < prefix.byte_len() + suffix.byte_len()
@@ -839,7 +839,7 @@ pure expand_make_vars(raw: Str, vars: Map[Str]) -> Str {
   while cursor < raw.byte_len() {
     let remaining = raw.byte_slice(cursor)
     let offset = remaining.find("$(") ?? -1
-    if offset < 0 { return output + remaining }
+    return output + remaining when offset < 0
     output += remaining.byte_slice(0, offset)
     let start = cursor + offset
     var index = start + 2
@@ -997,8 +997,8 @@ pure active_var_lhs(expanded: Str) -> Str {
 }
 
 pure assigned_make_value(current: Str, exists: Bool, op: Str, rhs: Str) -> Str {
-  if op == "+=" { return f"{current} {rhs}".trim() }
-  if op == "?=" and exists { return current }
+  return f"{current} {rhs}".trim() when op == "+="
+  return current when op == "?=" and exists
   rhs
 }
 
@@ -1277,7 +1277,7 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
         let key = join_rel(dir, object_name) |> path_key(_)
         let current = flags.get(key) ?? []
 
-        if assign.op == "?=" and key in flags { continue }
+        continue when assign.op == "?=" and key in flags
         if assign.op == "+=" {
           flags[key] = current.extend(make_fields(rhs))
         } else {

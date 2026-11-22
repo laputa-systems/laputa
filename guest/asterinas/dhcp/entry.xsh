@@ -94,7 +94,7 @@ proc show_client_log() {
 proc await_state(label: Str, wanted: Str, timeout_ms: Int) {
   let deadline = elapsed_ms()? + timeout_ms
   while elapsed_ms()? < deadline {
-    if significant(client_state()) == wanted { return }
+    return when significant(client_state()) == wanted
     time.sleep(POLL_MS * 1ms)
   }
   eprint --flush f"NET_DHCP_{label}_TIMEOUT waiting for {wanted}, last {client_state()}"
@@ -192,7 +192,7 @@ proc start_tcp_client() [fs, process, error] -> Result[Client] {
 proc await_file(file: Path, timeout_ms: Int) -> Result[Bool] {
   let deadline = elapsed_ms()? + timeout_ms
   while elapsed_ms()? < deadline {
-    if file.exists() { return Ok(true) }
+    return Ok(true) when file.exists()
     time.sleep(POLL_MS * 1ms)
   }
   Ok(false)

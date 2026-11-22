@@ -84,9 +84,7 @@ test hosts_that_order_shared_operations_differently_are_refused {
 
 pure position(list: List[Str], id: Str) -> Int {
   for index in range(list.len()) {
-    if list[index] == id {
-      return index
-    }
+    return index when list[index] == id
   }
 
   -1

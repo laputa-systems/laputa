@@ -2,9 +2,7 @@
 
 proc expected_status() -> Result[Int] {
   for token in p"/proc/cmdline".read_text()?.words() {
-    if token.starts_with("LAPUTA_RESCUE_EXPECT=") {
-      return token.split("=")[1] as Int
-    }
+    return token.split("=")[1] as Int when token.starts_with("LAPUTA_RESCUE_EXPECT=")
   }
   fail "LAPUTA_RESCUE_EXPECT is missing from the kernel command line"
 }
@@ -12,18 +10,14 @@ proc expected_status() -> Result[Int] {
 proc mounted_read_only(mount_point: Str) -> Result[Bool] {
   for line in p"/proc/mounts".read_text()?.lines() {
     let fields = line.words()
-    if fields.len() > 3 and fields[1] == mount_point {
-      return "ro" in fields[3].split(",")
-    }
+    return "ro" in fields[3].split(",") when fields.len() > 3 and fields[1] == mount_point
   }
   fail f"{mount_point} is not mounted"
 }
 
 proc network_free() -> Result[Bool] {
   for entry in fs.children(p"/sys/class/net")? {
-    if fp"/sys/class/net/{entry.name}/device".exists() {
-      return false
-    }
+    return false when fp"/sys/class/net/{entry.name}/device".exists()
   }
   true
 }

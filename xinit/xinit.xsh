@@ -2329,8 +2329,8 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
       match fs.rename_noreplace(entry.path, claimed) {
         Ok(_) => { out = drain_claim(out, processing, claimed, entry.name)? }
         Err(failure) => {
-          if fs.stat(claimed, follow_symlinks: false) is Ok(_) { continue }
-          if fs.stat(entry.path, follow_symlinks: false) is Err(_) { continue }
+          continue when fs.stat(claimed, follow_symlinks: false) is Ok(_)
+          continue when fs.stat(entry.path, follow_symlinks: false) is Err(_)
           return Err(failure)
         }
       }

@@ -151,9 +151,7 @@ proc steady_state() {
   var waited = 0
   while waited < 60 {
     leased = json.get(json.read(p"/run/dhcpc/eth0.status")?, ["state"], "").require(Str)?
-    if leased == "bound" {
-      break
-    }
+    break when leased == "bound"
     time.sleep(1s)
     waited += 1
   }

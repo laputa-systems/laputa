@@ -336,9 +336,7 @@ pure split_at_image(words: List[Str], image: Str) -> ImageSplit {
   var index = 0
 
   while index < words.len() {
-    if words[index] == image {
-      return {docker: words[..index], cargo: words[index + 1..]}
-    }
+    return {docker: words[..index], cargo: words[index + 1..]} when words[index] == image
 
     index += 1
   }

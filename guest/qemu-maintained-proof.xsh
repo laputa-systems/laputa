@@ -39,21 +39,15 @@ proc lease_summary() -> Result[Str] {
   let status = p"/run/dhcpc/eth0.status"
   return "absent" unless status.exists()
   let text = status.read_text()?.trim()
-  if text == "" {
-    return "empty"
-  }
-  if text.byte_len() > 500 {
-    return text[..500]
-  }
+  return "empty" when text == ""
+  return text[..500] when text.byte_len() > 500
   text
 }
 
 proc wait_state(name: Str, want: Str) {
   var waited = 0
   while waited < 30 {
-    if service_state(name)? == want {
-      return
-    }
+    return when service_state(name)? == want
     time.sleep(1s)
     waited += 1
   }
@@ -72,9 +66,7 @@ proc supervised_network() -> Result[Str] {
   var waited = 0
   while waited < 60 {
     leased = json.get(json.read(lease)?, ["state"], "").require(Str)?
-    if leased == "bound" {
-      break
-    }
+    break when leased == "bound"
     time.sleep(1s)
     waited += 1
   }

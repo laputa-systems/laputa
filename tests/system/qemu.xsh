@@ -105,7 +105,7 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
 
 pure position(items: List[Str], wanted: Str) -> Int {
   for index in range(items.len()) {
-    if items[index] == wanted { return index }
+    return index when items[index] == wanted
   }
   -1
 }

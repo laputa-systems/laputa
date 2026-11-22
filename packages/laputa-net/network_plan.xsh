@@ -305,18 +305,14 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
 export pure network_replay(plan: NetworkPlan, events: List[NetworkReplayEvent]) -> NetworkReplayResult {
   match network_plan(plan.intent, plan.owned, plan.before) {
     Err(_) => return NetworkInvalid("invalid plan precondition")
-    Ok(expected_plan) => {
-      if expected_plan != plan { return NetworkInvalid("plan operations do not match policy") }
-    }
+    Ok(expected_plan) => return NetworkInvalid("plan operations do not match policy") when expected_plan != plan
   }
   if events.len() > network_replay_limit { return NetworkInvalid(f"replay exceeds {network_replay_limit} events") }
-  if events.is_empty() { return NetworkInvalid("missing precondition observation") }
+  return NetworkInvalid("missing precondition observation") when events.is_empty()
   match events[0] {
     NetworkLostEvents => return NetworkReobserve("lost events require full observation")
     NetworkTruncated => return NetworkInvalid("truncated observation")
-    NetworkPrecondition(observed) => {
-      if observed != plan.before { return NetworkReobserve("stale precondition") }
-    }
+    NetworkPrecondition(observed) => return NetworkReobserve("stale precondition") when observed != plan.before
     NetworkApplied(_) | NetworkDenied(_) | NetworkFailed(_) | NetworkObserved(_) => return NetworkInvalid("expected precondition observation")
   }
   var next_operation = 0
@@ -327,7 +323,7 @@ export pure network_replay(plan: NetworkPlan, events: List[NetworkReplayEvent]) 
   }
   for event_index, event in events {
     continue when event_index == 0
-    if converged { return NetworkInvalid("events after final observation") }
+    return NetworkInvalid("events after final observation") when converged
     match event {
       NetworkLostEvents => return NetworkReobserve("lost events require full observation")
       NetworkTruncated => return NetworkInvalid("truncated observation")
@@ -369,7 +365,7 @@ export pure network_replay(plan: NetworkPlan, events: List[NetworkReplayEvent]) 
       }
     }
   }
-  if !converged { return NetworkInvalid("missing final observation") }
+  return NetworkInvalid("missing final observation") unless converged
   NetworkConverged(expected)
 }
 

@@ -383,7 +383,7 @@ proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
 
 proc qemu_qmp(operation: QmpOperation, socket: Path, deadline: Int) {
   let now = time.monotonic()?
-  if now >= deadline { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
+  return Err(types.LaputaError.Docker("QMP proof deadline expired")) when now >= deadline
   let limit = if deadline < now + 60000000000 { deadline } else { now + 60000000000 }
   match qmp.qmp_run_until(socket, qmp_steps(operation)?, limit) {
     Ok(_) => Ok(),

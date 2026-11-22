@@ -76,9 +76,7 @@ pure failed_hosts(report: Report) -> List[HostReport] {
 
 pure attention(entry: Entry) -> Bool {
   let status = entry.status
-  if status == "uncertain" {
-    return ! entry.conditional
-  }
+  return ! entry.conditional when status == "uncertain"
 
   status == "failed" or status == "partial" or status == "unknown" or status == "conflict"
 }
@@ -109,9 +107,7 @@ pure label(entry: Entry) -> Str {
 
 pure entry_lines(entry: Entry, verbose: Bool) -> List[Str] {
   let quiet = entry.status == "satisfied" or entry.status == "unchanged"
-  if quiet and ! verbose {
-    return []
-  }
+  return [] when quiet and ! verbose
 
   var lines = [f"  {entry.id} [{entry.kind}] {label(entry)}"]
   let phase = entry.phase ?? ""

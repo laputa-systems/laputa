@@ -20,9 +20,7 @@ proc fingerprint(pub: Path) -> Result[Str] {
 proc wait_for_sshd(container: Str) -> Result[Unit] {
   for _ in range(50) {
     let status = run.status docker exec $container nc -z 127.0.0.1 22
-    if status.ok {
-      return
-    }
+    return when status.ok
 
     time.sleep(200ms)
   }
@@ -107,9 +105,7 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
 ## Remove the containers recorded in DIR/containers.json.
 cli main down(dir: Path = p".work/fixtures") [fs, process, error] {
   let record = fp"{dir}/containers.json"
-  if ! record.exists() {
-    return
-  }
+  return unless record.exists()
 
   let state = json.read(record)?.require(State)?
   for container in state.containers {

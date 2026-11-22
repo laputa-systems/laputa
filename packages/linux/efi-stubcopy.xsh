@@ -22,8 +22,6 @@ proc main(...argv: List[Str]) [fs, process, env, error] -> Result[Unit, Error] {
       return Err(error.failure(f"EFI stub has absolute relocations: {input}"))?
     }
     let copy = run.capture --text "llvm-objcopy" "--remove-section=.note.gnu.property" $input $output
-    if ! copy.status.ok {
-      return Err(error.failure(f"EFI stub copy failed: {copy.stderr}"))?
-    }
+    return Err(error.failure(f"EFI stub copy failed: {copy.stderr}"))? unless copy.status.ok
   }?
 }

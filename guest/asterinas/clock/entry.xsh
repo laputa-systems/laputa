@@ -64,7 +64,7 @@ pure magnitude(value: Int) -> Int {
 
 pure probe_field(text: Str, name: Str) -> Result[Int, Error] {
   for part in text.trim().split(" ") {
-    if part.starts_with(f"{name}=") { return part.replace(f"{name}=", with: "").parse_int()? }
+    return part.replace(f"{name}=", with: "").parse_int()? when part.starts_with(f"{name}=")
   }
   Err(NtpCaseError.Failed(f"ntp-probe did not report {name}"))
 }
@@ -100,7 +100,7 @@ proc await_agreement(probe: Path, timeout_ms: Int, label: Str) -> Result[Int] {
     let current = stratum()?
     print f"NTP_{label}_SAMPLE stratum={current} offset_us={sample.offset_us}"
     if current < 16 and distance < 100000 { consecutive += 1 } else { consecutive = 0 }
-    if consecutive >= 5 { return worst_us }
+    return worst_us when consecutive >= 5
     time.sleep(1s)
   }
   Err(NtpCaseError.Failed(f"the clock did not stay within 100 ms of the peer for five samples ({label})"))
@@ -301,7 +301,7 @@ minimum-agreeing-sources = 1
       } else {
         consecutive = 0
       }
-      if consecutive >= 5 { break }
+      break when consecutive >= 5
     }
     if (now_ms()? - origin) % 10000 < 1000 { print f"NTP_PROGRESS stratum={current} delta_ms={delta}" }
     time.sleep(1s)

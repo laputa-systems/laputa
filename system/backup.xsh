@@ -106,9 +106,7 @@ pure backup_unknown_keys(value: Any, allowed: List[Str]) -> List[Str] {
 }
 
 pure backup_hook(value: Any, label: Str) -> Result[BackupHook?, Error] {
-  if value == null {
-    return Ok(null)
-  }
+  return Ok(null) when value == null
   let unknown = backup_unknown_keys(value, ["command", "timeout_ms"])
   guard unknown.is_empty() else {
     return Err(error.failure(f"{label} has unknown keys: {unknown.join(",")}"))
@@ -381,9 +379,7 @@ pure backup_options(argv: List[Str]) -> Result[BackupOptions, Str] {
       options.config = value
       continue
     }
-    if word.starts_with("-") {
-      return Err(f"unknown option {word}")
-    }
+    return Err(f"unknown option {word}") when word.starts_with("-")
     guard ! saw_action and word in ["run", "init"] else {
       return Err(f"unexpected argument {word}")
     }
@@ -495,16 +491,12 @@ proc backup_new_snapshot(config: BackupConfig, before: List[Str]) -> Result[Str,
   let text = backup_rustic(config, ["backup", "--json", "--exclude-if-present", config.exclude_if_present, @config.sources], "backup")?
   if let Ok(value) = json.decode(text) {
     let id = json.get(value, ["id"], "").require(Str) ?? ""
-    if backup_snapshot_id_ok(id) {
-      return Ok(id)
-    }
+    return Ok(id) when backup_snapshot_id_ok(id)
   }
 
   let listed = backup_list_snapshots(config, "snapshots-after-backup")?
   for id in listed {
-    if ! (id in before) {
-      return Ok(id)
-    }
+    return Ok(id) unless id in before
   }
   Err(error.failure("backup produced no new snapshot"))
 }

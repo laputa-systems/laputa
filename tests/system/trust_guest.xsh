@@ -49,9 +49,7 @@ proc guest_file_or_skip(path_value: Path, label: Str) {
 
 proc guest_kernel() -> Result[Path, Error] {
   for candidate in GUEST_KERNEL_CANDIDATES {
-    if fp"{candidate}".exists() {
-      return fp"{candidate}"
-    }
+    return fp"{candidate}" when fp"{candidate}".exists()
   }
 
   test.skip("guest proof needs a host kernel at /boot/vmlinuz-stable or /boot/vmlinuz-lts")
@@ -96,9 +94,7 @@ pure guest_module_path(name: Str) -> Str {
 
 proc guest_xsh() [fs, process, env, error] -> Result[Path, Error] {
   let configured = (e"XSH_HOST" ?? "").trim()
-  if configured != "" {
-    return fp"{configured}"
-  }
+  return fp"{configured}" when configured != ""
 
   match process.which("xsh") {
     Ok(found) => found,
@@ -225,9 +221,7 @@ proc wait_for_marker(log: Path, marker: Str, attempts: Int) -> Result[Str, Error
   while tries < attempts {
     if log.exists() {
       let text = log.read_text()?
-      if marker in text {
-        return text
-      }
+      return text when marker in text
 
       if "LAPUTA_TRUST_GUEST FAIL" in text or "LAPUTA_TRUST_CUT FAIL" in text {
         assert false, f"guest reported failure before {marker}: {text}"
@@ -280,9 +274,7 @@ proc wait_for_port(port_file: Path, attempts: Int) -> Result[Int, Error] {
   while tries < attempts {
     if port_file.exists() {
       let text = port_file.read_text()?.trim()
-      if text != "" {
-        return text.parse_int_decimal()
-      }
+      return text.parse_int_decimal() when text != ""
     }
 
     time.sleep(100ms)

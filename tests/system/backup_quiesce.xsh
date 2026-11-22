@@ -119,9 +119,7 @@ proc options(services: List[Str]) -> Result[quiesce.QuiesceOptions, Error] {
 
 proc transitions(rig: Rig) -> Result[List[Str], Error] {
   let log = fp"{rig.env.state_dir}/stub.log"
-  if ! log.exists() {
-    return Ok([])
-  }
+  return Ok([]) unless log.exists()
   Ok(log.read_text()?.lines() |> where .trim() != "" |> collect)
 }
 

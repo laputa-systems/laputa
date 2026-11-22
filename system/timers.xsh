@@ -420,29 +420,17 @@ export pure timer_resume_kind(wall_delta_ms: Int, mono_delta_ms: Int, tolerance_
 
 ## The overlap policy for a due occurrence of a job that may still be running.
 export pure timer_overlap_action(policy: Str, running: Bool, queued: Bool) -> Str {
-  if ! running {
-    return "start"
-  }
-  if policy == "skip" {
-    return "skip"
-  }
-  if queued {
-    return "skip"
-  }
+  return "start" unless running
+  return "skip" when policy == "skip"
+  return "skip" when queued
   "queue"
 }
 
 ## The cancellation outcome for one job.
 export pure timer_cancel_action(cancelled: Bool, running: Bool, queued: Bool) -> Str {
-  if ! cancelled {
-    return "active"
-  }
-  if running {
-    return "terminate"
-  }
-  if queued {
-    return "drop"
-  }
+  return "active" unless cancelled
+  return "terminate" when running
+  return "drop" when queued
   "hold"
 }
 
@@ -453,12 +441,8 @@ export pure timer_retry_delay(attempt: Int, retries: Int, delay_ms: Int) -> Int?
 
 ## The durable outcome of one finished run.
 export pure timer_outcome(exit_code: Int, signaled: Bool, timed_out: Bool) -> Str {
-  if timed_out {
-    return "timeout"
-  }
-  if signaled {
-    return "signaled"
-  }
+  return "timeout" when timed_out
+  return "signaled" when signaled
   if exit_code == 0 { "ok" } else { "failed" }
 }
 
@@ -600,9 +584,7 @@ pure timer_json_int(value: Any, json_path: List[Any], label: Str) -> Result[Int,
 
 pure timer_json_int_or(value: Any, json_path: List[Any], fallback: Int, label: Str) -> Result[Int, Error] {
   let raw = json.get(value, json_path, null)
-  if raw == null {
-    return Ok(fallback)
-  }
+  return Ok(fallback) when raw == null
   if let Ok(number) = raw.require(Int) {
     Ok(number)
   } else {
@@ -613,18 +595,14 @@ pure timer_json_int_or(value: Any, json_path: List[Any], fallback: Int, label: S
 ## The definition named `name`, or null.
 export pure timer_find_job(jobs: List[TimerJob], name: Str) -> TimerJob? {
   for job in jobs {
-    if job.name == name {
-      return job
-    }
+    return job when job.name == name
   }
   null
 }
 
 pure timer_is_running(running: List[TimerRunning], name: Str) -> Bool {
   for entry in running {
-    if entry.name == name {
-      return true
-    }
+    return true when entry.name == name
   }
   false
 }
@@ -771,12 +749,8 @@ export pure timer_writer_verdict(
   leader_start_ms: Int,
   recorded_start_ms: Int,
 ) -> Str {
-  if record_boot_id != "" and boot_id != "" and record_boot_id != boot_id {
-    return "gone"
-  }
-  if ! group_present {
-    return "gone"
-  }
+  return "gone" when record_boot_id != "" and boot_id != "" and record_boot_id != boot_id
+  return "gone" unless group_present
   if leader_start_ms > 0 and recorded_start_ms > 0 and leader_start_ms != recorded_start_ms {
     return "gone"
   }
@@ -810,12 +784,8 @@ export pure timer_writer_from_json(value: Any) -> Result[TimerWriter, Error] {
 ## Whether a job's release is due: `run`, `wait` for its retry delay, or `exhausted` after the
 ## published number of failed attempts.
 export pure timer_release_due(release: TimerRelease, now_mono_ms: Int, max_attempts: Int) -> Str {
-  if release.attempts >= max_attempts {
-    return "exhausted"
-  }
-  if now_mono_ms < release.due_mono_ms {
-    return "wait"
-  }
+  return "exhausted" when release.attempts >= max_attempts
+  return "wait" when now_mono_ms < release.due_mono_ms
   "run"
 }
 
@@ -874,9 +844,7 @@ pure timer_options(argv: List[Str]) -> Result[TimerOptions, Str] {
       }
       continue
     }
-    if word.starts_with("-") {
-      return Err(f"unknown option {word}")
-    }
+    return Err(f"unknown option {word}") when word.starts_with("-")
     if options.action == "run" and ! saw_action {
       guard word in ["run", "status", "cancel", "resume", "run-now"] else {
         return Err(f"unknown action {word}")
@@ -1176,9 +1144,7 @@ proc timer_writer_file(store: TimerWriterStore, name: Str) -> Path {
 ## The kernel start time of a live process in milliseconds, or 0 when it is not listed.
 export proc timer_process_start_ms(pid: Int) [process, error] -> Result[Int, Error] {
   for entry in process.list()? {
-    if entry.pid == pid {
-      return Ok(entry.start_time_ms)
-    }
+    return Ok(entry.start_time_ms) when entry.pid == pid
   }
   Ok(0)
 }
@@ -1205,9 +1171,7 @@ export proc timer_writer_save(store: TimerWriterStore, record: TimerWriter) [fs,
 
 ## The names with a writer record, in file-name order.
 export proc timer_writer_names(store: TimerWriterStore) [fs, error] -> Result[List[Str], Error] {
-  if ! store.dir.exists() {
-    return Ok([])
-  }
+  return Ok([]) unless store.dir.exists()
   let names = collect {
     for entry in fs.children(store.dir)? |> sort-by .name {
       if entry.name.ends_with(".json") {
@@ -1256,9 +1220,7 @@ proc timer_writer_wait_gone(record: TimerWriter, boot_id: Str, resend: Str, limi
   var waited = 0
   while true {
     let scan = timer_writer_observe(record, boot_id)?
-    if scan.verdict == "gone" {
-      return Ok(true)
-    }
+    return Ok(true) when scan.verdict == "gone"
     if resend != "" {
       timer_writer_signal(scan.groups, resend)
     }
@@ -1277,9 +1239,7 @@ proc timer_writer_wait_gone(record: TimerWriter, boot_id: Str, resend: Str, limi
 ## is still a member.
 export proc timer_writer_stop(record: TimerWriter, boot_id: Str) [process, time, error] -> Result[Str, Error] {
   let scan = timer_writer_observe(record, boot_id)?
-  if scan.verdict == "gone" {
-    return Ok("gone")
-  }
+  return Ok("gone") when scan.verdict == "gone"
   timer_writer_signal(scan.groups, "TERM")
   if timer_writer_wait_gone(record, boot_id, "", TIMER_KILL_GRACE_MS) {
     return Ok("stopped")
@@ -1294,9 +1254,7 @@ export proc timer_writer_stop(record: TimerWriter, boot_id: Str) [process, time,
 ## `none` (no record), `settled`, or `unproven`, which keeps the record for the next try.
 export proc timer_writer_settle(store: TimerWriterStore, name: Str) [fs, process, time, io, error] -> Result[Str, Error] {
   let file = timer_writer_file(store, name)
-  if ! file.exists() {
-    return Ok("none")
-  }
+  return Ok("none") unless file.exists()
   let record = timer_writer_from_json(json.read(file)?)?
   let outcome = match timer_writer_stop(record, store.boot_id) {
     Ok(result) => result
@@ -1317,9 +1275,7 @@ export proc timer_writer_settle(store: TimerWriterStore, name: Str) [fs, process
 
 ## The jobs with a quiescence record, in file-name order.
 export proc timer_quiesce_names(store: TimerWriterStore) [fs, error] -> Result[List[Str], Error] {
-  if ! store.quiesce_dir.exists() {
-    return Ok([])
-  }
+  return Ok([]) unless store.quiesce_dir.exists()
   let names = collect {
     for entry in fs.children(store.quiesce_dir)? |> sort-by .name {
       if entry.name.ends_with(".json") {
@@ -1375,9 +1331,7 @@ export proc timer_quiesce_reconcile(
   var out = releases
   let names = timer_quiesce_names(store)?
   for name in names {
-    if timer_is_running(running, name) {
-      continue
-    }
+    continue when timer_is_running(running, name)
     let tracker = out.get(name) ?? TimerRelease(due_mono_ms: 0, attempts: 0, reported: false)
     let policy = match timer_release_policy(store, name) {
       Ok(value) => value
@@ -1390,9 +1344,7 @@ export proc timer_quiesce_reconcile(
       }
     }
     let decision = timer_release_due(tracker, now.mono_ms, policy.max_attempts)
-    if decision == "wait" {
-      continue
-    }
+    continue when decision == "wait"
     if decision == "exhausted" {
       if ! tracker.reported {
         timer_log(f"event=quiesce-release-exhausted name={name} attempts={tracker.attempts}")
@@ -1498,9 +1450,7 @@ proc timer_start(
 }
 
 proc timer_pid_alive(pid: Int) -> Bool {
-  if pid <= 0 {
-    return false
-  }
+  return false when pid <= 0
   match process.kill(pid, "0") {
     Ok(_) => true
     Err(_) => false,
@@ -1786,9 +1736,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
       timer_log(f"event=resume kind={observed} wall_delta_ms={now.wall_ms - previous.wall_ms} mono_delta_ms={now.mono_ms - previous.mono_ms}")
       if observed == "wall-backward" {
         for job in loaded.jobs {
-          if job.schedule != "calendar" or job.name in cancelled {
-            continue
-          }
+          continue when job.schedule != "calendar" or job.name in cancelled
           var runtime = runtimes.get(job.name) ?? timer_initial_runtime(job, states.get(job.name) ?? timer_state_new(job.name), now)
           let anchored = timer_calendar_next(job.hour, job.minute, now.wall_ms)
           if anchored != runtime.next_wall_ms {

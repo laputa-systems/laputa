@@ -358,9 +358,7 @@ test test_writer_record_refuses_foreign_or_malformed_input [error] {
 
 proc writer_group_live(pid: Int) -> Result[Bool, Error] {
   for entry in process.list()? {
-    if (entry.session ?? 0) == pid and ! entry.status.starts_with("Z") {
-      return Ok(true)
-    }
+    return Ok(true) when (entry.session ?? 0) == pid and ! entry.status.starts_with("Z")
   }
   Ok(false)
 }
@@ -502,9 +500,7 @@ proc release_rig(ctx: TestContext, name: Str, jobs: List[Str]) [fs, process, env
 
 proc release_calls(rig: ReleaseRig) -> Result[List[Str], Error] {
   let calls = fp"{rig.root}/calls.log"
-  if ! calls.exists() {
-    return Ok([])
-  }
+  return Ok([]) unless calls.exists()
   Ok(calls.read_text()?.lines() |> where .trim() != "" |> collect)
 }
 

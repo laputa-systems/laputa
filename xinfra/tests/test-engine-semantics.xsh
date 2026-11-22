@@ -31,9 +31,7 @@ proc lines_of(log: Path) [fs] -> List[Str] {
 
 pure first_index(lines: List[Str], needle: Str) -> Int {
   for index in range(lines.len()) {
-    if needle in lines[index] {
-      return index
-    }
+    return index when needle in lines[index]
   }
 
   -1

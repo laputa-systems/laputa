@@ -119,9 +119,7 @@ pure content_of(
 }
 
 pure validator_ok(id: Str, validate: List[Str]) -> Result[Unit, Error] {
-  if validate.is_empty() {
-    return
-  }
+  return when validate.is_empty()
 
   ctx f"file {id}" {
     check.argv_ok("validate", validate)?

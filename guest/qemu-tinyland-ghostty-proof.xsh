@@ -59,9 +59,7 @@ proc guest_find_input(name: Str, phase: Str) -> Result[Path, Error] {
   for entry in g"/dev/input/event*" {
     let candidate = fp"/sys/class/input/{entry.name}/device/name"
 
-    if candidate.exists() and candidate.read_text()?.trim() == name {
-      return entry
-    }
+    return entry when candidate.exists() and candidate.read_text()?.trim() == name
   }
 
   guest_fail(phase, f"no input device named {name}")
@@ -81,9 +79,7 @@ proc guest_pci_of_input(event_name: Str, phase: Str) -> Result[Str, Error] {
   }
 
   for component in physical.display().split("/") {
-    if component.starts_with("0000:") {
-      return component
-    }
+    return component when component.starts_with("0000:")
   }
 
   guest_fail(phase, f"no PCI parent for {event_name}")
@@ -92,9 +88,7 @@ proc guest_pci_of_input(event_name: Str, phase: Str) -> Result[Str, Error] {
 
 proc guest_process_alive(pid: Int) -> Result[Bool, Error] {
   for entry in process.list()? {
-    if entry.pid == pid {
-      return true
-    }
+    return true when entry.pid == pid
   }
 
   false
@@ -109,9 +103,7 @@ proc guest_wait_unit(name: Str, previous: Int, ready: Bool) -> Result[Int, Error
         let pid = json.get(status, ["pid"], 0).require(Int)?
         let state = json.get(status, ["state"], "").require(Str)?
         let is_ready = json.get(status, ["ready"], false).require(Bool)?
-        if state == "running" and (! ready or is_ready) and pid != previous {
-          return pid
-        }
+        return pid when state == "running" and (! ready or is_ready) and pid != previous
       }
     }
     time.sleep(1s)
@@ -133,7 +125,7 @@ proc guest_wait_session(runtime: Path, previous: Int) -> Result[Int, Error] {
           if session_id.exists() and pid != previous and guest_process_alive(pid) {
             if let Ok(expected) = session_id.read_text() {
               if let Ok(observed) = ready_id.read_text() {
-                if expected != "" and expected == observed { return pid }
+                return pid when expected != "" and expected == observed
               }
             }
           }
@@ -163,7 +155,7 @@ proc guest_wait_gl(previous: Int, phase: Str) -> Result[Int, Error] {
   var elapsed = 0
   while elapsed < 60 {
     let count = guest_gl_count()?
-    if count > previous { return count }
+    return count when count > previous
     time.sleep(1s)
     elapsed += 1
   }

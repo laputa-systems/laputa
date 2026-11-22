@@ -7,9 +7,7 @@ proc wait_for_port(port_file: Path, attempts: Int) -> Result[Int, Error] {
   while tries < attempts {
     if port_file.exists() {
       let text = port_file.read_text()?.trim()
-      if text != "" {
-        return text.parse_int_decimal()
-      }
+      return text.parse_int_decimal() when text != ""
     }
 
     time.sleep(100ms)
@@ -76,9 +74,7 @@ proc uv_reaches_http(ctx: TestContext, uv: Path, bundle: Path, port: Int, label:
   )
   let _ = process.run(command)?
   let text = stderr.read_text()?
-  if "invalid peer certificate" in text {
-    return false
-  }
+  return false when "invalid peer certificate" in text
 
   assert "unsatisfiable" in text, text
   true
@@ -142,9 +138,7 @@ proc cargo_reaches_registry(ctx: TestContext, cargo: Path, bundle: Path, port: I
   )
   let _ = process.run(command)?
   let text = stderr.read_text()?
-  if "SSL certificate" in text {
-    return false
-  }
+  return false when "SSL certificate" in text
 
   assert "config.json not found" in text, text
   true

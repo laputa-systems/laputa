@@ -29,9 +29,7 @@ proc read_header() [io, error] -> Result[Record, Error] {
 }
 
 proc maybe_json(file: Path) [fs, error] -> Result[Any, Error] {
-  if file.exists() {
-    return json.read(file)?
-  }
+  return json.read(file)? when file.exists()
   null
 }
 
@@ -60,9 +58,7 @@ proc inspect() [fs, error] -> Result[Record, Error] {
 }
 
 proc read_log(file: Path, count: Int) [fs, error] -> Result[Record, Error] {
-  if ! file.exists() {
-    return {path: file.display(), readable: true, lines: []}
-  }
+  return {path: file.display(), readable: true, lines: []} unless file.exists()
   match file.read_text() {
     Ok(text) => {
       let lines = text.lines()
@@ -153,9 +149,7 @@ proc validated_name(header: Record) [error] -> Result[Str, Error] {
 }
 
 proc incoming_names(root: Path) [fs, error] -> Result[List[Str], Error] {
-  if ! root.exists() {
-    return []
-  }
+  return [] unless root.exists()
   var names: List[Str] = []
   for entry in fs.children(root)? {
     if entry.name.starts_with(".incoming-") {
@@ -169,9 +163,7 @@ proc staged_state(header: Record) [env, fs, error] -> Result[Record, Error] {
   let root = staging_root()?
   let target = fp"{root}/{validated_name(header)?}"
   let incoming = incoming_names(root)?
-  if ! target.exists() {
-    return {present: false, size: 0, sha256: "", incoming: incoming}
-  }
+  return {present: false, size: 0, sha256: "", incoming: incoming} unless target.exists()
   {present: true, size: target.metadata()?.size, sha256: hash.sha256(target)?.hex(), incoming: incoming}
 }
 

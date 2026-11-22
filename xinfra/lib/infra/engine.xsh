@@ -253,9 +253,7 @@ proc fresh_material(resource: model.Resource) [fs, env, error] -> Result[compare
     return Ok(null)
   }
 
-  if spec.presence == .Absent {
-    return Ok(null)
-  }
+  return Ok(null) when spec.presence == .Absent
 
   let measured = content.measure(source)?
   Ok(measured)
@@ -347,13 +345,9 @@ pure with_fatal(state: HostState, phase: Str, message: Str) -> HostState {
 }
 
 pure blocked_reason(state: HostState, resource: model.Resource, aborted: Str?) -> Str? {
-  if aborted != null {
-    return aborted
-  }
+  return aborted when aborted != null
 
-  if state.stopped != null {
-    return state.stopped
-  }
+  return state.stopped when state.stopped != null
 
   let waiting = model.dependencies(resource) |> where { |id| id in state.unsettled } |> collect()
   if waiting.is_empty() { null } else { f"{waiting[0]} did not complete on this host" }
@@ -415,9 +409,7 @@ proc settle_lock(state: HostState, secrets: List[Str]) [fs, env, process, error]
   }
 
   let released = if let connection = state.connection { transport.usable(connection) and release_on(connection, held) } else { false }
-  if released or release_fresh(state.workload.host, held) {
-    return {...state, held: null}
-  }
+  return {...state, held: null} when released or release_fresh(state.workload.host, held)
 
   let note = f"the lock {held.path} is still held with token {held.token}; release it with: xinfra unlock INVENTORY {state.workload.host.name} --token {held.token}"
   {...state, held: null, fatal: clean(note, secrets), fatal_phase: "release"}
@@ -456,9 +448,7 @@ pure cancelled_host(state: HostState, secrets: List[Str]) -> report.HostReport {
   var entries = state.entries
   let known = recorded_ids(entries)
   for resource in state.workload.resources {
-    if resource.id in known {
-      continue
-    }
+    continue when resource.id in known
 
     var status = "blocked"
     var detail = "the apply was cancelled before this resource ran"
@@ -528,14 +518,10 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
   for id in prepared.operations {
     var steps: List[Step] = []
     for state in states.values() {
-      if state.fatal != null {
-        continue
-      }
+      continue when state.fatal != null
 
       let resource = find_resource(state.workload.resources, id)
-      if resource == null {
-        continue
-      }
+      continue when resource == null
 
       let reason = blocked_reason(state, resource, aborted)
       if reason == null {

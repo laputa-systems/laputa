@@ -102,18 +102,12 @@ pure ready_everywhere(id: Str, lists: List[List[Str]], placed: Set[Str]) -> Bool
 }
 
 pure earlier_placed(id: Str, list: List[Str], placed: Set[Str]) -> Bool {
-  if id not in list {
-    return true
-  }
+  return true when id not in list
 
   for other in list {
-    if other == id {
-      return true
-    }
+    return true when other == id
 
-    if other not in placed {
-      return false
-    }
+    return false when other not in placed
   }
 
   true

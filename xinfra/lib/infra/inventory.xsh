@@ -39,17 +39,13 @@ pure bool_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[Bool?, Error
 }
 
 pure list_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[List[Str], Error] {
-  if key not in entries.keys() {
-    return Ok([])
-  }
+  return Ok([]) when key not in entries.keys()
 
   ctx f"{what}.{key}" { Ok(entries.get(key)?.require(List[Str])?) }
 }
 
 pure vars_of(what: Str, entries: Map[Str, Any]) -> Result[Map[Str, Any], Error] {
-  if "vars" not in entries.keys() {
-    return Ok({})
-  }
+  return Ok({}) when "vars" not in entries.keys()
 
   table(entries.get("vars")?, f"{what}.vars")
 }
@@ -254,9 +250,7 @@ export proc load(file: Path) [fs, error] -> Result[Inventory, Error] {
 ## Choose hosts by name or group. Every limit must name a host or a group;
 ## the result keeps inventory order without repeats. No limit selects all.
 export pure select(inventory: Inventory, limit: List[Str]) -> Result[List[model.Host], Error] {
-  if limit.is_empty() {
-    return Ok(inventory.hosts)
-  }
+  return Ok(inventory.hosts) when limit.is_empty()
 
   for item in limit {
     let known = inventory.hosts |> any { |host| host.name == item or item in host.groups }

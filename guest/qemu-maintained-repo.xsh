@@ -16,9 +16,7 @@ proc say(message: Str) -> Result[Unit] {
 
 proc cmdline_value(name: Str) -> Result[Str] {
   for token in p"/proc/cmdline".read_text()?.words() {
-    if token.starts_with(f"{name}=") {
-      return token.split("=", 1)[1]
-    }
+    return token.split("=", 1)[1] when token.starts_with(f"{name}=")
   }
   fail f"{name} is missing from the kernel command line"
 }
@@ -33,9 +31,7 @@ proc wait_for_lease() {
   wait until lease.exists() within 90s every 200ms
   var waited = 0
   while waited < 90 {
-    if json.get(json.read(lease)?, ["state"], "").require(Str)? == "bound" {
-      return
-    }
+    return when json.get(json.read(lease)?, ["state"], "").require(Str)? == "bound"
     time.sleep(1s)
     waited += 1
   }

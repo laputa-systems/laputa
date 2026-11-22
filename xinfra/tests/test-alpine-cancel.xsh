@@ -167,17 +167,13 @@ proc assert_cancelled(cancelled: Cancelled, id: Str, kind: Str) [error] {
 
 proc rerun_status(invocation: Invocation, id: Str) [error] -> Str {
   for line in invocation.stdout.lines() {
-    if line.trim() == "" {
-      continue
-    }
+    continue when line.trim() == ""
 
     let record = json.decode(line)?.require(Record)?
     let kind = record.get("type")?.require(Str)?
     if kind == "entry" {
       let identity = record.get("id")?.require(Str)?
-      if identity == id {
-        return record.get("status")?.require(Str)?
-      }
+      return record.get("status")?.require(Str)? when identity == id
     }
   }
 

@@ -7,7 +7,7 @@ proc wait_for_port(port_file: Path) -> Result[Int, Error] {
   while attempts < 100 {
     if port_file.exists() {
       let text = port_file.read_text()?.trim()
-      if text != "" { return text.parse_int_decimal() }
+      return text.parse_int_decimal() when text != ""
     }
     time.sleep(100ms)
     attempts += 1

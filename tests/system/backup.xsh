@@ -67,9 +67,7 @@ type QuiesceBound = {transition_ms: Int, release_ms: Int, retry_ms: Int, attempt
 pure quiesce_flag(command: List[Str], flag: Str) -> Result[Int, Error] {
   var index = 0
   while index < command.len() - 1 {
-    if command[index] == flag {
-      return Ok(command[index + 1].parse_int()?)
-    }
+    return Ok(command[index + 1].parse_int()?) when command[index] == flag
     index += 1
   }
   Err(error.failure(f"the shipped quiesce command does not publish {flag}"))
