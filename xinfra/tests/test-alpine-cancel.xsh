@@ -260,7 +260,7 @@ test cancellation_before_and_after_a_directory_is_reported_from_the_target_side_
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
-    let deploy = write_deploy(dir, directory_body(base, mark, direction))?
+    let deploy = directory_body(base, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -314,7 +314,7 @@ test cancellation_before_and_after_a_file_is_reported_from_the_target_side_and_c
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
-    let deploy = write_deploy(dir, file_body(base, mark, direction))?
+    let deploy = file_body(base, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -371,7 +371,7 @@ test cancellation_before_and_after_a_symlink_is_reported_from_the_target_side_an
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
-    let deploy = write_deploy(dir, symlink_body(base, mark, direction))?
+    let deploy = symlink_body(base, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -426,7 +426,7 @@ test cancellation_before_and_after_a_command_is_reported_from_the_target_side_an
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
-    let deploy = write_deploy(dir, command_body(base, mark, direction))?
+    let deploy = command_body(base, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -472,7 +472,7 @@ test an_in_flight_command_cancellation_is_unknown_blocks_dependents_and_is_not_r
   let lock_path = f"{base}.lock"
   let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
   let _ = testing.remote_text(host, "mkdir -p -- \"$1\" && : > \"$1/hold\"", [mark])?
-  let deploy = write_deploy(dir, held_command_body(base, mark))?
+  let deploy = held_command_body(base, mark) |> write_deploy(dir, _)?
   let cancelled = cancelled_inflight(
     dir,
     inventory,
@@ -517,7 +517,7 @@ test an_in_flight_file_transfer_cancellation_is_unknown_and_never_publishes_a_pa
   let base = f"/var/tmp/{testing.scratch_name(dir)}-inflight-file"
   let blob = fp"{dir}/artifact.bin"
   run dd if=/dev/urandom of=$blob bs=1M count=40 status=none
-  let deploy = write_deploy(dir, file_stream_body(base, blob))?
+  let deploy = file_stream_body(base, blob) |> write_deploy(dir, _)?
   let lock_path = f"{base}.lock"
   let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [base], privileged: true)?
   let cancelled = cancelled_inflight(
@@ -583,7 +583,7 @@ test cancellation_before_and_after_a_package_and_package_index_is_reported_and_c
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
     let _ = testing.remote_text(host, "apk del -q zstd >/dev/null 2>&1 || true", [], privileged: true)?
-    let deploy = write_deploy(dir, package_body(mark, direction))?
+    let deploy = package_body(mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -611,7 +611,7 @@ test cancellation_before_and_after_a_package_and_package_index_is_reported_and_c
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
-    let deploy = write_deploy(dir, package_index_body(mark, direction))?
+    let deploy = package_index_body(mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -657,7 +657,7 @@ test cancellation_before_and_after_a_group_is_reported_from_the_target_side_and_
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
     let _ = testing.remote_text(host, "delgroup \"$1\" >/dev/null 2>&1 || true", [name], privileged: true)?
-    let deploy = write_deploy(dir, group_body(name, mark, direction))?
+    let deploy = group_body(name, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -711,7 +711,7 @@ test cancellation_before_and_after_a_user_is_reported_from_the_target_side_and_c
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
     let _ = testing.remote_text(host, "deluser \"$1\" >/dev/null 2>&1 || true", [name], privileged: true)?
-    let deploy = write_deploy(dir, user_body(name, mark, direction))?
+    let deploy = user_body(name, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -782,7 +782,7 @@ test cancellation_before_and_after_a_service_is_reported_from_the_target_side_an
     let lock_path = f"{base}.lock"
     service_cleanup(host, name)
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
-    let deploy = write_deploy(dir, service_body(name, quick_service_script, mark, direction))?
+    let deploy = service_body(name, quick_service_script, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -820,11 +820,11 @@ test an_in_flight_service_notification_cancellation_is_unknown_and_converges { |
   let name = f"xi{token.byte_slice(0, 10)}"
   service_cleanup(host, name)
   let lock_path = f"/var/tmp/{testing.scratch_name(dir)}-inflight-service.lock"
-  let first_deploy = write_deploy(dir, service_notify_body(name, "1", notify_service_script, f"/var/tmp/{name}.mark"))?
+  let first_deploy = service_notify_body(name, "1", notify_service_script, f"/var/tmp/{name}.mark") |> write_deploy(dir, _)?
   let first = apply_again(dir, inventory, host, first_deploy, lock_path)?
   assert first.code == 0, first.stderr
   assert "started" in testing.remote_text(host, "rc-service \"$1\" status 2>&1 || true", [name], privileged: true)?
-  let deploy = write_deploy(dir, service_notify_body(name, "2", notify_service_script, f"/var/tmp/{name}.mark"))?
+  let deploy = service_notify_body(name, "2", notify_service_script, f"/var/tmp/{name}.mark") |> write_deploy(dir, _)?
   let cancelled = cancelled_inflight(
     dir,
     inventory,

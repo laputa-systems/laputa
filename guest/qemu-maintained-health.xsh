@@ -78,8 +78,7 @@ proc main() {
   let encoded = json.encode(report)?
   p"/run/laputa-health.json".write(encoded + "\n")
   p"/dev/console".write(f"LAPUTA_ACTIVATION_HEALTH {encoded}\n")
-  let failed = boot_failed_id(cmdline)?
-  let marker = boot_marker_line(id, serial, failed, report.root_digest, report.profile, services)?
+  let marker = boot_failed_id(cmdline)? |> boot_marker_line(id, serial, _, report.root_digest, report.profile, services)?
   var pre_lines = []
   if p"/var/log/boot-markers.log".exists() {
     pre_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect

@@ -955,8 +955,7 @@ proc included_kbuild_file(root: Path, line: Str, vars: Map[Str], config: Kconfig
 
   return null when spec == "" or " " in spec or "$(" in spec or spec.starts_with("/")
 
-  let rel = normalize_rel_path(fp"{spec}")
-  join_root(root, rel)
+  normalize_rel_path(fp"{spec}") |> join_root(root, _)
 }
 
 pure parse_assignment_at(line: Str, marker: Str, marker_len: Int, index: Int) -> ParsedAssignment {
@@ -2229,8 +2228,7 @@ proc scan_flat_kbuild(
 
     if eligible_plan_assignment(line) {
       if let Ok(assign) = parse_assignment(line) {
-        let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
-        let lhs = active_var_lhs(expanded_lhs)
+        let lhs = expand_vars(assign.lhs, vars, config, srcarch) |> active_var_lhs(_)
 
         if lhs != "" {
           let rhs = expand_vars(assign.rhs, vars, config, srcarch)
@@ -2342,8 +2340,7 @@ proc scan_discover_dir(
 
     if eligible_plan_assignment(line) {
       if let Ok(assign) = parse_assignment(line) {
-        let expanded_lhs = expand_vars(assign.lhs, vars, config, srcarch)
-        let lhs = active_var_lhs(expanded_lhs)
+        let lhs = expand_vars(assign.lhs, vars, config, srcarch) |> active_var_lhs(_)
 
         if lhs != "" {
           let rhs = expand_vars(assign.rhs, vars, config, srcarch)

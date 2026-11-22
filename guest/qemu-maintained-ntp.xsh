@@ -69,7 +69,7 @@ proc stratum(text: Str) -> Result[Int] {
 proc wait_synchronized() -> Result[Int] {
   var waited = 0
   while waited < sync_seconds {
-    let level = stratum(status_text()?)?
+    let level = status_text()? |> stratum(_)?
     return level when level < 16
     time.sleep(1s)
     waited += 1
@@ -108,7 +108,7 @@ proc wall_minus_monotonic() -> Result[Int] {
 
 proc sync_phase() {
   let first = service_pid(0)?
-  let early = stratum(status_text()?)?
+  let early = status_text()? |> stratum(_)?
   guard early == 16 else { fail f"readiness already reported stratum {early}" }
   console("LAPUTA_NTP_DRILL_READY_UNSYNCHRONIZED stratum=16")
   let level = wait_synchronized()?

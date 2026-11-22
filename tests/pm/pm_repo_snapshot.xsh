@@ -308,7 +308,7 @@ proc stage_snapshot_dir(ctx: TestContext, name: Str, which: Str) -> Result[Path]
 }
 
 test test_publish_snapshot_binds_index_advances_and_freezes [fs, net, env, time, error] { |ctx|
-  let remote_root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let remote_root = fixture("index.json") |> stage_snapshot_remote(ctx, _)?
   let remote_url = f"file://{remote_root}"
   let both_keys = [key_bytes("signing-key")?, key_bytes("next-key")?]
   let work = test.temp_dir(ctx, name: "snapshot-publish-work")?
@@ -339,7 +339,7 @@ test test_publish_snapshot_binds_index_advances_and_freezes [fs, net, env, time,
 }
 
 test test_publish_snapshot_rejects_unbound_and_incomplete_inputs [fs, net, env, time, error] { |ctx|
-  let remote_root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let remote_root = fixture("index.json") |> stage_snapshot_remote(ctx, _)?
   let remote_url = f"file://{remote_root}"
   let both_keys = [key_bytes("signing-key")?, key_bytes("next-key")?]
   let work = test.temp_dir(ctx, name: "snapshot-publish-reject-work")?
@@ -373,7 +373,7 @@ test test_publish_snapshot_rejects_unbound_and_incomplete_inputs [fs, net, env, 
 }
 
 test test_publish_snapshot_refuses_to_replace_a_legacy_publication [fs, net, env, time, error] { |ctx|
-  let root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let root = fixture("index.json") |> stage_snapshot_remote(ctx, _)?
   fixture("snapshot-v1/metadata").copy(to: fp"{root}/snapshot.json")
   fixture("snapshot-v1/metadata.sig").copy(to: fp"{root}/snapshot.sig")
   let before = fp"{root}/snapshot.json".read_bytes()?
@@ -713,7 +713,7 @@ test test_signed_index_requires_digests_for_every_referenced_artifact [fs, error
 }
 
 test test_snapshot_publication_retry_repairs_missing_commit_signature [fs, net, env, time, error] { |ctx|
-  let root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let root = fixture("index.json") |> stage_snapshot_remote(ctx, _)?
   let release = stage_snapshot_dir(ctx, "retry-release", "snapshot-gen1")?
   let work = test.temp_dir(ctx, name: "retry-work")?
   let url = f"file://{root}"

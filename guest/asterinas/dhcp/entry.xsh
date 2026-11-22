@@ -105,7 +105,7 @@ proc watch_states(label: Str, duration_ms: Int) {
   var sequence = []
   let deadline = elapsed_ms()? + duration_ms
   while elapsed_ms()? < deadline {
-    let state = significant(client_state())
+    let state = client_state() |> significant(_)
     if sequence.is_empty() or sequence[sequence.len() - 1] != state { sequence += [state] }
     time.sleep(POLL_MS * 1ms)
   }

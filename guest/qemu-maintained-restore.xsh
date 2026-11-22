@@ -187,7 +187,7 @@ proc phase_backup() {
     }
   }
   fp"{backup_mount}/snap1.id".write(ids[0] + "\n")
-  let manifest = hash_manifest(identity_files()?)?
+  let manifest = identity_files()? |> hash_manifest(_)?
   fp"{backup_mount}/hashes-before.txt".write(manifest)
   let _ = rustic(["key", "remove", first_key], pw2)?
   let denied = process.run(
@@ -291,8 +291,7 @@ proc phase_verify() {
   let snap1_listing = rustic(["find", snap1, "--path", "/etc/passwd"], pw2)?
   console(f"RESTORE_SNAP1_BEGIN\n{snap1_listing}RESTORE_SNAP1_END")
   let _ = rustic(["backup", "--exclude-if-present", ".no-backup", @backup_sources()], pw2)?
-  let listed = rustic(["snapshots", "--json"], pw2)?
-  let ids = snapshot_ids(listed)?
+  let ids = rustic(["snapshots", "--json"], pw2)? |> snapshot_ids(_)?
   guard snap1 in ids else { fail "the backup snapshot is gone from the repo" }
   guard ids.len() >= 2 else { fail "re-backup produced no new snapshot" }
   let snap2 = [id for id in ids if id != snap1][-1]
