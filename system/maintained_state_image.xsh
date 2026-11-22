@@ -7,7 +7,7 @@ proc main(...argv: List[Str]) [fs, process, error] {
   }
   let root = Path(argv[0])
   let output = Path(argv[1])
-  let size = argv[2].parse_int()?
+  let size = argv[2] as Int
   let formatter = Path(argv[3])
   let xsh = Path(argv[4])
   let owners = first_boot.state_ownership(root)?

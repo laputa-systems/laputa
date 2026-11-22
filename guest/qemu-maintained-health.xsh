@@ -57,7 +57,7 @@ proc main() {
   return when ids.is_empty() and serials.is_empty()
   guard ids.len() == 1 and serials.len() == 1 else { fail "ambiguous boot selection" }
   let id = ids[0].replace("LAPUTA_GENERATION_ID=", with: "")
-  let serial = serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "").trim().parse_int()?
+  let serial = serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "").trim() as Int
   wait until ready() within 30s every 100ms
   let receipt = json.read(p"/run/laputa-running-generation.json")?
   let services: List[Record] = collect {

@@ -181,7 +181,7 @@ proc main() [fs, process, env, time, net, error] {
   )
 
   let block_numbers = p"/sys/class/block/vda/dev".read_text()?.trim().split(":")
-  let expected_rdev = block_numbers[0].parse_int()? * 256 + block_numbers[1].parse_int()?
+  let expected_rdev = block_numbers[0] as Int * 256 + block_numbers[1] as Int
 
   for round in range(3) {
     if round > 0 {

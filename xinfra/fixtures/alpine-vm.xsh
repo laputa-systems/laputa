@@ -182,7 +182,7 @@ proc start_qemu(base: Path, vm: Vm) -> Result[Int] {
     fail f"qemu for {vm.name} did not write {pidfile}"
   }
 
-  Ok(pidfile.read_text()?.trim().parse_int()?)
+  Ok(pidfile.read_text()?.trim() as Int)
 }
 
 proc seed_text(name: Str, run_id: Str, pubkey: Str) -> Str {

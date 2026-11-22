@@ -44,7 +44,7 @@ pure be32(value: Int) -> Result[Bytes, Error] {
 
 pure ipv4(text: Str) -> Result[Int, Error] {
   var value = 0
-  for part in text.split(".") { value = value * 256 + part.parse_int()? }
+  for part in text.split(".") { value = value * 256 + part as Int }
   Ok(value)
 }
 

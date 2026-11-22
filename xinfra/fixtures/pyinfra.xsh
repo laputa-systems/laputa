@@ -87,7 +87,7 @@ proc probe_of(container: Str, script: Str) -> Result[Str] {
 
 proc fixture_container(inventory: Path, host: Str) -> Result[Str] {
   let state = json.read(fp"{inventory.parent()}/containers.json")?.require(State)?
-  let index = host.replace("fx-", with: "").parse_int()? - 1
+  let index = host.replace("fx-", with: "") as Int - 1
   Ok(state.containers[index])
 }
 

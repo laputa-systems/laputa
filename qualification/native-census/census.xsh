@@ -51,7 +51,7 @@ proc defined_symbols(binary: Path, sized: Bool) [fs, process, env, error] -> Res
     for line in listing.lines() {
       let fields = line.fields()
       if sized and fields.len() == 4 {
-        yield {name: normalize_symbol(fields[3]), size: fields[1].parse_uint()?}
+        yield {name: normalize_symbol(fields[3]), size: fields[1] as UInt}
       } else if sized == false and fields.len() == 3 {
         yield {name: normalize_symbol(fields[2]), size: 0}
       }

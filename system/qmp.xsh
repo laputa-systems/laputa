@@ -24,7 +24,7 @@ proc qmp_frame(fd: Int, pending: Bytes, deadline: Int) -> Result[QmpFrame, Error
     if !endings.is_empty() {
       let end = endings[0].start
       return Err(QmpError.Protocol("QMP frame exceeds 1 MiB")) when end > 1048576
-      let message = json.decode(buffer.slice(0, end).utf8()?)?
+      let message = json.decode(buffer.slice(0, end) as Str)?
       return Err(QmpError.Protocol("QMP deadline expired")) when time.monotonic()? >= deadline
       return {message, pending: buffer.slice(end + 1)}
     }

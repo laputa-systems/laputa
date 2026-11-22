@@ -198,7 +198,7 @@ proc guest_rss_kb(pid: Int) -> Result[Int, Error] {
   let status = fp"/proc/{pid}/status".read_text()?
   for line in status.split("\n") {
     if line.starts_with("VmRSS:") {
-      return line.split(":")[1].trim().split(" ")[0].parse_int()?
+      return line.split(":")[1].trim().split(" ")[0] as Int
     }
   }
   0
@@ -293,7 +293,7 @@ proc main() [fs, process, time, error] {
   guest_tick("unplugged")
   time.sleep(2s)
 
-  let survivor_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
+  let survivor_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim() as Int
 
   if !guest_process_alive(survivor_pid) {
     for log in [p"/var/log/tinyland/current", p"/var/log/seatd/current"] {
@@ -373,7 +373,7 @@ proc main() [fs, process, time, error] {
   ), "play-gpu-next")
   guest_console("LAPUTA_TINYLAND_PLAY_GPU_NEXT_OK")
 
-  let idle_tinyland = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
+  let idle_tinyland = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim() as Int
   let idle_ghostty = [entry.pid for entry in process.list()? if entry.command == "ghostty-custom"]
   if idle_ghostty.len() == 1 {
     guest_console(f"LAPUTA_TINYLAND_RSS tinyland_kb={guest_rss_kb(idle_tinyland)?} ghostty_kb={guest_rss_kb(idle_ghostty[0])?}")

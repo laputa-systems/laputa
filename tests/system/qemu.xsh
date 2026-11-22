@@ -451,7 +451,7 @@ test test_qemu_supervisor_does_not_replay_input_and_reaps_qemu_after_disconnect 
     Err(problem) => assert "OutcomeIndeterminate" in problem.message, problem.message,
   }
   assert fp"{fixture.outputs.root}/native-events".read_lines()?.len() == 1
-  let pid = fixture.qemu_pid.read_text()?.trim().parse_int()?
+  let pid = fixture.qemu_pid.read_text()?.trim() as Int
   for entry in process.list()? {
     assert entry.pid != pid, f"QEMU process {pid} remained after input failure"
   }

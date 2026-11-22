@@ -14,7 +14,7 @@ test hostile_arguments_arrive_byte_for_byte {
   let result = transport.exec(connection, .EchoArguments, hostile)?
   assert result.code == 0
   let expected = hostile |> map { |word| word + "\0" } |> collect()
-  assert result.stdout.utf8()? == expected.join("")
+  assert result.stdout as Str == expected.join("")
 }
 
 test a_nonzero_exit_is_an_execution_not_an_error {

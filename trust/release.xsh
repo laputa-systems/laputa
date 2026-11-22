@@ -49,7 +49,7 @@ proc release_require(condition: Bool, message: Str) [error] {
 ## Parses one exact signed-release metadata document.
 export proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMetadata, Error] {
   release_require(! message.is_empty() and message.len() <= MAX_METADATA_BYTES, "signed metadata size is invalid")
-  let text = message.utf8()?
+  let text = message as Str
   release_require(text.ends_with("\n") and "\r" not in text, "signed metadata must use LF-terminated UTF-8 lines")
   let lines = text.byte_slice(0, text.byte_len() - 1).split("\n")
   release_require(lines.len() == 6 and lines[0] == "laputa-trust-release-v2", "signed metadata header or field count is invalid")

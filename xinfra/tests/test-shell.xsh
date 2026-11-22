@@ -36,7 +36,7 @@ test quote_round_trips_hostile_values_through_a_real_shell {
     let command = shell.command(script, [value, "second"])?
     let out = run.capture --bytes sh -c $command
     assert out.status.ok, f"exit for {value}"
-    assert out.stdout.utf8()? == value + "\0second\0"
+    assert out.stdout as Str == value + "\0second\0"
   }
 }
 
@@ -75,5 +75,5 @@ test random_hostile_words_round_trip_through_a_real_shell_as_single_arguments {
   let out = run.capture --bytes sh -c $command
   assert out.status.ok
   let expected = words |> map { |word| word + "\0" } |> collect()
-  assert out.stdout.utf8()? == expected.join("")
+  assert out.stdout as Str == expected.join("")
 }

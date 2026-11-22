@@ -78,7 +78,7 @@ proc path_from(connection: transport.Connection, target: Str) [fs, process, erro
     fail f"path state exited {execution.code}: {execution.stderr.utf8() ?? ""}"
   }
 
-  Ok(probe.path_fact(execution.stdout.utf8()?))
+  Ok(probe.path_fact(execution.stdout as Str))
 }
 
 test the_xsh_dialect_round_trips_hostile_arguments_as_literals {
@@ -86,7 +86,7 @@ test the_xsh_dialect_round_trips_hostile_arguments_as_literals {
   let result = transport.exec(connection, .EchoArguments, hostile)?
   assert result.code == 0
   let expected = hostile |> map { |word| word + "\0" } |> collect()
-  assert result.stdout.utf8()? == expected.join("")
+  assert result.stdout as Str == expected.join("")
 }
 
 test posix_operations_still_resolve_to_the_original_constants {
@@ -179,8 +179,8 @@ test the_xsh_xinit_probe_reports_the_same_service_facts_as_the_posix_script { |c
       let expected = transport.exec(posix, .XinitServiceState, [name])?
       let actual = transport.exec(xsh, .XinitServiceState, [name])?
       assert expected.code == 0 and actual.code == 0
-      let actual_text = actual.stdout.utf8()?
-      assert service_description(probe.xinit_service_fact(actual_text)) == service_description(probe.xinit_service_fact(expected.stdout.utf8()?)), f"{name}: {actual_text}"
+      let actual_text = actual.stdout as Str
+      assert service_description(probe.xinit_service_fact(actual_text)) == service_description(probe.xinit_service_fact(expected.stdout as Str)), f"{name}: {actual_text}"
     }
   }
 }
@@ -215,7 +215,7 @@ test the_xsh_capability_probe_reports_the_running_identity {
   let connection = connect(testing.local_xsh_host())?
   let execution = transport.exec(connection, .Capabilities)?
   assert execution.code == 0
-  let found = probe.capabilities(execution.stdout.utf8()?)?
+  let found = probe.capabilities(execution.stdout as Str)?
   assert found.uid == user.current()?.uid
   assert "xinit" in found.present or "xinit" in found.absent
 }

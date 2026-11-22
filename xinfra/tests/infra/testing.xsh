@@ -95,7 +95,7 @@ export proc remote_text(host: model.Host, script: Str, args: List[Str] = [], pri
     fail f"exit {execution.code}: {execution.stderr.utf8() ?? ""}"
   }
 
-  Ok(execution.stdout.utf8()?)
+  Ok(execution.stdout as Str)
 }
 
 ## Skip controller-target tests whose scripts require Linux facilities.

@@ -2277,7 +2277,7 @@ export let service = {{
 
   let control = {XINIT_SERVICE_DIR: service_dir.display(), XINIT_RUN_DIR: run_dir.display(), XINIT_LOG_ROOT: log_root.display(), XINIT_TEST_ALLOW_NON_PID1: "1"}
   let started = xinit_text(ctx, ["start", "stubborn"], control)?
-  let pid = rx"pid=([0-9]+)".captures(started)[1].parse_int()?
+  let pid = rx"pid=([0-9]+)".captures(started)[1] as Int
   var tries = 0
   while ! marker.exists() and tries < 200 {
     time.sleep(25ms)
@@ -2330,7 +2330,7 @@ export let service = {
   })?
   assert scan == ""
   let saved = fp"{run_dir}/crasher.json".read_text()?
-  let restarts = rx"\x22restarts\x22:([0-9]+)".captures(saved)[1].parse_int()?
+  let restarts = rx"\x22restarts\x22:([0-9]+)".captures(saved)[1] as Int
   assert restarts >= 1, saved
   assert fp"{log_root}/crasher/current".read_text()?.lines().len() >= 2
 }

@@ -30,8 +30,8 @@ export pure raster(image: Bytes) -> Result[Raster, Error] {
   while (image.byte_at(newline) ?? 10) != 10 { newline += 1 }
   let dimensions = image.slice(3, newline - 3).utf8()?.split(" ")
   guard dimensions.len() == 2 else { fail "screenshot header lacks its dimensions" }
-  let width = dimensions[0].parse_int()?
-  let height = dimensions[1].parse_int()?
+  let width = dimensions[0] as Int
+  let height = dimensions[1] as Int
   let offset = newline + 5
   guard image.len() >= offset + width * height * 3 else { fail "screenshot is shorter than its header" }
   {data: image, offset, width, height}

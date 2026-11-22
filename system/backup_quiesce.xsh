@@ -470,7 +470,7 @@ proc quiesce_main(...argv: List[Str]) [fs, process, time, io, error] {
   }
   let qe = quiesce_env_default()
   if parsed.action == "stop" {
-    return quiesce_acquire(qe, e"LAPUTA_TIMER_NAME" ?? "", (e"LAPUTA_TIMER_ATTEMPT" ?? "0").parse_int()?, parsed)
+    return quiesce_acquire(qe, e"LAPUTA_TIMER_NAME" ?? "", (e"LAPUTA_TIMER_ATTEMPT" ?? "0") as Int, parsed)
   }
   let job = if parsed.action == "reconcile" { parsed.services[0] } else { e"LAPUTA_TIMER_NAME" ?? "" }
   guard QUIESCE_JOB_RE.matches(job) else {

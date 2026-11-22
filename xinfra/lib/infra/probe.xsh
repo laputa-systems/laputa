@@ -154,7 +154,7 @@ pure group_line(line: Str) -> Result[fact.GroupInfo, Error] {
   }
 
   let members = if parts[3] == "" { [] } else { parts[3].split(",") }
-  Ok(fact.GroupInfo(name: parts[0], gid: parts[2].parse_int()?, members:))
+  Ok(fact.GroupInfo(name: parts[0], gid: parts[2] as Int, members:))
 }
 
 pure passwd_line(line: Str, groups: List[fact.GroupInfo]) -> Result[fact.UserInfo, Error] {
@@ -164,13 +164,13 @@ pure passwd_line(line: Str, groups: List[fact.GroupInfo]) -> Result[fact.UserInf
   }
 
   let name = parts[0]
-  let gid = parts[3].parse_int()?
+  let gid = parts[3] as Int
   let owners = groups |> where .gid == gid |> map .name |> collect()
   let primary: Str? = if owners.is_empty() { null } else { owners[0] }
   let memberships = groups |> where name in .members |> map .name |> collect()
   Ok(fact.UserInfo(
     name:,
-    uid: parts[2].parse_int()?,
+    uid: parts[2] as Int,
     gid:,
     group: primary,
     home: parts[5],
@@ -316,7 +316,7 @@ export pure capabilities(stdout: Str) -> Result[Capabilities, Error] {
     } else if line.starts_with("lack ") {
       absent += [line.byte_slice(5)]
     } else if line.starts_with("uid ") {
-      uid = line.byte_slice(4).parse_int()?
+      uid = line.byte_slice(4) as Int
     }
   }
 

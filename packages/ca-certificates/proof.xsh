@@ -73,7 +73,7 @@ proc main(rootfs = p"/rootfs") [fs, error] {
 
   let paths = trust_store.trust_store_paths(rootfs)
   let seed_bundle = trust_store.seed_bundle_path(paths.root).read_bytes()?
-  let seed_body = seed_bundle.utf8()?
+  let seed_body = seed_bundle as Str
   let cert_count = seed_body.split("-----BEGIN CERTIFICATE-----").len() - 1
   ensure(cert_count == 118, "ca-certificates-bundle", f"expected 118 certificates, found {cert_count}")
   ensure(

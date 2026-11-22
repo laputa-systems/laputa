@@ -1717,7 +1717,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
 
   let notify = e"NOTIFY_FD" ?? ""
   if ! notify.is_empty() {
-    let channel = notify.parse_int()?
+    let channel = notify as Int
     assert unix.write_fd(channel, b"r")? == 1
     unix.close_fd(channel)
   }

@@ -96,7 +96,7 @@ test trust_tls_accepts_trusted_chain [fs, process, env, time, net, error] { |ctx
   let url = f"https://127.0.0.1:{server.port}/hello"
   let response = https_get(url, bundle, "trust-tls-accept")?
   assert response.status == 200
-  assert response.body.utf8()? == "hello fixture\n"
+  assert response.body as Str == "hello fixture\n"
   net.close_pool("trust-tls-accept")
 }
 
@@ -212,7 +212,7 @@ test trust_tls_long_lived_service_recovers_by_recreating_pool [fs, process, env,
   let _ = net.pool("trust-tls-service-next", 4, 1s)?
   let recovered = https_get(second_url, service_bundle, "trust-tls-service-next")?
   assert recovered.status == 200
-  assert recovered.body.utf8()? == "service payload\n"
+  assert recovered.body as Str == "service payload\n"
   served += 1
   assert served == 2
   net.close_pool("trust-tls-service-next")
