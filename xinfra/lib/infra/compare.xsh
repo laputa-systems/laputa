@@ -171,7 +171,7 @@ pure compare_file(spec: model.FileSpec, material: Material?, state: fact.PathSta
         let wanted = material?.digest ?? ""
         let changes: List[Change] = collect {
           if info.digest != wanted {
-            let from = if spec.sensitive { redacted } else { short(info.digest ?? "") }
+            let from = if spec.sensitive { redacted } else { short(info.digest) }
             let to = if spec.sensitive { redacted } else { short(wanted) }
             yield change("content", from, to)
           }
