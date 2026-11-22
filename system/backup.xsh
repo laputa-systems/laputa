@@ -493,15 +493,13 @@ proc backup_run_hook(hook: BackupHook?, label: Str) -> Result[Unit, Error] {
 
 proc backup_new_snapshot(config: BackupConfig, before: List[Str]) -> Result[Str, Error] {
   let text = backup_rustic(config, ["backup", "--json", "--exclude-if-present", config.exclude_if_present, @config.sources], "backup")?
-  match json.decode(text) {
-    Ok(value) => {
-      let id = json.get(value, ["id"], "").require(Str) ?? ""
-      if backup_snapshot_id_ok(id) {
-        return Ok(id)
-      }
+  if let Ok(value) = json.decode(text) {
+    let id = json.get(value, ["id"], "").require(Str) ?? ""
+    if backup_snapshot_id_ok(id) {
+      return Ok(id)
     }
-    Err(_) => {}
   }
+
   let listed = backup_list_snapshots(config, "snapshots-after-backup")?
   for id in listed {
     if ! (id in before) {

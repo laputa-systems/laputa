@@ -2292,9 +2292,10 @@ export let service = {{
   var alive = true
   var waits = 0
   while alive and waits < 100 {
-    alive = match fp"/proc/{pid}/stat".read_text() {
-      Ok(stat) => ! stat.split(") ")[-1].starts_with("Z"),
-      Err(_) => false,
+    alive = if let Ok(stat) = fp"/proc/{pid}/stat".read_text() {
+      ! stat.split(") ")[-1].starts_with("Z")
+    } else {
+      false
     }
     waits += 1
     time.sleep(20ms)

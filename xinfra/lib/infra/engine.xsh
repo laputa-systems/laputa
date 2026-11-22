@@ -62,9 +62,10 @@ pure planned_change(mode: Mode, verdict: compare.Verdict) -> Bool {
 
 pure material_for(prepared: workload.Prepared, host: Str, resource: model.Resource) -> compare.Material? {
   let found = prepared.materials.get(workload.material_key(host, resource.id))
-  match found {
-    Ok(material) => material
-    Err(_) => null
+  if let Ok(material) = found {
+    material
+  } else {
+    null
   }
 }
 
@@ -147,17 +148,16 @@ pure unknown_at(phase: outcome.Phase, message: Str) -> outcome.Outcome {
 }
 
 pure skip_reason(spec: model.Spec) -> Str {
-  match spec {
-    model.Exec(command) => {
-      match command.guard {
-        model.Creates(target) => f"{target} already exists"
-        model.SkipIf(_) => "the skip guard succeeded"
-        model.OnlyIf(_) => "the only-if guard failed"
-        model.OnChange => "no triggering resource changed"
-        model.Always => "always runs"
-      }
+  if let model.Exec(command) = spec {
+    match command.guard {
+      model.Creates(target) => f"{target} already exists"
+      model.SkipIf(_) => "the skip guard succeeded"
+      model.OnlyIf(_) => "the only-if guard failed"
+      model.OnChange => "no triggering resource changed"
+      model.Always => "always runs"
     }
-    else => "condition not met"
+  } else {
+    "condition not met"
   }
 }
 
@@ -221,23 +221,26 @@ proc run_drift(
   drift: compare.Drift,
   material: compare.Material?,
 ) [fs, env, process, error] -> outcome.Outcome {
-  match mutate.apply(connection, resource, state, drift, declared_content(resource), material) {
-    Err(failure) => outcome.of_error(failure)
-    Ok(_) => confirm(connection, resource, drift, material)
+  if let Err(failure) = mutate.apply(connection, resource, state, drift, declared_content(resource), material) {
+    outcome.of_error(failure)
+  } else {
+    confirm(connection, resource, drift, material)
   }
 }
 
 pure declared_content(resource: model.Resource) -> model.Content? {
-  match resource.spec {
-    model.File(spec) => spec.content
-    else => null
+  if let model.File(spec) = resource.spec {
+    spec.content
+  } else {
+    null
   }
 }
 
 pure file_spec(resource: model.Resource) -> model.FileSpec? {
-  match resource.spec {
-    model.File(spec) => spec
-    else => null
+  if let model.File(spec) = resource.spec {
+    spec
+  } else {
+    null
   }
 }
 

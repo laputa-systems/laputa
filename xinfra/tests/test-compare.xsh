@@ -29,16 +29,18 @@ pure denied() -> fact.Fact {
 const none: List[Str] = []
 
 pure fields(verdict: compare.Verdict) -> List[Str] {
-  match verdict {
-    compare.Drifted(drift) => drift.changes |> map { |change| change.field } |> collect()
-    else => []
+  if let compare.Drifted(drift) = verdict {
+    drift.changes |> map { |change| change.field } |> collect()
+  } else {
+    []
   }
 }
 
 pure act(verdict: compare.Verdict) -> compare.Act? {
-  match verdict {
-    compare.Drifted(drift) => drift.act
-    else => null
+  if let compare.Drifted(drift) = verdict {
+    drift.act
+  } else {
+    null
   }
 }
 
@@ -118,18 +120,19 @@ test a_sensitive_file_never_shows_its_digests {
   let resource = declare.file(id: "f", at: "/etc/f", secret_env: "TOKEN")?
   let material = compare.Material(digest: sha("a"), size: 1)
   let verdict = compare.verdict(resource.spec, found(info(.Regular, digest: sha("b"))), material, none)
-  match verdict {
-    compare.Drifted(drift) => {
-      for change in drift.changes {
-        assert change.from == "(redacted)" and change.to == "(redacted)"
-      }
+  if let compare.Drifted(drift) = verdict {
+    for change in drift.changes {
+      assert change.from == "(redacted)" and change.to == "(redacted)"
     }
-    else => assert false, "no drift"
+  } else {
+    assert false, "no drift"
   }
+
   let created = compare.verdict(resource.spec, gone(), material, none)
-  match created {
-    compare.Drifted(drift) => assert drift.changes[0].to == "(redacted)"
-    else => assert false, "no drift"
+  if let compare.Drifted(drift) = created {
+    assert drift.changes[0].to == "(redacted)"
+  } else {
+    assert false, "no drift"
   }
 }
 
@@ -278,12 +281,11 @@ test restart_supersedes_reload_and_each_is_one_notification {
   let reloaded = compare.verdict(resource.spec, up, null, ["a", "b"])
   assert fields(reloaded) == ["notify"]
   let both = compare.verdict(resource.spec, up, null, ["a", "b", "c"])
-  match both {
-    compare.Drifted(drift) => {
-      assert drift.changes.len() == 1
-      assert drift.changes[0].to == "restart"
-    }
-    else => assert false, "no drift"
+  if let compare.Drifted(drift) = both {
+    assert drift.changes.len() == 1
+    assert drift.changes[0].to == "restart"
+  } else {
+    assert false, "no drift"
   }
 }
 
@@ -299,9 +301,15 @@ test an_xinit_service_plans_from_its_status_not_from_enablement {
   assert fields(compare.verdict(resource.spec, xinit_fact(.Stopped, false), null, none)) == ["running"]
   assert fields(compare.verdict(resource.spec, xinit_fact(.Crashed, false), null, none)) == ["running"]
   assert compare.verdict(resource.spec, .OnService(fact.NoService), null, none) is .Uncertain(_)
-  match compare.verdict(resource.spec, .OnService(.ServiceUnseen(fact.Unreadable(cause: .Denied, detail: "no"))), null, none) {
-    compare.Uncertain(unreadable) => assert unreadable.cause == .Denied
-    else => assert false, "an unreadable status was not uncertain"
+  if let compare.Uncertain(unreadable) = compare.verdict(
+    resource.spec,
+    .OnService(.ServiceUnseen(fact.Unreadable(cause: .Denied, detail: "no"))),
+    null,
+    none,
+  ) {
+    assert unreadable.cause == .Denied
+  } else {
+    assert false, "an unreadable status was not uncertain"
   }
 
   let stopped = declare.xinit_service(id: "s", name: "logger", running: false)?
@@ -314,13 +322,13 @@ test an_xinit_trigger_restarts_or_reloads_once_per_apply {
   assert compare.verdict(resource.spec, xinit_fact(.Started, true), null, none) is .Satisfied
   assert fields(compare.verdict(resource.spec, xinit_fact(.Started, true), null, ["a"])) == ["notify"]
   let both = compare.verdict(resource.spec, xinit_fact(.Started, true), null, ["a", "b"])
-  match both {
-    compare.Drifted(drift) => {
-      assert drift.changes.len() == 1
-      assert drift.changes[0].to == "restart"
-    }
-    else => assert false, "no drift"
+  if let compare.Drifted(drift) = both {
+    assert drift.changes.len() == 1
+    assert drift.changes[0].to == "restart"
+  } else {
+    assert false, "no drift"
   }
+
   assert compare.verdict(resource.spec, xinit_fact(.Stopped, false), null, ["a"]) is .Satisfied
 }
 

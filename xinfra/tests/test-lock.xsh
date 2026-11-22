@@ -8,13 +8,13 @@ test only_one_controller_holds_the_lock_at_a_time { |ctx|
   let connection = transport.connect(testing.local_host())?
   let held = lock.acquire(connection, lock_dir)?
   assert held.token != ""
-  match lock.acquire(connection, lock_dir) {
-    Err(lock.LockError.Contended {holder}) => {
-      assert held.token in holder
-      assert "xinfra controller" in holder
-    }
-    else => assert false, "a second controller took the lock"
+  if let Err(lock.LockError.Contended {holder}) = lock.acquire(connection, lock_dir) {
+    assert held.token in holder
+    assert "xinfra controller" in holder
+  } else {
+    assert false, "a second controller took the lock"
   }
+
   lock.release(connection, held)
   let again = lock.acquire(connection, lock_dir)?
   assert again.token != held.token

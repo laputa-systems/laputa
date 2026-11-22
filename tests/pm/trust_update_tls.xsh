@@ -81,12 +81,11 @@ proc https_get(url: Str, bundle: Path, pool: Str) [fs, net, time, error] -> Resu
 }
 
 test trust_tls_accepts_trusted_chain [fs, process, env, time, net, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let bundle = test.temp_path(ctx, name: "trust-tls-bundle.pem")
@@ -104,12 +103,11 @@ test trust_tls_accepts_trusted_chain [fs, process, env, time, net, error] { |ctx
 }
 
 test trust_tls_rejects_untrusted_chain [fs, process, env, time, net, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let bundle = test.temp_path(ctx, name: "trust-tls-reject-bundle.pem")
@@ -129,12 +127,11 @@ test trust_tls_rejects_untrusted_chain [fs, process, env, time, net, error] { |c
 }
 
 test trust_tls_poisoned_client_requires_recreation [fs, process, env, time, net, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let bundle = test.temp_path(ctx, name: "trust-tls-poison-bundle.pem")
@@ -161,12 +158,11 @@ test trust_tls_poisoned_client_requires_recreation [fs, process, env, time, net,
   net.close_pool("trust-tls-poison-new")
 }
 test trust_tls_unrelated_chains_keep_working [fs, process, env, time, net, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let bundle = test.temp_path(ctx, name: "trust-tls-control-bundle.pem")
@@ -183,12 +179,11 @@ test trust_tls_unrelated_chains_keep_working [fs, process, env, time, net, error
 }
 
 test trust_tls_long_lived_service_recovers_by_recreating_pool [fs, process, env, time, net, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let routes = fixture_routes(ctx, "trust-tls-service-routes", "service payload\n")?

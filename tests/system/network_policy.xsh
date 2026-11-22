@@ -128,9 +128,10 @@ test test_captured_docker_observation_reproduces_foreign_ownership_conflict [fs,
   assert record.input.owned.addresses.is_empty()
   assert record.input.owned.routes.is_empty()
   for attempt in [1, 2] {
-    match policy.network_plan(record.input.intent, record.input.owned, record.input.observed) {
-      Err(problem) => assert problem.message == record.error
-      Ok(_) => assert false
+    if let Err(problem) = policy.network_plan(record.input.intent, record.input.owned, record.input.observed) {
+      assert problem.message == record.error
+    } else {
+      assert false
     }
   }
 }
@@ -155,9 +156,10 @@ test test_vm_capture_replays_partial_failure_without_rollback_or_foreign_adoptio
   for foreign in record.input.observed.addresses {
     assert foreign in record.observed.addresses
   }
-  match policy.network_plan(record.input.intent, record.input.owned, record.observed) {
-    Err(problem) => assert problem.message == "desired address is foreign; ownership cannot be inferred"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(record.input.intent, record.input.owned, record.observed) {
+    assert problem.message == "desired address is foreign; ownership cannot be inferred"
+  } else {
+    assert false
   }
 }
 
@@ -172,9 +174,10 @@ test test_capture_selection_accepts_ordinary_default_and_refuses_tos_specific_de
   let record = capture.select_capture(docker_dump(0))?
   assert record.error == "desired address is foreign; ownership cannot be inferred"
   assert record.input.observed.routes == [{gateway: "172.17.0.1", metric: 0}]
-  match capture.select_capture(docker_dump(8)) {
-    Err(problem) => assert problem.message == "selected route is outside the supported main-table unicast cohort"
-    Ok(_) => assert false
+  if let Err(problem) = capture.select_capture(docker_dump(8)) {
+    assert problem.message == "selected route is outside the supported main-table unicast cohort"
+  } else {
+    assert false
   }
 }
 
@@ -225,15 +228,18 @@ test test_ipv4_zero_metric_is_not_rewritten_to_the_ipv6_default [error] {
 test test_ipv6_settled_cohort_plans_nothing_and_keeps_foreign_resources [error] {
   let plan = policy.network_plan(intent6(), owned6(), snapshot6())?
   assert plan.operations.is_empty()
-  match policy.network_plan(intent6(), empty_owned(), snapshot6()) {
-    Err(problem) => assert problem.message == "desired address is foreign; ownership cannot be inferred"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(intent6(), empty_owned(), snapshot6()) {
+    assert problem.message == "desired address is foreign; ownership cannot be inferred"
+  } else {
+    assert false
   }
+
   var without_address = snapshot6()
   without_address.addresses = [{local: "2001:db8:ff::2", prefix: 64}]
-  match policy.network_plan(intent6(), empty_owned(), without_address) {
-    Err(problem) => assert problem.message == "desired route is foreign; ownership cannot be inferred"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(intent6(), empty_owned(), without_address) {
+    assert problem.message == "desired route is foreign; ownership cannot be inferred"
+  } else {
+    assert false
   }
 }
 
@@ -261,9 +267,10 @@ test test_ipv6_intent_must_be_canonical_global_unicast_text [error] {
   for text in invalid {
     var desired = intent6()
     desired.address.local = text
-    match policy.network_plan(desired, empty_owned(), observed) {
-      Err(problem) => assert problem.message == "invalid IPv6 intent or observation sequence", text
-      Ok(_) => assert false, f"{text} was accepted"
+    if let Err(problem) = policy.network_plan(desired, empty_owned(), observed) {
+      assert problem.message == "invalid IPv6 intent or observation sequence", text
+    } else {
+      assert false, f"{text} was accepted"
     }
   }
   for text in ["2001:db8::2", "2001:db8:0:1:1:1:1:1", "2001:db8::1:0:0:1", "2001:db8::", "3fff::1", "fec0::1", "2000::1"] {
@@ -279,9 +286,10 @@ test test_ipv6_prefix_and_gateway_bounds_and_family_agreement [error] {
   for prefix in [0, 129, -1] {
     var desired = intent6()
     desired.address.prefix = prefix
-    match policy.network_plan(desired, empty_owned(), observed) {
-      Err(problem) => assert problem.message == "invalid IPv6 intent or observation sequence"
-      Ok(_) => assert false, f"prefix {prefix} was accepted"
+    if let Err(problem) = policy.network_plan(desired, empty_owned(), observed) {
+      assert problem.message == "invalid IPv6 intent or observation sequence"
+    } else {
+      assert false, f"prefix {prefix} was accepted"
     }
   }
   for prefix in [1, 64, 128] {
@@ -292,9 +300,10 @@ test test_ipv6_prefix_and_gateway_bounds_and_family_agreement [error] {
   for gateway in ["::", "::1", "ff02::1", "192.0.2.1", "FE80::1", "fe80:0:0:0:0:0:0:1", "fe80::1%eth0", ""] {
     var desired = intent6()
     desired.gateway = gateway
-    match policy.network_plan(desired, empty_owned(), observed) {
-      Err(problem) => assert problem.message == "invalid IPv6 intent or observation sequence", gateway
-      Ok(_) => assert false, f"gateway {gateway} was accepted"
+    if let Err(problem) = policy.network_plan(desired, empty_owned(), observed) {
+      assert problem.message == "invalid IPv6 intent or observation sequence", gateway
+    } else {
+      assert false, f"gateway {gateway} was accepted"
     }
   }
   for gateway in ["fe80::1", "2001:db8:1::1", "fe80::ff:fe00:3201"] {
@@ -304,38 +313,50 @@ test test_ipv6_prefix_and_gateway_bounds_and_family_agreement [error] {
   }
   var v4_with_v6_gateway = intent()
   v4_with_v6_gateway.gateway = "fe80::1"
-  match policy.network_plan(v4_with_v6_gateway, owned(), snapshot()) {
-    Err(problem) => assert problem.message == "invalid IPv4 intent or observation sequence"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(v4_with_v6_gateway, owned(), snapshot()) {
+    assert problem.message == "invalid IPv4 intent or observation sequence"
+  } else {
+    assert false
   }
 }
 
 test test_a_cohort_never_mixes_address_families [error] {
-  match policy.network_plan(intent6(), empty_owned(), snapshot()) {
-    Err(problem) => assert problem.message == "observed cohort holds an address outside the intent's IPv6 family"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(intent6(), empty_owned(), snapshot()) {
+    assert problem.message == "observed cohort holds an address outside the intent's IPv6 family"
+  } else {
+    assert false
   }
+
   var only_route: policy.NetworkSnapshot = {...snapshot6(), addresses: [], routes: [{gateway: "192.0.2.1", metric: 100}]}
-  match policy.network_plan(intent6(), empty_owned(), only_route) {
-    Err(problem) => assert problem.message == "observed cohort holds a default route outside the intent's IPv6 family"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(intent6(), empty_owned(), only_route) {
+    assert problem.message == "observed cohort holds a default route outside the intent's IPv6 family"
+  } else {
+    assert false
   }
-  match policy.network_plan(intent6(), owned(), snapshot6()) {
-    Err(problem) => assert problem.message == "ownership holds an address outside the intent's IPv6 family"
-    Ok(_) => assert false
+
+  if let Err(problem) = policy.network_plan(intent6(), owned(), snapshot6()) {
+    assert problem.message == "ownership holds an address outside the intent's IPv6 family"
+  } else {
+    assert false
   }
+
   let route_only: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [], routes: [{gateway: "192.0.2.1", metric: 100}]}
-  match policy.network_plan(intent6(), route_only, snapshot6()) {
-    Err(problem) => assert problem.message == "ownership holds a default route outside the intent's IPv6 family"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(intent6(), route_only, snapshot6()) {
+    assert problem.message == "ownership holds a default route outside the intent's IPv6 family"
+  } else {
+    assert false
   }
-  match policy.network_plan(intent(), owned6(), snapshot()) {
-    Err(problem) => assert problem.message == "ownership holds an address outside the intent's IPv4 family"
-    Ok(_) => assert false
+
+  if let Err(problem) = policy.network_plan(intent(), owned6(), snapshot()) {
+    assert problem.message == "ownership holds an address outside the intent's IPv4 family"
+  } else {
+    assert false
   }
-  match policy.network_plan(intent(), owned(), snapshot6()) {
-    Err(problem) => assert problem.message == "observed cohort holds an address outside the intent's IPv4 family"
-    Ok(_) => assert false
+
+  if let Err(problem) = policy.network_plan(intent(), owned(), snapshot6()) {
+    assert problem.message == "observed cohort holds an address outside the intent's IPv4 family"
+  } else {
+    assert false
   }
 }
 
@@ -343,19 +364,22 @@ test test_ipv6_address_present_with_another_prefix_is_refused_before_a_kernel_co
   var observed = snapshot6()
   observed.addresses = [{local: "2001:db8:1::2", prefix: 128}]
   observed.routes = []
-  match policy.network_plan(intent6(), empty_owned(), observed) {
-    Err(problem) => assert problem.message == "desired IPv6 address is present with another prefix; explicit reconciliation required"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(intent6(), empty_owned(), observed) {
+    assert problem.message == "desired IPv6 address is present with another prefix; explicit reconciliation required"
+  } else {
+    assert false
   }
 }
 
 test test_ipv6_default_route_metric_occupancy_is_per_family [error] {
   var observed = snapshot6()
   observed.routes = [{gateway: "fe80::9", metric: 1024}]
-  match policy.network_plan(intent6(), owned6(), observed) {
-    Err(problem) => assert problem.message == "default route metric is occupied; explicit reconciliation required"
-    Ok(_) => assert false
+  if let Err(problem) = policy.network_plan(intent6(), owned6(), observed) {
+    assert problem.message == "default route metric is occupied; explicit reconciliation required"
+  } else {
+    assert false
   }
+
   observed.routes = [{gateway: "fe80::9", metric: 100}]
   let plan = policy.network_plan(intent6(), owned6(), observed)?
   assert plan.operations == [policy.NetworkAddDefaultRoute({gateway: "fe80::1", metric: 1024})]

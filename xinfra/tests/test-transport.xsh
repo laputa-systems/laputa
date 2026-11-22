@@ -40,9 +40,10 @@ test stdin_bytes_and_files_reach_the_script_unchanged {
 
 test a_command_killed_by_a_signal_is_abnormal_not_exit_zero {
   let connection = local()?
-  match transport.exec_script(connection, "kill -TERM $$") {
-    Err(transport.TransportError.Abnormal {message}) => assert "signal" in message
-    else => assert false, "a signal death was not abnormal"
+  if let Err(transport.TransportError.Abnormal {message}) = transport.exec_script(connection, "kill -TERM $$") {
+    assert "signal" in message
+  } else {
+    assert false, "a signal death was not abnormal"
   }
 }
 
@@ -63,9 +64,10 @@ test a_nul_in_an_argument_is_refused_before_anything_runs {
 }
 
 test certainty_is_read_from_the_typed_error_of_the_native_client {
-  match ssh.connect({}) {
-    Err(error) => assert transport.certainty_of(error) == .NotSubmitted
-    Ok(_) => assert false, "an empty option record connected"
+  if let Err(error) = ssh.connect({}) {
+    assert transport.certainty_of(error) == .NotSubmitted
+  } else {
+    assert false, "an empty option record connected"
   }
 }
 

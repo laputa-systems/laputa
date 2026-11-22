@@ -15,9 +15,10 @@ proc guest_console(message: Str) [fs, error] {
 # Phase timing for lifecycle recovery claims: boot-relative seconds from the
 # guest clock, logged raw and parsed on the host.
 proc guest_tick(label: Str) {
-  match p"/proc/uptime".read_text() {
-    Ok(text) => guest_console(f"LAPUTA_TINYLAND_T {label} uptime={text.trim()}")
-    Err(_) => guest_console(f"LAPUTA_TINYLAND_T {label} uptime=unknown")
+  if let Ok(text) = p"/proc/uptime".read_text() {
+    guest_console(f"LAPUTA_TINYLAND_T {label} uptime={text.trim()}")
+  } else {
+    guest_console(f"LAPUTA_TINYLAND_T {label} uptime=unknown")
   }
 }
 
@@ -251,27 +252,22 @@ proc main() [fs, process, time, error] {
   # effective modes before the unprivileged session needs them. The mdevd
   # catch-all would set root:root 0660 here, which the session cannot use.
   for node in [p"/dev/ptmx", p"/dev/console"] {
-    match node.metadata() {
-      Ok(meta) => {
-        guest_console(f"LAPUTA_TINYLAND_NODE {node.display()} mode={meta.mode % 4096}")
-      },
-      Err(_) => {
-        guest_fail("device-nodes", f"missing {node.display()}")
-      },
+    if let Ok(meta) = node.metadata() {
+      guest_console(f"LAPUTA_TINYLAND_NODE {node.display()} mode={meta.mode % 4096}")
+    } else {
+      guest_fail("device-nodes", f"missing {node.display()}")
     }
   }
-  match p"/run/seatd.sock".metadata() {
-    Ok(meta) => {
-      guest_console(f"LAPUTA_TINYLAND_NODE /run/seatd.sock mode={meta.mode % 4096}")
-
-      if meta.mode % 4096 != 0o770 {
-        guest_fail("seatd-socket", f"unexpected seatd socket mode {meta.mode % 4096}")
-      }
-    },
-    Err(_) => {
-      guest_fail("seatd-socket", "missing seatd socket")
-    },
+  if let Ok(meta) = p"/run/seatd.sock".metadata() {
+    guest_console(f"LAPUTA_TINYLAND_NODE /run/seatd.sock mode={meta.mode % 4096}")
+  
+    if meta.mode % 4096 != 0o770 {
+      guest_fail("seatd-socket", f"unexpected seatd socket mode {meta.mode % 4096}")
+    }
+  } else {
+    guest_fail("seatd-socket", "missing seatd socket")
   }
+
   let account = user.lookup("laputa")?
   let runtime = fp"/run/user/{account.uid}"
   guest_run_required(process.command_argv(

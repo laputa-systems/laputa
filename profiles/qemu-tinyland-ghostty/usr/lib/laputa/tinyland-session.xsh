@@ -73,14 +73,12 @@ proc main() [fs, process, env, error] {
   guard input_count > 0 else { fail "no input devices available for mediation proof" }
   p"/dev/console".write("LAPUTA_TINYLAND_DIRECT_DENIED\n")
   fp"{runtime}/laputa-direct-denied".write("denied\n")
-  match p"/dev/ptmx".metadata() {
-    Ok(meta) => {
-      p"/dev/console".write(f"LAPUTA_TINYLAND_PTMX mode={meta.mode % 4096}\n")
-    },
-    Err(_) => {
-      p"/dev/console".write("LAPUTA_TINYLAND_PTMX_MISSING\n")
-    },
+  if let Ok(meta) = p"/dev/ptmx".metadata() {
+    p"/dev/console".write(f"LAPUTA_TINYLAND_PTMX mode={meta.mode % 4096}\n")
+  } else {
+    p"/dev/console".write("LAPUTA_TINYLAND_PTMX_MISSING\n")
   }
+
   let session_id = f"{process.current_pid()?}"
   fp"{runtime}/laputa-session-id".write(session_id)
   env ({

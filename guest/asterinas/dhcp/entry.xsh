@@ -46,9 +46,10 @@ pure significant(state: Str) -> Str {
 proc client_state() -> Str {
   let status = fp"{WORK}/run/eth0.status"
   guard status.exists() else { return "none" }
-  match json.read(status) {
-    Ok(parsed) => parsed.require(ClientStatus)?.state
-    Err(_) => "unreadable"
+  if let Ok(parsed) = json.read(status) {
+    parsed.require(ClientStatus)?.state
+  } else {
+    "unreadable"
   }
 }
 
@@ -171,14 +172,11 @@ proc messages(label: Str, capture: Int) [fs, process, net, time, error] {
   time.sleep(300ms)
   var previous = ""
   while unix.poll_fd(capture, ["readable"], 0)? != [] {
-    match unix.read_fd(capture, 2048) {
-      Ok(frame) => {
-        if let text = client_message(frame) {
-          if text != previous { eprint --flush f"NET_DHCP_{label}_MSG {text}" }
-          previous = text
-        }
+    if let Ok(frame) = unix.read_fd(capture, 2048) {
+      if let text = client_message(frame) {
+        if text != previous { eprint --flush f"NET_DHCP_{label}_MSG {text}" }
+        previous = text
       }
-      Err(_) => {}
     }
   }
 }

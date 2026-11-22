@@ -128,15 +128,14 @@ export pure package_fact(stdout: Str) -> fact.PackageState {
         "gt" => .Newer
         else => null
       }
-      match table.get("version") {
-        Ok(version) => {
-          if table.get("ordering") is Ok("unknown") {
-            .PackageUnseen(malformed(f"apk could not order version {version}"))
-          } else {
-            .Installed(fact.InstalledPackage(version:, ordering:))
-          }
+      if let Ok(version) = table.get("version") {
+        if table.get("ordering") is Ok("unknown") {
+          .PackageUnseen(malformed(f"apk could not order version {version}"))
+        } else {
+          .Installed(fact.InstalledPackage(version:, ordering:))
         }
-        Err(_) => .PackageUnseen(malformed("package report has no version"))
+      } else {
+        .PackageUnseen(malformed("package report has no version"))
       }
     }
     "unavailable" => .PackageUnseen(fact.Unreadable(cause: .Unavailable, detail: "apk database is not readable"))

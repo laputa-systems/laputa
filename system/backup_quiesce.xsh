@@ -80,9 +80,10 @@ pure quiesce_int_option(argv: List[Str], index: Int, flag: Str, low: Int, high: 
   guard index < argv.len() else {
     return Err(f"{flag} requires a value")
   }
-  let value = match argv[index].parse_int() {
-    Ok(parsed) => parsed,
-    Err(_) => { return Err(f"{flag} requires an integer") },
+  let value = if let Ok(parsed) = argv[index].parse_int() {
+    parsed
+  } else {
+    return Err(f"{flag} requires an integer")
   }
   guard value >= low and value <= high else {
     return Err(f"{flag} must be {low}..{high}")
@@ -447,9 +448,10 @@ proc quiesce_supervised(qe: QuiesceEnv, job: Str, attempt: Int) -> Result[Unit, 
 }
 
 proc quiesce_boot_id() -> Str {
-  match p"/proc/sys/kernel/random/boot_id".read_text() {
-    Ok(text) => text.trim()
-    Err(_) => ""
+  if let Ok(text) = p"/proc/sys/kernel/random/boot_id".read_text() {
+    text.trim()
+  } else {
+    ""
   }
 }
 

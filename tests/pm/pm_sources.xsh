@@ -80,12 +80,11 @@ test test_repository_staging_excludes_build_and_harness_outputs [fs, net, proces
   fp"{source}/.work/tmp".mkdir(parents: true)
   fp"{source}/target/debug".mkdir(parents: true)
   fp"{source}/target/debug/tool".write("stale executable\n")
-  let python = match process.which("python3") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("python3 is unavailable to bind the fixture socket")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found
+  } else {
+    test.skip("python3 is unavailable to bind the fixture socket")
+    return
   }
   run $python "-c" "import os,socket,sys; os.chdir(sys.argv[1]); s=socket.socket(socket.AF_UNIX); s.bind('test.sock')" fp"{source}/.work/tmp"
   let dest = fp"{root}/staged"
@@ -520,12 +519,11 @@ version = "1.0.0"
 source = "{owned_crate.item.source}"
 checksum = "{owned_crate.item.checksum}"
 """)
-  let cargo = match process.which("cargo") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("cargo is unavailable to read the vendored lockfile")
-      return
-    },
+  let cargo = if let Ok(found) = process.which("cargo") {
+    found
+  } else {
+    test.skip("cargo is unavailable to read the vendored lockfile")
+    return
   }
   let cargo_home = test.temp_dir(ctx, name: "registry-empty-cargo-home")?
   let vendor_config = f"source.vendored-sources.directory=\"{src}/vendor\""
@@ -650,12 +648,11 @@ forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
   fp"{src}/src".mkdir()
   fp"{src}/src/lib.rs".write("pub fn answer() -> u32 { forked::answer() }\n")
   lockfile.copy(to: fp"{src}/Cargo.lock")
-  let cargo = match process.which("cargo") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("cargo is unavailable to read the staged git workspace")
-      return
-    },
+  let cargo = if let Ok(found) = process.which("cargo") {
+    found
+  } else {
+    test.skip("cargo is unavailable to read the staged git workspace")
+    return
   }
   let cargo_home = test.temp_dir(ctx, name: "git-workspace-empty-cargo-home")?
   let config = fp"{src}/git-fork/.cargo-source.toml"
@@ -676,12 +673,11 @@ forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
 }
 
 test test_source_downloads_name_their_client_to_hosts_that_require_one [fs, net, process, time, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture HTTP server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found
+  } else {
+    test.skip("python3 is unavailable for the fixture HTTP server")
+    return
   }
   let root = test.temp_dir(ctx, name: "agent-download")?
   let port_file = fp"{root}/port"

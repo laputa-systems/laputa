@@ -25,15 +25,12 @@ proc guest_bootstrap_insmod_one(ctx: GuestBootstrap, name: Str, phase: Str) {
     Ok(_) => {},
     Err(problem) => {
       var seen = ""
-      match fs.children(fp"/lib/modules") {
-        Ok(entries) => {
-          for entry in entries {
-            seen = f"{seen} {entry.name}"
-          }
-        },
-        Err(_) => {
-          seen = "<unlistable>"
-        },
+      if let Ok(entries) = fs.children(fp"/lib/modules") {
+        for entry in entries {
+          seen = f"{seen} {entry.name}"
+        }
+      } else {
+        seen = "<unlistable>"
       }
 
       return guest_bootstrap_fail_phase(ctx, phase, f"insmod {name}: {problem.message}; exists={fp"/lib/modules/{name}.ko".exists()?}; entries={seen}")
@@ -77,23 +74,17 @@ proc guest_bootstrap_wait_for_dev_vda(ctx: GuestBootstrap, phase: Str) {
   while ! p"/dev/vda".exists() {
     guard elapsed < 30 else {
       var seen = ""
-      match fs.children(fp"/dev") {
-        Ok(entries) => {
-          for entry in entries {
-            seen = f"{seen} {entry.name}"
-          }
-        },
-        Err(_) => {
-          seen = "<unlistable>"
-        },
+      if let Ok(entries) = fs.children(fp"/dev") {
+        for entry in entries {
+          seen = f"{seen} {entry.name}"
+        }
+      } else {
+        seen = "<unlistable>"
       }
 
       var mounts = "<unreadable>"
-      match p"/proc/mounts".read_text() {
-        Ok(text) => {
-          mounts = text
-        },
-        Err(_) => {},
+      if let Ok(text) = p"/proc/mounts".read_text() {
+        mounts = text
       }
 
       return guest_bootstrap_fail_phase(ctx, phase, f"missing /dev/vda after 30s; dev=[{seen}] mounts=[{mounts}]")

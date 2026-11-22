@@ -144,12 +144,9 @@ export proc connect_all(hosts: List[model.Host], jobs: Int) [error] -> List[Resu
       continue
     }
 
-    match refusals.get(host.name) {
-      Ok(refusal) => {
-        results += [Err(refusal)]
-        continue
-      }
-      Err(_) => {}
+    if let Ok(refusal) = refusals.get(host.name) {
+      results += [Err(refusal)]
+      continue
     }
 
     match opened[next] {
@@ -169,9 +166,10 @@ export proc usable(connection: Connection) [error] -> Bool {
     return true
   }
 
-  match ssh.info(session) {
-    Ok(info) => info.usable
-    Err(_) => false
+  if let Ok(info) = ssh.info(session) {
+    info.usable
+  } else {
+    false
   }
 }
 

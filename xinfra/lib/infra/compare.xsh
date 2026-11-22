@@ -405,47 +405,54 @@ pure compare_command(spec: model.CommandSpec, state: fact.Fact, changed: List[St
 export pure verdict(spec: model.Spec, state: fact.Fact, material: Material?, changed: List[Str]) -> Verdict {
   match spec {
     model.Directory(directory) => {
-      match state {
-        fact.OnPath(path_state) => compare_directory(directory, path_state)
-        else => mismatch("directory")
+      if let fact.OnPath(path_state) = state {
+        compare_directory(directory, path_state)
+      } else {
+        mismatch("directory")
       }
     }
     model.File(file) => {
-      match state {
-        fact.OnPath(path_state) => compare_file(file, material, path_state)
-        else => mismatch("file")
+      if let fact.OnPath(path_state) = state {
+        compare_file(file, material, path_state)
+      } else {
+        mismatch("file")
       }
     }
     model.Link(link) => {
-      match state {
-        fact.OnPath(path_state) => compare_symlink(link, path_state)
-        else => mismatch("symlink")
+      if let fact.OnPath(path_state) = state {
+        compare_symlink(link, path_state)
+      } else {
+        mismatch("symlink")
       }
     }
     model.Package(package) => {
-      match state {
-        fact.OnPackage(package_state) => compare_package(package, package_state)
-        else => mismatch("package")
+      if let fact.OnPackage(package_state) = state {
+        compare_package(package, package_state)
+      } else {
+        mismatch("package")
       }
     }
     model.PackageIndex(_) => Unevaluated("the package index is refreshed only at apply")
     model.GroupAccount(account_group) => {
-      match state {
-        fact.OnGroup(group_state) => compare_group(account_group, group_state)
-        else => mismatch("group")
+      if let fact.OnGroup(group_state) = state {
+        compare_group(account_group, group_state)
+      } else {
+        mismatch("group")
       }
     }
     model.UserAccount(account) => {
-      match state {
-        fact.OnUser(user_state) => compare_user(account, user_state)
-        else => mismatch("user")
+      if let fact.OnUser(user_state) = state {
+        compare_user(account, user_state)
+      } else {
+        mismatch("user")
       }
     }
     model.Exec(command) => compare_command(command, state, changed)
     model.Service(service) => {
-      match state {
-        fact.OnService(service_state) => compare_service(service, service_state, changed)
-        else => mismatch("service")
+      if let fact.OnService(service_state) = state {
+        compare_service(service, service_state, changed)
+      } else {
+        mismatch("service")
       }
     }
   }

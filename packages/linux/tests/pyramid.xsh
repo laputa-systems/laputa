@@ -53,10 +53,16 @@ proc pyramid_reject_stop(stage: kbuild_verify.LinuxKbuildStop, outcome: Result[U
 
 test test_pyramid_kernel_stop_requires_exact_kind_and_stage [fs, env, time, process, error] { |ctx|
   let source = pyramid_kernel_source(ctx)?
-  match kbuild_verify.linux_kbuild_verify_stopped(kbuild_verify.Prepare, Err(PyramidStopError.Failed("original cause")), source) {
-    Err(PyramidStopError.Failed {message}) => assert message == "original cause"
-    else => test.fail("kernel stop verification lost the original error family")
+  if let Err(PyramidStopError.Failed {message}) = kbuild_verify.linux_kbuild_verify_stopped(
+    kbuild_verify.Prepare,
+    Err(PyramidStopError.Failed("original cause")),
+    source,
+  ) {
+    assert message == "original cause"
+  } else {
+    test.fail("kernel stop verification lost the original error family")
   }
+
   for stage in [kbuild_verify.Prepare, kbuild_verify.Discover, kbuild_verify.Plan] {
     kbuild_verify.linux_kbuild_verify_stopped(stage, pyramid_stop(stage), source)
     pyramid_reject_stop(stage, Ok(), source)

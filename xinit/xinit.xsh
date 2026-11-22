@@ -2227,9 +2227,9 @@ proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: P
     Ok(opened) => opened
     Err(failure) => {
       let info = fs.stat(path_value, follow_symlinks: false)
-      let uid = match info { Ok(value) => value.uid, Err(_) => -1 }
-      let kind = match info { Ok(value) => value.kind, Err(_) => "" }
-      let oversized = match info { Ok(value) => value.size > control_request_limit, Err(_) => false }
+      let uid = if let Ok(value) = info { value.uid } else { -1 }
+      let kind = if let Ok(value) = info { value.kind } else { "" }
+      let oversized = if let Ok(value) = info { value.size > control_request_limit } else { false }
       let reason = if kind != "" and kind != "file" {
         "not-a-single-regular-file"
       } else if oversized {
@@ -2238,24 +2238,22 @@ proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: P
         failure.message
       }
       eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={reason}"
-      match info {
-        Ok(value) => {
-          if value.kind == "dir" {
-            let target = fp"{inbox_dir()?}/{name}"
-            match fs.rename_noreplace(path_value, target) {
-              Ok(_) => {}
-              Err(_) => {
-                let key = bytes.from_text(name).sha256().hex()
-                let refused = fp"{path_value.parent()}/.refused-{key}-{process.current_pid()?}-{time.monotonic()?}"
-                fs.rename_noreplace(path_value, refused)
-              }
+      if let Ok(value) = info {
+        if value.kind == "dir" {
+          let target = fp"{inbox_dir()?}/{name}"
+          match fs.rename_noreplace(path_value, target) {
+            Ok(_) => {}
+            Err(_) => {
+              let key = bytes.from_text(name).sha256().hex()
+              let refused = fp"{path_value.parent()}/.refused-{key}-{process.current_pid()?}-{time.monotonic()?}"
+              fs.rename_noreplace(path_value, refused)
             }
-          } else {
-            processing.remove(leaf)
           }
+        } else {
+          processing.remove(leaf)
         }
-        Err(_) => {}
       }
+
       return out
     }
   }

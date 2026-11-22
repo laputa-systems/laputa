@@ -175,22 +175,27 @@ test test_zero_metric_route_changes_never_reach_a_request [error] {
   let raised: policy.NetworkIntent = {ifindex: 7, name: "veth-test", address: {local: "192.0.2.2", prefix: 24}, gateway: "192.0.2.1", metric: 200}
   let plan = policy.network_plan(raised, owned, observed)?
   assert plan.operations == [policy.NetworkAddDefaultRoute({gateway: "192.0.2.1", metric: 200}), policy.NetworkRemoveDefaultRoute({gateway: "192.0.2.1", metric: 0})]
-  match kernel.network_changes(plan) {
-    Err(problem) => assert problem.message == "a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"
-    Ok(_) => assert false, "a zero-metric removal was encoded"
+  if let Err(problem) = kernel.network_changes(plan) {
+    assert problem.message == "a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"
+  } else {
+    assert false, "a zero-metric removal was encoded"
   }
+
   assert kernel.network_change(plan, 0) == Ok(net_state.AddRoute({family: .Inet, table: net_state.TABLE_MAIN, destination: null, prefix: 0, source: null, source_prefix: 0, preferred_source: null, tos: 0, priority: 200, protocol: 3, scope: 0, route_type: 1, flags: 0, hops: [{ifindex: 7, gateway: "192.0.2.1"}], other_attributes: []}))
-  match kernel.network_change(plan, 1) {
-    Err(problem) => assert problem.message == "a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"
-    Ok(_) => assert false, "a zero-metric removal was encoded"
+  if let Err(problem) = kernel.network_change(plan, 1) {
+    assert problem.message == "a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"
+  } else {
+    assert false, "a zero-metric removal was encoded"
   }
+
   let created: policy.NetworkIntent = {...raised, metric: 0}
   let empty_routes: policy.NetworkSnapshot = {...observed, routes: []}
   let creation = policy.network_plan(created, {ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: []}, empty_routes)?
   assert creation.operations == [policy.NetworkAddDefaultRoute({gateway: "192.0.2.1", metric: 0})]
-  match kernel.network_change(creation, 0) {
-    Err(problem) => assert problem.message == "a zero-metric default route is never created because the kernel treats priority 0 as unset on removal, so it could not be removed exactly"
-    Ok(_) => assert false, "a zero-metric creation was encoded"
+  if let Err(problem) = kernel.network_change(creation, 0) {
+    assert problem.message == "a zero-metric default route is never created because the kernel treats priority 0 as unset on removal, so it could not be removed exactly"
+  } else {
+    assert false, "a zero-metric creation was encoded"
   }
 }
 
@@ -207,14 +212,17 @@ test test_forged_operations_are_rejected_by_the_whole_change_set [error] {
   }
   var forged = plan
   forged.operations = [.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
-  match kernel.network_changes(forged) {
-    Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
-    Ok(_) => assert false, "a forged operation was accepted"
+  if let Err(problem) = kernel.network_changes(forged) {
+    assert problem.message == "operation is not part of a valid policy plan"
+  } else {
+    assert false, "a forged operation was accepted"
   }
+
   var extended = plan
   extended.operations = plan.operations + [.NetworkRemoveDefaultRoute({gateway: "198.51.100.1", metric: 200})]
-  match kernel.network_changes(extended) {
-    Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
-    Ok(_) => assert false, "an appended operation was accepted"
+  if let Err(problem) = kernel.network_changes(extended) {
+    assert problem.message == "operation is not part of a valid policy plan"
+  } else {
+    assert false, "an appended operation was accepted"
   }
 }

@@ -108,13 +108,12 @@ test xsh_source_is_never_rendered_as_a_posix_command_string {
 }
 
 test a_dialect_missing_an_operation_is_a_typed_refusal_not_the_posix_script {
-  match scripts.source(.Xsh, .PackageState) {
-    Err(scripts.ScriptError.Missing {dialect, operation, message}) => {
-      assert dialect == .Xsh
-      assert operation == .PackageState
-      assert "no script for package-state" in message
-    }
-    else => assert false, "an xsh package probe resolved"
+  if let Err(scripts.ScriptError.Missing {dialect, operation, message}) = scripts.source(.Xsh, .PackageState) {
+    assert dialect == .Xsh
+    assert operation == .PackageState
+    assert "no script for package-state" in message
+  } else {
+    assert false, "an xsh package probe resolved"
   }
 
   assert scripts.source(.Posix, .PackageState) is Ok(_)
@@ -123,25 +122,26 @@ test a_dialect_missing_an_operation_is_a_typed_refusal_not_the_posix_script {
   assert ! scripts.supports(.Xsh, .RunShell)
 
   let connection = connect(testing.local_xsh_host())?
-  match transport.exec(connection, .RunShell, ["echo hi"]) {
-    Err(transport.TransportError.Refused {message}) => assert "no script for run-shell" in message
-    else => assert false, "a missing xsh script fell back to a shell"
+  if let Err(transport.TransportError.Refused {message}) = transport.exec(connection, .RunShell, ["echo hi"]) {
+    assert "no script for run-shell" in message
+  } else {
+    assert false, "a missing xsh script fell back to a shell"
   }
 
-  match transport.exec_script(connection, "echo hi") {
-    Err(transport.TransportError.Refused {message}) => assert "raw POSIX script" in message
-    else => assert false, "a raw POSIX script ran on an xsh target"
+  if let Err(transport.TransportError.Refused {message}) = transport.exec_script(connection, "echo hi") {
+    assert "raw POSIX script" in message
+  } else {
+    assert false, "a raw POSIX script ran on an xsh target"
   }
 }
 
 test workload_refuses_a_resource_kind_the_xsh_dialect_has_no_script_for {
   let resources = [declare.package(id: "jq", name: "jq")?]
-  match workload.prepare([workload.Workload(host: testing.local_xsh_host(), resources:)]) {
-    Err(error) => {
-      assert "no script for package-state" in error.message
-      assert "package resource" in error.message
-    }
-    Ok(_) => assert false, "an xsh host accepted a package resource"
+  if let Err(error) = workload.prepare([workload.Workload(host: testing.local_xsh_host(), resources:)]) {
+    assert "no script for package-state" in error.message
+    assert "package resource" in error.message
+  } else {
+    assert false, "an xsh host accepted a package resource"
   }
 }
 

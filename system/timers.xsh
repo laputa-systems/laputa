@@ -591,9 +591,10 @@ pure timer_json_str(value: Any, json_path: List[Any], fallback: Str) -> Str {
 }
 
 pure timer_json_int(value: Any, json_path: List[Any], label: Str) -> Result[Int, Error] {
-  match json.get(value, json_path, null).require(Int) {
-    Ok(number) => Ok(number)
-    Err(_) => Err(error.failure(f"{label} must be an integer"))
+  if let Ok(number) = json.get(value, json_path, null).require(Int) {
+    Ok(number)
+  } else {
+    Err(error.failure(f"{label} must be an integer"))
   }
 }
 
@@ -602,9 +603,10 @@ pure timer_json_int_or(value: Any, json_path: List[Any], fallback: Int, label: S
   if raw == null {
     return Ok(fallback)
   }
-  match raw.require(Int) {
-    Ok(number) => Ok(number)
-    Err(_) => Err(error.failure(f"{label} must be an integer"))
+  if let Ok(number) = raw.require(Int) {
+    Ok(number)
+  } else {
+    Err(error.failure(f"{label} must be an integer"))
   }
 }
 
@@ -901,9 +903,10 @@ pure timer_options(argv: List[Str]) -> Result[TimerOptions, Str] {
 }
 
 proc timer_read_boot_id() -> Str {
-  match p"/proc/sys/kernel/random/boot_id".read_text() {
-    Ok(text) => text.trim()
-    Err(_) => ""
+  if let Ok(text) = p"/proc/sys/kernel/random/boot_id".read_text() {
+    text.trim()
+  } else {
+    ""
   }
 }
 
@@ -1344,15 +1347,18 @@ proc timer_release_policy(store: TimerWriterStore, name: Str) -> Result[TimerRel
 }
 
 proc timer_release_run(command: List[Str], name: Str, policy: TimerReleasePolicy) [process, error] -> Result[Bool, Error] {
-  match process.run(process.command_argv(
-    command[0],
-    command + [name],
-    cwd: p"/",
-    stdin: p"/dev/null",
-    timeout: time.millis(timer_release_cap_ms(policy)),
-  )) {
-    Ok(status) => Ok(status.ok)
-    Err(_) => Ok(false)
+  if let Ok(status) = process.run(
+    process.command_argv(
+      command[0],
+      command + [name],
+      cwd: p"/",
+      stdin: p"/dev/null",
+      timeout: time.millis(timer_release_cap_ms(policy)),
+    ),
+  ) {
+    Ok(status.ok)
+  } else {
+    Ok(false)
   }
 }
 
@@ -1514,27 +1520,25 @@ proc timers_status(config: SchedulerConfig, as_json: Bool) -> Result[Unit, Error
   var resume = "unknown"
   var last_step: TimerStep? = null
   if status_path.exists() {
-    match json.read(status_path) {
-      Ok(live) => {
-        let live_pid = json.get(live, ["scheduler_pid"], 0).require(Int) ?? 0
-        let live_boot = json.get(live, ["boot_id"], "").require(Str) ?? ""
-        if timer_pid_alive(live_pid) and live_boot == boot_id and (json.get(live, ["format"], "").require(Str) ?? "") == TIMER_STATUS_FORMAT {
-          scheduler_pid = live_pid
-          armed_wall_ms = json.get(live, ["armed_wall_ms"], now.wall_ms).require(Int) ?? now.wall_ms
-          resume = json.get(live, ["resume"], "unknown").require(Str) ?? "unknown"
-          let step = json.get(live, ["last_step"], null)
-          if step != null {
-            last_step = TimerStep(
-              kind: json.get(step, ["kind"], "").require(Str) ?? "",
-              wall_delta_ms: json.get(step, ["wall_delta_ms"], 0).require(Int) ?? 0,
-              mono_delta_ms: json.get(step, ["mono_delta_ms"], 0).require(Int) ?? 0,
-              at_wall_ms: json.get(step, ["at_wall_ms"], 0).require(Int) ?? 0,
-            )
-          }
-          views = timer_live_views(live)
+    if let Ok(live) = json.read(status_path) {
+      let live_pid = json.get(live, ["scheduler_pid"], 0).require(Int) ?? 0
+      let live_boot = json.get(live, ["boot_id"], "").require(Str) ?? ""
+      if timer_pid_alive(live_pid) and live_boot == boot_id and (json.get(live, ["format"], "").require(Str) ?? "") == TIMER_STATUS_FORMAT {
+        scheduler_pid = live_pid
+        armed_wall_ms = json.get(live, ["armed_wall_ms"], now.wall_ms).require(Int) ?? now.wall_ms
+        resume = json.get(live, ["resume"], "unknown").require(Str) ?? "unknown"
+        let step = json.get(live, ["last_step"], null)
+        if step != null {
+          last_step = TimerStep(
+            kind: json.get(step, ["kind"], "").require(Str) ?? "",
+            wall_delta_ms: json.get(step, ["wall_delta_ms"], 0).require(Int) ?? 0,
+            mono_delta_ms: json.get(step, ["mono_delta_ms"], 0).require(Int) ?? 0,
+            at_wall_ms: json.get(step, ["at_wall_ms"], 0).require(Int) ?? 0,
+          )
         }
+    
+        views = timer_live_views(live)
       }
-      Err(_) => {}
     }
   }
   if views.is_empty() {
@@ -1857,10 +1861,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
         let signaled = ! done.status.exited()
         var code: Int? = null
         if ! signaled {
-          match done.status.exit_code() {
-            Ok(value) => { code = value }
-            Err(_) => {}
-          }
+          if let Ok(value) = done.status.exit_code() { code = value }
         }
         let outcome = timer_outcome(code ?? 0, signaled, false)
         var state = states.get(entry.name) ?? timer_state_new(entry.name)

@@ -48,8 +48,9 @@ export proc inline_bytes(content: model.Content) [fs, env, error] -> Result[Byte
 
 ## The local file a source streams from, or none for an in-memory source.
 export pure streamed_path(content: model.Content) -> Path? {
-  match content {
-    model.FromFile(source) => source
-    else => null
+  if let model.FromFile(source) = content {
+    source
+  } else {
+    null
   }
 }

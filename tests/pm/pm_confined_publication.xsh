@@ -464,12 +464,11 @@ test test_killed_composition_publishes_nothing_partial [fs, process, env, time, 
 }
 
 test test_exhausted_space_fails_without_partial_generation_or_lost_prior [fs, process, env, error] { |ctx|
-  let unshare = match process.which("unshare") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("unshare is unavailable for the tmpfs fixture")
-      return
-    },
+  let unshare = if let Ok(found) = process.which("unshare") {
+    found
+  } else {
+    test.skip("unshare is unavailable for the tmpfs fixture")
+    return
   }
   let probe = run.capture --text $unshare -Urm true
   if ! probe.status.ok {

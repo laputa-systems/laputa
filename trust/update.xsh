@@ -253,9 +253,10 @@ export proc trust_status(system_root: Path) [fs, time, error] -> Result[Record, 
   }
 
   let parsed_policy = trust_policy.parse(policy)?
-  let key_status = match trust_key.trust_key_load(paths.root) {
-    Ok(key) => f"present sha256:{trust_key.trust_key_fingerprint(key)}",
-    Err(_) => "MISSING (updates will fail closed)",
+  let key_status = if let Ok(key) = trust_key.trust_key_load(paths.root) {
+    f"present sha256:{trust_key.trust_key_fingerprint(key)}"
+  } else {
+    "MISSING (updates will fail closed)"
   }
   let accepted = trust_store.trust_store_read_accepted(paths)?
   guard ! trust_policy.policy_u64_is_greater(accepted, active) else {
@@ -416,10 +417,7 @@ proc trust_recover(
   # the accepted high-water mark or below an already-active newer generation
   # before any recovery branch mutates the store.
   if trust_policy.policy_u64_text_is_valid(journal.generation) {
-    let accepted_floor = match trust_store.trust_store_read_accepted(paths) {
-      Ok(found) => found,
-      Err(_) => "",
-    }
+    let accepted_floor = if let Ok(found) = trust_store.trust_store_read_accepted(paths) { found } else { "" }
     if accepted_floor != "" {
       guard ! trust_policy.policy_u64_is_greater(accepted_floor, journal.generation) else {
         return Err(
@@ -430,10 +428,7 @@ proc trust_recover(
       }
     }
 
-    let current_active = match trust_store.trust_store_read_active(paths) {
-      Ok(found) => found,
-      Err(_) => "",
-    }
+    let current_active = if let Ok(found) = trust_store.trust_store_read_active(paths) { found } else { "" }
     if current_active != "" {
       guard ! trust_policy.policy_u64_is_greater(current_active, journal.generation) else {
         return Err(
@@ -468,9 +463,10 @@ proc trust_recover(
       # it must still pass expiry validation. A generation that already
       # flipped active before the interruption rolls forward without
       # re-authorization, like the activated-phase branch below.
-      let already_active = match trust_store.trust_store_read_active(paths) {
-        Ok(found) => found == journal.generation,
-        Err(_) => false,
+      let already_active = if let Ok(found) = trust_store.trust_store_read_active(paths) {
+        found == journal.generation
+      } else {
+        false
       }
       if ! already_active {
         if verified.issued_at > now_epoch_seconds or verified.expires_at <= now_epoch_seconds {
@@ -503,9 +499,10 @@ proc trust_recover(
   }
 
   if journal.phase == "committed" {
-    let already_flipped = match trust_store.trust_store_read_active(paths) {
-      Ok(found) => found == journal.generation,
-      Err(_) => false,
+    let already_flipped = if let Ok(found) = trust_store.trust_store_read_active(paths) {
+      found == journal.generation
+    } else {
+      false
     }
     if already_flipped {
       let verified = trust_verify_committed_bookkeeping(paths, key, journal.generation)?
@@ -616,9 +613,10 @@ proc trust_activate_release(
   match trust_store.trust_store_commit_generation(paths, staged.path, generation) {
     Ok(_) => {},
     Err(_) => {
-      let committed_metadata = match fp"{trust_store.trust_store_generation_dir(paths, generation)}/{trust_store.TRUST_METADATA_NAME}".read_bytes() {
-        Ok(found) => found,
-        Err(_) => bytes.from_text(""),
+      let committed_metadata = if let Ok(found) = fp"{trust_store.trust_store_generation_dir(paths, generation)}/{trust_store.TRUST_METADATA_NAME}".read_bytes() {
+        found
+      } else {
+        bytes.from_text("")
       }
       guard committed_metadata == metadata and committed_metadata.len() > 0 else {
         return Err(
@@ -701,15 +699,14 @@ proc trust_repair_active_pointer(
   paths: trust_store.TrustStorePaths,
   key: Bytes,
 ) -> Result[Str, Error] {
-  let accepted = match trust_store.trust_store_read_accepted(paths) {
-    Ok(found) => found,
-    Err(_) => {
-      return Err(
-        update_fail(
-          "installed trust state is incomplete and the accepted generation is unreadable; refusing to bootstrap over it",
-        ),
-      )
-    },
+  let accepted = if let Ok(found) = trust_store.trust_store_read_accepted(paths) {
+    found
+  } else {
+    return Err(
+      update_fail(
+        "installed trust state is incomplete and the accepted generation is unreadable; refusing to bootstrap over it",
+      ),
+    )
   }
   let dir = trust_store.trust_store_generation_dir(paths, accepted)
   guard dir.exists() else {
@@ -765,11 +762,10 @@ proc trust_apply_release(
   match trust_store.trust_store_read_active(paths) {
     Ok(_) => {},
     Err(_) => {
-      let repairable = match trust_store.trust_store_read_accepted(paths) {
-        Ok(accepted) => {
-          trust_store.trust_store_generation_dir(paths, accepted).exists()?
-        },
-        Err(_) => false,
+      let repairable = if let Ok(accepted) = trust_store.trust_store_read_accepted(paths) {
+        trust_store.trust_store_generation_dir(paths, accepted).exists()?
+      } else {
+        false
       }
       if repairable {
         let _ = trust_repair_active_pointer(paths, key)?

@@ -6,9 +6,10 @@ error NetworkCaptureError = Failed(message: Str)
 export type NetworkConflictCapture = {input: policy.NetworkPlanInput, error: Str}
 
 pure conflict(input: policy.NetworkPlanInput) -> Result[Str, Error] {
-  match policy.network_plan(input.intent, input.owned, input.observed) {
-    Err(problem) => Ok(problem.message)
-    Ok(_) => Err(NetworkCaptureError.Failed("Docker-owned resources unexpectedly admitted a plan"))
+  if let Err(problem) = policy.network_plan(input.intent, input.owned, input.observed) {
+    Ok(problem.message)
+  } else {
+    Err(NetworkCaptureError.Failed("Docker-owned resources unexpectedly admitted a plan"))
   }
 }
 

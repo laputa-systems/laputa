@@ -18,9 +18,10 @@ pure report(execution: transport.Execution) -> Result[Str, fact.Unreadable] {
     return Err(unreadable(.Unavailable, f"exit {execution.code}: {stderr.trim()}"))
   }
 
-  match execution.stdout.utf8() {
-    Ok(text) => Ok(text)
-    Err(_) => Err(unreadable(.Malformed, "the report is not valid UTF-8"))
+  if let Ok(text) = execution.stdout.utf8() {
+    Ok(text)
+  } else {
+    Err(unreadable(.Malformed, "the report is not valid UTF-8"))
   }
 }
 

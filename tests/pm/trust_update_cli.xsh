@@ -162,12 +162,11 @@ proc kill_child(pid: Int, handle: ProcessHandle) [process, error] {
 }
 
 test trust_update_url_converges_with_from [fs, process, env, time, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let root = stage_system(ctx, "trust-update-url", "signing-key")?
@@ -204,12 +203,11 @@ test trust_update_url_converges_with_from [fs, process, env, time, error] { |ctx
 }
 
 test trust_update_interrupted_download_leaves_no_store_mutation [fs, process, env, time, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let root = stage_system(ctx, "trust-update-trickle", "signing-key")?
@@ -264,9 +262,12 @@ test trust_update_killed_mid_transaction_recovers_cleanly [fs, process, env, tim
     process.kill(child.pid, signal: "KILL")
     let _ = wait [child]?
 
-    let active = match trust_store.trust_store_read_active(trust_store.trust_store_paths(root)) {
-      Ok(generation) => generation,
-      Err(_) => "none",
+    let active = if let Ok(generation) = trust_store.trust_store_read_active(
+      trust_store.trust_store_paths(root),
+    ) {
+      generation
+    } else {
+      "none"
     }
     if active == "none" {
       assert ! fp"{root}/var/lib/laputa/trust/generations/2".exists()?

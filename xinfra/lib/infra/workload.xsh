@@ -60,9 +60,8 @@ proc secret_values(host: Str, resource: model.Resource) -> Result[List[Str], Err
   match resource.spec {
     model.File(spec) => {
       if let source = spec.content {
-        match source {
-          model.SecretEnv(name) => names += [name]
-          else => {}
+        if let model.SecretEnv(name) = source {
+          names += [name]
         }
       }
     }
@@ -100,13 +99,10 @@ export proc prepare(declared: List[Workload]) [fs, env, error] -> Result[Prepare
     ctx f"host {entry.host.name}" { check_dialect(entry.host, resources) }
     ordered += [Workload(host: entry.host, resources:)]
     for resource in resources {
-      match resource.spec {
-        model.File(spec) => {
-          if let found = measure_file(entry.host.name, resource, spec)? {
-            materials[material_key(entry.host.name, resource.id)] = found
-          }
+      if let model.File(spec) = resource.spec {
+        if let found = measure_file(entry.host.name, resource, spec)? {
+          materials[material_key(entry.host.name, resource.id)] = found
         }
-        else => {}
       }
 
       for value in secret_values(entry.host.name, resource)? {

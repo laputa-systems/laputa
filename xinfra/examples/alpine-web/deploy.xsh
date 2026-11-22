@@ -6,16 +6,18 @@ use infra.declare
 use infra.model
 
 pure number(host: model.Host, name: Str, fallback: Int) -> Result[Int, Error] {
-  match host.vars.get(name) {
-    Ok(value) => value.require(Int)
-    Err(_) => Ok(fallback)
+  if let Ok(value) = host.vars.get(name) {
+    value.require(Int)
+  } else {
+    Ok(fallback)
   }
 }
 
 pure text(host: model.Host, name: Str, fallback: Str) -> Result[Str, Error] {
-  match host.vars.get(name) {
-    Ok(value) => value.require(Str)
-    Err(_) => Ok(fallback)
+  if let Ok(value) = host.vars.get(name) {
+    value.require(Str)
+  } else {
+    Ok(fallback)
   }
 }
 

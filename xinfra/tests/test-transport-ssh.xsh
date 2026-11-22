@@ -47,9 +47,10 @@ test a_wrong_host_key_pin_fails_before_any_command {
   }
 
   let wrong: model.Host = {...host, host_key: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
-  match transport.connect(wrong) {
-    Err(transport.TransportError.Unreachable {message}) => assert "mismatch" in message
-    else => assert false, "a wrong pin did not fail the connection"
+  if let Err(transport.TransportError.Unreachable {message}) = transport.connect(wrong) {
+    assert "mismatch" in message
+  } else {
+    assert false, "a wrong pin did not fail the connection"
   }
 }
 
@@ -118,8 +119,9 @@ test connect_all_opens_reachable_hosts_in_parallel_and_fails_only_the_unreachabl
   assert opened[0] is Ok(_)
   assert opened[1] is Err(transport.TransportError.Unreachable {..})
   assert opened[2] is Ok(_)
-  match opened[2] {
-    Ok(connection) => assert transport.exec_script(connection, "true")?.code == 0
-    Err(_) => assert false, "the second host did not open"
+  if let Ok(connection) = opened[2] {
+    assert transport.exec_script(connection, "true")?.code == 0
+  } else {
+    assert false, "the second host did not open"
   }
 }

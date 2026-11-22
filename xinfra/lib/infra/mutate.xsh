@@ -121,19 +121,19 @@ proc apply_directory(connection: transport.Connection, spec: model.DirectorySpec
 }
 
 pure existing_info(state: fact.PathState) -> fact.PathInfo? {
-  match state {
-    fact.Found(info) => info
-    else => null
+  if let fact.Found(info) = state {
+    info
+  } else {
+    null
   }
 }
 
 pure staged_path(execution: transport.Execution) -> Result[Str, outcome.StepError] {
   let text = execution.stdout.utf8() ?? ""
-  match probe.decode_hex(text.trim()) {
-    Ok(found) => {
-      if found.starts_with("/") { Ok(found) } else { Err(failure(.Stage, "the staging path is not absolute", false)) }
-    }
-    Err(_) => Err(failure(.Stage, "the staging path could not be read", false))
+  if let Ok(found) = probe.decode_hex(text.trim()) {
+    if found.starts_with("/") { Ok(found) } else { Err(failure(.Stage, "the staging path is not absolute", false)) }
+  } else {
+    Err(failure(.Stage, "the staging path could not be read", false))
   }
 }
 
@@ -205,34 +205,22 @@ proc replace_file(
   let mode = spec.mode ?? existing?.mode ?? 0o644
   let created = output(connection, .Stage, .CreateStage, [parent_of(spec.path)], false)?
   let stage = staged_path(created)?
-  match stream_content(connection, stage, source, expected) {
-    Err(error) => {
-      return Err(discard(connection, stage, error))
-    }
-    Ok(_) => {}
+  if let Err(error) = stream_content(connection, stage, source, expected) {
+    return Err(discard(connection, stage, error))
   }
 
-  match step(connection, .Stage, .FinishStage, [stage, owner, compare.octal(mode)], false) {
-    Err(error) => {
-      return Err(discard(connection, stage, error))
-    }
-    Ok(_) => {}
+  if let Err(error) = step(connection, .Stage, .FinishStage, [stage, owner, compare.octal(mode)], false) {
+    return Err(discard(connection, stage, error))
   }
 
   if ! spec.validate.is_empty() {
-    match step(connection, .Validate, .RunArgv, validator_argv(spec.validate, stage), false) {
-      Err(error) => {
-        return Err(discard(connection, stage, error))
-      }
-      Ok(_) => {}
+    if let Err(error) = step(connection, .Validate, .RunArgv, validator_argv(spec.validate, stage), false) {
+      return Err(discard(connection, stage, error))
     }
   }
 
-  match step(connection, .Promote, .PromoteStage, [stage, spec.path], false) {
-    Err(error) => {
-      return Err(discard(connection, stage, error))
-    }
-    Ok(_) => {}
+  if let Err(error) = step(connection, .Promote, .PromoteStage, [stage, spec.path], false) {
+    return Err(discard(connection, stage, error))
   }
 }
 
@@ -337,9 +325,10 @@ proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: f
   }
 
   for member in memberships {
-    let known = match state {
-      fact.OnUser(.UserFound(info)) => member in info.memberships or member == (info.group ?? "")
-      else => false
+    let known = if let fact.OnUser(.UserFound(info)) = state {
+      member in info.memberships or member == (info.group ?? "")
+    } else {
+      false
     }
     if ! known {
       step(connection, .Apply, .JoinGroup, [spec.name, member], applied)
@@ -432,9 +421,10 @@ export proc apply(
   match resource.spec {
     model.Directory(spec) => apply_directory(connection, spec, drift)
     model.File(spec) => {
-      match state {
-        fact.OnPath(path_state) => apply_file(connection, spec, path_state, drift, source, expected)
-        else => Err(failure(.Apply, "a file was compared with a fact of another kind", false))
+      if let fact.OnPath(path_state) = state {
+        apply_file(connection, spec, path_state, drift, source, expected)
+      } else {
+        Err(failure(.Apply, "a file was compared with a fact of another kind", false))
       }
     }
     model.Link(spec) => apply_link(connection, spec, drift)

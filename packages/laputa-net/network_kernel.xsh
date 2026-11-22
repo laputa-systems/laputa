@@ -369,9 +369,10 @@ export pure network_outcome(index: Int, result: Result[Unit, net_state.ChangeFai
 
 ## The replay event for drained notifications that say the last observation can no longer be trusted, if any.
 export pure network_lost_events(notices: net_state.Notices) -> policy.NetworkReplayEvent? {
-  match notices {
-    net_state.Lost(reason) => policy.NetworkLostEvents
-    else => null
+  if let net_state.Lost(reason) = notices {
+    policy.NetworkLostEvents
+  } else {
+    null
   }
 }
 
