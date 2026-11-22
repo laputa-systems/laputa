@@ -128,7 +128,7 @@ cli main census(root: Path, spec: Path = p"qualification/native-census/component
   var installed: Map[Int] = {}
   var elf_packages: Map[Int] = {}
   var elf_count = 0
-  var linked_edges: Map[Bool] = {}
+  var linked_edges: Set[Str] = set.empty()
   for package in packages {
     let metadata = json.read(fp"{package.path}/metadata.json")?.require(Record)?
     dependencies[package.name] = metadata.get("deps")?.require(List[Str])?
@@ -143,7 +143,7 @@ cli main census(root: Path, spec: Path = p"qualification/native-census/component
       elf_count += 1
       for soname in info.needed {
         let owner = providers.get(soname) ?? ""
-        linked_edges[f"{package.name} {owner}"] = true
+        linked_edges = linked_edges.add(f"{package.name} {owner}")
       }
       elf_packages[package.name] = (elf_packages.get(package.name) ?? 0) + 1
     }
