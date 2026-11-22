@@ -9,7 +9,7 @@ export error TrustKeyError = InvalidData(message: Str)
 ## Loads the raw 32-byte Ed25519 trust-update public key.
 export proc trust_key_load(system_root: Path) [fs, error] -> Result[Bytes, Error] {
   let key_path = trust_store.provisioned_key_path(system_root)
-  guard key_path.exists()? else {
+  guard key_path.exists() else {
     return Err(
       TrustKeyError.InvalidData(
         "no trust-update verification key is provisioned at /etc/laputa/trust-update-key; provision one per docs/CERTIFICATE-TRUST.md before updating trust",

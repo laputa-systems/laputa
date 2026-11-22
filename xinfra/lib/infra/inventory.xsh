@@ -114,7 +114,7 @@ pure build_host(
     fail f"{what}: host names are lowercase letters, digits, dot, underscore and hyphen"
   }
 
-  only_fields(what, entries, host_fields)?
+  only_fields(what, entries, host_fields)
   let transport = transport_of(what, pick_text(text_of(what, entries, "transport")?, text_of("defaults", defaults, "transport")?))?
   let dialect = dialect_of(what, pick_text(text_of(what, entries, "dialect")?, text_of("defaults", defaults, "dialect")?))?
   let address = text_of(what, entries, "address")?
@@ -189,7 +189,7 @@ pure build_host(
     fail f"{what}.port must be 1..65535"
   }
 
-  check.account_ok(f"{what}.user", wanted_user)?
+  check.account_ok(f"{what}.user", wanted_user)
   let key = if wanted_key.starts_with("/") { fp"{wanted_key}" } else { fp"{base}/{wanted_key}" }
   Ok(model.Host(
     name:,
@@ -214,15 +214,15 @@ pure build_host(
 ## missing connection details are errors; nothing is connected.
 export pure parse(text: Str, base: Path) -> Result[Inventory, Error] {
   let document = table(toml.decode(text)?, "inventory")?
-  only_fields("inventory", document, top_fields)?
+  only_fields("inventory", document, top_fields)
   let defaults = table(json.get(document, ["defaults"], {}), "defaults")?
-  only_fields("defaults", defaults, default_fields)?
+  only_fields("defaults", defaults, default_fields)
   var group_vars: Map[Str, Map[Str, Any]] = {}
   if "groups" in document.keys() {
     let groups = table(document.get("groups")?, "groups")?
     for key in groups.keys() {
       let entries = table(groups.get(key)?, f"groups.{key}")?
-      only_fields(f"groups.{key}", entries, group_fields)?
+      only_fields(f"groups.{key}", entries, group_fields)
       group_vars[key] = vars_of(f"groups.{key}", entries)?
     }
   }

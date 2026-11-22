@@ -64,7 +64,7 @@ test test_seed_rejects_registry_cache_after_cargo_source_changes [fs, process, e
   let config = fp"{xsh_root}/.cargo/config.toml"
   config.write("first source")
   let arch = xsh_seed.xsh_seed_arch("x86_64")?
-  xsh_seed.xsh_seed_fetch(p"/bin/true", root, xsh_root, arch)?
+  xsh_seed.xsh_seed_fetch(p"/bin/true", root, xsh_root, arch)
   config.write("different source")
 
   match xsh_seed.xsh_seed_build(p"/bin/true", root, xsh_root, arch, 1, false) {

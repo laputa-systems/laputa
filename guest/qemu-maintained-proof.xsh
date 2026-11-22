@@ -2,13 +2,13 @@
 
 proc listener_ready() -> Result[Bool] {
   let status = p"/run/xinit/oxish.json"
-  return false unless status.exists()?
+  return false unless status.exists()
   json.get(json.read(status)?, ["state"], "down").require(Str)? == "running"
 }
 
 proc service_state(name: Str) -> Result[Str] {
   let status = fp"/run/xinit/{name}.json"
-  wait until status.exists()? within 30s every 100ms
+  wait until status.exists() within 30s every 100ms
   json.get(json.read(status)?, ["state"], "").require(Str)?
 }
 
@@ -37,7 +37,7 @@ proc path_summary() -> Result[Str] {
 
 proc lease_summary() -> Result[Str] {
   let status = p"/run/dhcpc/eth0.status"
-  return "absent" unless status.exists()?
+  return "absent" unless status.exists()
   let text = status.read_text()?.trim()
   if text == "" {
     return "empty"
@@ -54,7 +54,7 @@ proc wait_state(name: Str, want: Str) {
     if service_state(name)? == want {
       return
     }
-    time.sleep(1s)?
+    time.sleep(1s)
     waited += 1
   }
   p"/dev/console".write(f"LAPUTA_MAINTAINED_STATUS units: {unit_summary()?}\n")
@@ -67,7 +67,7 @@ proc supervised_network() -> Result[Str] {
   wait_state("logger", "running")
   wait_state("dhcp-eth0", "running")
   let lease = p"/run/dhcpc/eth0.status"
-  wait until lease.exists()? within 30s every 100ms
+  wait until lease.exists() within 30s every 100ms
   var leased = ""
   var waited = 0
   while waited < 60 {
@@ -75,7 +75,7 @@ proc supervised_network() -> Result[Str] {
     if leased == "bound" {
       break
     }
-    time.sleep(1s)?
+    time.sleep(1s)
     waited += 1
   }
   guard leased == "bound" else { fail f"dhcp lease is {leased}, not bound" }
@@ -100,20 +100,20 @@ proc run_proof() {
   if "LAPUTA_FIREWALL_FAILURE_PROOF=1" in cmdline {
     let firewall = p"/run/xinit/firewall.json"
     time.sleep(3s)
-    if firewall.exists()? {
+    if firewall.exists() {
       guard json.get(json.read(firewall)?, ["state"], "missing").require(Str)? != "running" else {
         fail "invalid firewall unexpectedly started"
       }
     }
-    guard ! listener_ready()? else { fail "oxish started after firewall failure" }
+    guard ! listener_ready() else { fail "oxish started after firewall failure" }
     let listener = p"/run/xinit/oxish.json"
-    if listener.exists()? {
+    if listener.exists() {
       guard json.get(json.read(listener)?, ["pid"], 0).require(Int)? == 0 else {
         fail "oxish process started after firewall failure"
       }
     }
     p"/dev/console".write("LAPUTA_FIREWALL_FAILURE_PROOF_OK listener stayed down\n")
-    process.kill(1, signal: "USR2")?
+    process.kill(1, signal: "USR2")
     return
   }
 
@@ -124,14 +124,14 @@ proc run_proof() {
   let keys = p"/etc/oxish/accounts"
   guard f"{name} ssh-ed25519 " in keys.read_text()? else { fail "operator account keys required" }
   let host_key = p"/etc/oxish/host_ed25519_key"
-  wait until host_key.exists()? within 30s every 100ms
+  wait until host_key.exists() within 30s every 100ms
   guard host_key.read_bytes()?.len() > 0 else { fail "persistent host key required" }
-  wait until listener_ready()? within 30s every 100ms
-  wait until p"/run/laputa-health.json".exists()? within 30s every 100ms
+  wait until listener_ready() within 30s every 100ms
+  wait until p"/run/laputa-health.json".exists() within 30s every 100ms
   let files = [host_key, keys, p"/etc/passwd", p"/etc/group", p"/etc/shadow", p"/etc/hostname", p"/etc/laputa/first-boot/applied"]
   let hashes = [hash.sha256(item)?.hex() for item in files].join("\n") + "\n" + supervised_network()?
   let baseline = p"/var/lib/laputa/maintained-proof-before-reboot"
-  if baseline.exists()? {
+  if baseline.exists() {
     let prior = baseline.read_text()?
     if prior == hashes {
       p"/dev/console".write("LAPUTA_MAINTAINED_PROOF_OK identity survived guest reboot\n")

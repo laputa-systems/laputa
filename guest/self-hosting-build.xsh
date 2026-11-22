@@ -26,7 +26,7 @@ proc main(mode: Str = "verification") [fs, process, env, error] -> Result[Unit, 
   let cargo = p"/seed/rust/bin/cargo"
   var argv = [cargo.display(), "build", "--locked", "--offline", "--profile", "verification", "-j", "2", "--target", "x86_64-unknown-linux-musl", "-p", "xsh", "-p", "xsht", "--no-default-features", "--features", "xsh/net xsh/tools xsht/native-tests", "--bin", "xsh", "--bin", "xsht", "--config", "source.crates-io.replace-with=\"vendored-sources\"", "--config", "source.vendored-sources.directory=\"/inputs/vendor\""]
   if mode == "debug" {
-    process.set_rlimit("stack", soft: 8 * 1024 * 1024, hard: 8 * 1024 * 1024)?
+    process.set_rlimit("stack", soft: 8 * 1024 * 1024, hard: 8 * 1024 * 1024)
     let limit = process.rlimit("stack")?
     assert limit.soft == 8 * 1024 * 1024 and limit.hard == 8 * 1024 * 1024
     let text = json.encode(limit)?
@@ -49,4 +49,4 @@ proc main(mode: Str = "verification") [fs, process, env, error] -> Result[Unit, 
   print "LAPUTA_SELF_HOSTING_COMPILED"
 }
 
-main(@args)?
+main(@args)

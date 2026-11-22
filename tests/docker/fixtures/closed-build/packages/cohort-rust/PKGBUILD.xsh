@@ -23,6 +23,6 @@ export let filetree = [{path: p"usr/bin/cohort-rust", kind: "binary"}]
 ## Build the declared Rust payload.
 export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
   let source = env("XSH_PM_SOURCE_DIR")?
-  fp"{dest}/usr/bin".mkdir()?
+  fp"{dest}/usr/bin".mkdir()
   run /bin/kache /seed/rust/bin/rustc fp"{source}/hello.rs" "-C" "linker=/usr/bin/clang" "-C" "link-arg=-fuse-ld=/bin/mold" "-o" fp"{dest}/usr/bin/cohort-rust"
 }

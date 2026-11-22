@@ -128,14 +128,14 @@ proc require(condition: Bool, message: Str) [error] {
 }
 
 proc check_line(name: Str, found: List[Run], glyphs: Bool) [error] {
-  require(shows_glyphs(found) == glyphs, f"{name} line {if glyphs { "rendered as tofu or blank" } else { "was expected to be tofu" }}: {[f"{word.width}:{word.ink}" for word in found].join(" ")}")?
+  require(shows_glyphs(found) == glyphs, f"{name} line {if glyphs { "rendered as tofu or blank" } else { "was expected to be tofu" }}: {[f"{word.width}:{word.ink}" for word in found].join(" ")}")
 }
 
 proc check_emoji_line(name: Str, found: List[Run], cluster_limit: Int) [error] {
-  require(found.len() == 2, f"{name} emoji line has {found.len()} runs, expected a cluster and a party popper")?
-  require(found[0].width <= cluster_limit, f"{name} ZWJ sequence is {found[0].width} px wide, over the {cluster_limit} px cluster limit")?
-  require(! similar(found[0], found[1]), f"{name} emoji runs look alike")?
-  require(found[1].chroma >= emoji_chroma_pixels, f"{name} party popper has {found[1].chroma} colored pixels, not a color emoji")?
+  require(found.len() == 2, f"{name} emoji line has {found.len()} runs, expected a cluster and a party popper")
+  require(found[0].width <= cluster_limit, f"{name} ZWJ sequence is {found[0].width} px wide, over the {cluster_limit} px cluster limit")
+  require(! similar(found[0], found[1]), f"{name} emoji runs look alike")
+  require(found[1].chroma >= emoji_chroma_pixels, f"{name} party popper has {found[1].chroma} colored pixels, not a color emoji")
 }
 
 ## Ghostty prints a magenta marker of 40 cells followed by six rows: Arabic,
@@ -157,7 +157,7 @@ export proc check_terminal_text(image: Bytes) [error] {
     }
     y += 1
   }
-  require(y0 >= 0, "terminal marker is not on screen")?
+  require(y0 >= 0, "terminal marker is not on screen")
   var marker_width = 0
   while pixel(screen, x0 + marker_width, y0) == marker_rgb { marker_width += 1 }
   var cell_height = 0
@@ -176,11 +176,11 @@ export proc check_terminal_text(image: Bytes) [error] {
     }
     row += 1
   }
-  check_line("Arabic", lines[0], true)?
-  check_line("Devanagari", lines[1], true)?
-  check_line("CJK", lines[2], true)?
-  check_emoji_line("terminal", lines[3], 2 * cell_width)?
-  check_line("uncovered-script", lines[4], false)?
+  check_line("Arabic", lines[0], true)
+  check_line("Devanagari", lines[1], true)
+  check_line("CJK", lines[2], true)
+  check_emoji_line("terminal", lines[3], 2 * cell_width)
+  check_line("uncovered-script", lines[4], false)
 }
 
 ## Play draws five centered subtitle lines on a black frame, in the order the
@@ -207,14 +207,14 @@ export proc check_player_text(image: Bytes) [error] {
     }
     y += 1
   }
-  require(bands.len() == 5, f"Play shows {bands.len()} subtitle lines, expected 5")?
+  require(bands.len() == 5, f"Play shows {bands.len()} subtitle lines, expected 5")
   var lines: List[List[Run]] = []
   for band in bands {
     lines = lines + [runs(screen, left, right, band[0], band[1], [0])]
   }
-  check_line("Play Arabic", lines[0], true)?
-  check_line("Play Devanagari", lines[1], true)?
-  check_line("Play CJK", lines[2], true)?
-  check_emoji_line("Play", lines[3], 2 * lines[3][1].width)?
-  check_line("Play uncovered-script", lines[4], false)?
+  check_line("Play Arabic", lines[0], true)
+  check_line("Play Devanagari", lines[1], true)
+  check_line("Play CJK", lines[2], true)
+  check_emoji_line("Play", lines[3], 2 * lines[3][1].width)
+  check_line("Play uncovered-script", lines[4], false)
 }

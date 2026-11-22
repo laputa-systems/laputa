@@ -6,4 +6,4 @@ proc main(root: Path) [process, error] -> Result[Unit, Error] {
   fail "disposable guest network replay failed" unless status.ok
   print "LAPUTA_SELF_HOSTING_NETWORK_REPLAYED"
 }
-main(@args)?
+main(@args)

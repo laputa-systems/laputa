@@ -26,7 +26,7 @@ proc wait_status(root: Path, previous: Int) -> Result[NtpStatus] {
   let deadline = now_ms()? + 20000
   while now_ms()? < deadline {
     let file = fp"{root}/ntpd-rs.json"
-    if file.exists()? {
+    if file.exists() {
       let status: NtpStatus = json.read(file)?.require()?
       if status.state == "running" and status.ready and status.pid > 0 and status.pid != previous {
         return status
@@ -108,15 +108,15 @@ proc await_agreement(probe: Path, timeout_ms: Int, label: Str) -> Result[Int] {
 
 proc peer_case(mode: Str) [fs, process, env, time, io, error] {
   let probe = fp"{case_dir}/ntp-probe"
-  fixture.link_up("eth0")?
-  fixture.address_add4("eth0", guest_address, 24, "192.0.2.255", "")?
+  fixture.link_up("eth0")
+  fixture.address_add4("eth0", guest_address, 24, "192.0.2.255", "")
   let first = await_sample(probe, 30000)?
-  linux.set_system_clock(time.now() + first.offset_us / 1000)?
+  linux.set_system_clock(time.now() + first.offset_us / 1000)
   let aligned = await_sample(probe, 5000)?
   assert aligned.offset_us > -20000 and aligned.offset_us < 20000, f"the clock was not aligned with the peer: {aligned.offset_us} us"
   print f"NTP_ALIGNED offset_us={aligned.offset_us} rtt_us={aligned.rtt_us}"
 
-  p"/etc/ntpd-rs".mkdir(true)?
+  p"/etc/ntpd-rs".mkdir(true)
   p"/etc/ntpd-rs/ntp.toml".write(f"""frequency-calibration-path = "/var/lib/ntpd-rs/frequency.json"
 [observability]
 log-level = "info"
@@ -129,18 +129,18 @@ initial-poll-interval = 1
 poll-interval-limits = {{ min = 1, max = 1 }}
 [synchronization]
 minimum-agreeing-sources = 1
-""")?
+""")
   var groups: List[Int] = []
   var completed = false
   defer {
     let daemon_log = p"/run/ntp-proof-logs/ntpd-rs/current"
-    if daemon_log.exists()? { print "NTP_DAEMON_LOG" daemon_log.read_text()? }
+    if daemon_log.exists() { print "NTP_DAEMON_LOG" daemon_log.read_text()? }
     let cleanup = unix.shutdown_process_groups(groups, 2s, 100ms)?
     assert cleanup.remaining.is_empty(), "NTP proof retained process groups"
     if completed { print "NTP_CASE_COMPLETE" }
   }
   let run_dir = p"/run/ntp-proof"
-  run_dir.mkdir(true)?
+  run_dir.mkdir(true)
   let supervisor = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
     XINIT_SERVICE_DIR: "/usr/lib/xinit/services",
     XINIT_RUN_DIR: run_dir.display(),
@@ -150,17 +150,17 @@ minimum-agreeing-sources = 1
   groups += [scanner.pid]
   let first_status = wait_status(run_dir, 0)?
   groups += [first_status.pid]
-  check_identity(first_status.pid)?
+  check_identity(first_status.pid)
   print "NTP_READY"
 
   let before_worst = await_agreement(probe, 120000, "BEFORE")?
   print f"NTP_SYNCED worst_offset_us={before_worst}"
 
   if mode == "jump" {
-    linux.set_system_clock(time.now() - 5000)?
+    linux.set_system_clock(time.now() - 5000)
     let restarted = wait_status(run_dir, first_status.pid)?
     groups += [restarted.pid]
-    check_identity(restarted.pid)?
+    check_identity(restarted.pid)
     assert restarted.restarts > first_status.restarts, "the daemon did not restart after an external backstep"
     print "NTP_JUMP_RESTART_READY"
     let rejected = await_sample(probe, 5000)?
@@ -210,7 +210,7 @@ minimum-agreeing-sources = 1
 proc main() [fs, process, env, time, io, error] {
   let mode = p"/usr/lib/asterinas/case/mode".read_text()?.trim()
   if mode == "pause" or mode == "jump" {
-    peer_case(mode)?
+    peer_case(mode)
     return
   }
   let frequency_case = mode == "frequency"
@@ -218,7 +218,7 @@ proc main() [fs, process, env, time, io, error] {
   let check = fp"{case_dir}/ntp-frequency-check"
   let saved = p"/var/lib/ntpd-rs/frequency.json"
 
-  p"/etc/ntpd-rs".mkdir(true)?
+  p"/etc/ntpd-rs".mkdir(true)
   p"/etc/ntpd-rs/ntp.toml".write("""frequency-calibration-path = "/var/lib/ntpd-rs/frequency.json"
 [observability]
 log-level = "info"
@@ -231,9 +231,9 @@ initial-poll-interval = 1
 poll-interval-limits = { min = 1, max = 1 }
 [synchronization]
 minimum-agreeing-sources = 1
-""")?
+""")
   if time.now() < boot_clock_floor {
-    linux.set_system_clock(fixture_epoch_ms)?
+    linux.set_system_clock(fixture_epoch_ms)
   }
   let raw_origin = (run.text $oracle "--raw").trim().parse_int_decimal()?
   let original = time.now()
@@ -242,19 +242,19 @@ minimum-agreeing-sources = 1
   var completed = false
   defer {
     let daemon_log = p"/run/ntp-proof-logs/ntpd-rs/current"
-    if daemon_log.exists()? { print "NTP_DAEMON_LOG" daemon_log.read_text()? }
+    if daemon_log.exists() { print "NTP_DAEMON_LOG" daemon_log.read_text()? }
     let cleanup = unix.shutdown_process_groups(groups, 2s, 100ms)?
     assert cleanup.remaining.is_empty(), "NTP proof retained process groups"
-    linux.set_system_clock(original + now_ms()? - origin)?
+    linux.set_system_clock(original + now_ms()? - origin)
     if completed { print "NTP_CASE_COMPLETE" }
   }
 
   if mode != "frequency" {
     let offset = if mode == "ahead" { startup_offset_ms } else { -startup_offset_ms }
-    linux.set_system_clock(original + offset)?
+    linux.set_system_clock(original + offset)
   }
   let run_dir = p"/run/ntp-proof"
-  run_dir.mkdir(true)?
+  run_dir.mkdir(true)
   let supervisor = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/bin/xinit", "--", "supervise", "ntpd-rs"], env: {
     XINIT_SERVICE_DIR: "/usr/lib/xinit/services",
     XINIT_RUN_DIR: run_dir.display(),
@@ -264,7 +264,7 @@ minimum-agreeing-sources = 1
   groups += [scanner.pid]
   let first = wait_status(run_dir, 0)?
   groups += [first.pid]
-  check_identity(first.pid)?
+  check_identity(first.pid)
   assert stratum()? == 16, "readiness was confused with synchronization"
   print "NTP_READY_UNSYNCED"
 
@@ -277,7 +277,7 @@ minimum-agreeing-sources = 1
   let server = unix.spawn_process_group(process.command_argv(oracle, oracle_args, stdout: p"/run/ntp-oracle.log", stderr: p"/run/ntp-oracle.log"))?
   groups += [server.pid]
   let server_deadline = now_ms()? + 10000
-  while ! ready.exists()? and now_ms()? < server_deadline { time.sleep(50ms) }
+  while ! ready.exists() and now_ms()? < server_deadline { time.sleep(50ms) }
   assert ready.exists()?, "controlled NTP source did not bind"
 
   let deadline = now_ms()? + 170000
@@ -288,7 +288,7 @@ minimum-agreeing-sources = 1
     let delta = time.now() - (original + raw_now - raw_origin)
     let current = stratum()?
     if frequency_case {
-      if current < 16 and saved.exists()? {
+      if current < 16 and saved.exists() {
         let valid = run.status $check "saved" $saved
         if valid.ok {
           learned = true
@@ -308,8 +308,8 @@ minimum-agreeing-sources = 1
   }
   if (frequency_case and ! learned) or (! frequency_case and consecutive < 5) {
     run /usr/bin/ntp-ctl "status" "-c" "/etc/ntpd-rs/ntp.toml"
-    if p"/run/ntp-oracle-count".exists()? { print "NTP_PACKETS" p"/run/ntp-oracle-count".read_text()? }
-    if p"/run/ntp-oracle.log".exists()? { print "NTP_ORACLE_LOG" p"/run/ntp-oracle.log".read_text()? }
+    if p"/run/ntp-oracle-count".exists() { print "NTP_PACKETS" p"/run/ntp-oracle-count".read_text()? }
+    if p"/run/ntp-oracle.log".exists() { print "NTP_ORACLE_LOG" p"/run/ntp-oracle.log".read_text()? }
     print "NTP_NOW_MINUS_ORIGINAL_MS" (time.now() - original)
   }
   if frequency_case {
@@ -326,10 +326,10 @@ minimum-agreeing-sources = 1
 
   let cleanup = unix.shutdown_process_groups([server.pid], 2s, 100ms)?
   assert cleanup.remaining.is_empty(), "the controlled source did not stop"
-  process.kill(first.pid, signal: "KILL")?
+  process.kill(first.pid, signal: "KILL")
   let replacement = wait_status(run_dir, first.pid)?
   groups += [replacement.pid]
-  check_identity(replacement.pid)?
+  check_identity(replacement.pid)
   assert replacement.restarts > first.restarts
   print "NTP_RESTART_READY"
   assert stratum()? == 16, "a restart without a source was synchronized"
@@ -341,4 +341,4 @@ minimum-agreeing-sources = 1
   completed = true
 }
 
-main()?
+main()

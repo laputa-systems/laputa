@@ -5,46 +5,46 @@ proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86
   assert generation.read_generation_receipt(p"/")?.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let output = p"/run/self-hosting-output"
-  output.mkdir()?
-  linux.mount(b"/dev/vdc", output, fstype: "ext4", options: ["nosuid", "nodev"])?
-  linux.mount(b"scratch", fp"{root}/scratch", fstype: "tmpfs", options: ["mode=1777", "size=1G", "nosuid", "nodev"])?
-  linux.mount(b"proc", fp"{root}/proc", fstype: "proc", options: ["nosuid", "noexec", "nodev"])?
-  linux.mount(b"dev", fp"{root}/dev", fstype: "devtmpfs", options: ["nosuid"])?
-  p"/run/self-hosting-sentinel".write("guest boundary sentinel\n")?
+  output.mkdir()
+  linux.mount(b"/dev/vdc", output, fstype: "ext4", options: ["nosuid", "nodev"])
+  linux.mount(b"scratch", fp"{root}/scratch", fstype: "tmpfs", options: ["mode=1777", "size=1G", "nosuid", "nodev"])
+  linux.mount(b"proc", fp"{root}/proc", fstype: "proc", options: ["nosuid", "noexec", "nodev"])
+  linux.mount(b"dev", fp"{root}/dev", fstype: "devtmpfs", options: ["nosuid"])
+  p"/run/self-hosting-sentinel".write("guest boundary sentinel\n")
   let work = p"/run/self-hosting-successor"
-  work.mkdir()?
-  linux.mount(b"successor", work, fstype: "tmpfs", options: ["size=1G", "nosuid", "nodev"])?
+  work.mkdir()
+  linux.mount(b"successor", work, fstype: "tmpfs", options: ["size=1G", "nosuid", "nodev"])
   let repository = fp"{work}/repository"
   let _ = fs.copy_tree(fp"{root}/inputs/laputa", repository, parents: true)?
   if development_os_release != null {
-    fs.install(development_os_release, fp"{repository}/packages/baselayout/files/rootfs/etc/os-release", 0o644, overwrite: true)?
+    fs.install(development_os_release, fp"{repository}/packages/baselayout/files/rootfs/etc/os-release", 0o644, overwrite: true)
   }
   let seed = fp"{repository}/.out/seed/x86_64"
   let _ = fs.copy_tree(fp"{root}/inputs/seed-A", seed, parents: true)?
   let runners = fp"{work}/runners"
-  runners.mkdir()?
+  runners.mkdir()
   for name in ["xsh", "xsht"] {
     let source = fp"{toolchain}/{name}"
-    fs.install(source, fp"{runners}/{name}", 0o755)?
-    fs.install(source, fp"{seed}/{name}", 0o755, overwrite: true)?
+    fs.install(source, fp"{runners}/{name}", 0o755)
+    fs.install(source, fp"{seed}/{name}", 0o755, overwrite: true)
   }
   let manifest = fp"{seed}/manifest.json"
   let record = json.read(manifest)?.require(Record)?
   let files = {name: hash.sha256(fp"{seed}/{name}")?.hex() for name in ["xsh", "xshi", "xsht", "core.tar.xz"]}
-  json.write(manifest, {format: record.get("format")?.require(Str)?, arch: record.get("arch")?.require(Str)?, files})?
+  json.write(manifest, {format: record.get("format")?.require(Str)?, arch: record.get("arch")?.require(Str)?, files})
   for name in ["cohort-c", "cohort-rust", "cohort-xsh"] {
     let _ = fs.copy_tree(fp"{root}/cohort/packages/{name}", fp"{repository}/packages/{name}")?
   }
   let profile = fp"{repository}/profiles/qemu-self-hosting.xsh"
-  profile.write(profile.read_text()?.replace("\"laputa-pm\", \"xinit\"", with: "\"laputa-pm\", \"xinit\", \"cohort-c\", \"cohort-rust\", \"cohort-xsh\""))?
-  util.normalize_checkout_tree(repository)?
+  profile.write(profile.read_text()?.replace("\"laputa-pm\", \"xinit\"", with: "\"laputa-pm\", \"xinit\", \"cohort-c\", \"cohort-rust\", \"cohort-xsh\""))
+  util.normalize_checkout_tree(repository)
   let artifacts = fp"{output}/successor-artifacts"
   let _ = fs.copy_tree(fp"{root}/inputs/artifacts-A", artifacts)?
   let bundle = fp"{output}/successor"
-  bundle.mkdir()?
+  bundle.mkdir()
   for directory in [artifacts, bundle] {
-    fs.set_owner(directory, uid: 65534, gid: 65534)?
-    for entry in fs.walk(directory, hidden: true)? { fs.set_owner(entry.path, uid: 65534, gid: 65534)? }
+    fs.set_owner(directory, uid: 65534, gid: 65534)
+    for entry in fs.walk(directory, hidden: true)? { fs.set_owner(entry.path, uid: 65534, gid: 65534) }
   }
   for pair in [
     {source: repository, destination: fp"{root}/src/laputa"},
@@ -53,9 +53,9 @@ proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86
     {source: fp"{runners}/xsh", destination: fp"{root}/bin/xsh"},
     {source: fp"{runners}/xsht", destination: fp"{root}/bin/xsht"},
   ] {
-    linux.mount(bytes.from_text(pair.source.display()), pair.destination, options: ["bind"])?
+    linux.mount(bytes.from_text(pair.source.display()), pair.destination, options: ["bind"])
   }
-  linux.mount(b"", fp"{root}/src/laputa", options: ["remount", "bind", "ro"])?
+  linux.mount(b"", fp"{root}/src/laputa", options: ["remount", "bind", "ro"])
   let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/src/laputa/guest/self-hosting-compose-inner.xsh"], env: {
     PATH: "/bin:/usr/lib/xsh/core:/usr/bin", XSH_MODULE_PATH: "/src/laputa", HOME: "/scratch/home",
     TMPDIR: "/output/tmp", LANG: "C", LC_ALL: "C", TZ: "UTC",
@@ -66,10 +66,10 @@ proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86
     KACHE_CACHE_DIR: "/scratch/kache", KACHE_RUNTIME_DIR: "/scratch/kache-runtime",
     KACHE_SOCKET_PATH: "/scratch/kache-runtime/daemon.sock", KACHE_LOCAL_ONLY: "1",
   })
-  fp"{bundle}/tmp".mkdir()?
-  fs.set_owner(fp"{bundle}/tmp", uid: 65534, gid: 65534)?
+  fp"{bundle}/tmp".mkdir()
+  fs.set_owner(fp"{bundle}/tmp", uid: 65534, gid: 65534)
   let status = linux.run_in_namespaces(command, unshare: ["net"], root: root, cwd: root, uid: 65534, gid: 65534, drop_groups: true)?
-  fs.sync()?
+  fs.sync()
   fail "in-guest successor composition failed" unless status.ok
   print "LAPUTA_SELF_HOSTING_SUCCESSOR_COMPOSED"
 }
@@ -77,7 +77,7 @@ proc compose(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86
 proc main(root: Path, toolchain: Path = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, time, error] -> Result[Unit, Error] {
   guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
   let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
-  compose(root, toolchain, release_input)?
+  compose(root, toolchain, release_input)
 }
 
-main(@args)?
+main(@args)

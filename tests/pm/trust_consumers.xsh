@@ -5,14 +5,14 @@ proc fixture(name: Str) -> Path {
 proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
-    if port_file.exists()? {
+    if port_file.exists() {
       let text = port_file.read_text()?.trim()
       if text != "" {
         return text.parse_int_decimal()
       }
     }
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
 
@@ -26,7 +26,7 @@ proc serve_chain(ctx: TestContext, name: Str, python: Str, chain: Str, key: Str)
   let dir = test.temp_dir(ctx, name:)?
   let routes = fp"{dir}/routes"
   routes.mkdir()
-  fp"{routes}/hello".write(bytes.from_text("hello\n"))?
+  fp"{routes}/hello".write(bytes.from_text("hello\n"))
   let port_file = fp"{dir}/port"
   let script = fixture("tls_server.py")
   let child = spawn run $python $script $chain $key $port_file $routes ?
@@ -64,7 +64,7 @@ proc root_bundle(ctx: TestContext) [fs, error] -> Result[Path, Error] {
 proc uv_reaches_http(ctx: TestContext, uv: Path, bundle: Path, port: Int, label: Str) [fs, process, error] -> Result[Bool, Error] {
   let dir = test.temp_dir(ctx, name: f"uv-{label}")?
   let requirements = fp"{dir}/requirements.in"
-  requirements.write(bytes.from_text("trust-consumer-fixture-package\n"))?
+  requirements.write(bytes.from_text("trust-consumer-fixture-package\n"))
   let stderr = fp"{dir}/stderr"
   let command = process.command_argv(
     uv,

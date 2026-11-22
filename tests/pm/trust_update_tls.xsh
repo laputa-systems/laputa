@@ -9,14 +9,14 @@ proc fixture(name: Str) -> Path {
 proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
-    if port_file.exists()? {
+    if port_file.exists() {
       let text = port_file.read_text()?.trim()
       if text != "" {
         return text.parse_int_decimal()
       }
     }
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
 
@@ -62,7 +62,7 @@ proc stop_fixture(server: TrustFixtureServer) [process, error] {
 
 proc fixture_routes(ctx: TestContext, name: Str, body: Str) [fs, error] -> Result[Path, Error] {
   let dir = test.temp_dir(ctx, name: name)?
-  fp"{dir}/hello".write(bytes.from_text(body))?
+  fp"{dir}/hello".write(bytes.from_text(body))
   dir
 }
 
@@ -94,13 +94,13 @@ test trust_tls_accepts_trusted_chain [fs, process, env, time, net, error] { |ctx
   let _ = net.pool("trust-tls-accept", 4, 1s)?
   let routes = fixture_routes(ctx, "trust-tls-accept-routes", "hello fixture\n")?
   let server = serve_fixture_tls(ctx, "trust-tls-accept", python, fixture("tls/server-a.crt").display(), fixture("tls/server-a.key").display(), routes, "", "")?
-  defer stop_fixture(server)?
+  defer stop_fixture(server)
 
   let url = f"https://127.0.0.1:{server.port}/hello"
   let response = https_get(url, bundle, "trust-tls-accept")?
   assert response.status == 200
   assert response.body.utf8()? == "hello fixture\n"
-  net.close_pool("trust-tls-accept")?
+  net.close_pool("trust-tls-accept")
 }
 
 test trust_tls_rejects_untrusted_chain [fs, process, env, time, net, error] { |ctx|
@@ -117,7 +117,7 @@ test trust_tls_rejects_untrusted_chain [fs, process, env, time, net, error] { |c
   let _ = net.pool("trust-tls-reject", 4, 1s)?
   let routes = fixture_routes(ctx, "trust-tls-reject-routes", "hello fixture\n")?
   let server = serve_fixture_tls(ctx, "trust-tls-reject", python, fixture("tls/server-a.crt").display(), fixture("tls/server-a.key").display(), routes, "", "")?
-  defer stop_fixture(server)?
+  defer stop_fixture(server)
 
   let url = f"https://127.0.0.1:{server.port}/hello"
   match https_get(url, bundle, "trust-tls-reject") {
@@ -125,7 +125,7 @@ test trust_tls_rejects_untrusted_chain [fs, process, env, time, net, error] { |c
     Err(problem) => assert "certificate" in problem.message
   }
 
-  net.close_pool("trust-tls-reject")?
+  net.close_pool("trust-tls-reject")
 }
 
 test trust_tls_poisoned_client_requires_recreation [fs, process, env, time, net, error] { |ctx|
@@ -142,7 +142,7 @@ test trust_tls_poisoned_client_requires_recreation [fs, process, env, time, net,
   let _ = net.pool("trust-tls-poison", 4, 1s)?
   let routes = fixture_routes(ctx, "trust-tls-poison-routes", "hello fixture\n")?
   let server = serve_fixture_tls(ctx, "trust-tls-poison", python, fixture("tls/server-a.crt").display(), fixture("tls/server-a.key").display(), routes, "", "")?
-  defer stop_fixture(server)?
+  defer stop_fixture(server)
 
   let url = f"https://127.0.0.1:{server.port}/hello"
   let first = https_get(url, bundle, "trust-tls-poison")?
@@ -157,8 +157,8 @@ test trust_tls_poisoned_client_requires_recreation [fs, process, env, time, net,
   let _ = net.pool("trust-tls-poison-new", 4, 1s)?
   let second = https_get(url, bundle, "trust-tls-poison-new")?
   assert second.status == 200
-  net.close_pool("trust-tls-poison")?
-  net.close_pool("trust-tls-poison-new")?
+  net.close_pool("trust-tls-poison")
+  net.close_pool("trust-tls-poison-new")
 }
 test trust_tls_unrelated_chains_keep_working [fs, process, env, time, net, error] { |ctx|
   let python = match process.which("python3") {
@@ -174,12 +174,12 @@ test trust_tls_unrelated_chains_keep_working [fs, process, env, time, net, error
   let _ = net.pool("trust-tls-control", 4, 1s)?
   let routes = fixture_routes(ctx, "trust-tls-control-routes", "hello fixture\n")?
   let server = serve_fixture_tls(ctx, "trust-tls-control", python, fixture("tls/chain-control.pem").display(), fixture("tls/ee-control.key").display(), routes, "", "")?
-  defer stop_fixture(server)?
+  defer stop_fixture(server)
 
   let url = f"https://127.0.0.1:{server.port}/hello"
   let response = https_get(url, bundle, "trust-tls-control")?
   assert response.status == 200
-  net.close_pool("trust-tls-control")?
+  net.close_pool("trust-tls-control")
 }
 
 test trust_tls_long_lived_service_recovers_by_recreating_pool [fs, process, env, time, net, error] { |ctx|
@@ -195,7 +195,7 @@ test trust_tls_long_lived_service_recovers_by_recreating_pool [fs, process, env,
   let service_bundle = test.temp_path(ctx, name: "trust-tls-service-bundle.pem")
   service_bundle.write(fixture("tls/ca-a.crt").read_bytes()?)
   let first = serve_fixture_tls(ctx, "trust-tls-service-first", python, fixture("tls/server-a.crt").display(), fixture("tls/server-a.key").display(), routes, "", "")?
-  defer stop_fixture(first)?
+  defer stop_fixture(first)
 
   var served = 0
   let _ = net.pool("trust-tls-service", 4, 1s)?
@@ -204,10 +204,10 @@ test trust_tls_long_lived_service_recovers_by_recreating_pool [fs, process, env,
   assert ready.status == 200
   served += 1
 
-  stop_fixture(first)?
-  service_bundle.write(bytes.from_text(fixture("tls/ca-a.crt").read_text()? + fixture("tls/ca-b.crt").read_text()?))?
+  stop_fixture(first)
+  service_bundle.write(bytes.from_text(fixture("tls/ca-a.crt").read_text()? + fixture("tls/ca-b.crt").read_text()?))
   let second = serve_fixture_tls(ctx, "trust-tls-service-second", python, fixture("tls/server-b.crt").display(), fixture("tls/server-b.key").display(), routes, "", "")?
-  defer stop_fixture(second)?
+  defer stop_fixture(second)
 
   let second_url = f"https://127.0.0.1:{second.port}/hello"
   match https_get(second_url, service_bundle, "trust-tls-service") {
@@ -215,12 +215,12 @@ test trust_tls_long_lived_service_recovers_by_recreating_pool [fs, process, env,
     Err(_) => {},
   }
 
-  net.close_pool("trust-tls-service")?
+  net.close_pool("trust-tls-service")
   let _ = net.pool("trust-tls-service-next", 4, 1s)?
   let recovered = https_get(second_url, service_bundle, "trust-tls-service-next")?
   assert recovered.status == 200
   assert recovered.body.utf8()? == "service payload\n"
   served += 1
   assert served == 2
-  net.close_pool("trust-tls-service-next")?
+  net.close_pool("trust-tls-service-next")
 }

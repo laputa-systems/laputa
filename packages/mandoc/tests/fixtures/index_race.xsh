@@ -31,7 +31,7 @@ var staging: List[Path] = []
 var attempts = 0
 while staging.is_empty() and attempts < 500 {
   for entry in fs.children(parent)? {
-    if fp"{entry.path}/usr/share/man/.race-ready".exists()? { staging = [entry.path] }
+    if fp"{entry.path}/usr/share/man/.race-ready".exists() { staging = [entry.path] }
   }
   if staging.is_empty() { time.sleep(10ms) }
   attempts += 1

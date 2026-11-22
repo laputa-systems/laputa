@@ -143,7 +143,7 @@ export proc upload_immutable_repo_file(
   match fs.rename_noreplace(temporary, dest) {
     Ok(_) => true
     Err(problem) => {
-      return Err(problem) unless dest.exists()?
+      return Err(problem) unless dest.exists()
       return false when dest.read_bytes()? == temporary.read_bytes()?
       return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
     }

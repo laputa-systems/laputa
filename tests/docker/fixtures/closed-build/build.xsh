@@ -50,9 +50,9 @@ proc main(repository: Path, mode: Str = "cohort") [fs, net, process, env, time, 
     1,
     confinement: policy.closed_build_confinement(p"/scratch"),
   )?
-  assert_no_substrate_leftovers()?
+  assert_no_substrate_leftovers()
   assert result.artifacts.len() == 3
   print "closed cohort published"
 }
 
-main(@args)?
+main(@args)

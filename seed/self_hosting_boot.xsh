@@ -8,7 +8,7 @@ use system.types
 
 proc record_failed_pending(state: Path) [fs, time, error] {
   let record = activation.activation_status(state)?
-  if record.pending != null { activation.activation_boot_failed(state)? }
+  if record.pending != null { activation.activation_boot_failed(state) }
 }
 
 proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, process, net, env, time, io, error] -> Result[Unit, Error] {
@@ -53,14 +53,14 @@ proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, proc
       fail f"guest failed; inspect {outputs.console_log} and {outputs.qemu_log}"
     }
     if ! paused and "LAP27_PAUSE_READY" in log {
-      qemu.qemu_control(outputs.qmp_socket, qemu.QemuStop)?
+      qemu.qemu_control(outputs.qmp_socket, qemu.QemuStop)
       print "LAP27_HOST_PAUSED"
-      io.flush_stdout()?
+      io.flush_stdout()
       fail "guest resume marker preceded the QMP stop acknowledgment" when "LAP27_RESUME_OBSERVED" in qemu.qemu_log_text(outputs.console_log, outputs.qemu_log)?
       time.sleep(3s)
-      qemu.qemu_control(outputs.qmp_socket, qemu.QemuContinue)?
+      qemu.qemu_control(outputs.qmp_socket, qemu.QemuContinue)
       print "LAP27_HOST_RESUMED"
-      io.flush_stdout()?
+      io.flush_stdout()
       paused = true
     }
     if completion_marker in log and (generations == null or "LAPUTA_SELF_HOSTING_ACTIVATION " in log) {
@@ -80,4 +80,4 @@ proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, proc
   }
 }
 
-main(@args)?
+main(@args)

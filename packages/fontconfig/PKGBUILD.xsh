@@ -91,7 +91,7 @@ proc stage_generated() {
     fs.install(entry.path, fp"build/{output}", 0o644, parents: true, overwrite: true)
   }
   for output in split.removed {
-    if output.ends_with(".h") and ! fp"build/{output}".exists()? {
+    if output.ends_with(".h") and ! fp"build/{output}".exists() {
       return Err(types.PmError.PackageContract(f"fontconfig: missing generated {output}"))
     }
   }

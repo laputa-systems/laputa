@@ -290,5 +290,5 @@ main(@args)?
   local.write_package_db(dest, pkg, manifest, etcsums)
   let archive_paths = local.collect_archive_paths(dest, pkg.filetree)?
   tarball.parent.mkdir()
-  payload_archive.create(tarball, dest, archive_paths)?
+  payload_archive.create(tarball, dest, archive_paths)
 }

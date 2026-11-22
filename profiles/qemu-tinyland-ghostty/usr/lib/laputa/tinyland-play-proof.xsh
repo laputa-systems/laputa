@@ -17,13 +17,13 @@ proc require(condition: Bool, phase: Str, message: Str) [error] {
 proc main() [fs, process, env, time, error] {
   let account = user.lookup("laputa")?
   let identity = unix.id()?
-  require(identity.uid == account.uid, "play-identity", "Play proof is not running as laputa")?
+  require(identity.uid == account.uid, "play-identity", "Play proof is not running as laputa")
   let runtime = fp"/run/user/{account.uid}"
   let icds = [entry.name for entry in fs.children(p"/usr/share/vulkan/icd.d")?]
-  require(icds == ["lvp_icd.json"], "play-icd", f"expected only the lavapipe ICD, found {icds.join(" ")}")?
+  require(icds == ["lvp_icd.json"], "play-icd", f"expected only the lavapipe ICD, found {icds.join(" ")}")
 
   let fixture = fp"{runtime}/laputa-play-fixture.mkv"
-  fixture.remove()?
+  fixture.remove()
   let ffmpeg = p"/usr/bin/ffmpeg"
   run $ffmpeg "-hide_banner" "-loglevel" "error" "-filter_complex" "testsrc2=size=320x240:rate=10,format=rgb24" "-frames:v" f"{fixture_frames}" "-c:v" "png" $fixture
 
@@ -35,16 +35,16 @@ proc main() [fs, process, env, time, error] {
   }) {
     run.capture --text --timeout=60s $player "--no-config" "--vo=gpu-next" "--gpu-context=waylandvk" "--gpu-sw=yes" "--ao=null" "--hwdec=no" "--keep-open=no" "--msg-level=all=info,vo=v" "--term-playing-msg=PLAY_FIXTURE \${width}x\${height} \${video-codec}" $fixture
   }?
-  fixture.remove()?
-  p"/dev/console".write(f"{played.stdout}{played.stderr}")?
-  require(played.status.ok, "play-exit", f"player failed: {played.stderr.trim()}")?
+  fixture.remove()
+  p"/dev/console".write(f"{played.stdout}{played.stderr}")
+  require(played.status.ok, "play-exit", f"player failed: {played.stderr.trim()}")
   let log = f"{played.stdout}{played.stderr}"
 
-  require("libvulkan_lvp.so" in log, "play-driver", "the Vulkan loader did not load lavapipe")?
-  require("libplacebo: GPU 0: Vulkan device" in log, "play-vulkan", "Play created no Vulkan device")?
-  require("vo/gpu-next/wayland: Registered output" in log, "play-wayland", "Play registered no Wayland output")?
-  require("PLAY_FIXTURE 320x240 png" in log, "play-fixture", "Play did not load the fixture")?
-  play_international_text(runtime)?
+  require("libvulkan_lvp.so" in log, "play-driver", "the Vulkan loader did not load lavapipe")
+  require("libplacebo: GPU 0: Vulkan device" in log, "play-vulkan", "Play created no Vulkan device")
+  require("vo/gpu-next/wayland: Registered output" in log, "play-wayland", "Play registered no Wayland output")
+  require("PLAY_FIXTURE 320x240 png" in log, "play-fixture", "Play did not load the fixture")
+  play_international_text(runtime)
 }
 
 proc play_international_text(runtime: Path) [fs, process, env, time, error] {
@@ -54,10 +54,10 @@ proc play_international_text(runtime: Path) [fs, process, env, time, error] {
   let subtitles = fp"{runtime}/laputa-play-text.srt"
   let output = fp"{runtime}/laputa-play-text.log"
   let frame = fp"{runtime}/laputa-play-text.png"
-  video.remove()?
-  frame.write(black_frame_png.base64_decode()?)?
+  video.remove()
+  frame.write(black_frame_png.base64_decode()?)
   run $ffmpeg "-hide_banner" "-loglevel" "error" "-loop" "1" "-framerate" "1" "-i" $frame "-frames:v" f"{text_seconds}" "-c:v" "png" $video
-  frame.remove()?
+  frame.remove()
   subtitles.write(
     """1
 00:00:00,000 --> 00:00:13,000
@@ -67,7 +67,7 @@ proc play_international_text(runtime: Path) [fs, process, env, time, error] {
 👨‍👩‍👧‍👦 🎉
 𓀀 𓀁 𓀂
 """,
-  )?
+  )
   let launched = spawn process.command_argv(
     player,
     ["player", "--no-config", "--vo=gpu-next", "--gpu-context=waylandvk", "--gpu-sw=yes", "--ao=null", "--hwdec=no", "--keep-open=no", f"--sub-file={subtitles}", "--term-playing-msg=PLAY_TEXT_PLAYING", video.display()],
@@ -78,17 +78,17 @@ proc play_international_text(runtime: Path) [fs, process, env, time, error] {
   )?
   var waited = 0
   while ! output.exists() or ! ("PLAY_TEXT_PLAYING" in output.read_text()?) {
-    require(waited < 40, "play-text-start", "Play did not start the subtitle fixture")?
+    require(waited < 40, "play-text-start", "Play did not start the subtitle fixture")
     time.sleep(500ms)
     waited += 1
   }
-  time.sleep(3s)?
-  p"/dev/console".write("LAPUTA_PROOF_SCREENSHOT play-text\n")?
+  time.sleep(3s)
+  p"/dev/console".write("LAPUTA_PROOF_SCREENSHOT play-text\n")
   let status = wait launched?
-  p"/dev/console".write(f"{output.read_text()?}\nuptime {p"/proc/uptime".read_text()?}")?
-  video.remove()?
-  subtitles.remove()?
-  require(status.ok, "play-text-exit", "Play failed on the subtitle fixture")?
+  p"/dev/console".write(f"{output.read_text()?}\nuptime {p"/proc/uptime".read_text()?}")
+  video.remove()
+  subtitles.remove()
+  require(status.ok, "play-text-exit", "Play failed on the subtitle fixture")
 }
 
 main()

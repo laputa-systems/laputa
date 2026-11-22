@@ -13,15 +13,15 @@ proc main(...argv: List[Str]) [fs, process, error] {
   let owners = first_boot.state_ownership(root)?
   with scratch = fs.tempdir_in(output.parent())? {
     let owner_file = fp"{scratch.host_path()?}/owners.json"
-    json.write(owner_file, owners)?
+    json.write(owner_file, owners)
     atomically replace output as temporary {
-      temporary.write(b"")?
-      temporary.chmod(0o600)?
-      temporary.truncate(size)?
+      temporary.write(b"")
+      temporary.chmod(0o600)
+      temporary.truncate(size)
       let status = process.run(process.command_argv(xsh, [xsh.display(), formatter.display(), "--", "-d", root.display(), "--inode-owners", owner_file.display(), temporary.display()]))?
       guard status.ok else { fail "maintained state image formatter failed" }
-      fs.fsync(temporary)?
+      fs.fsync(temporary)
     }
   }
 }
-main(@args)?
+main(@args)

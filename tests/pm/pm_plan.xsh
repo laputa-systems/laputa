@@ -172,19 +172,19 @@ test test_repository_input_ignores_cargo_target_output [fs, env, error] { |ctx|
   let _ = fs.copy_tree(fixture("fingerprint-repository"), dir, parents: true, overwrite: true)?
   let pkg = recipe.load_package(dir)?
   let tool = fp"{root}/tool"
-  fp"{tool}/src".mkdir(parents: true)?
-  fp"{tool}/Cargo.toml".write("[package]\nname = \"tool\"\n")?
-  fp"{tool}/src/main.rs".write("fn main() {}\n")?
+  fp"{tool}/src".mkdir(parents: true)
+  fp"{tool}/Cargo.toml".write("[package]\nname = \"tool\"\n")
+  fp"{tool}/src/main.rs".write("fn main() {}\n")
   let before = fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?
-  fp"{tool}/target/debug".mkdir(parents: true)?
-  fp"{tool}/target/debug/tool".write("binary-bytes\n")?
-  fp"{tool}/target/debug/build/tool".mkdir(parents: true)?
-  fp"{tool}/target/debug/build/tool/output".write("more-bytes\n")?
+  fp"{tool}/target/debug".mkdir(parents: true)
+  fp"{tool}/target/debug/tool".write("binary-bytes\n")
+  fp"{tool}/target/debug/build/tool".mkdir(parents: true)
+  fp"{tool}/target/debug/build/tool/output".write("more-bytes\n")
   test.eq(fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?, before)
-  fp"{tool}/.work/tmp".mkdir(parents: true)?
-  fp"{tool}/.work/tmp/probe.log".write("harness scratch\n")?
+  fp"{tool}/.work/tmp".mkdir(parents: true)
+  fp"{tool}/.work/tmp/probe.log".write("harness scratch\n")
   test.eq(fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?, before)
-  fp"{tool}/src/main.rs".write("fn main() { println!(\"changed\"); }\n")?
+  fp"{tool}/src/main.rs".write("fn main() { println!(\"changed\"); }\n")
   assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? != before
 }
 
@@ -273,7 +273,7 @@ proc executor_fixture_payload(ctx: TestContext, name: Str) [fs, env, error] -> R
   let root = fixture(f"executor-validity/{name}")
   let executor = module.load(fp"{root}/pm/build.xsh")?.require(hooks.BuildFilesystem)?
   let dest = test.temp_dir(ctx, name: f"executor-payload-{name}")?
-  executor.build(dest)?
+  executor.build(dest)
   fp"{dest}/payload.bin".read_bytes()?
 }
 

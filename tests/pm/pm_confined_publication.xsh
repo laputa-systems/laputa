@@ -432,16 +432,16 @@ test test_killed_composition_publishes_nothing_partial [fs, process, env, time, 
     while ! staging_present(value.gens, f"killed-{delay_ms}") and ! output.exists() {
       polls += 1
       assert polls < 30000, "composition never began staging"
-      time.sleep(time.millis(2))?
+      time.sleep(time.millis(2))
     }
 
-    time.sleep(time.millis(delay_ms))?
-    process.kill(child.pid, signal: "KILL")?
+    time.sleep(time.millis(delay_ms))
+    process.kill(child.pid, signal: "KILL")
     let _ = wait [child]?
     let staged = staging_present(value.gens, f"killed-{delay_ms}")?
-    outcomes = outcomes.add(if output.exists()? { "published" } else if staged { "staged" } else { "absent" })
+    outcomes = outcomes.add(if output.exists() { "published" } else if staged { "staged" } else { "absent" })
 
-    if output.exists()? {
+    if output.exists() {
       generation.verify_generation(output, generation.read_generation_receipt(output)?)
       assert fp"{output}/usr/share/wide/399".read_text()? == filler_text(64)
     }
@@ -458,7 +458,7 @@ test test_killed_composition_publishes_nothing_partial [fs, process, env, time, 
   assert "staged" in outcomes and "published" in outcomes
 
   let retried = fp"{value.gens}/retried"
-  let retried_run = run.capture --text XSH_MODULE_PATH=$modules XSH_HOST=$xsh $xsh pm.xsh -- root compose $plan_path --store $store_root --runtime-root app --output $retried ?
+  let retried_run = run.capture --text XSH_MODULE_PATH=$modules XSH_HOST=$xsh $xsh pm.xsh -- root compose $plan_path --store $store_root --runtime-root app --output $retried
   assert retried_run.status.ok, retried_run.stderr
   generation.verify_generation(retried, generation.read_generation_receipt(retried)?)
 }
@@ -471,7 +471,7 @@ test test_exhausted_space_fails_without_partial_generation_or_lost_prior [fs, pr
       return
     },
   }
-  let probe = run.capture --text $unshare -Urm true ?
+  let probe = run.capture --text $unshare -Urm true
   if ! probe.status.ok {
     test.skip("unprivileged user and mount namespaces are unavailable for the tmpfs fixture")
     return
@@ -496,7 +496,7 @@ cat "$1/prior/usr/share/runtime-lib" | sed 's/^/prior-file /'
 """)
   let xsh = runner()?
   let modules = path.absolute(p".")?
-  let result = run.capture --text XSH_MODULE_PATH=$modules XSH_HOST=$xsh $unshare -Urm sh $script $mount $xsh $plan_path $value.store_root $store_root ?
+  let result = run.capture --text XSH_MODULE_PATH=$modules XSH_HOST=$xsh $unshare -Urm sh $script $mount $xsh $plan_path $value.store_root $store_root
   assert result.status.ok, result.stderr
   let lines = result.stdout.trim().split("\n")
   assert "full-status 0" not in lines and lines[0].starts_with("full-status "), result.stdout

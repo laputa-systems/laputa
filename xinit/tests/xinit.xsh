@@ -1487,9 +1487,9 @@ export proc finish() [fs, process, env, error] -> Result[Unit, Error] {{
 proc run_crash_replay(ctx: TestContext, root: Path, script: Str) [fs, process, error] -> Result[XinitRun] {
   let unix_log = fp"{root}/unix.jsonl"
   let replay = fp"{root}/crash-replay.txt"
-  crash_replay_service(root, unix_log)?
+  crash_replay_service(root, unix_log)
   replay.write(p"xinit/tests/fixtures/crash-replay.txt".read_text()?)
-  test.unix_fake(ctx, {log: unix_log, replay: replay})?
+  test.unix_fake(ctx, {log: unix_log, replay: replay})
   let result = test.run_xsh(ctx, script, [], ["supervise", "demo"], {
     XINIT_SERVICE_DIR: fp"{root}/services".display(),
     XINIT_RUN_DIR: fp"{root}/run".display(),
@@ -1720,9 +1720,9 @@ fp"{env_value("XINIT_RUN_DIR", "")}/done".write("")
   let deadline = time.monotonic()? + 60000000000
   var complete = 0
   var torn = 0
-  while ! done.exists()? {
+  while ! done.exists() {
     assert time.monotonic()? < deadline, "the status writer did not finish"
-    if status.exists()? {
+    if status.exists() {
       match json.read(status) {
         Ok(_) => complete += 1
         Err(_) => torn += 1
@@ -2279,8 +2279,8 @@ export let service = {{
   let started = xinit_text(ctx, ["start", "stubborn"], control)?
   let pid = rx"pid=([0-9]+)".captures(started)[1].parse_int()?
   var tries = 0
-  while ! marker.exists()? and tries < 200 {
-    time.sleep(25ms)?
+  while ! marker.exists() and tries < 200 {
+    time.sleep(25ms)
     tries += 1
   }
   assert marker.exists()?
@@ -2297,7 +2297,7 @@ export let service = {{
       Err(_) => false,
     }
     waits += 1
-    time.sleep(20ms)?
+    time.sleep(20ms)
   }
   assert ! alive, "the TERM-ignoring service survived the stop"
 }
@@ -2621,7 +2621,7 @@ test test_session_sweep_terminates_groups_no_record_names_and_spares_other_sessi
 let helper = unix.spawn_process_group(process.command_argv("sleep", ["sleep", "300"]))?
 marker.write(f"{helper.pid}")?
 while true { time.sleep(500ms) }
-""")?
+""")
   let marker_literal = json.encode(fp"{root}/helper".display())?
   let runner_literal = json.encode(runner.display())?
   let leader_literal = json.encode(leader_script.display())?

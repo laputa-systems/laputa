@@ -97,7 +97,7 @@ pure changes_field(drift: compare.Drift, field: Str) -> Bool {
 
 proc apply_directory(connection: transport.Connection, spec: model.DirectorySpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, .RemoveDirectory, [spec.path], false)?
+    step(connection, .Apply, .RemoveDirectory, [spec.path], false)
     return
   }
 
@@ -105,18 +105,18 @@ proc apply_directory(connection: transport.Connection, spec: model.DirectorySpec
   if drift.act == .Create {
     let initial = if spec.mode == null { "" } else { compare.octal(0o700) }
     let parents = if spec.parents { "1" } else { "0" }
-    step(connection, .Apply, .MakeDirectory, [spec.path, parents, initial], false)?
+    step(connection, .Apply, .MakeDirectory, [spec.path, parents, initial], false)
     applied = true
   }
 
   let owner = owner_spec(spec.owner, spec.group)
   if owner != "" and (drift.act == .Create or changes_field(drift, "owner") or changes_field(drift, "group")) {
-    step(connection, .Apply, .ChangeOwner, [owner, spec.path], applied)?
+    step(connection, .Apply, .ChangeOwner, [owner, spec.path], applied)
     applied = true
   }
 
   if spec.mode != null and (drift.act == .Create or changes_field(drift, "mode")) {
-    step(connection, .Apply, .ChangeMode, [compare.octal(spec.mode), spec.path], applied)?
+    step(connection, .Apply, .ChangeMode, [compare.octal(spec.mode), spec.path], applied)
   }
 }
 
@@ -181,7 +181,7 @@ proc stream_content(
     }
   }
 
-  step(connection, .Stage, .WriteStage, [stage], false, stdin: data, stdin_path: streamed, timeout_ms: connection.transfer_timeout_ms)?
+  step(connection, .Stage, .WriteStage, [stage], false, stdin: data, stdin_path: streamed, timeout_ms: connection.transfer_timeout_ms)
   let inspected = output(connection, .Stage, .InspectStage, [stage], false)?
   let table = inspected.stdout.utf8() ?? ""
   if f"digest {expected.digest}" not in table.lines() {
@@ -245,7 +245,7 @@ proc apply_file(
   expected: compare.Material?,
 ) [fs, env, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, .RemoveFile, [spec.path], false)?
+    step(connection, .Apply, .RemoveFile, [spec.path], false)
     return
   }
 
@@ -258,32 +258,32 @@ proc apply_file(
       return Err(failure(.Apply, "the content of the file was not measured", false))
     }
 
-    replace_file(connection, spec, state, wanted, material)?
+    replace_file(connection, spec, state, wanted, material)
     return
   }
 
   let owner = owner_spec(spec.owner, spec.group)
   var applied = false
   if owner != "" and (changes_field(drift, "owner") or changes_field(drift, "group")) {
-    step(connection, .Apply, .ChangeOwner, [owner, spec.path], false)?
+    step(connection, .Apply, .ChangeOwner, [owner, spec.path], false)
     applied = true
   }
 
   if spec.mode != null and changes_field(drift, "mode") {
-    step(connection, .Apply, .ChangeMode, [compare.octal(spec.mode), spec.path], applied)?
+    step(connection, .Apply, .ChangeMode, [compare.octal(spec.mode), spec.path], applied)
   }
 }
 
 proc apply_link(connection: transport.Connection, spec: model.SymlinkSpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   match drift.act {
     compare.Remove => {
-      step(connection, .Apply, .RemoveLink, [spec.path], false)?
+      step(connection, .Apply, .RemoveLink, [spec.path], false)
     }
     compare.Update => {
-      step(connection, .Apply, .ReplaceLink, [spec.target, spec.path], false)?
+      step(connection, .Apply, .ReplaceLink, [spec.target, spec.path], false)
     }
     else => {
-      step(connection, .Apply, .MakeLink, [spec.target, spec.path], false)?
+      step(connection, .Apply, .MakeLink, [spec.target, spec.path], false)
     }
   }
 }
@@ -294,28 +294,28 @@ pure package_argument(spec: model.PackageSpec) -> Str {
 
 proc apply_package(connection: transport.Connection, spec: model.PackageSpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, .ApkDel, [spec.name], false, timeout_ms: 600000)?
+    step(connection, .Apply, .ApkDel, [spec.name], false, timeout_ms: 600000)
   } else {
-    step(connection, .Apply, .ApkAdd, [package_argument(spec)], false, timeout_ms: 600000)?
+    step(connection, .Apply, .ApkAdd, [package_argument(spec)], false, timeout_ms: 600000)
   }
 }
 
 proc refresh_index(connection: transport.Connection) [fs, process, error] -> Result[Unit, outcome.StepError] {
-  step(connection, .Apply, .ApkUpdate, [], false, timeout_ms: 600000)?
+  step(connection, .Apply, .ApkUpdate, [], false, timeout_ms: 600000)
 }
 
 proc apply_group(connection: transport.Connection, spec: model.GroupSpec, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, .DeleteGroup, [spec.name], false)?
+    step(connection, .Apply, .DeleteGroup, [spec.name], false)
   } else {
     let gid = if spec.gid == null { "" } else { f"{spec.gid}" }
-    step(connection, .Apply, .AddGroup, [spec.name, gid], false)?
+    step(connection, .Apply, .AddGroup, [spec.name, gid], false)
   }
 }
 
 proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: fact.Fact, drift: compare.Drift) [fs, process, error] -> Result[Unit, outcome.StepError] {
   if drift.act == .Remove {
-    step(connection, .Apply, .DeleteUser, [spec.name], false)?
+    step(connection, .Apply, .DeleteUser, [spec.name], false)
     return
   }
 
@@ -324,14 +324,14 @@ proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: f
   if drift.act == .Create {
     let uid = if spec.uid == null { "" } else { f"{spec.uid}" }
     let system_flag = if spec.system { "1" } else { "0" }
-    step(connection, .Apply, .AddUser, [spec.name, uid, spec.group ?? "", spec.home ?? "", spec.shell ?? "", system_flag], false)?
+    step(connection, .Apply, .AddUser, [spec.name, uid, spec.group ?? "", spec.home ?? "", spec.shell ?? "", system_flag], false)
     applied = true
   } else {
     let primary = if changes_field(drift, "group") { spec.group ?? "" } else { "" }
     let home = if changes_field(drift, "home") { spec.home ?? "" } else { "" }
     let shell = if changes_field(drift, "shell") { spec.shell ?? "" } else { "" }
     if primary != "" or home != "" or shell != "" {
-      step(connection, .Apply, .ModifyUser, [spec.name, primary, home, shell], false)?
+      step(connection, .Apply, .ModifyUser, [spec.name, primary, home, shell], false)
       applied = true
     }
   }
@@ -342,7 +342,7 @@ proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: f
       else => false
     }
     if ! known {
-      step(connection, .Apply, .JoinGroup, [spec.name, member], applied)?
+      step(connection, .Apply, .JoinGroup, [spec.name, member], applied)
       applied = true
     }
   }
@@ -369,7 +369,7 @@ proc apply_service(connection: transport.Connection, spec: model.ServiceSpec, dr
       }
 
       let operation: scripts.Operation = if change.to == "enabled" { .EnableService } else { .DisableService }
-      step(connection, .Apply, operation, [spec.name, spec.runlevel], applied)?
+      step(connection, .Apply, operation, [spec.name, spec.runlevel], applied)
       applied = true
     }
   }
@@ -377,14 +377,14 @@ proc apply_service(connection: transport.Connection, spec: model.ServiceSpec, dr
   for change in drift.changes {
     if change.field == "running" {
       let action = if change.to == "started" { "start" } else { "stop" }
-      step(connection, .Apply, control_operation(spec.adapter), [spec.name, action], applied, timeout_ms: 120000)?
+      step(connection, .Apply, control_operation(spec.adapter), [spec.name, action], applied, timeout_ms: 120000)
       applied = true
     }
   }
 
   let notice = notification(drift)
   if notice != null and ! changes_field(drift, "running") {
-    step(connection, .Notify, control_operation(spec.adapter), [spec.name, notice], applied, timeout_ms: 120000)?
+    step(connection, .Notify, control_operation(spec.adapter), [spec.name, notice], applied, timeout_ms: 120000)
   }
 }
 

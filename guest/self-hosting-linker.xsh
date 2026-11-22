@@ -18,4 +18,4 @@ proc main(...linker_args: List[Str]) [process, env, error] -> Result[Unit, Error
   exit status.shell_code()?
 }
 
-main(@args)?
+main(@args)

@@ -63,7 +63,7 @@ export proc linux_kbuild_verify_stopped(
 
 proc linux_kbuild_discovery_stop() [env, error] -> Result[Unit, Error] {
   env ({XSH_LINUX_KBUILD_STOP_AFTER: "discover"}) {
-    linux_shared.stop_after("discover")?
+    linux_shared.stop_after("discover")
   }
 }
 
@@ -104,7 +104,7 @@ export proc linux_kbuild_discover_prepared(
   if ! config.display().starts_with(recipe_root.display() + "/") {
     return Err(kbuild.ScriptError.Failed(kind: "linux-kbuild-case-input", message: "configuration leaves the recipe directory"))
   }
-  sources.verify_source_checksum(config, checksum, "file")?
+  sources.verify_source_checksum(config, checksum, "file")
   let repository = fs.cwd()?
   let scratch_path = fp"{repository}/.work/tmp"
   let scratch = scratch_path.resolve()?
@@ -130,16 +130,16 @@ export proc linux_kbuild_discover_prepared(
     }
   }
   let staged_config = fp"{source}/.config"
-  config.copy(to: staged_config, overwrite: true)?
+  config.copy(to: staged_config, overwrite: true)
   let srcarch = if target == types.X86_64LinuxMusl { "x86" } else { "arm64" }
-  kbuild.write_config_headers(staged_config, source, pkg.ver, srcarch)?
+  kbuild.write_config_headers(staged_config, source, pkg.ver, srcarch)
   let loaded = kbuild.load_config(staged_config)?
   let options: kbuild.DiscoverOptions = {
     progress: false, progress_every: 100, jobs: 1,
     local_records: false, local_record_cache: false, build_plan: true,
   }
   let plan = kbuild.discover_plan_with_options(source, loaded, srcarch, options)?
-  kbuild.write_discovered_plan(plan, fp"{source}/.xsh-kbuild-plan.json")?
-  linux_kbuild_verify_stopped(Discover, linux_kbuild_discovery_stop(), source)?
+  kbuild.write_discovered_plan(plan, fp"{source}/.xsh-kbuild-plan.json")
+  linux_kbuild_verify_stopped(Discover, linux_kbuild_discovery_stop(), source)
   plan
 }

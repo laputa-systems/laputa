@@ -188,7 +188,7 @@ proc pyramid_graph_counts(source: Path, tasks: List[make.MakeTask]) [fs, error] 
   var counts: Map[Int] = {}
   for task in tasks {
     let counter = fp"{source}/executions/{task.name}"
-    counts[task.name] = if counter.exists()? { counter.read_text()?.byte_len() } else { 0 }
+    counts[task.name] = if counter.exists() { counter.read_text()?.byte_len() } else { 0 }
   }
   counts
 }
@@ -293,7 +293,7 @@ test test_pyramid_prepared_discovery_rejects_checksum_before_writes [fs, env, er
     ],
   }
   let source = pyramid_discovery_source(ctx)?
-  test.error_kind(kbuild_verify.linux_kbuild_discover_prepared(source, pkg, types.X86_64LinuxMusl), "checksum-mismatch")?
+  test.error_kind(kbuild_verify.linux_kbuild_discover_prepared(source, pkg, types.X86_64LinuxMusl), "checksum-mismatch")
   assert fp"{source}/.config".exists()? == false
   assert fp"{source}/include".exists()? == false
   assert fp"{source}/.xsh-kbuild-plan.json".exists()? == false

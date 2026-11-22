@@ -10,10 +10,10 @@ for entry in fs.walk(p"/declared", hidden: true)? {
 }
 for root in [p"/output", p"/scratch"] {
   let file = fp"{root}/permission-probe"
-  file.write("declared writable directory\n")?
+  file.write("declared writable directory\n")
   assert file.read_text()? == "declared writable directory\n"
-  file.remove()?
+  file.remove()
 }
 assert p"/dev/null".read_bytes()?.len() == 0
-p"/dev/null".write("discarded device probe\n")?
+p"/dev/null".write("discarded device probe\n")
 print "declared input permission contract passed" $files "regular files"

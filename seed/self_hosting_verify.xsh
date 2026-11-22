@@ -21,7 +21,7 @@ export proc self_hosting_verify_bundle(bundle: Path, expected_generation: Str, s
   let rootfs = fp"{bundle}/rootfs.ext4"
   let disk = fp"{bundle}/disk.img"
   let size = rootfs.metadata()?.size
-  image.verify_disk(disk, size)?
+  image.verify_disk(disk, size)
   let sector_bytes = 512
   let partition = bytes.read_at(disk, 2 * sector_bytes, 128)?
   let start = bytes.unpack_le(partition, 8, offset: 32)? * sector_bytes
@@ -34,5 +34,5 @@ export proc self_hosting_verify_bundle(bundle: Path, expected_generation: Str, s
 }
 
 proc main(bundle: Path, expected_generation: Str, selected_kernel: Path, tools_image: Str) [fs, process, env, error] -> Result[Unit, Error] {
-  self_hosting_verify_bundle(bundle, expected_generation, selected_kernel, tools_image)?
+  self_hosting_verify_bundle(bundle, expected_generation, selected_kernel, tools_image)
 }

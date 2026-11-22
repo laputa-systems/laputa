@@ -298,7 +298,7 @@ export proc qemu_run_asterinas_reference(
   defer qemu_stop(launched)
   var deadline = time.monotonic()? + timeout_seconds * 1000000000
   var completed = false
-  while qemu_process_live(launched.pid)? {
+  while qemu_process_live(launched.pid) {
     let output = qemu_log_text(console_log, qemu_log)?
     if markers.failure in output or "LAPUTA_ASTERINAS_TEST_FAILED" in output or "Kernel panic" in output or "Uncaught panic" in output {
       fail "qualification guest reported failure"
@@ -311,7 +311,7 @@ export proc qemu_run_asterinas_reference(
       if completed { fail "qualification guest did not power off after its completion marker" }
       fail "qualification guest timed out"
     }
-    time.sleep(200ms)?
+    time.sleep(200ms)
   }
   let status = wait launched?
   let output = qemu_log_text(console_log, qemu_log)?
@@ -412,7 +412,7 @@ proc qemu_qmp_retry(operation: QmpRetryOperation, socket: Path, deadline: Int) {
         let remaining_ms = (deadline - time.monotonic()?) / 1000000
         if remaining_ms <= 0 { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
         let pause_ms = if remaining_ms < 250 { remaining_ms } else { 250 }
-        time.sleep(time.millis(pause_ms))?
+        time.sleep(time.millis(pause_ms))
         attempt += 1
       }
     }
@@ -498,7 +498,7 @@ pure requested_captures(console: Str) -> List[Str] {
 }
 
 proc verify_capture(name: Str, screenshot: Path, outputs: build.ProfileOutputs) [fs, error] {
-  if ! screenshot_is_valid(screenshot)? {
+  if ! screenshot_is_valid(screenshot) {
     return Err(types.LaputaError.Profile(f"QMP did not create a nonempty {name} screenshot; inspect {qemu_output_locations(outputs)}"))
   }
   match name {
@@ -566,7 +566,7 @@ export proc run_test(
       if ! (name in captured) {
         qemu_qmp_retry(QmpRetryScreenshot(capture_path(outputs, name)), outputs.qmp_socket, deadline)
         captured = captured + [name]
-        verify_capture(name, capture_path(outputs, name), outputs)?
+        verify_capture(name, capture_path(outputs, name), outputs)
       }
     }
 
@@ -608,7 +608,7 @@ export proc run_test(
     }
 
     let pause_ms = if remaining_ms < 1000 { remaining_ms } else { 1000 }
-    time.sleep(time.millis(pause_ms))?
+    time.sleep(time.millis(pause_ms))
   }
 
   let _ = wait launched?

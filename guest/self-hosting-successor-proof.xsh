@@ -18,9 +18,9 @@ proc verify_successor(root: Path, expected_tools: Path = p"/run/self-hosting-out
     print "LAPUTA_SELF_HOSTING_PACKAGE_REBUILT" $rebuilt_key
   }
   let output = p"/run/self-hosting-output"
-  output.mkdir()?
+  output.mkdir()
   assert p"/sys/class/block/vdc/ro".read_text()?.trim() == "1"
-  linux.mount(b"/dev/vdc", output, fstype: "ext4", options: ["ro", "noload", "nosuid", "nodev"])?
+  linux.mount(b"/dev/vdc", output, fstype: "ext4", options: ["ro", "noload", "nosuid", "nodev"])
   for name in ["xsh", "xsht"] {
     assert hash.sha256(fp"/usr/bin/{name}")? == hash.sha256(fp"{expected_tools}/{name}")?
   }
@@ -34,7 +34,7 @@ proc verify_successor(root: Path, expected_tools: Path = p"/run/self-hosting-out
 proc main(root: Path, expected_tools: Path = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, error] -> Result[Unit, Error] {
   guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
   let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
-  verify_successor(root, expected_tools, release_input)?
+  verify_successor(root, expected_tools, release_input)
 }
 
-main(@args)?
+main(@args)

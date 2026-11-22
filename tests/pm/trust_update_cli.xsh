@@ -110,14 +110,14 @@ proc active_bundle(root: Path) [fs, error] -> Result[Bytes, Error] {
 proc wait_for_port_file(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
-    if port_file.exists()? {
+    if port_file.exists() {
       let text = port_file.read_text()?.trim()
       if text != "" {
         return text.parse_int_decimal()
       }
     }
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
 
@@ -183,7 +183,7 @@ test trust_update_url_converges_with_from [fs, process, env, time, error] { |ctx
     "",
     "",
   )?
-  defer kill_child(server.pid, server.handle)?
+  defer kill_child(server.pid, server.handle)
 
   let url = f"https://127.0.0.1:{server.port}/"
   let out = test.temp_path(ctx, name: "trust-update-url.out")
@@ -225,14 +225,14 @@ test trust_update_interrupted_download_leaves_no_store_mutation [fs, process, en
     "2048",
     "100",
   )?
-  defer kill_child(server.pid, server.handle)?
+  defer kill_child(server.pid, server.handle)
 
   let xsh = runner()?
   let modules = module_root()?
   let url = f"https://127.0.0.1:{server.port}/"
   let child = spawn run XSH_MODULE_PATH=$modules XSH_HOST=$xsh SSL_CERT_FILE=$bundle $xsh trust.xsh -- update --url $url --root $root ?
-  time.sleep(2s)?
-  process.kill(child.pid, signal: "KILL")?
+  time.sleep(2s)
+  process.kill(child.pid, signal: "KILL")
   let _ = wait [child]?
 
   assert ! fp"{root}/var/lib/laputa/trust/generations".exists()?
@@ -260,8 +260,8 @@ test trust_update_killed_mid_transaction_recovers_cleanly [fs, process, env, tim
     let xsh = runner()?
     let modules = module_root()?
     let child = spawn run XSH_MODULE_PATH=$modules XSH_HOST=$xsh $xsh trust.xsh -- update --from $source --root $root ?
-    time.sleep(time.millis(delay_ms))?
-    process.kill(child.pid, signal: "KILL")?
+    time.sleep(time.millis(delay_ms))
+    process.kill(child.pid, signal: "KILL")
     let _ = wait [child]?
 
     let active = match trust_store.trust_store_read_active(trust_store.trust_store_paths(root)) {
@@ -302,7 +302,7 @@ test trust_update_changes_admissions_without_restarting_services [fs, process, e
   let sentinel = fp"{fake_path}/service-restarted"
   for name in ["xinit", "systemctl", "service"] {
     let launcher = fp"{fake_path}/{name}"
-    launcher.write(bytes.from_text(f"#!/bin/sh\ntouch {sentinel.display()}\n"))?
+    launcher.write(bytes.from_text(f"#!/bin/sh\ntouch {sentinel.display()}\n"))
     launcher.chmod(0o755)
   }
   let xsh = runner()?
@@ -330,8 +330,8 @@ test trust_cli_status_is_read_only_under_concurrency [fs, process, env, time, er
   let source = stage_release(ctx, "trust-cli-status-race-source", "release-b")?
   let _ = trust_update.trust_update_from_dir(root, source)?
 
-  fp"{root}/var/lib/laputa/trust/sentinel-keep".write("keep\n")?
-  fp"{root}/var/lib/laputa/trust/generations/2/sentinel-keep".write("keep\n")?
+  fp"{root}/var/lib/laputa/trust/sentinel-keep".write("keep\n")
+  fp"{root}/var/lib/laputa/trust/generations/2/sentinel-keep".write("keep\n")
   let before = store_snapshot(root)?
 
   let xsh = runner()?

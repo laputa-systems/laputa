@@ -253,9 +253,9 @@ proc quiesce_owner(qe: QuiesceEnv, service: Str) [fs, error] -> Result[Str, Erro
 }
 
 proc quiesce_xinit(qe: QuiesceEnv, args: List[Str]) [fs, process, error] -> Result[Str, Error] {
-  qe.scratch.mkdir(parents: true)?
+  qe.scratch.mkdir(parents: true)
   let errors = fp"{qe.scratch}/quiesce-xinit.err"
-  errors.remove(missing_ok: true)?
+  errors.remove(missing_ok: true)
   let status = process.run(process.command_argv(
     qe.xinit[0],
     qe.xinit + args,
@@ -265,7 +265,7 @@ proc quiesce_xinit(qe: QuiesceEnv, args: List[Str]) [fs, process, error] -> Resu
     stderr: errors,
   ))?
   let text = if errors.exists() { errors.read_text()?.trim() } else { "" }
-  errors.remove(missing_ok: true)?
+  errors.remove(missing_ok: true)
   guard status.ok else {
     return Err(error.failure(f"xinit {args.join(" ")} failed: {text}"))
   }
@@ -295,7 +295,7 @@ proc quiesce_wait(qe: QuiesceEnv, service: Str, up: Bool, timeout_ms: Int) [fs, 
       let wanted = if up { "up" } else { "down" }
       return Err(error.failure(f"service {service} did not reach {wanted} in {timeout_ms}ms"))
     }
-    time.sleep(100ms)?
+    time.sleep(100ms)
     waited += 100
   }
 }
@@ -306,7 +306,7 @@ proc quiesce_record_file(qe: QuiesceEnv, job: Str) -> Path {
 
 ## Durably write the record. It must exist before the first service is stopped.
 export proc quiesce_write_record(qe: QuiesceEnv, record: QuiesceRecord) [fs, error] -> Result[Unit, Error] {
-  qe.records.mkdir(parents: true)?
+  qe.records.mkdir(parents: true)
   let file = quiesce_record_file(qe, record.job)
   let body = json.encode({
     format: QUIESCE_RECORD_FORMAT,
@@ -394,7 +394,7 @@ export proc quiesce_release_service(qe: QuiesceEnv, record: QuiesceRecord, servi
     guard waited < timeout_ms else {
       return Err(error.failure(f"service {service} is still stopped by {record.token} after {timeout_ms}ms {last}"))
     }
-    time.sleep(100ms)?
+    time.sleep(100ms)
     waited += 100
   }
   Ok()
@@ -423,7 +423,7 @@ export proc quiesce_release_record(qe: QuiesceEnv, job: Str, timeout_ms: Int) [f
   guard failures.is_empty() else {
     return Err(error.failure(failures.join("; ")))
   }
-  quiesce_record_file(qe, job).remove(missing_ok: true)?
+  quiesce_record_file(qe, job).remove(missing_ok: true)
   fs.fsync(qe.records)
   for name in restored {
     match quiesce_wait(qe, name, true, record.timeout_ms) {
@@ -436,7 +436,7 @@ export proc quiesce_release_record(qe: QuiesceEnv, job: Str, timeout_ms: Int) [f
 
 proc quiesce_supervised(qe: QuiesceEnv, job: Str, attempt: Int) [fs, process, error] -> Result[Unit, Error] {
   let file = fp"{qe.writers}/{job}.json"
-  guard file.exists()? else {
+  guard file.exists() else {
     return Err(error.failure(f"{job} has no supervised attempt: quiescence runs under the timer supervisor"))
   }
   let writer = json.read(file)?
@@ -458,15 +458,15 @@ export proc quiesce_acquire(qe: QuiesceEnv, job: Str, attempt: Int, options: Qui
   guard job != "" else {
     return Err(error.failure("quiescence runs under the timer supervisor: run the job with `timers.xsh run-now JOB`"))
   }
-  quiesce_supervised(qe, job, attempt)?
+  quiesce_supervised(qe, job, attempt)
   guard quiesce_read_record(qe, job)? == null else {
     return Err(error.failure(f"a previous quiescence of {job} is not released"))
   }
   let record = quiesce_plan(qe, job, attempt, options.services, quiesce_boot_id(), time.now(), options)?
-  quiesce_write_record(qe, record)?
+  quiesce_write_record(qe, record)
   for service in record.services {
     if service.acquired {
-      quiesce_stop_service(qe, record, service.name)?
+      quiesce_stop_service(qe, record, service.name)
     } else {
       print f"quiesce service={service.name} desired=down state=down note=already-stopped"
     }

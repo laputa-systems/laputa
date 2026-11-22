@@ -62,7 +62,7 @@ export proc remote_decode_reply(result: ExecResult) [error] -> Result[Record, Er
   guard json.get(reply, ["protocol"], "") == REMOTE_PROTOCOL else {
     return Err(RemoteError.Malformed(message: "the remote program speaks another protocol"))
   }
-  if json.get(reply, ["ok"], false).require(Bool)? {
+  if json.get(reply, ["ok"], false).require(Bool) {
     return json.get(reply, ["result"], {}).require(Record)?
   }
   let failure = json.get(reply, ["error"], {}).require(Record)?

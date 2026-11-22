@@ -66,7 +66,7 @@ cli main(
   var deadline = deadline_start + timeout_seconds * 1000000000
   var completed = false
   var killed = false
-  while process_live(launched.pid)? {
+  while process_live(launched.pid) {
     let output = log_text(console, backend_log)?
     guard !guest_failed(output) else { fail "storage guest reported a kernel or proof failure" }
     if kill_marker != "" {
@@ -74,7 +74,7 @@ cli main(
         fail "storage guest finished before its kill marker"
       }
       if kill_marker in output {
-        launched.cancel(signal: "KILL", kill_after: 0ms)?
+        launched.cancel(signal: "KILL", kill_after: 0ms)
         killed = true
         break
       }
@@ -85,7 +85,7 @@ cli main(
     if time.monotonic()? >= deadline {
       fail "storage guest timed out"
     }
-    time.sleep(50ms)?
+    time.sleep(50ms)
   }
 
   if killed {

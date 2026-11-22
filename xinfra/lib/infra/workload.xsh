@@ -97,7 +97,7 @@ export proc prepare(declared: List[Workload]) [fs, env, error] -> Result[Prepare
   var secrets: List[Str] = []
   for entry in declared {
     let resources = ctx f"host {entry.host.name}" { graph.order(entry.resources)? }
-    ctx f"host {entry.host.name}" { check_dialect(entry.host, resources)? }
+    ctx f"host {entry.host.name}" { check_dialect(entry.host, resources) }
     ordered += [Workload(host: entry.host, resources:)]
     for resource in resources {
       match resource.spec {

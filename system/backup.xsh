@@ -407,7 +407,7 @@ pure backup_tail(text: Str, limit: Int) -> Str {
 }
 
 proc backup_scratch() [fs, error] -> Result[Path] {
-  BACKUP_RUN_DIR.mkdir(parents: true)?
+  BACKUP_RUN_DIR.mkdir(parents: true)
   Ok(BACKUP_RUN_DIR)
 }
 
@@ -418,11 +418,11 @@ proc backup_rustic(
 ) [fs, process, error] -> Result[Str, Error] {
   let scratch = backup_scratch()?
   let home = fp"{scratch}/home"
-  home.mkdir(parents: true)?
+  home.mkdir(parents: true)
   let out = fp"{scratch}/rustic-{label}.out"
   let errors = fp"{scratch}/rustic-{label}.err"
-  out.remove(missing_ok: true)?
-  errors.remove(missing_ok: true)?
+  out.remove(missing_ok: true)
+  errors.remove(missing_ok: true)
   let environment = {
     RUSTIC_REPOSITORY: config.repository,
     RUSTIC_PASSWORD_FILE: config.password_file,
@@ -440,13 +440,13 @@ proc backup_rustic(
   ))?
   let errors_text = if errors.exists() { errors.read_text()? } else { "" }
   guard status.ok else {
-    out.remove(missing_ok: true)?
-    errors.remove(missing_ok: true)?
+    out.remove(missing_ok: true)
+    errors.remove(missing_ok: true)
     return Err(error.failure(f"{label} failed: {backup_tail(errors_text, 2000)}"))
   }
   let text = if out.exists() { out.read_text()? } else { "" }
-  out.remove(missing_ok: true)?
-  errors.remove(missing_ok: true)?
+  out.remove(missing_ok: true)
+  errors.remove(missing_ok: true)
   Ok(text)
 }
 
@@ -465,8 +465,8 @@ proc backup_run_hook(hook: BackupHook?, label: Str) [fs, process, io, error] -> 
   let scratch = backup_scratch()?
   let out = fp"{scratch}/hook-{label}.out"
   let errors = fp"{scratch}/hook-{label}.err"
-  out.remove(missing_ok: true)?
-  errors.remove(missing_ok: true)?
+  out.remove(missing_ok: true)
+  errors.remove(missing_ok: true)
   let status = match process.run(process.command_argv(
     value.command[0],
     value.command,
@@ -482,12 +482,12 @@ proc backup_run_hook(hook: BackupHook?, label: Str) [fs, process, io, error] -> 
     }
   }
   let errors_text = if errors.exists() { errors.read_text()? } else { "" }
-  out.remove(missing_ok: true)?
-  errors.remove(missing_ok: true)?
+  out.remove(missing_ok: true)
+  errors.remove(missing_ok: true)
   guard status.ok else {
     return Err(error.failure(f"{label} hook failed: {backup_tail(errors_text, 2000)}"))
   }
-  backup_log(f"event=backup-hook name={label} outcome=ok")?
+  backup_log(f"event=backup-hook name={label} outcome=ok")
   Ok()
 }
 
@@ -513,7 +513,7 @@ proc backup_new_snapshot(config: BackupConfig, before: List[Str]) [fs, process, 
 
 proc backup_write_receipt(config: BackupConfig, receipt: BackupReceipt) [fs, error] -> Result[Unit, Error] {
   let file = fp"{config.receipt}"
-  file.parent().mkdir(parents: true)?
+  file.parent().mkdir(parents: true)
   let body = json.encode(receipt)? + "\n"
   atomically replace file as next {
     next.write(body, mode: 0o600)
@@ -526,12 +526,12 @@ proc backup_init(config: BackupConfig) [fs, process, io, error] -> Result[Unit, 
   let repository = fp"{config.repository}"
   let marker = fp"{repository}/config"
   if marker.exists() {
-    backup_log(f"event=backup-init repository={config.repository} state=already-initialized")?
+    backup_log(f"event=backup-init repository={config.repository} state=already-initialized")
     return Ok()
   }
-  repository.mkdir(parents: true)?
+  repository.mkdir(parents: true)
   let text = backup_rustic(config, ["init"], "init")?
-  backup_log(f"event=backup-init repository={config.repository} state=initialized bytes={text.byte_len()}")?
+  backup_log(f"event=backup-init repository={config.repository} state=initialized bytes={text.byte_len()}")
   Ok()
 }
 
@@ -545,16 +545,16 @@ proc backup_run(config: BackupConfig) [fs, process, time, io, error] -> Result[U
     return Err(error.failure(f"rustic is missing: {config.rustic}"))
   }
   let before = backup_list_snapshots(config, "snapshots-before")?
-  backup_log(f"event=backup-start job={job} attempt={attempt} repository={config.repository} snapshots={before.len()} keep_last={config.keep_last}")?
+  backup_log(f"event=backup-start job={job} attempt={attempt} repository={config.repository} snapshots={before.len()} keep_last={config.keep_last}")
   var release_needed = false
   let outcome = try {
     release_needed = config.release != null
-    backup_run_hook(config.quiesce, "quiesce")?
+    backup_run_hook(config.quiesce, "quiesce")
     let snapshot_id = backup_new_snapshot(config, before)?
-    backup_log(f"event=backup-snapshot job={job} snapshot={snapshot_id}")?
+    backup_log(f"event=backup-snapshot job={job} snapshot={snapshot_id}")
     let _ = backup_rustic(config, ["check"], "check")?
     let checked_wall_ms = time.now()
-    backup_log(f"event=backup-check job={job} outcome=ok")?
+    backup_log(f"event=backup-check job={job} outcome=ok")
     let _ = backup_rustic(config, ["forget", "--keep-last", f"{config.keep_last}", "--prune"], "forget")?
     let listed = backup_list_snapshots(config, "snapshots-after-prune")?
     guard snapshot_id in listed else {
@@ -566,7 +566,7 @@ proc backup_run(config: BackupConfig) [fs, process, time, io, error] -> Result[U
     backup_write_receipt(
       config,
       backup_receipt_new(time.now(), snapshot_id, config.sources, config.keep_last, listed, checked_wall_ms),
-    )?
+    )
     backup_log(f"event=backup-finish job={job} outcome=ok snapshot={snapshot_id} kept={listed.len()}")?
   }
   let release = if release_needed {

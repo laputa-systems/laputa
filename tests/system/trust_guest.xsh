@@ -41,7 +41,7 @@ proc guest_tool_or_skip(name: Str) [fs, process, error] -> Result[Path, Error] {
 }
 
 proc guest_file_or_skip(path_value: Path, label: Str) [fs, error] {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     test.skip(f"guest proof needs {label} at {path_value.display()}")
     return
   }
@@ -49,7 +49,7 @@ proc guest_file_or_skip(path_value: Path, label: Str) [fs, error] {
 
 proc guest_kernel() [fs, error] -> Result[Path, Error] {
   for candidate in GUEST_KERNEL_CANDIDATES {
-    if fp"{candidate}".exists()? {
+    if fp"{candidate}".exists() {
       return fp"{candidate}"
     }
   }
@@ -72,7 +72,7 @@ proc guest_modules_dir() [fs, error] -> Result[Path, Error] {
   }
 
   for name in GUEST_MODULES {
-    guest_file_or_skip(fp"{found}/kernel/{guest_module_path(name)}.ko.gz", f"module {name}")?
+    guest_file_or_skip(fp"{found}/kernel/{guest_module_path(name)}.ko.gz", f"module {name}")
   }
 
   found
@@ -127,31 +127,31 @@ proc stage_initramfs(
     fp"{root}/{dir}".mkdir(parents: true)
   }
 
-  xsh.copy(to: fp"{root}/bin/xsh", overwrite: true)?
+  xsh.copy(to: fp"{root}/bin/xsh", overwrite: true)
   fp"{root}/bin/xsh".chmod(0o755)
-  p"guest/bootstrap.xsh".copy(to: fp"{root}/lib/guest/bootstrap.xsh", overwrite: true)?
-  p"guest/trust-guest-init.xsh".copy(to: fp"{root}/init", overwrite: true)?
+  p"guest/bootstrap.xsh".copy(to: fp"{root}/lib/guest/bootstrap.xsh", overwrite: true)
+  p"guest/trust-guest-init.xsh".copy(to: fp"{root}/init", overwrite: true)
   fp"{root}/init".chmod(0o755)
   if main_script == "" {
-    p"guest/trust-guest.xsh".copy(to: fp"{root}/guest/main.xsh", overwrite: true)?
+    p"guest/trust-guest.xsh".copy(to: fp"{root}/guest/main.xsh", overwrite: true)
   } else {
     fp"{root}/guest/main.xsh".write(bytes.from_text(main_script))
   }
   fp"{root}/guest/main.xsh".chmod(0o755)
   for entry in fs.children(p"trust")? {
     if entry.name.ends_with(".xsh") {
-      entry.path.copy(to: fp"{root}/lib/trust/{entry.name}", overwrite: true)?
+      entry.path.copy(to: fp"{root}/lib/trust/{entry.name}", overwrite: true)
     }
   }
 
   for entry in fs.children(p"pm")? {
     if entry.name.ends_with(".xsh") {
-      entry.path.copy(to: fp"{root}/lib/pm/{entry.name}", overwrite: true)?
+      entry.path.copy(to: fp"{root}/lib/pm/{entry.name}", overwrite: true)
     }
   }
 
-  fp"packages/ca-certificates/files/cacert.pem".copy(to: fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt", overwrite: true)?
-  fp"packages/ca-certificates/files/trust-policy".copy(to: fp"{root}/usr/share/laputa/trust/seed/trust-policy", overwrite: true)?
+  fp"packages/ca-certificates/files/cacert.pem".copy(to: fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt", overwrite: true)
+  fp"packages/ca-certificates/files/trust-policy".copy(to: fp"{root}/usr/share/laputa/trust/seed/trust-policy", overwrite: true)
 
   fp"{root}/etc/laputa/trust-update-key".write(key_bytes, mode: 0o444)
   fp"{root}/etc/ssl/certs/ca-certificates.crt".symlink(to: p"../../../var/lib/laputa/trust/active/ca-certificates.crt")
@@ -159,11 +159,11 @@ proc stage_initramfs(
   fp"{root}/etc/ssl/cert.pem".symlink(to: p"certs/ca-certificates.crt")
   fp"{root}/var/lib/laputa/trust".symlink(to: p"/store/trust")
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
-    fp"{fixture("release-b")}/{file}".copy(to: fp"{root}/releases/release-b/{file}", overwrite: true)?
+    fp"{fixture("release-b")}/{file}".copy(to: fp"{root}/releases/release-b/{file}", overwrite: true)
   }
   fp"{root}/releases/release-c".mkdir(parents: true)
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
-    fp"{fixture("release-c")}/{file}".copy(to: fp"{root}/releases/release-c/{file}", overwrite: true)?
+    fp"{fixture("release-c")}/{file}".copy(to: fp"{root}/releases/release-c/{file}", overwrite: true)
   }
 
   for name in GUEST_MODULES {
@@ -196,7 +196,7 @@ proc build_initramfs(root: Path, output: Path) [fs, process, error] -> Result[Un
   }
 
   let list_file = fp"{root}.list"
-  list_file.write(bytes.from_text(entries.join("\n") + "\n"))?
+  list_file.write(bytes.from_text(entries.join("\n") + "\n"))
   let command = process.command_argv(
     "cpio",
     ["cpio", "--format=newc", "--owner=0:0", "-o"],
@@ -223,7 +223,7 @@ proc build_store_disk(path_value: Path, size_mb: Int) [fs, process, error] -> Re
 proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] -> Result[Str, Error] {
   var tries = 0
   while tries < attempts {
-    if log.exists()? {
+    if log.exists() {
       let text = log.read_text()?
       if marker in text {
         return text
@@ -234,11 +234,11 @@ proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] ->
       }
     }
 
-    time.sleep(2s)?
+    time.sleep(2s)
     tries += 1
   }
 
-  let tail = if log.exists()? { log.read_text()? } else { "<no serial log>" }
+  let tail = if log.exists() { log.read_text()? } else { "<no serial log>" }
   assert false, f"guest never printed {marker}; serial tail: {tail}"
   
 }
@@ -254,11 +254,11 @@ proc guest_alive(pid: Int) [process, error] -> Result[Bool, Error] {
 proc wait_for_exit(pid: Int, attempts: Int) [process, time, error] -> Result[Unit, Error] {
   var tries = 0
   while tries < attempts {
-    guard guest_alive(pid)? else {
+    guard guest_alive(pid) else {
       return
     }
 
-    time.sleep(2s)?
+    time.sleep(2s)
     tries += 1
   }
 
@@ -278,14 +278,14 @@ type GuestTlsServer = {port: Int, pid: Int, handle: ProcessHandle}
 proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
-    if port_file.exists()? {
+    if port_file.exists() {
       let text = port_file.read_text()?.trim()
       if text != "" {
         return text.parse_int_decimal()
       }
     }
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
 
@@ -614,7 +614,7 @@ proc marker_boot(
 }
 
 test trust_guest_power_cut_at_every_journal_fsync_recovers_forward [fs, process, env, time, error] { |ctx|
-  guest_file_or_skip(p"/dev/kvm", "KVM")?
+  guest_file_or_skip(p"/dev/kvm", "KVM")
   let kernel = guest_kernel()?
   let modules_dir = guest_modules_dir()?
   let xsh = guest_xsh()?
@@ -626,27 +626,27 @@ test trust_guest_power_cut_at_every_journal_fsync_recovers_forward [fs, process,
   let work = test.temp_dir(ctx, name: "trust-cut-work")?
   let staging = stage_initramfs(ctx, "trust-cut-root", xsh, modules_dir, main_script: TRUST_CUT_GUEST)?
   let initramfs = fp"{work}/initramfs.cpio"
-  build_initramfs(staging, initramfs)?
+  build_initramfs(staging, initramfs)
   let base = fp"{work}/base.ext4"
-  build_store_disk(base, 64)?
+  build_store_disk(base, 64)
 
   let prepared = marker_boot(ctx, "trust-cut-prepare", kernel, initramfs, base, "prepare", "PREPARE_OK generation=2")?
-  wait_for_exit(prepared.pid, 50)?
+  wait_for_exit(prepared.pid, 50)
   stop_guest(prepared.pid)
   assert "LAPUTA_TRUST_CUT FAIL" not in prepared.log.read_text()?
 
   for phase in ["staged", "committed", "activated", "persisted"] {
     let store = fp"{work}/cut-{phase}.ext4"
-    base.copy(to: store, overwrite: true)?
+    base.copy(to: store, overwrite: true)
 
     let cut = marker_boot(ctx, f"trust-cut-{phase}", kernel, initramfs, store, phase, f"CUT {phase}")?
     assert f"CUT {phase}" in cut.log.read_text()?
     stop_guest(cut.pid)
-    wait_for_exit(cut.pid, 30)?
+    wait_for_exit(cut.pid, 30)
     assert "LAPUTA_TRUST_CUT FAIL" not in cut.log.read_text()?
 
     let recovered = marker_boot(ctx, f"trust-recover-{phase}", kernel, initramfs, store, "recover", "RECOVER_OK")?
-    wait_for_exit(recovered.pid, 50)?
+    wait_for_exit(recovered.pid, 50)
     stop_guest(recovered.pid)
     let final = recovered.log.read_text()?
     assert f"RECOVER_OK before=" in final
@@ -656,7 +656,7 @@ test trust_guest_power_cut_at_every_journal_fsync_recovers_forward [fs, process,
 }
 
 test trust_guest_reboot_replays_clean_generation [fs, process, env, time, error] { |ctx|
-  guest_file_or_skip(p"/dev/kvm", "KVM")?
+  guest_file_or_skip(p"/dev/kvm", "KVM")
   let kernel = guest_kernel()?
   let modules_dir = guest_modules_dir()?
   let xsh = guest_xsh()?
@@ -666,27 +666,27 @@ test trust_guest_reboot_replays_clean_generation [fs, process, env, time, error]
   let _ = guest_tool_or_skip("python3")?
   let digests = expected_digests()?
   let server = serve_release_c(ctx, "trust-guest-https", "", "")?
-  defer stop_server(server)?
+  defer stop_server(server)
 
   let url = f"https://10.0.2.2:{server.port}/"
   let work = test.temp_dir(ctx, name: "trust-guest-replay-work")?
   let staging = stage_initramfs(ctx, "trust-guest-replay-root", xsh, modules_dir)?
   let initramfs = fp"{work}/initramfs.cpio"
-  build_initramfs(staging, initramfs)?
+  build_initramfs(staging, initramfs)
   let store = fp"{work}/store.ext4"
-  build_store_disk(store, 64)?
+  build_store_disk(store, 64)
 
   let boot = launch_guest(ctx, "trust-guest-replay", kernel, initramfs, store, url, "replay")?
-  defer stop_guest(boot.pid)?
+  defer stop_guest(boot.pid)
   var text = wait_for_marker(boot.log, "PHASE0_OK", 50)?
-  assert_clean_markers(text, digests, true)?
+  assert_clean_markers(text, digests, true)
   text = wait_for_marker(boot.log, "BOOT phase=1", 50)?
   text = wait_for_marker(boot.log, "PHASE1_OK", 50)?
   assert f"PHASE1_OK generation=3 bundle={digests.c_bundle} policy={digests.c_policy}" in text
   text = wait_for_marker(boot.log, "BOOT phase=2", 50)?
   text = wait_for_marker(boot.log, "REPLAY_OK", 50)?
   assert f"REPLAY_OK generation=3 bundle={digests.c_bundle} policy={digests.c_policy}" in text
-  wait_for_exit(boot.pid, 50)?
+  wait_for_exit(boot.pid, 50)
   let final = boot.log.read_text()?
   assert "LAPUTA_TRUST_GUEST FAIL" not in final
   assert "ENTRY phase=1 active=2 journal=false" in final
@@ -694,7 +694,7 @@ test trust_guest_reboot_replays_clean_generation [fs, process, env, time, error]
 }
 
 test trust_guest_power_cut_recovers_forward [fs, process, env, time, error] { |ctx|
-  guest_file_or_skip(p"/dev/kvm", "KVM")?
+  guest_file_or_skip(p"/dev/kvm", "KVM")
   let kernel = guest_kernel()?
   let modules_dir = guest_modules_dir()?
   let xsh = guest_xsh()?
@@ -704,32 +704,32 @@ test trust_guest_power_cut_recovers_forward [fs, process, env, time, error] { |c
   let _ = guest_tool_or_skip("python3")?
   let digests = expected_digests()?
   let server = serve_release_c(ctx, "trust-guest-cut-https", "1024", "250")?
-  defer stop_server(server)?
+  defer stop_server(server)
 
   let url = f"https://10.0.2.2:{server.port}/"
   let work = test.temp_dir(ctx, name: "trust-guest-cut-work")?
   let staging = stage_initramfs(ctx, "trust-guest-cut-root", xsh, modules_dir)?
   let initramfs = fp"{work}/initramfs.cpio"
-  build_initramfs(staging, initramfs)?
+  build_initramfs(staging, initramfs)
   let store = fp"{work}/store.ext4"
-  build_store_disk(store, 64)?
+  build_store_disk(store, 64)
 
   let first = launch_guest(ctx, "trust-guest-cut-first", kernel, initramfs, store, url, "once")?
   var text = wait_for_marker(first.log, "PHASE0_OK", 50)?
-  assert_clean_markers(text, digests, true)?
+  assert_clean_markers(text, digests, true)
   text = wait_for_marker(first.log, "FETCH_START", 50)?
-  time.sleep(2s)?
-  stop_guest(first.pid)?
-  wait_for_exit(first.pid, 30)?
+  time.sleep(2s)
+  stop_guest(first.pid)
+  wait_for_exit(first.pid, 30)
   let cut = first.log.read_text()?
   assert "LAPUTA_TRUST_GUEST FAIL" not in cut
   assert "ENTRY phase=1 active=2 journal=false" in cut
 
   let second = launch_guest(ctx, "trust-guest-cut-second", kernel, initramfs, store, url, "once")?
-  defer stop_guest(second.pid)?
+  defer stop_guest(second.pid)
   text = wait_for_marker(second.log, "PHASE1_OK", 50)?
   assert f"PHASE1_OK generation=3 bundle={digests.c_bundle} policy={digests.c_policy}" in text
-  wait_for_exit(second.pid, 50)?
+  wait_for_exit(second.pid, 50)
   let final = second.log.read_text()?
   assert "LAPUTA_TRUST_GUEST FAIL" not in final
   assert "ENTRY phase=1 active=2 journal=" in final or "ENTRY phase=1 active=3 journal=" in final, final
@@ -738,7 +738,7 @@ test trust_guest_power_cut_recovers_forward [fs, process, env, time, error] { |c
 }
 
 test trust_guest_rejects_stale_journal_without_mutation [fs, process, env, time, error] { |ctx|
-  guest_file_or_skip(p"/dev/kvm", "KVM")?
+  guest_file_or_skip(p"/dev/kvm", "KVM")
   let kernel = guest_kernel()?
   let modules_dir = guest_modules_dir()?
   let xsh = guest_xsh()?
@@ -750,18 +750,18 @@ test trust_guest_rejects_stale_journal_without_mutation [fs, process, env, time,
   let work = test.temp_dir(ctx, name: "trust-guest-stale-work")?
   let staging = stage_initramfs(ctx, "trust-guest-stale-root", xsh, modules_dir)?
   let initramfs = fp"{work}/initramfs.cpio"
-  build_initramfs(staging, initramfs)?
+  build_initramfs(staging, initramfs)
   let store = fp"{work}/store.ext4"
-  build_store_disk(store, 64)?
+  build_store_disk(store, 64)
 
   let boot = launch_guest(ctx, "trust-guest-stale", kernel, initramfs, store, "https://10.0.2.2:1/", "stale")?
-  defer stop_guest(boot.pid)?
+  defer stop_guest(boot.pid)
   var text = wait_for_marker(boot.log, "PHASE0_OK", 50)?
-  assert_clean_markers(text, digests, true)?
+  assert_clean_markers(text, digests, true)
   text = wait_for_marker(boot.log, "BOOT phase=1", 50)?
   text = wait_for_marker(boot.log, "STALE_OK", 50)?
   assert f"STALE_OK generation=2 bundle={digests.b_bundle} policy={digests.b_policy}" in text
-  wait_for_exit(boot.pid, 50)?
+  wait_for_exit(boot.pid, 50)
   let final = boot.log.read_text()?
   assert "LAPUTA_TRUST_GUEST FAIL" not in final
   assert "ENTRY phase=1 active=2 journal=false" in final

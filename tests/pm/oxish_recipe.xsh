@@ -55,7 +55,7 @@ test oxish_recipe_installs_the_release_executables_and_service_modules [fs, erro
   let root = test.temp_dir(ctx, name: "oxish install")?
   let release = stage_release(root, "")?
   let dest = fp"{root}/dest"
-  oxish_recipe.install_release(release, p"packages/oxish", dest)?
+  oxish_recipe.install_release(release, p"packages/oxish", dest)
 
   for tool in executables {
     let installed = fp"{dest}/usr/bin/{tool}"

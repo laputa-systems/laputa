@@ -17,4 +17,4 @@ proc main() [fs, process, env, error] -> Result[Unit, Error] {
   print "LAP30_COMPOSED_GENERATION" $identity
 }
 
-main()?
+main()

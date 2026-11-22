@@ -136,7 +136,7 @@ proc execute_run_confined_build(
   }
 
   let runner = fp"{work}/confined-build.xsh"
-  runner.write(confined_build_runner())?
+  runner.write(confined_build_runner())
   let xsh = execute_xsh_runner()?
   let command = process.command_argv(
     xsh,
@@ -205,7 +205,7 @@ proc execute_stage_local(
       if context.confinement == null {
         pm_build.build_prepared_package(recipe_dir, source, dest, payload)
       } else {
-        execute_run_confined_build(context, node, work, build_root, recipe_dir, source, dest, payload)?
+        execute_run_confined_build(context, node, work, build_root, recipe_dir, source, dest, payload)
       }
     }
   }

@@ -29,7 +29,7 @@ export let service = {
 export proc status() [fs, process, env, error] -> Result[Str, Error] {
   let ntp_ctl = "/usr/bin/ntp-ctl"
   let administered_config = p"/etc/ntpd-rs/ntp.toml"
-  let config = if administered_config.exists()? { administered_config } else { p"/usr/share/ntpd-rs/ntp.toml" }
+  let config = if administered_config.exists() { administered_config } else { p"/usr/share/ntpd-rs/ntp.toml" }
   let text = run.text $ntp_ctl "status" "-c" f"{config}"
 
   for line in text.lines() {

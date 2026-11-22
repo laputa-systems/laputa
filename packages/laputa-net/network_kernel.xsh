@@ -136,7 +136,7 @@ export pure network_project_state(state: net_state.State, intent: policy.Network
         if family == .Inet6 {
           return Err(NetworkKernelError.Conflict("foreign preferred-source route depends on a selected IPv6 address"))
         }
-        if !address_derived_route(route, address, intent.ifindex)? {
+        if !address_derived_route(route, address, intent.ifindex) {
           return Err(NetworkKernelError.Conflict("foreign preferred-source route depends on a selected IPv4 address"))
         }
       }
@@ -234,7 +234,7 @@ export pure network_changes(plan: policy.NetworkPlan) -> Result[List[net_state.C
 ## whole set `network_changes` additionally refuses when a later one cannot be
 ## expressed.
 export pure network_change(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Change, Error] {
-  validated_plan(plan)?
+  validated_plan(plan)
   if index < 0 or index >= plan.operations.len() {
     return Err(NetworkKernelError.Conflict("operation is not part of a valid policy plan"))
   }

@@ -146,7 +146,7 @@ test workload_refuses_a_resource_kind_the_xsh_dialect_has_no_script_for {
 }
 
 test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let root = fp"{dir}/tree"
   root.mkdir()
@@ -154,7 +154,7 @@ test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
   file.write("hello\n")
   file.chmod(0o640)
   let link = fp"{root}/current"
-  fs.symlink(p"motd", link)?
+  fs.symlink(p"motd", link)
   let blocker = fp"{root}/blocker"
   blocker.write("x")
 
@@ -169,7 +169,7 @@ test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
 
 test the_xsh_xinit_probe_reports_the_same_service_facts_as_the_posix_script { |ctx|
   let dir = test.temp_dir(ctx)?
-  xinit_fixture(dir)?
+  xinit_fixture(dir)
   let search = env.get("PATH")?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let posix = connect(testing.local_host())?
@@ -186,7 +186,7 @@ test the_xsh_xinit_probe_reports_the_same_service_facts_as_the_posix_script { |c
 }
 
 test an_xsh_file_validation_failure_discards_the_stage { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let target = fp"{dir}/validated"
   let resources = [declare.file(id: "validated", at: f"{target}", text: "bad\n", validate: ["/bin/false", "{}"])?]
@@ -199,14 +199,14 @@ test an_xsh_file_validation_failure_discards_the_stage { |ctx|
 }
 
 test a_relative_lock_path_resolves_against_the_remote_cwd { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let connection = connect(testing.local_xsh_host())?
   cd (dir) {
     let held = lock.acquire(connection, "xinfra.lock")?
     assert held.token.byte_len() == 32
     assert lock.inspect(connection, "xinfra.lock")? != null
-    lock.release(connection, held)?
+    lock.release(connection, held)
     assert lock.inspect(connection, "xinfra.lock")? == null
   }
 }
@@ -237,9 +237,9 @@ proc actions(dir: Path) [fs] -> List[Str] {
 }
 
 test a_local_xsh_host_converges_file_directory_link_command_and_service_and_reruns_unchanged { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
-  xinit_fixture(dir)?
+  xinit_fixture(dir)
   let search = env.get("PATH")?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let site = fp"{dir}/site"

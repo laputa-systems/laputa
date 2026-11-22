@@ -29,7 +29,7 @@ proc read_header() [io, error] -> Result[Record, Error] {
 }
 
 proc maybe_json(file: Path) [fs, error] -> Result[Any, Error] {
-  if file.exists()? {
+  if file.exists() {
     return json.read(file)?
   }
   null
@@ -60,7 +60,7 @@ proc inspect() [fs, error] -> Result[Record, Error] {
 }
 
 proc read_log(file: Path, count: Int) [fs, error] -> Result[Record, Error] {
-  if ! file.exists()? {
+  if ! file.exists() {
     return {path: file.display(), readable: true, lines: []}
   }
   match file.read_text() {
@@ -115,7 +115,7 @@ proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[
         return Err(refuse("cwd", "cwd must be an absolute directory"))
       }
       dir = Path(requested)
-      guard dir.exists()? and dir.is_dir()? else {
+      guard dir.exists() and dir.is_dir() else {
         return Err(refuse("cwd", "cwd must be an existing directory"))
       }
     }
@@ -153,7 +153,7 @@ proc validated_name(header: Record) [error] -> Result[Str, Error] {
 }
 
 proc incoming_names(root: Path) [fs, error] -> Result[List[Str], Error] {
-  if ! root.exists()? {
+  if ! root.exists() {
     return []
   }
   var names: List[Str] = []
@@ -169,7 +169,7 @@ proc staged_state(header: Record) [env, fs, error] -> Result[Record, Error] {
   let root = staging_root()?
   let target = fp"{root}/{validated_name(header)?}"
   let incoming = incoming_names(root)?
-  if ! target.exists()? {
+  if ! target.exists() {
     return {present: false, size: 0, sha256: "", incoming: incoming}
   }
   {present: true, size: target.metadata()?.size, sha256: hash.sha256(target)?.hex(), incoming: incoming}
@@ -186,59 +186,59 @@ proc stage(header: Record) [env, fs, io, error] -> Result[Record, Error] {
     return Err(refuse("sha256", "sha256 must be 64 hexadecimal digits"))
   }
   let root = staging_root()?
-  root.mkdir(parents: true)?
+  root.mkdir(parents: true)
   let target = fp"{root}/{name}"
   let scratch = fp"{root}/.incoming-{name}"
-  scratch.remove(missing_ok: true)?
+  scratch.remove(missing_ok: true)
   var received = 0
   let created = bytes.write_at(scratch, 0, bytes.zero(0)?, create: true)?
   while received < size {
     let want = if size - received < chunk { size - received } else { chunk }
     let data = io.stdin_read(want)?
     if data.is_empty() {
-      scratch.remove(missing_ok: true)?
+      scratch.remove(missing_ok: true)
       return Err(refuse("short-payload", f"payload ended after {received} of {size} bytes"))
     }
     let _ = bytes.write_at(scratch, received, data)?
     received += data.len()
   }
   if ! io.stdin_read(1)?.is_empty() {
-    scratch.remove(missing_ok: true)?
+    scratch.remove(missing_ok: true)
     return Err(refuse("long-payload", "payload is longer than size"))
   }
-  fs.fsync(scratch)?
+  fs.fsync(scratch)
   let actual = hash.sha256(scratch)?.hex()
   if actual != sha256.lower() {
-    scratch.remove(missing_ok: true)?
+    scratch.remove(missing_ok: true)
     return Err(refuse("digest-mismatch", f"payload digest is {actual}"))
   }
-  if target.exists()? {
-    scratch.remove(missing_ok: true)?
+  if target.exists() {
+    scratch.remove(missing_ok: true)
     if hash.sha256(target)?.hex() == actual {
       return {outcome: "present", path: target.display(), size: size, sha256: actual}
     }
     return Err(refuse("exists", "a different file already has this name"))
   }
-  fs.rename_noreplace(scratch, target)?
-  fs.fsync(root)?
+  fs.rename_noreplace(scratch, target)
+  fs.fsync(root)
   {outcome: "staged", path: target.display(), size: size, sha256: actual}
 }
 
 proc reply_ok(result: Any) [io, error] {
-  io.write_stdout(json.encode({protocol: protocol, ok: true, result: result})? + "\n")?
-  io.flush_stdout()?
+  io.write_stdout(json.encode({protocol: protocol, ok: true, result: result})? + "\n")
+  io.flush_stdout()
 }
 
 proc reply_error(kind: Str, message: Str) [io, error] {
-  io.write_stdout(json.encode({protocol: protocol, ok: false, error: {kind: kind, message: message}})? + "\n")?
-  io.flush_stdout()?
+  io.write_stdout(json.encode({protocol: protocol, ok: false, error: {kind: kind, message: message}})? + "\n")
+  io.flush_stdout()
 }
 
 proc main() [env, fs, io, process, error] {
   let header = match read_header() {
     Ok(value) => value,
     Err(error) => {
-      reply_error("request", error.message)?
+      reply_error("request", error.message)
       return
     }
   }
@@ -263,4 +263,4 @@ proc main() [env, fs, io, process, error] {
   }
 }
 
-main()?
+main()

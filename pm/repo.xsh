@@ -231,7 +231,7 @@ export proc publish(
     let lock_path = util.repo_file_path(remote_repo, p".index.lock")?
     lock_path.parent.mkdir()
     let lock = fs.lock(lock_path)?
-    defer fs.unlock(lock)?
+    defer fs.unlock(lock)
     repo_publish_locked(repo_snapshot, remote_repo, token, work, arch)
     return
   }
@@ -277,7 +277,7 @@ proc repo_publish_locked(repo_snapshot: types.RepoSnapshot, remote_repo: Str, to
       if ! merged.already_published { changed = true }
     }
     return unless changed
-    if remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token, expected)? { return }
+    if remote.write_remote_index_to_repo(remote_repo, work, fp"{work}/index", index, token, expected) { return }
   }
   return Err(types.PmError.RemoteUpload("index changed during five publication attempts"))
 }

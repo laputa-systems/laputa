@@ -11,4 +11,4 @@ proc main(root: Path) [fs, process, env, error] -> Result[Unit, Error] {
   fail "selected package successor failed" unless status.ok
 }
 
-main(@args)?
+main(@args)

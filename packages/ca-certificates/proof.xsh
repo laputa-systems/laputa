@@ -67,9 +67,9 @@ proc verify_distrust_policy(rootfs: Path) [fs, error] {
 }
 
 proc main(rootfs = p"/rootfs") [fs, error] {
-  verify_managed_symlinks(rootfs)?
-  verify_provisioned_key(rootfs)?
-  verify_package_metadata(rootfs)?
+  verify_managed_symlinks(rootfs)
+  verify_provisioned_key(rootfs)
+  verify_package_metadata(rootfs)
 
   let paths = trust_store.trust_store_paths(rootfs)
   let seed_bundle = trust_store.seed_bundle_path(paths.root).read_bytes()?
@@ -86,7 +86,7 @@ proc main(rootfs = p"/rootfs") [fs, error] {
   ensure(active == "1", "ca-certificates-store", f"seeded trust generation is not 1: {active}")
 
   let bundle = trust_store.canonical_bundle_path(paths.root).read_bytes()?
-  net.validate_root_bundle(bundle)?
+  net.validate_root_bundle(bundle)
 
   ensure(bundle == seed_bundle, "ca-certificates-store", "active bundle differs from the pinned seed")
 

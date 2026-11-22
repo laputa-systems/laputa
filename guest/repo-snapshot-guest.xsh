@@ -7,12 +7,12 @@ const GUEST_CONTEXT = {marker: "LAPUTA_REPO_GUEST", phase_file: "/store/repo-pha
 proc main() [fs, process, time, net, error, io] {
   p"/proc".mkdir(parents: true)
   p"/sys".mkdir(parents: true)
-  linux.mount(bytes.from_text("devtmpfs"), p"/dev", fstype: "devtmpfs")?
-  linux.mount(bytes.from_text("proc"), p"/proc", fstype: "proc")?
-  linux.mount(bytes.from_text("sysfs"), p"/sys", fstype: "sysfs")?
-  guest_bootstrap.guest_bootstrap_load_drivers(GUEST_CONTEXT, "boot")?
-  guest_bootstrap.guest_bootstrap_mount_store(GUEST_CONTEXT, "boot")?
-  guest_bootstrap.guest_bootstrap_bring_up_net(GUEST_CONTEXT, "boot")?
+  linux.mount(bytes.from_text("devtmpfs"), p"/dev", fstype: "devtmpfs")
+  linux.mount(bytes.from_text("proc"), p"/proc", fstype: "proc")
+  linux.mount(bytes.from_text("sysfs"), p"/sys", fstype: "sysfs")
+  guest_bootstrap.guest_bootstrap_load_drivers(GUEST_CONTEXT, "boot")
+  guest_bootstrap.guest_bootstrap_mount_store(GUEST_CONTEXT, "boot")
+  guest_bootstrap.guest_bootstrap_bring_up_net(GUEST_CONTEXT, "boot")
   let url = guest_bootstrap.guest_bootstrap_cmdline_value(GUEST_CONTEXT, "repo_url")?
   let keys = [p"/guest/signing-key".read_bytes()?, p"/guest/next-key".read_bytes()?]
   let state = p"/store/state"
@@ -29,10 +29,10 @@ proc main() [fs, process, time, net, error, io] {
       Ok(_) => return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "tamper", "tampered index was accepted"),
       Err(problem) => guard "does not match signed snapshot metadata" in problem.message else { return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "tamper", problem.message) },
     }
-    guard ! p"/store/tampered-out".exists()? else { return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "tamper", "tampered index was cached") }
-    guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, "ACCEPT_AND_TAMPER_OK generation=2")?
-    guest_bootstrap.guest_bootstrap_write_phase(GUEST_CONTEXT, "1")?
-    linux.reboot()?
+    guard ! p"/store/tampered-out".exists() else { return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "tamper", "tampered index was cached") }
+    guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, "ACCEPT_AND_TAMPER_OK generation=2")
+    guest_bootstrap.guest_bootstrap_write_phase(GUEST_CONTEXT, "1")
+    linux.reboot()
     return
   }
   guard phase == "1" else { return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "boot", "unknown phase") }
@@ -43,9 +43,9 @@ proc main() [fs, process, time, net, error, io] {
   let accepted = repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(state, url))?
   guard accepted != null else { return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "rollback", "accepted state disappeared") }
   guard accepted.generation == "2" else { return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "rollback", "accepted generation changed") }
-  guard ! p"/store/rollback-out".exists()? else { return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "rollback", "older index was cached") }
-  guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, "ROLLBACK_REJECTED generation=2")?
-  linux.poweroff()?
+  guard ! p"/store/rollback-out".exists() else { return guest_bootstrap.guest_bootstrap_fail_phase(GUEST_CONTEXT, "rollback", "older index was cached") }
+  guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, "ROLLBACK_REJECTED generation=2")
+  linux.poweroff()
 }
 
-main()?
+main()

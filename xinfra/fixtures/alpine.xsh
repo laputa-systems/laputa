@@ -48,8 +48,8 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
   let run_id = f"{time.now()}"
   fp"{dir}".mkdir(parents: true)
   let client = fp"{dir}/client"
-  if ! fp"{client}".exists()? {
-    keygen(client)?
+  if ! fp"{client}".exists() {
+    keygen(client)
   }
 
   var lines = [
@@ -63,7 +63,7 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
   var ids: List[Str] = []
   for index in range(1, count + 1) {
     let host_key = fp"{dir}/host-{run_id}-{index}"
-    keygen(host_key)?
+    keygen(host_key)
     let pin = fingerprint(fp"{host_key}.pub")?
     let name = f"xinfra-fx-{run_id}-{index}"
     let container = docker_text(
@@ -74,7 +74,7 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
       image,
     )?
     ids += [container]
-    wait_for_sshd(container)?
+    wait_for_sshd(container)
     let port = docker_text("inspect", "-f", "{{(index (index .NetworkSettings.Ports \"22/tcp\") 0).HostPort}}", container)?
     lines += [
       f"[hosts.fx-{index}]",
@@ -100,14 +100,14 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
   }
 
   fp"{dir}/inventory.toml".write(lines.join("\n") + "\n")
-  json.write(fp"{dir}/containers.json", {containers: ids})?
+  json.write(fp"{dir}/containers.json", {containers: ids})
   print f"started {ids.len()} host(s); inventory at {dir}/inventory.toml"
 }
 
 ## Remove the containers recorded in DIR/containers.json.
 cli main down(dir: Path = p".work/fixtures") [fs, process, error] {
   let record = fp"{dir}/containers.json"
-  if ! record.exists()? {
+  if ! record.exists() {
     return
   }
 

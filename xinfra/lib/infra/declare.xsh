@@ -6,42 +6,42 @@ use infra.model
 
 pure require_args(what: Str, id: Str, needs: List[Str]) -> Result[Unit, Error] {
   ctx f"{what} {id}" {
-    check.identifier_ok(id)?
-    check.needs_ok(needs)?
+    check.identifier_ok(id)
+    check.needs_ok(needs)
   }
 }
 
 pure principals(owner: Str?, group_name: Str?) -> Result[Unit, Error] {
   if owner != null {
-    check.principal_ok("owner", owner)?
+    check.principal_ok("owner", owner)
   }
 
   if group_name != null {
-    check.principal_ok("group", group_name)?
+    check.principal_ok("group", group_name)
   }
 }
 
 pure optional_id(what: Str, value: Int?) -> Result[Unit, Error] {
   if value != null {
-    check.id_number_ok(what, value)?
+    check.id_number_ok(what, value)
   }
 }
 
 pure optional_path(what: Str, value: Str?) -> Result[Unit, Error] {
   if value != null {
-    check.path_ok(what, value)?
+    check.path_ok(what, value)
   }
 }
 
 pure optional_account(what: Str, value: Str?) -> Result[Unit, Error] {
   if value != null {
-    check.account_ok(what, value)?
+    check.account_ok(what, value)
   }
 }
 
 pure modes(mode: Int?) -> Result[Unit, Error] {
   if mode != null {
-    check.mode_ok(mode)?
+    check.mode_ok(mode)
   }
 }
 
@@ -57,11 +57,11 @@ export pure directory(
   parents: Bool = false,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("directory", id, needs)?
+  require_args("directory", id, needs)
   ctx f"directory {id}" {
-    check.path_ok("path", at)?
-    check.not_root("path", at)?
-    principals(owner, group_name)?
+    check.path_ok("path", at)
+    check.not_root("path", at)
+    principals(owner, group_name)
     modes(mode)?
   }
 
@@ -93,7 +93,7 @@ pure content_of(
   }
 
   if secret_env != null {
-    check.environment_ok(secret_env)?
+    check.environment_ok(secret_env)
     chosen += [model.SecretEnv(secret_env)]
   }
 
@@ -155,15 +155,15 @@ export pure file(
   sensitive: Bool = false,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("file", id, needs)?
+  require_args("file", id, needs)
   ctx f"file {id}" {
-    check.path_ok("path", at)?
-    check.not_root("path", at)?
-    principals(owner, group_name)?
+    check.path_ok("path", at)
+    check.not_root("path", at)
+    principals(owner, group_name)
     modes(mode)?
   }
 
-  validator_ok(id, validate)?
+  validator_ok(id, validate)
   let content = content_of(id, presence, text, data, source, secret_env, template_file, template_json)?
   let marked = sensitive or secret_env != null
   let spec = model.FileSpec(path: at, presence:, content:, owner:, group: group_name, mode:, validate:, sensitive: marked)
@@ -180,10 +180,10 @@ export pure symlink(
   replace: Bool = false,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("symlink", id, needs)?
+  require_args("symlink", id, needs)
   ctx f"symlink {id}" {
-    check.path_ok("path", at)?
-    check.not_root("path", at)?
+    check.path_ok("path", at)
+    check.not_root("path", at)
     if presence == .Present {
       guard target != "" and target.find("\0") == null else {
         fail "a present symlink needs a nonempty target without a NUL byte"
@@ -201,7 +201,7 @@ pure constraint_of(version: Str) -> Result[model.Constraint, Error] {
   for text in table {
     if version.starts_with(text) {
       let rest = version.byte_slice(text.byte_len())
-      check.version_ok(rest)?
+      check.version_ok(rest)
       let op: model.VersionOp = match text {
         ">=" => .Ge
         "<=" => .Le
@@ -213,7 +213,7 @@ pure constraint_of(version: Str) -> Result[model.Constraint, Error] {
     }
   }
 
-  check.version_ok(version)?
+  check.version_ok(version)
   Ok(model.Constraint(op: .Eq, version:))
 }
 
@@ -226,9 +226,9 @@ export pure package(
   version: Str? = null,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("package", id, needs)?
+  require_args("package", id, needs)
   ctx f"package {id}" {
-    check.package_ok(name)?
+    check.package_ok(name)
     guard presence == .Present or version == null else {
       fail "an absent package takes no version"
     }
@@ -242,7 +242,7 @@ export pure package(
 ## Declare an explicit refresh of the apk index. It runs only at apply and is
 ## reported separately; plan and check never refresh.
 export pure package_index(id: Str, needs: List[Str] = []) -> Result[model.Resource, Error] {
-  require_args("package_index", id, needs)?
+  require_args("package_index", id, needs)
   let spec = model.PackageIndexSpec(note: "apk update")
   Ok(model.Resource(id:, needs:, spec: model.PackageIndex(spec)))
 }
@@ -256,9 +256,9 @@ export pure group_account(
   gid: Int? = null,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("group", id, needs)?
+  require_args("group", id, needs)
   ctx f"group {id}" {
-    check.account_ok("group name", name)?
+    check.account_ok("group name", name)
     optional_id("gid", gid)?
   }
 
@@ -281,16 +281,16 @@ export pure user_account(
   system_account: Bool = false,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("user", id, needs)?
+  require_args("user", id, needs)
   ctx f"user {id}" {
-    check.account_ok("user name", name)?
-    optional_id("uid", uid)?
-    optional_account("primary group", primary_group)?
+    check.account_ok("user name", name)
+    optional_id("uid", uid)
+    optional_account("primary group", primary_group)
     for member in groups {
-      check.account_ok("group", member)?
+      check.account_ok("group", member)
     }
 
-    optional_path("home", home)?
+    optional_path("home", home)
     optional_path("shell", shell)?
   }
 
@@ -304,11 +304,11 @@ pure invocation_of(what: Str, argv: List[Str]?, shell: Str?) -> Result[model.Inv
   }
 
   if argv != null {
-    check.argv_ok(what, argv)?
+    check.argv_ok(what, argv)
     return Ok(model.Argv(argv))
   }
 
-  check.shell_ok(what, shell ?? "")?
+  check.shell_ok(what, shell ?? "")
   Ok(model.Shell(shell ?? ""))
 }
 
@@ -335,11 +335,11 @@ export pure command(
   timeout_seconds: Int = 600,
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("command", id, needs)?
+  require_args("command", id, needs)
   let invocation = ctx f"command {id}" { invocation_of("command", argv, shell)? }
   var guards: List[model.Guard] = []
   if creates != null {
-    ctx f"command {id}" { check.path_ok("creates", creates)? }
+    ctx f"command {id}" { check.path_ok("creates", creates) }
     guards += [model.Creates(creates)]
   }
 
@@ -352,7 +352,7 @@ export pure command(
   }
 
   if ! run_on.is_empty() {
-    ctx f"command {id}" { check.needs_ok(run_on)? }
+    ctx f"command {id}" { check.needs_ok(run_on) }
     guards += [model.OnChange]
   }
 
@@ -365,7 +365,7 @@ export pure command(
   }
 
   if stdin_env != null {
-    ctx f"command {id}" { check.environment_ok(stdin_env)? }
+    ctx f"command {id}" { check.environment_ok(stdin_env) }
   }
 
   guard ! accept.is_empty() else {
@@ -400,11 +400,11 @@ export pure service(
   restart_on: List[Str] = [],
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("service", id, needs)?
+  require_args("service", id, needs)
   ctx f"service {id}" {
-    check.service_ok(name)?
-    check.service_ok(runlevel)?
-    check.needs_ok(reload_on)?
+    check.service_ok(name)
+    check.service_ok(runlevel)
+    check.needs_ok(reload_on)
     check.needs_ok(restart_on)?
   }
 
@@ -429,10 +429,10 @@ export pure xinit_service(
   restart_on: List[Str] = [],
   needs: List[Str] = [],
 ) -> Result[model.Resource, Error] {
-  require_args("service", id, needs)?
+  require_args("service", id, needs)
   ctx f"service {id}" {
-    check.service_ok(name)?
-    check.needs_ok(reload_on)?
+    check.service_ok(name)
+    check.needs_ok(reload_on)
     check.needs_ok(restart_on)?
   }
 

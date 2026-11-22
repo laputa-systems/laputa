@@ -6,4 +6,4 @@ proc main(root: Path) [fs, error] -> Result[Unit, Error] {
   fail "deliberate self-hosting candidate health failure"
 }
 
-main(@args)?
+main(@args)

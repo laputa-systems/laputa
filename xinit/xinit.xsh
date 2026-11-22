@@ -1355,7 +1355,7 @@ proc spawned_readiness(service: Service, pid: Int) -> Result[Bool] {
   match wait_ready(service) {
     Ok(ready) => ready
     Err(failure) => {
-      cleanup_failed_start(service, pid, failure)?
+      cleanup_failed_start(service, pid, failure)
       return Err(failure)
     }
   }
@@ -1480,7 +1480,7 @@ proc start_one_service(name: Str) -> Result[SavedStatus] {
   match recorded {
     Ok(status) => status
     Err(failure) => {
-      cleanup_failed_start(service, base.pid, failure)?
+      cleanup_failed_start(service, base.pid, failure)
       return Err(failure)
     }
   }
@@ -1531,7 +1531,7 @@ proc request_desired(name: Str, desired: Str, qualifier: Str = "") {
     }
   }
 
-  wake_scanner()?
+  wake_scanner()
   print f"{name} {desired} queued"
 }
 
@@ -1567,7 +1567,7 @@ proc require_scanner_for_owner(qualifier: Str) {
 }
 
 proc start_service(name: Str, qualifier: Str = "") {
-  require_scanner_for_owner(qualifier)?
+  require_scanner_for_owner(qualifier)
 
   if scanner_active() {
     request_desired(name, "up", qualifier)
@@ -1606,7 +1606,7 @@ proc running_dependents(name: Str) -> Result[List[Str]] {
 }
 
 proc stop_service(name: Str, qualifier: Str = "") {
-  require_scanner_for_owner(qualifier)?
+  require_scanner_for_owner(qualifier)
 
   if scanner_active() {
     request_desired(name, "down", qualifier)
@@ -2247,11 +2247,11 @@ proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: P
               Err(_) => {
                 let key = bytes.from_text(name).sha256().hex()
                 let refused = fp"{path_value.parent()}/.refused-{key}-{process.current_pid()?}-{time.monotonic()?}"
-                fs.rename_noreplace(path_value, refused)?
+                fs.rename_noreplace(path_value, refused)
               }
             }
           } else {
-            processing.remove(leaf)?
+            processing.remove(leaf)
           }
         }
         Err(_) => {}
@@ -2281,12 +2281,12 @@ proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: P
 
   match parse_control_request(observed.data) {
     Ok(request) => {
-      if control_skipped(request, name)? {
+      if control_skipped(request, name) {
         eprint --flush f"xinit-control-skipped: service={name} uid={uid} verb={request.verb} reason=owner-mismatch"
       } else {
         print --flush f"xinit-control accepted service={name} uid={uid} verb={request.verb}"
         if request.verb != "reload" and unit_state_of(out, name) != "" {
-          set_control_owner(name, request.owner)?
+          set_control_owner(name, request.owner)
         }
         out = apply_request(out, name, request.verb)?
       }
@@ -2395,7 +2395,7 @@ proc scan_units(names: List[Str]) {
   prepare_control_inbox()
 
   for unit in units {
-    set_control_owner(unit.service.name, "")?
+    set_control_owner(unit.service.name, "")
   }
 
   let wake_path = scanner_wake_path()?

@@ -129,7 +129,7 @@ proc guest_wait_session(runtime: Path, previous: Int) [fs, process, time, error]
         if let Ok(pid) = pid_text.trim().parse_int() {
           let session_id = fp"{runtime}/laputa-session-id"
           let ready_id = fp"{runtime}/laputa-ghostty-read-ready"
-          if session_id.exists() and pid != previous and guest_process_alive(pid)? {
+          if session_id.exists() and pid != previous and guest_process_alive(pid) {
             if let Ok(expected) = session_id.read_text() {
               if let Ok(observed) = ready_id.read_text() {
                 if expected != "" and expected == observed { return pid }
@@ -188,7 +188,7 @@ proc guest_require_broker_census(mdevd_pid: Int, seatd_pid: Int) [fs, process, e
   }
   guard mdevd_count == 1 and matching_mdevd else { fail "mdevd census differs from scanner ownership" }
   guard seatd_count == 1 and matching_seatd else { fail "seatd census differs from scanner ownership" }
-  guest_console(f"LAPUTA_TINYLAND_BROKER_CENSUS mdevd={mdevd_pid} seatd={seatd_pid}")?
+  guest_console(f"LAPUTA_TINYLAND_BROKER_CENSUS mdevd={mdevd_pid} seatd={seatd_pid}")
 }
 
 proc guest_run_required(command: Command, phase: Str) {
@@ -217,19 +217,19 @@ proc guest_granted_device_control(runtime: Path) [fs, process, error] {
   let marker = fp"{runtime}/laputa-direct-opened"
   marker.remove()
   defer device.chmod(original)
-  device.chmod(0o666)?
+  device.chmod(0o666)
   let result = process.run(process.command_argv(
     p"/usr/bin/su",
     ["su", "laputa", "-s", "/usr/bin/xsh", "/usr/lib/laputa/tinyland-session.xsh"],
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
     timeout: 10s,
   ))
-  device.chmod(original)?
+  device.chmod(original)
   let status = result?
   guard ! status.ok else { fail "device denial probe accepted granted DRM access" }
   guard marker.read_text()? == device.display() else { fail "granted DRM access did not reach the denial probe" }
-  marker.remove()?
-  guest_console("LAPUTA_TINYLAND_GRANTED_DEVICE_REJECTED")?
+  marker.remove()
+  guest_console("LAPUTA_TINYLAND_GRANTED_DEVICE_REJECTED")
 }
 
 proc main() [fs, process, time, error] {
@@ -237,8 +237,8 @@ proc main() [fs, process, time, error] {
   let mdevd_pid = guest_wait_unit("mdevd", -1, true)?
   let _ = guest_wait_unit("coldplug", -1, true)?
   let seatd_pid = guest_wait_unit("seatd", -1, true)?
-  guest_require_broker_census(mdevd_pid, seatd_pid)?
-  guest_console("LAPUTA_TINYLAND_COLDPLUG_COMPLETE")?
+  guest_require_broker_census(mdevd_pid, seatd_pid)
+  guest_console("LAPUTA_TINYLAND_COLDPLUG_COMPLETE")
   guest_run_required(process.command_argv(p"/usr/bin/xsh", ["xsh", "/usr/lib/laputa/doas-qualification.xsh"], stdout: p"/dev/console", stderr: p"/dev/console"), "doas-qualification")
 
   guest_wait_for(p"/dev/dri/card0", "drm-device", 20)
@@ -281,33 +281,33 @@ proc main() [fs, process, time, error] {
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
     timeout: 10s,
   ), "runtime-attack")
-  guest_granted_device_control(runtime)?
-  p"/run/tinyland-proof-prepared".write("ready\n")?
+  guest_granted_device_control(runtime)
+  p"/run/tinyland-proof-prepared".write("ready\n")
   let tinyland_pid = guest_wait_session(runtime, 0)?
   guest_tick("session-ready")
   let _ = guest_wait_gl(0, "opengl")?
-  guest_console("LAPUTA_TINYLAND_GHOSTTY_GL43")?
+  guest_console("LAPUTA_TINYLAND_GHOSTTY_GL43")
 
   guest_tick("crash-before-kill")
   guest_console(f"LAPUTA_TINYLAND_CRASH target={tinyland_pid}")
-  process.kill(tinyland_pid, signal: "KILL")?
+  process.kill(tinyland_pid, signal: "KILL")
   let crash_pid = guest_wait_session(runtime, tinyland_pid)?
-  if guest_process_alive(tinyland_pid)? { guest_fail("compositor-crash", "old compositor survived") }
-  guest_console("LAPUTA_TINYLAND_CRASH session exited")?
+  if guest_process_alive(tinyland_pid) { guest_fail("compositor-crash", "old compositor survived") }
+  guest_console("LAPUTA_TINYLAND_CRASH session exited")
   guest_tick("crash-reaped")
   guest_tick("crash-recovered")
 
   let virtio_event = guest_find_input("QEMU Virtio Keyboard", "device-loss")?
   let virtio_pci = guest_pci_of_input(virtio_event.name, "device-loss")?
   guest_console(f"LAPUTA_TINYLAND_UNPLUG target={virtio_event.display()} pci={virtio_pci}")
-  fp"/sys/bus/pci/devices/{virtio_pci}/remove".write("1")?
+  fp"/sys/bus/pci/devices/{virtio_pci}/remove".write("1")
   guest_wait_for_removed(virtio_event, "device-loss", 60)
   guest_tick("unplugged")
   time.sleep(2s)
 
   let survivor_pid = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
 
-  if !guest_process_alive(survivor_pid)? {
+  if !guest_process_alive(survivor_pid) {
     for log in [p"/var/log/tinyland/current", p"/var/log/seatd/current"] {
       if log.exists() { guest_console(log.read_text()?) }
     }
@@ -319,12 +319,12 @@ proc main() [fs, process, time, error] {
   }
 
   guest_tick("broker-loss-before-kill")
-  process.kill(seatd_pid, signal: "KILL")?
+  process.kill(seatd_pid, signal: "KILL")
   let restarted_seatd_pid = guest_wait_unit("seatd", seatd_pid, true)?
-  guest_require_broker_census(mdevd_pid, restarted_seatd_pid)?
+  guest_require_broker_census(mdevd_pid, restarted_seatd_pid)
   let recovered_pid = guest_wait_session(runtime, crash_pid)?
-  if guest_process_alive(crash_pid)? { guest_fail("broker-loss", "old session survived broker loss") }
-  guest_console("LAPUTA_TINYLAND_BROKER_LOSS session exited")?
+  if guest_process_alive(crash_pid) { guest_fail("broker-loss", "old session survived broker loss") }
+  guest_console("LAPUTA_TINYLAND_BROKER_LOSS session exited")
   guest_tick("broker-loss-reaped")
   guest_tick("broker-recovered")
 
@@ -333,26 +333,26 @@ proc main() [fs, process, time, error] {
     let commands = [f"{entry.command}:{entry.pid}/{entry.parent_pid}/{entry.pgrp ?? -1}/{entry.session ?? -1}" for entry in process.list()? if entry.uid != 0 or entry.command in ["su", "xinit", "tinyland-sessio"]].join(",")
     guest_fail("application-exit", f"expected one ghostty-custom process, found {applications.len()} among {commands}")
   }
-  process.kill(applications[0], signal: "TERM")?
+  process.kill(applications[0], signal: "TERM")
   let application_restart_pid = guest_wait_session(runtime, recovered_pid)?
-  guard ! guest_process_alive(recovered_pid)? else { fail "old compositor survived application exit" }
-  guest_console("LAPUTA_TINYLAND_APPLICATION_EXIT_RECOVERED")?
+  guard ! guest_process_alive(recovered_pid) else { fail "old compositor survived application exit" }
+  guest_console("LAPUTA_TINYLAND_APPLICATION_EXIT_RECOVERED")
 
   let scanner = json.get(json.read(p"/run/xinit/scanner.json")?, ["pid"], 0).require(Int)?
   guard scanner > 1 else { fail "missing service scanner ownership" }
   let shutdown_applications = [entry.pid for entry in process.list()? if entry.command == "ghostty-custom"]
   guard shutdown_applications.len() == 1 else { fail "expected one application before scanner shutdown" }
   let gl_before_final = guest_gl_count()?
-  process.kill(scanner, signal: "TERM")?
+  process.kill(scanner, signal: "TERM")
   let shutdown_mdevd = guest_wait_unit("mdevd", mdevd_pid, true)?
   let shutdown_seatd = guest_wait_unit("seatd", restarted_seatd_pid, true)?
   let _ = guest_wait_session(runtime, application_restart_pid)?
   let _ = guest_wait_gl(gl_before_final, "opengl-final")?
   for old in [scanner, mdevd_pid, restarted_seatd_pid, application_restart_pid, shutdown_applications[0]] {
-    guard ! guest_process_alive(old)? else { fail f"owned process {old} survived scanner shutdown" }
+    guard ! guest_process_alive(old) else { fail f"owned process {old} survived scanner shutdown" }
   }
-  guest_require_broker_census(shutdown_mdevd, shutdown_seatd)?
-  guest_console("LAPUTA_TINYLAND_SCANNER_SHUTDOWN_REAPED")?
+  guest_require_broker_census(shutdown_mdevd, shutdown_seatd)
+  guest_console("LAPUTA_TINYLAND_SCANNER_SHUTDOWN_REAPED")
 
   guest_console("LAPUTA_TINYLAND_GHOSTTY_PROOF_READY")
   var waited = 0
@@ -373,7 +373,7 @@ proc main() [fs, process, time, error] {
     guest_fail("input", f"expected LAPUTA!, got {input}")
   }
 
-  guest_console("LAPUTA_PROOF_SCREENSHOT ghostty-text")?
+  guest_console("LAPUTA_PROOF_SCREENSHOT ghostty-text")
   time.sleep(5s)
 
   guest_run_required(process.command_argv(
@@ -383,12 +383,12 @@ proc main() [fs, process, time, error] {
     env: {PATH: "/usr/local/bin:/usr/bin:/bin"},
     timeout: 120s,
   ), "play-gpu-next")
-  guest_console("LAPUTA_TINYLAND_PLAY_GPU_NEXT_OK")?
+  guest_console("LAPUTA_TINYLAND_PLAY_GPU_NEXT_OK")
 
   let idle_tinyland = fp"{runtime}/laputa-tinyland.pid".read_text()?.trim().parse_int()?
   let idle_ghostty = [entry.pid for entry in process.list()? if entry.command == "ghostty-custom"]
   if idle_ghostty.len() == 1 {
-    guest_console(f"LAPUTA_TINYLAND_RSS tinyland_kb={guest_rss_kb(idle_tinyland)?} ghostty_kb={guest_rss_kb(idle_ghostty[0])?}")?
+    guest_console(f"LAPUTA_TINYLAND_RSS tinyland_kb={guest_rss_kb(idle_tinyland)?} ghostty_kb={guest_rss_kb(idle_ghostty[0])?}")
   }
 
   guest_console("LAPUTA_TINYLAND_GHOSTTY_PROOF_OK")

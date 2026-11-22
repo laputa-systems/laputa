@@ -29,7 +29,7 @@ proc qmp_frame(fd: Int, pending: Bytes, deadline: Int) -> Result[QmpFrame, Error
       return {message, pending: buffer.slice(end + 1)}
     }
     if buffer.len() > 1048576 { return Err(QmpError.Protocol("QMP frame exceeds 1 MiB")) }
-    qmp_wait(fd, "readable", deadline)?
+    qmp_wait(fd, "readable", deadline)
     let part = unix.read_fd(fd, 4096)?
     if part.len() == 0 { return Err(QmpError.Protocol("QMP socket closed")) }
     buffer = bytes.concat([buffer, part])
@@ -39,7 +39,7 @@ proc qmp_frame(fd: Int, pending: Bytes, deadline: Int) -> Result[QmpFrame, Error
 proc qmp_send(fd: Int, payload: Bytes, deadline: Int) -> Result[Unit, Error] {
   var offset = 0
   while offset < payload.len() {
-    qmp_wait(fd, "writable", deadline)?
+    qmp_wait(fd, "writable", deadline)
     let written = unix.write_fd(fd, payload.slice(offset))?
     if written == 0 { return Err(QmpError.Protocol("QMP socket closed while writing")) }
     offset += written
@@ -62,14 +62,14 @@ proc qmp_response(fd: Int, pending: Bytes, id: Int, deadline: Int) -> Result[Qmp
 
 proc qmp_command(fd: Int, pending: Bytes, execute: Str, arguments: Any, id: Int, deadline: Int) -> Result[QmpReply, Error] {
   let request = json.encode({execute, arguments, id})? + "\n"
-  qmp_send(fd, bytes.from_text(request), deadline)?
+  qmp_send(fd, bytes.from_text(request), deadline)
   qmp_response(fd, pending, id, deadline)?
 }
 
 ## Execute ordered steps on one Unix connection with a session deadline.
 export proc qmp_run(socket: Path, steps: List[QmpStep], timeout_ms: Int) -> Result[Unit, Error] {
   if timeout_ms <= 0 { return Err(QmpError.Protocol("QMP timeout must be positive")) }
-  qmp_run_until(socket, steps, time.monotonic()? + timeout_ms * 1000000)?
+  qmp_run_until(socket, steps, time.monotonic()? + timeout_ms * 1000000)
 }
 
 ## Execute ordered steps before an absolute process-local monotonic deadline in nanoseconds.
@@ -89,7 +89,7 @@ export proc qmp_run_until(socket: Path, steps: List[QmpStep], deadline: Int) -> 
         if milliseconds < 0 or milliseconds * 1000000 > deadline - time.monotonic()? {
           return Err(QmpError.Protocol("QMP delay exceeds deadline"))
         }
-        time.sleep(time.millis(milliseconds))?
+        time.sleep(time.millis(milliseconds))
       },
       QmpExecute(execute, arguments, kind) => {
         let decoded = json.decode(arguments)?

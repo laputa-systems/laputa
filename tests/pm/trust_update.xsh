@@ -75,7 +75,7 @@ proc snapshot_store_state(paths: trust_store.TrustStorePaths) [fs, error] -> Res
   generations = generations |> sort
 
   var staging: List[Str] = []
-  if paths.staging.exists()? {
+  if paths.staging.exists() {
     for entry in fs.children(paths.staging)? {
       staging += [entry.name]
     }
@@ -84,7 +84,7 @@ proc snapshot_store_state(paths: trust_store.TrustStorePaths) [fs, error] -> Res
 
   {
     accepted: paths.accepted.read_bytes()?,
-    journal: if paths.journal.exists()? { paths.journal.read_bytes()? } else { bytes.from_text("") },
+    journal: if paths.journal.exists() { paths.journal.read_bytes()? } else { bytes.from_text("") },
     journal_present: paths.journal.exists()?,
     active: trust_store.trust_store_read_active(paths)?,
     generations,
@@ -288,7 +288,7 @@ test trust_release_verify_fails_closed_on_a_missing_or_incorrect_clock [fs, proc
 
   let paths = trust_store.trust_store_paths(root)
   let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
-  trust_store.trust_store_persist_signed_floor(paths, time.now() / 1000 + 100000)?
+  trust_store.trust_store_persist_signed_floor(paths, time.now() / 1000 + 100000)
   let source = stage_release(ctx, "trust-release-clock-source", "release-b")?
   match trust_update.trust_update_from_dir(root, source) {
     Ok(_) => test.fail("a release was applied with a clock behind the signed floor"),
@@ -346,9 +346,9 @@ test trust_update_rejects_malformed_releases [fs, process, env, time, error] { |
 
   let linked = stage_release(ctx, "trust-update-linked", "release-b")?
   let outside = test.temp_path(ctx, name: "trust-update-linked-outside")
-  outside.write(bytes.from_text("not a release\n"))?
-  fp"{linked}/metadata".remove()?
-  fp"{linked}/metadata".symlink(to: outside)?
+  outside.write(bytes.from_text("not a release\n"))
+  fp"{linked}/metadata".remove()
+  fp"{linked}/metadata".symlink(to: outside)
   expect_rejected(trust_update.trust_update_from_dir(root, linked), "not a regular file", root, "1", "symlinked-metadata")
 
   let duped = stage_release(ctx, "trust-update-duped", "release-b")?
@@ -403,7 +403,7 @@ test trust_update_serializes_concurrent_attempts [fs, process, time, error] { |c
   }
 
   assert ! fp"{root}/var/lib/laputa/trust/generations".exists()?
-  fs.unlock(held)?
+  fs.unlock(held)
   let applied = trust_update.trust_update_from_dir(root, source)?
   assert applied.generation == "2"
 }
@@ -426,7 +426,7 @@ test trust_update_never_replaces_an_existing_generation [fs, process, time, erro
   assert ! fp"{root}/var/lib/laputa/trust/accepted".exists()?
   assert ! fp"{root}/var/lib/laputa/trust/generations/1".exists()?
 
-  blocker.remove()?
+  blocker.remove()
   let release_c = stage_release(ctx, "trust-update-conflict-c", "release-c")?
   match trust_update.trust_update_from_dir(root, release_c) {
     Ok(applied) => assert applied.generation == "3"
@@ -442,7 +442,7 @@ test trust_update_rejects_releases_behind_the_time_lower_bound [fs, process, tim
   let _ = trust_update.trust_update_from_dir(root, source)?
 
   let paths = trust_store.trust_store_paths(root)
-  trust_store.trust_store_persist_signed_floor(paths, time.now() / 1000 + 100000)?
+  trust_store.trust_store_persist_signed_floor(paths, time.now() / 1000 + 100000)
   match trust_update.trust_update_from_dir(root, source) {
     Ok(_) => test.fail("trust update accepted a release behind the persisted time bound"),
     Err(problem) => assert "system clock reads behind" in problem.message
@@ -476,7 +476,7 @@ test trust_update_recovers_interrupted_staging [fs, process, time, error] { |ctx
   fp"{paths.store}/{staging}".mkdir(parents: true)
   fp"{paths.store}/{staging}/owner".write(bytes.from_text("orphan-token"))
   let key = key_bytes("signing-key")?
-  trust_store.trust_store_write_journal(paths, "staged", "3", staging, "orphan-token")?
+  trust_store.trust_store_write_journal(paths, "staged", "3", staging, "orphan-token")
 
   let source = stage_release(ctx, "trust-update-recover-c", "release-c")?
   let applied = trust_update.trust_update_from_dir(root, source)?
@@ -503,8 +503,8 @@ test trust_update_rolls_forward_a_committed_candidate [fs, process, time, error]
     fixture("release-c/metadata").read_bytes()?,
     fixture("release-c/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_write_journal(paths, "committed", "3", staged.path, staged.token)?
-  trust_store.trust_store_commit_generation(paths, staged.path, "3")?
+  trust_store.trust_store_write_journal(paths, "committed", "3", staged.path, staged.token)
+  trust_store.trust_store_commit_generation(paths, staged.path, "3")
 
   let applied = trust_update.trust_update_from_dir(root, stage_release(ctx, "trust-update-recover-c", "release-c")?)?
   assert applied.generation == "3"
@@ -518,7 +518,7 @@ test trust_update_refuses_unknown_journal_state [fs, process, time, error] { |ct
   let _ = trust_update.trust_update_from_dir(root, release_b)?
 
   let paths = trust_store.trust_store_paths(root)
-  json.write(paths.journal, {format: "other", phase: 7})?
+  json.write(paths.journal, {format: "other", phase: 7})
   let source = stage_release(ctx, "trust-update-unknown-c", "release-c")?
   match trust_update.trust_update_from_dir(root, source) {
     Ok(_) => test.fail("trust update proceeded with an unknown journal"),
@@ -533,7 +533,7 @@ test trust_bootstrap_refuses_over_accepted_generation_without_mutation [fs, proc
   let root = stage_system(ctx, "trust-bootstrap-downgrade", "signing-key")?
   let release_b = stage_release(ctx, "trust-bootstrap-downgrade-b", "release-b")?
   let _ = trust_update.trust_update_from_dir(root, release_b)?
-  fp"{root}/var/lib/laputa/trust/active".remove()?
+  fp"{root}/var/lib/laputa/trust/active".remove()
 
   match trust_store.trust_store_bootstrap_from_seeds(root) {
     Ok(_) => test.fail("bootstrap activated generation 1 over accepted generation 2"),
@@ -548,8 +548,8 @@ test trust_bootstrap_refuses_dangling_active_without_mutation [fs, process, time
   let root = stage_system(ctx, "trust-bootstrap-dangling", "signing-key")?
   let release_b = stage_release(ctx, "trust-bootstrap-dangling-b", "release-b")?
   let _ = trust_update.trust_update_from_dir(root, release_b)?
-  fp"{root}/var/lib/laputa/trust/active".remove()?
-  fp"{root}/var/lib/laputa/trust/active".symlink(to: p"generations/9")?
+  fp"{root}/var/lib/laputa/trust/active".remove()
+  fp"{root}/var/lib/laputa/trust/active".symlink(to: p"generations/9")
 
   match trust_store.trust_store_bootstrap_from_seeds(root) {
     Ok(_) => test.fail("bootstrap activated generation 1 over a dangling active pointer"),
@@ -564,7 +564,7 @@ test trust_update_repairs_lost_active_pointer_without_downgrade [fs, process, ti
   let root = stage_system(ctx, "trust-update-repair", "signing-key")?
   let release_b = stage_release(ctx, "trust-update-repair-b", "release-b")?
   let _ = trust_update.trust_update_from_dir(root, release_b)?
-  fp"{root}/var/lib/laputa/trust/active".remove()?
+  fp"{root}/var/lib/laputa/trust/active".remove()
 
   let release_c = stage_release(ctx, "trust-update-repair-c", "release-c")?
   let applied = trust_update.trust_update_from_dir(root, release_c)?
@@ -610,8 +610,8 @@ test trust_update_adopts_orphaned_commit_after_staged_journal [fs, process, time
     fixture("release-c/metadata").read_bytes()?,
     fixture("release-c/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_write_journal(paths, "staged", "3", staged.path, staged.token)?
-  trust_store.trust_store_commit_generation(paths, staged.path, "3")?
+  trust_store.trust_store_write_journal(paths, "staged", "3", staged.path, staged.token)
+  trust_store.trust_store_commit_generation(paths, staged.path, "3")
 
   let applied = trust_update.trust_update_from_dir(root, stage_release(ctx, "trust-update-adopt-c", "release-c")?)?
   assert applied.generation == "3"
@@ -634,8 +634,8 @@ test trust_update_refuses_expired_commit_and_cleans_up [fs, process, time, error
     fixture("release-expired/metadata").read_bytes()?,
     fixture("release-expired/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_write_journal(paths, "committed", "2", staged.path, staged.token)?
-  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
+  trust_store.trust_store_write_journal(paths, "committed", "2", staged.path, staged.token)
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")
 
   let source = stage_release(ctx, "trust-update-expired-commit-c", "release-c")?
   match trust_update.trust_update_from_dir(root, source) {
@@ -667,9 +667,9 @@ test trust_update_rolls_forward_expired_active_without_bricking [fs, process, ti
     fixture("release-expired/metadata").read_bytes()?,
     fixture("release-expired/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
-  trust_store.trust_store_flip_active(paths, "2")?
-  trust_store.trust_store_write_journal(paths, "activated", "2", "", staged.token)?
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")
+  trust_store.trust_store_flip_active(paths, "2")
+  trust_store.trust_store_write_journal(paths, "activated", "2", "", staged.token)
 
   let source = stage_release(ctx, "trust-update-expired-active-c", "release-c")?
   let applied = trust_update.trust_update_from_dir(root, source)?
@@ -694,9 +694,9 @@ test trust_update_finishes_flip_lagging_commit_journal [fs, process, time, error
     fixture("release-c/metadata").read_bytes()?,
     fixture("release-c/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_write_journal(paths, "committed", "3", staged.path, staged.token)?
-  trust_store.trust_store_commit_generation(paths, staged.path, "3")?
-  trust_store.trust_store_flip_active(paths, "3")?
+  trust_store.trust_store_write_journal(paths, "committed", "3", staged.path, staged.token)
+  trust_store.trust_store_commit_generation(paths, staged.path, "3")
+  trust_store.trust_store_flip_active(paths, "3")
 
   let applied = trust_update.trust_update_from_dir(root, stage_release(ctx, "trust-update-flip-lag-c", "release-c")?)?
   assert applied.generation == "3"
@@ -740,7 +740,7 @@ test trust_update_rotates_keys_package_only [fs, process, env, time, error] { |c
   fp"{src}/cacert.pem".write(fixture("release-d/ca-certificates.crt").read_bytes()?)
   fp"{src}/trust-policy".write(fixture("release-d/trust-policy").read_bytes()?)
   fp"{src}/trust-update-key".write(key_bytes("rotation-key")?)
-  recipe.call_build(pkg, src, dest)?
+  recipe.call_build(pkg, src, dest)
 
   let built_key = fp"{dest}/etc/laputa/trust-update-key"
   let built_bundle = fp"{dest}/usr/share/laputa/trust/seed/ca-certificates.crt"
@@ -753,9 +753,9 @@ test trust_update_rotates_keys_package_only [fs, process, env, time, error] { |c
     assert ! fp"{dest}/{release_file}".exists()?
   }
 
-  built_key.copy(to: fp"{root}/etc/laputa/trust-update-key", overwrite: true)?
-  built_bundle.copy(to: fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt", overwrite: true)?
-  built_policy.copy(to: fp"{root}/usr/share/laputa/trust/seed/trust-policy", overwrite: true)?
+  built_key.copy(to: fp"{root}/etc/laputa/trust-update-key", overwrite: true)
+  built_bundle.copy(to: fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt", overwrite: true)
+  built_policy.copy(to: fp"{root}/usr/share/laputa/trust/seed/trust-policy", overwrite: true)
   assert fp"{root}/etc/laputa/trust-update-key".read_bytes()? == key_bytes("rotation-key")?
   assert fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt".read_bytes()? == fixture("release-d/ca-certificates.crt").read_bytes()?
   assert fp"{root}/usr/share/laputa/trust/seed/trust-policy".read_bytes()? == fixture("release-d/trust-policy").read_bytes()?
@@ -796,7 +796,7 @@ test trust_store_persist_accepted_is_monotonic [fs, process, time, error] { |ctx
   let paths = trust_store.trust_store_paths(root)
   assert trust_store.trust_store_read_accepted(paths)? == "3"
 
-  trust_store.trust_store_persist_accepted(paths, "3")?
+  trust_store.trust_store_persist_accepted(paths, "3")
   assert trust_store.trust_store_read_accepted(paths)? == "3"
 
   match trust_store.trust_store_persist_accepted(paths, "2") {
@@ -820,7 +820,7 @@ test trust_update_rejects_stale_staged_journal_without_mutation [fs, process, ti
   let staging = "staging/candidate-2-stale"
   fp"{paths.store}/{staging}".mkdir(parents: true)
   fp"{paths.store}/{staging}/owner".write(bytes.from_text("stale-token"))
-  trust_store.trust_store_write_journal(paths, "staged", "2", staging, "stale-token")?
+  trust_store.trust_store_write_journal(paths, "staged", "2", staging, "stale-token")
   let before = snapshot_store_state(paths)?
 
   let source = stage_release(ctx, "trust-update-stale-staged-new", "release-c")?
@@ -830,7 +830,7 @@ test trust_update_rejects_stale_staged_journal_without_mutation [fs, process, ti
   }
 
   let after = snapshot_store_state(paths)?
-  assert_same_store_state(before, after, "stale-staged")?
+  assert_same_store_state(before, after, "stale-staged")
   assert fp"{paths.store}/{staging}/owner".read_bytes()? == bytes.from_text("stale-token")
   assert active_bundle(root)? == fixture("release-c/ca-certificates.crt").read_bytes()?
 }
@@ -844,7 +844,7 @@ test trust_update_rejects_stale_committed_journal_without_mutation [fs, process,
 
   let paths = trust_store.trust_store_paths(root)
   assert trust_store.trust_store_generation_dir(paths, "2").exists()?
-  trust_store.trust_store_write_journal(paths, "committed", "2", "staging/candidate-2-gone", "stale-token")?
+  trust_store.trust_store_write_journal(paths, "committed", "2", "staging/candidate-2-gone", "stale-token")
   let before = snapshot_store_state(paths)?
 
   let source = stage_release(ctx, "trust-update-stale-committed-new", "release-c")?
@@ -854,7 +854,7 @@ test trust_update_rejects_stale_committed_journal_without_mutation [fs, process,
   }
 
   let after = snapshot_store_state(paths)?
-  assert_same_store_state(before, after, "stale-committed")?
+  assert_same_store_state(before, after, "stale-committed")
   assert active_bundle(root)? == fixture("release-c/ca-certificates.crt").read_bytes()?
 }
 
@@ -871,8 +871,8 @@ test trust_update_refuses_expired_staged_adoption_without_activation [fs, proces
     fixture("release-expired/metadata").read_bytes()?,
     fixture("release-expired/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_write_journal(paths, "staged", "2", staged.path, staged.token)?
-  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
+  trust_store.trust_store_write_journal(paths, "staged", "2", staged.path, staged.token)
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")
 
   let source = stage_release(ctx, "trust-update-expired-adopt-c", "release-c")?
   match trust_update.trust_update_from_dir(root, source) {
@@ -905,9 +905,9 @@ test trust_update_staged_adoption_preserves_activated_release_after_expiry [fs, 
     fixture("release-expired/metadata").read_bytes()?,
     fixture("release-expired/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_write_journal(paths, "staged", "2", staged.path, staged.token)?
-  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
-  trust_store.trust_store_flip_active(paths, "2")?
+  trust_store.trust_store_write_journal(paths, "staged", "2", staged.path, staged.token)
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")
+  trust_store.trust_store_flip_active(paths, "2")
 
   let source = stage_release(ctx, "trust-update-adopted-expired-c", "release-c")?
   let applied = trust_update.trust_update_from_dir(root, source)?
@@ -927,7 +927,7 @@ test trust_update_refuses_torn_journal_write_without_mutation [fs, process, time
   let before = snapshot_store_state(paths)?
   assert before.journal_present.require(Bool)? == false
   let torn = bytes.from_text("{\"format\": \"laputa-trust-journal-1\", \"phase\": \"commit")
-  paths.journal.write(torn)?
+  paths.journal.write(torn)
 
   let source = stage_release(ctx, "trust-update-torn-journal-c", "release-c")?
   match trust_update.trust_update_from_dir(root, source) {
@@ -945,7 +945,7 @@ test trust_update_rejects_legacy_wall_clock_floor [fs, process, time, error] { |
   let root = stage_system(ctx, "trust-update-legacy-floor", "signing-key")?
   let _ = trust_store.trust_store_bootstrap_from_seeds(root)?
   let paths = trust_store.trust_store_paths(root)
-  paths.lower_bound.write(bytes.from_text("1234567890\n"))?
+  paths.lower_bound.write(bytes.from_text("1234567890\n"))
   let source = stage_release(ctx, "trust-update-legacy-floor-source", "release-b")?
   match trust_update.trust_update_from_dir(root, source) {
     Ok(_) => test.fail("legacy wall-clock floor was accepted"),
@@ -969,9 +969,9 @@ test trust_update_recovery_persists_signed_time_for_expired_active_release [fs, 
     metadata,
     fixture("release-expired/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
-  trust_store.trust_store_flip_active(paths, "2")?
-  trust_store.trust_store_write_journal(paths, "activated", "2", "", staged.token)?
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")
+  trust_store.trust_store_flip_active(paths, "2")
+  trust_store.trust_store_write_journal(paths, "activated", "2", "", staged.token)
   let source = stage_release(ctx, "trust-update-signed-recovery-source", "release-expired")?
   match trust_update.trust_update_from_dir(root, source) {
     Ok(_) => test.fail("expired active release was reauthorized"),
@@ -1003,8 +1003,8 @@ test trust_update_rejects_future_issued_staged_adoption [fs, process, time, erro
     fixture("release-future/metadata").read_bytes()?,
     fixture("release-future/metadata.sig").read_bytes()?,
   )?
-  trust_store.trust_store_write_journal(paths, "staged", "2", staged.path, staged.token)?
-  trust_store.trust_store_commit_generation(paths, staged.path, "2")?
+  trust_store.trust_store_write_journal(paths, "staged", "2", staged.path, staged.token)
+  trust_store.trust_store_commit_generation(paths, staged.path, "2")
   let source = stage_release(ctx, "trust-update-future-adoption-source", "release-b")?
   match trust_update.trust_update_from_dir(root, source) {
     Ok(_) => test.fail("future-issued staged release was activated"),

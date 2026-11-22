@@ -23,30 +23,30 @@ proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
   assert receipt.profile.name == "qemu-self-hosting"
   assert "LAPUTA_SELF_HOSTING=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   let output = p"/run/self-hosting-output"
-  output.mkdir()?
-  linux.mount(b"/dev/vdc", output, fstype: "ext4", options: ["nosuid", "nodev"])?
-  linux.mount(b"scratch", fp"{root}/scratch", fstype: "tmpfs", options: ["mode=1777", "size=1G", "nosuid", "nodev"])?
-  linux.mount(b"proc", fp"{root}/proc", fstype: "proc", options: ["nosuid", "noexec", "nodev"])?
-  linux.mount(b"dev", fp"{root}/dev", fstype: "devtmpfs", options: ["nosuid"])?
+  output.mkdir()
+  linux.mount(b"/dev/vdc", output, fstype: "ext4", options: ["nosuid", "nodev"])
+  linux.mount(b"scratch", fp"{root}/scratch", fstype: "tmpfs", options: ["mode=1777", "size=1G", "nosuid", "nodev"])
+  linux.mount(b"proc", fp"{root}/proc", fstype: "proc", options: ["nosuid", "noexec", "nodev"])
+  linux.mount(b"dev", fp"{root}/dev", fstype: "devtmpfs", options: ["nosuid"])
   let runners = p"/run/self-hosting-runners"
-  runners.mkdir()?
-  p"/run/self-hosting-sentinel".write("guest boundary sentinel\n")?
+  runners.mkdir()
+  p"/run/self-hosting-sentinel".write("guest boundary sentinel\n")
   for name in ["xsh", "xsht"] {
-    fs.install(fp"{output}/target/x86_64-unknown-linux-musl/verification/{name}", fp"{runners}/{name}", 0o755)?
+    fs.install(fp"{output}/target/x86_64-unknown-linux-musl/verification/{name}", fp"{runners}/{name}", 0o755)
   }
   for pass in ["baseline", "replacement"] {
     let store = fp"{output}/{pass}"
-    store.mkdir()?
-    fs.set_owner(store, uid: 65534, gid: 65534)?
+    store.mkdir()
+    fs.set_owner(store, uid: 65534, gid: 65534)
     if pass == "replacement" {
       for name in ["xsh", "xsht"] {
-        linux.mount(bytes.from_text(fp"{runners}/{name}".display()), fp"{root}/bin/{name}", options: ["bind"])?
+        linux.mount(bytes.from_text(fp"{runners}/{name}".display()), fp"{root}/bin/{name}", options: ["bind"])
       }
     }
-    linux.mount(bytes.from_text(store.display()), fp"{root}/output", options: ["bind"])?
-    run_closed(root, "/inputs/laputa/guest/self-hosting-cohort.xsh", [if pass == "baseline" { "/checkout-one" } else { "/checkout-two" }])?
+    linux.mount(bytes.from_text(store.display()), fp"{root}/output", options: ["bind"])
+    run_closed(root, "/inputs/laputa/guest/self-hosting-cohort.xsh", [if pass == "baseline" { "/checkout-one" } else { "/checkout-two" }])
     assert p"/run/self-hosting-sentinel".read_text()? == "guest boundary sentinel\n"
-    linux.umount(fp"{root}/output")?
+    linux.umount(fp"{root}/output")
   }
   for name in ["cohort-c", "cohort-rust", "cohort-xsh"] {
     var first: Record = {}
@@ -72,8 +72,8 @@ proc main(root: Path) [fs, process, env, time, error] -> Result[Unit, Error] {
     assert first_payload.read_bytes()? == second_payload.read_bytes()?
     print "LAP29_COHORT_MATCH" $name
   }
-  fs.sync()?
+  fs.sync()
   print "LAPUTA_SELF_HOSTING_QUALIFIED"
 }
 
-main(@args)?
+main(@args)

@@ -24,6 +24,6 @@ export let filetree = [{path: p"usr/bin/cohort-c", kind: "binary"}]
 export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
   run /seed/probe
   let source = env("XSH_PM_SOURCE_DIR")?
-  fp"{dest}/usr/bin".mkdir()?
+  fp"{dest}/usr/bin".mkdir()
   run /usr/bin/clang "-fuse-ld=/bin/mold" "-static" "-nostdlib" "/usr/lib/crt1.o" "/usr/lib/crti.o" fp"{source}/hello.c" "/usr/lib/libc.a" "/usr/lib/crtn.o" "-o" fp"{dest}/usr/bin/cohort-c"
 }

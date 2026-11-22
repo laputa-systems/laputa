@@ -19,4 +19,4 @@ proc main(root: Path) [fs, process, env, error] -> Result[Unit, Error] {
   print "LAPUTA_SELF_HOSTING_REPLAYED"
 }
 
-main(@args)?
+main(@args)

@@ -413,13 +413,13 @@ export proc tar_source_strip_components(source_path: Path) [fs, error] -> Result
 
 proc stage_cargo_git_workspace(line: types.SourceLine, checksum: Str, source_path: Path, dest: Path) {
   let pinned = cargo_git_workspace(fp"{line.source} => {line.dest}", checksum)?
-  dest.remove()?
-  dest.parent.mkdir(parents: true)?
+  dest.remove()
+  dest.parent.mkdir(parents: true)
   archive.extract(source_path, dest, .Tar, strip_components: tar_source_strip_components(source_path)?, collision: .Replace)
 
   for entry in fs.walk(dest, gitignore: false)? {
     if entry.kind == "file" and entry.name == "Cargo.toml" and entry.path != fp"{dest}/Cargo.toml" {
-      json.write(fp"{entry.path.parent}/.cargo-checksum.json", {files: {}, package: null})?
+      json.write(fp"{entry.path.parent}/.cargo-checksum.json", {files: {}, package: null})
     }
   }
 
@@ -435,7 +435,7 @@ replace-with = {replacement}
 
 [source.{replacement}]
 directory = {directory}
-""")?
+""")
 }
 
 proc stage_resolved_source(
@@ -469,12 +469,12 @@ proc stage_resolved_source(
         let output = fp"{dest}/{relative}"
         let metadata = input.metadata()?
         match metadata.kind {
-          "dir" => { output.mkdir(parents: true)? },
-          "file" => { fs.install(input, output, util.checkout_mode("file", metadata.mode), parents: true, overwrite: true)? },
+          "dir" => { output.mkdir(parents: true) },
+          "file" => { fs.install(input, output, util.checkout_mode("file", metadata.mode), parents: true, overwrite: true) },
           "symlink" => {
-            output.parent.mkdir(parents: true)?
-            output.remove()?
-            output.symlink(to: input.readlink()?)?
+            output.parent.mkdir(parents: true)
+            output.remove()
+            output.symlink(to: input.readlink()?)
           },
           else => { return Err(types.PmError.PackageContract(f"unsupported repository source entry {input}")) },
         }

@@ -379,7 +379,7 @@ proc writer_record(store: timers.TimerWriterStore, handle: ProcessHandle, name: 
     start_time_ms: timers.timer_process_start_ms(handle.pid)?,
     started_wall_ms: 0,
   )
-  timers.timer_writer_save(store, record)?
+  timers.timer_writer_save(store, record)
   Ok(record)
 }
 
@@ -390,15 +390,15 @@ test test_restarted_supervisor_proves_an_orphaned_writer_group_stopped [fs, proc
   let handle = writer_spawn(root, "sleep 300 & echo $! > child.pid; wait")?
   let record = writer_record(store, handle, "backup")?
   var waited = 0
-  while ! fp"{root}/child.pid".exists()? and waited < 5000 {
-    time.sleep(50ms)?
+  while ! fp"{root}/child.pid".exists() and waited < 5000 {
+    time.sleep(50ms)
     waited += 50
   }
   assert fp"{root}/child.pid".exists()?
   assert timers.timer_writer_names(store)? == ["backup"]
 
   # The job leader dies first and leaves the snapshot writer behind in its group.
-  process.kill(handle.pid, "KILL")?
+  process.kill(handle.pid, "KILL")
   let _ = process.wait_timeout([handle], 5s)?
   assert writer_group_live(record.pid)?
 
@@ -424,7 +424,7 @@ test test_recycled_or_foreign_boot_records_never_signal_a_live_group [fs, proces
     start_time_ms: live.start_time_ms + 1000,
     started_wall_ms: 0,
   )
-  timers.timer_writer_save(store, recycled)?
+  timers.timer_writer_save(store, recycled)
   assert timers.timer_writer_settle(store, "backup")? == "settled"
   assert writer_group_live(live.pid)?
 
@@ -436,11 +436,11 @@ test test_recycled_or_foreign_boot_records_never_signal_a_live_group [fs, proces
     start_time_ms: live.start_time_ms,
     started_wall_ms: 0,
   )
-  timers.timer_writer_save(store, other_boot)?
+  timers.timer_writer_save(store, other_boot)
   assert timers.timer_writer_settle(store, "backup")? == "settled"
   assert writer_group_live(live.pid)?
 
-  timers.timer_writer_save(store, live)?
+  timers.timer_writer_save(store, live)
   assert timers.timer_writer_settle(store, "backup")? == "settled"
   let _ = process.wait_timeout([bystander], 5s)?
   assert ! writer_group_live(live.pid)?
@@ -502,7 +502,7 @@ proc release_rig(ctx: TestContext, name: Str, jobs: List[Str]) [fs, process, env
 
 proc release_calls(rig: ReleaseRig) [fs, error] -> Result[List[Str], Error] {
   let calls = fp"{rig.root}/calls.log"
-  if ! calls.exists()? {
+  if ! calls.exists() {
     return Ok([])
   }
   Ok(calls.read_text()?.lines() |> where .trim() != "" |> collect)
@@ -561,7 +561,7 @@ test test_a_running_attempts_quiescence_is_left_alone [fs, process, time, io, en
   let _ = timers.timer_quiesce_reconcile(rig.store, rig.command, live, {}, at(1000, BASE))?
   assert release_calls(rig)? == ["other"]
   assert timers.timer_quiesce_names(rig.store)? == ["backup"]
-  process.kill(handle.pid, "KILL")?
+  process.kill(handle.pid, "KILL")
   let _ = process.wait_timeout([handle], 5s)?
 }
 
@@ -602,12 +602,12 @@ test test_a_snapshot_tool_in_its_own_group_is_still_the_attempts_writer [fs, pro
   let record = writer_record(store, handle, "backup")?
   var waited = 0
   while writer_foreign_groups(record.pid)? == 0 and waited < 10000 {
-    time.sleep(50ms)?
+    time.sleep(50ms)
     waited += 50
   }
   assert writer_foreign_groups(record.pid)? == 1
 
-  process.kill(handle.pid, "KILL")?
+  process.kill(handle.pid, "KILL")
   let _ = process.wait_timeout([handle], 5s)?
   assert writer_group_live(record.pid)?
   assert timers.timer_writer_settle(store, "backup")? == "settled"

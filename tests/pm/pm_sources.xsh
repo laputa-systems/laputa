@@ -75,11 +75,11 @@ proc expect_stage_error(pkg: types.Package, src: Path, expected: List[Str]) {
 test test_repository_staging_excludes_build_and_harness_outputs [fs, net, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "repository-staging-scratch")?
   let source = fp"{root}/tool"
-  fp"{source}/src".mkdir(parents: true)?
-  fp"{source}/src/main.rs".write("fn main() {}\n")?
-  fp"{source}/.work/tmp".mkdir(parents: true)?
-  fp"{source}/target/debug".mkdir(parents: true)?
-  fp"{source}/target/debug/tool".write("stale executable\n")?
+  fp"{source}/src".mkdir(parents: true)
+  fp"{source}/src/main.rs".write("fn main() {}\n")
+  fp"{source}/.work/tmp".mkdir(parents: true)
+  fp"{source}/target/debug".mkdir(parents: true)
+  fp"{source}/target/debug/tool".write("stale executable\n")
   let python = match process.which("python3") {
     Ok(found) => found,
     Err(_) => {
@@ -599,7 +599,7 @@ test test_git_workspace_source_preserves_the_locked_git_identity_offline [fs, ne
   let git_source = f"git+https://github.com/example/fork?rev={revision}#{revision}"
   let tree = test.temp_dir(ctx, name: "git-workspace-tree")?
   let checkout = fp"{tree}/fork-{revision}"
-  fp"{checkout}/forked/src".mkdir(parents: true)?
+  fp"{checkout}/forked/src".mkdir(parents: true)
   fp"{checkout}/Cargo.toml".write("[workspace]\nmembers = [\"forked\"]\n")
   fp"{checkout}/forked/Cargo.toml".write("[package]\nname = \"forked\"\nversion = \"0.1.0\"\nedition = \"2021\"\n")
   fp"{checkout}/forked/src/lib.rs".write("pub fn answer() -> u32 { 42 }\n")
@@ -649,7 +649,7 @@ forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
 """)
   fp"{src}/src".mkdir()
   fp"{src}/src/lib.rs".write("pub fn answer() -> u32 { forked::answer() }\n")
-  lockfile.copy(to: fp"{src}/Cargo.lock")?
+  lockfile.copy(to: fp"{src}/Cargo.lock")
   let cargo = match process.which("cargo") {
     Ok(found) => found,
     Err(_) => {
@@ -691,9 +691,9 @@ test test_source_downloads_name_their_client_to_hosts_that_require_one [fs, net,
     let _ = process.wait_any([server])
   }
   var tries = 0
-  while ! port_file.exists()? or port_file.read_text()?.trim() == "" {
+  while ! port_file.exists() or port_file.read_text()?.trim() == "" {
     assert tries < 100, "fixture HTTP server did not start"
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
   let port = port_file.read_text()?.trim()

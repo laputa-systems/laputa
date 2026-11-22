@@ -187,11 +187,11 @@ cli main diff(scenario: Str = "all", inventory: Path = p".work/fixtures/inventor
   let container = fixture_container(inventory, host)?
   var agreed = true
   for item in chosen {
-    if ! compare_scenario(item, inventory, host, work, target, address, container)? {
+    if ! compare_scenario(item, inventory, host, work, target, address, container) {
       agreed = false
     }
 
-    if item.name == "failures" and ! compare_unreachable(inventory, host, work, target, address)? {
+    if item.name == "failures" and ! compare_unreachable(inventory, host, work, target, address) {
       agreed = false
     }
   }

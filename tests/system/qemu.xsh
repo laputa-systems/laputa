@@ -175,7 +175,7 @@ pure qualification_input(root: Path) -> qemu.QemuAsterinasReference {
 test test_qemu_qualification_accepts_a_guest_that_powers_off_after_completion [fs, process, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-qualification-poweroff")?
   let config = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'LAPUTA_ASTERINAS_TEST_OK\\n'\nexit 0\n")?
-  qemu.qemu_run_asterinas_reference(config, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2)?
+  qemu.qemu_run_asterinas_reference(config, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2)
 }
 
 test test_qemu_qualification_rejects_a_guest_that_stays_up_after_completion [fs, process, time, error] { |ctx|
@@ -204,7 +204,7 @@ test test_qemu_qualification_rejects_a_guest_that_exits_with_failure_after_compl
 test test_qemu_qualification_keeps_native_and_laputa_completion_separate [fs, process, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-native-proof")?
   let native = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'XSH_NATIVE_RESULT pass\\n'\nexit 0\n")?
-  qemu.qemu_run_asterinas_reference(native, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2, proof: qemu.NativeXsh)?
+  qemu.qemu_run_asterinas_reference(native, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2, proof: qemu.NativeXsh)
   match qemu.qemu_run_asterinas_reference(native, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
     Ok(_) => fail "accepted native test completion as the maintained Laputa proof"
     Err(problem) => assert "before its completion marker" in problem.message
@@ -430,7 +430,7 @@ test test_qemu_supervisor_retries_safe_qmp_operations_and_injects_once [fs, proc
   let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/reject-ready".write("")
   fp"{fixture.outputs.root}/reject-screenshot".write("")
-  qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)?
+  qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)
   assert fp"{fixture.outputs.root}/connections".read_lines()?.len() == 5
   let events = fp"{fixture.outputs.root}/native-events".read_lines()?
   assert events.len() == 18

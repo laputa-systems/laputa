@@ -67,7 +67,7 @@ test test_pyramid_pm_selected_fresh_build_and_reuse [fs, net, process, env, time
   var reused: List[Str] = []
   var fresh: List[Str] = []
   for node in value.nodes {
-    if store.artifact_path(object_store, node.artifact_key).exists()? {
+    if store.artifact_path(object_store, node.artifact_key).exists() {
       reused += [node.name]
     } else {
       fresh += [node.name]

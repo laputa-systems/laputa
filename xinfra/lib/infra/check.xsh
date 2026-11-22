@@ -134,6 +134,6 @@ export pure id_number_ok(what: Str, value: Int) -> Result[Unit, Error] {
 ## Accept the identifier list of dependencies.
 export pure needs_ok(needs: List[Str]) -> Result[Unit, Error] {
   for id in needs {
-    identifier_ok(id)?
+    identifier_ok(id)
   }
 }

@@ -86,8 +86,8 @@ proc mount_backup() {
   p"/mnt".mkdir()
   backup_mount.mkdir()
   linux.mount(backup_dev, backup_mount, fstype: "ext4", options: ["nosuid", "nodev"])
-  guard fp"{backup_mount}/tools/rustic".exists()? else { fail "backup disk has no rustic tool" }
-  guard fp"{backup_mount}/tools/restic".exists()? else { fail "backup disk has no restic tool" }
+  guard fp"{backup_mount}/tools/rustic".exists() else { fail "backup disk has no rustic tool" }
+  guard fp"{backup_mount}/tools/restic".exists() else { fail "backup disk has no restic tool" }
 }
 
 proc backup_sources() -> List[Str] {
@@ -96,7 +96,7 @@ proc backup_sources() -> List[Str] {
 
 proc password(name: Str) -> Result[Path] {
   let file = fp"{backup_mount}/keys/{name}"
-  guard file.exists()? else { fail f"drill password {name} is missing" }
+  guard file.exists() else { fail f"drill password {name} is missing" }
   file
 }
 
@@ -144,9 +144,9 @@ proc hash_manifest(files: List[Path]) -> Result[Str] {
 }
 
 proc steady_state() {
-  wait until p"/run/xinit/oxish.json".exists()? within 30s every 100ms
+  wait until p"/run/xinit/oxish.json".exists() within 30s every 100ms
   wait until json.get(json.read(p"/run/xinit/oxish.json")?, ["state"], "").require(Str)? == "running" within 30s every 100ms
-  wait until p"/run/dhcpc/eth0.status".exists()? within 30s every 100ms
+  wait until p"/run/dhcpc/eth0.status".exists() within 30s every 100ms
   var leased = ""
   var waited = 0
   while waited < 60 {
@@ -154,7 +154,7 @@ proc steady_state() {
     if leased == "bound" {
       break
     }
-    time.sleep(1s)?
+    time.sleep(1s)
     waited += 1
   }
   guard leased == "bound" else { fail "dhcp lease never bound before backup" }
@@ -168,7 +168,7 @@ proc phase_backup() {
   let pw1 = password("password1")?
   let pw2 = password("password2")?
   let repo = fp"{backup_mount}/repo"
-  guard ! repo.exists()? else { fail "backup repo already exists" }
+  guard ! repo.exists() else { fail "backup repo already exists" }
   let _ = rustic(["init"], pw1)?
   let keys = fs.files(fp"{repo}/keys", hidden: true)? |> collect
   guard keys.len() == 1 else { fail "expected exactly one initial repository key" }
@@ -198,9 +198,9 @@ proc phase_backup() {
     ),
   )?
   guard ! denied.ok else { fail "removed first key still opens the repo" }
-  pw1.remove()?
-  guard ! pw1.exists()? else { fail "first password survived loss" }
-  linux.umount(backup_mount)?
+  pw1.remove()
+  guard ! pw1.exists() else { fail "first password survived loss" }
+  linux.umount(backup_mount)
   console(f"RESTORE_BACKUP_OK snapshot={ids[0]}")
 }
 
@@ -208,7 +208,7 @@ proc phase_restore() {
   mount_backup()
   blank_mount.mkdir()
   linux.mount(blank_dev, blank_mount, fstype: "ext4", options: ["nosuid", "nodev"])
-  guard ! fp"{backup_mount}/keys/password1".exists()? else { fail "first password survived loss" }
+  guard ! fp"{backup_mount}/keys/password1".exists() else { fail "first password survived loss" }
   let pw2 = password("password2")?
   let snap1 = fp"{backup_mount}/snap1.id".read_text()?.trim()
   guard snap1 != "" else { fail "snap1.id is missing" }
@@ -220,7 +220,7 @@ proc phase_restore() {
     let fields = entry.split("  ")
     guard fields.len() == 2 else { fail f"unparseable manifest line: {entry}" }
     let restored = fp"{blank_mount}{fields[1]}"
-    guard restored.exists()? else { fail f"restore is missing {fields[1]}" }
+    guard restored.exists() else { fail f"restore is missing {fields[1]}" }
     guard hash.sha256(restored)?.hex() == fields[0] else {
       fail f"restored {fields[1]} does not match the pre-loss hash"
     }
@@ -236,8 +236,8 @@ proc phase_restore() {
   ## The state-format marker lives beside the backed-up trees, not inside
   ## them; lay it down as part of reinstalling the base.
   fp"{blank_mount}/format".write("laputa-maintained-state-1\n")
-  linux.umount(blank_mount)?
-  linux.umount(backup_mount)?
+  linux.umount(blank_mount)
+  linux.umount(backup_mount)
   console("RESTORE_RESTORE_OK identity files match the pre-loss hashes")
 }
 
@@ -277,7 +277,7 @@ proc diff_paths(text: Str) -> Result[List[Str]] {
 
 proc phase_verify() {
   mount_backup()
-  guard ! fp"{backup_mount}/keys/password1".exists()? else { fail "first password survived loss" }
+  guard ! fp"{backup_mount}/keys/password1".exists() else { fail "first password survived loss" }
   let pw2 = password("password2")?
   let snap1 = fp"{backup_mount}/snap1.id".read_text()?.trim()
   let _ = rustic(["check"], pw2)?
@@ -326,7 +326,7 @@ proc phase_verify() {
   guard snap1 in listed2 else { fail "second key cannot list the repo snapshots" }
   console("RESTORE_SECOND_KEY_OK second key opens the repo")
   let masterkey = fp"{backup_mount}/keys/masterkey.export"
-  guard masterkey.exists()? else { fail "exported masterkey is missing" }
+  guard masterkey.exists() else { fail "exported masterkey is missing" }
   let master_env = {
     RUSTIC_REPOSITORY: fp"{backup_mount}/repo".display(),
     RUSTIC_KEY_FILE: masterkey.display(),
@@ -341,7 +341,7 @@ proc phase_verify() {
   guard master.ok else { fail "exported masterkey cannot open the repo" }
   guard snap1 in fp"{backup_mount}/tool.out".read_text()? else { fail "masterkey cannot list the original snapshot" }
   console("RESTORE_MASTERKEY_OK exported masterkey opens the repo")
-  linux.umount(backup_mount)?
+  linux.umount(backup_mount)
   console("RESTORE_VERIFY_OK")
 }
 
@@ -349,17 +349,17 @@ proc dispatch() {
   let cmdline = p"/proc/cmdline".read_text()?
   if "LAPUTA_RESTORE_BACKUP=1" in cmdline {
     console("RESTORE_DRILL_START phase=backup")
-    phase_backup()?
+    phase_backup()
     return
   }
   if "LAPUTA_RESTORE_RESTORE=1" in cmdline {
     console("RESTORE_DRILL_START phase=restore")
-    phase_restore()?
+    phase_restore()
     return
   }
   if "LAPUTA_RESTORE_VERIFY=1" in cmdline {
     console("RESTORE_DRILL_START phase=verify")
-    phase_verify()?
+    phase_verify()
     return
   }
   return

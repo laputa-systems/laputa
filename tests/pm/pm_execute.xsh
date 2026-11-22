@@ -60,12 +60,12 @@ proc configured_executor_binary(name: Str) [fs, process, env, error] -> Result[P
   let runner = if configured != "" {
     let selected = fp"{configured}"
 
-    if ! selected.exists()? {
+    if ! selected.exists() {
       return Err(types.PmError.PackageContract(f"configured XSH runner {selected} is missing"))
     }
 
     selected
-  } else if p"/bin/xsh".exists()? {
+  } else if p"/bin/xsh".exists() {
     p"/bin/xsh"
   } else {
     process.which("xsh")?
@@ -474,7 +474,7 @@ test test_execute_counts_build_hooks_and_reused_artifacts [fs, net, process, env
   for name in names {
     let recipe = fp"{repo_root}/packages/{name}/PKGBUILD.xsh"
     let source = recipe.read_text()?
-    recipe.write(source.replace("  let target =", with: f"  print \"build-hook:{name}\"\n  let target ="))?
+    recipe.write(source.replace("  let target =", with: f"  print \"build-hook:{name}\"\n  let target ="))
   }
 
   let initial = resolve_execute_plan(repo_root)?
@@ -494,7 +494,7 @@ test test_execute_counts_build_hooks_and_reused_artifacts [fs, net, process, env
   }
 
   let app_recipe = fp"{repo_root}/packages/execute-app/PKGBUILD.xsh"
-  app_recipe.write(app_recipe.read_text()?.replace("application v1\\n", with: "application v2\\n"))?
+  app_recipe.write(app_recipe.read_text()?.replace("application v1\\n", with: "application v2\\n"))
   let app_plan = resolve_execute_plan(repo_root)?
   let app_logs = test.temp_dir(ctx, name: "execute-count-app")?
   let app_rebuilt = execute.build_plan(app_plan, repo_root, object_store, "", 2, app_logs)?
@@ -510,7 +510,7 @@ test test_execute_counts_build_hooks_and_reused_artifacts [fs, net, process, env
   assert old_app.payload_sha256 != new_app.payload_sha256
 
   let recipe = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"
-  recipe.write(recipe.read_text()?.replace("dependency\\n", with: "dependency revision two\\n"))?
+  recipe.write(recipe.read_text()?.replace("dependency\\n", with: "dependency revision two\\n"))
   let changed = resolve_execute_plan(repo_root)?
   let changed_logs = test.temp_dir(ctx, name: "execute-count-changed")?
   let rebuilt = execute.build_plan(changed, repo_root, object_store, "", 2, changed_logs)?
@@ -672,8 +672,8 @@ test test_execute_recomposes_generation_through_failed_publication_and_gc [fs, n
   let old_remote_tar_sha256 = hash.sha256(old_remote_tar)?.hex()
 
   let interrupted_source = test.temp_path(ctx, name: "execute-generation-lifecycle-interrupted-source")
-  interrupted_source.write("")?
-  interrupted_source.truncate(8192)?
+  interrupted_source.write("")
+  interrupted_source.truncate(8192)
   let marker_before_limit = bytes.from_text("before-file-limit")
   let marker_after_limit = bytes.from_text("after-file-limit")
   assert bytes.write_at(interrupted_source, 4070, marker_before_limit)? == marker_before_limit.len()
@@ -832,7 +832,7 @@ main(@args)?
   let runner = configured_executor_binary("xsh")?
   let first_retry = spawn run $runner $retry_script ${retry_plan_path} ${object_store} $remote_url ${retry_work_a} ${retry_release} ${retry_ready_a} ?
   let second_retry = spawn run $runner $retry_script ${retry_plan_path} ${object_store} $remote_url ${retry_work_b} ${retry_release} ${retry_ready_b} ?
-  wait until retry_ready_a.exists()? and retry_ready_b.exists()? within 10s every 10ms
+  wait until retry_ready_a.exists() and retry_ready_b.exists() within 10s every 10ms
   retry_release.write("start")
   let retry_statuses = wait [first_retry, second_retry]?
   assert retry_statuses[0].ok

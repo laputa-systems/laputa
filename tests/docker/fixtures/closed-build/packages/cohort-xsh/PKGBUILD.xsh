@@ -22,6 +22,6 @@ export let filetree = [{path: p"usr/share/cohort-xsh", kind: "file"}]
 
 ## Build the declared XSH payload.
 export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
-  fp"{dest}/usr/share".mkdir()?
-  fp"{dest}/usr/share/cohort-xsh".write("declared XSH payload\n")?
+  fp"{dest}/usr/share".mkdir()
+  fp"{dest}/usr/share/cohort-xsh".write("declared XSH payload\n")
 }

@@ -30,7 +30,7 @@ proc stage_layout(root: Path) [fs, error] {
 
 proc prove_ok(ctx: TestContext, name: Str) [fs, process, env, error] {
   let root = test.temp_dir(ctx, name: name)?
-  stage_layout(root)?
+  stage_layout(root)
   let xsh = runner()?
   let command = process.command_argv(xsh, [xsh, p"packages/ca-certificates/proof.xsh", "--", root])
   assert process.run(command)?.ok
@@ -43,7 +43,7 @@ proc prove_ok(ctx: TestContext, name: Str) [fs, process, env, error] {
 
 proc prove_fails(ctx: TestContext, name: Str, mutate: Path, body: Str, fragment: Str) [fs, process, env, error] {
   let root = test.temp_dir(ctx, name: name)?
-  stage_layout(root)?
+  stage_layout(root)
   let stderr = fp"{root}/proof.stderr"
   let xsh = runner()?
   fp"{root}/{mutate}".write(bytes.from_text(body))
@@ -53,7 +53,7 @@ proc prove_fails(ctx: TestContext, name: Str, mutate: Path, body: Str, fragment:
 }
 
 test ca_certificate_proof_checks_pinned_roots_and_managed_store [fs, process, env, error] { |ctx|
-  prove_ok(ctx, "certificate proof")?
+  prove_ok(ctx, "certificate proof")
 }
 
 test ca_certificate_proof_pins_each_seed_blocked_spki [fs, process, env, error] { |ctx|
@@ -78,7 +78,7 @@ test ca_certificate_proof_rejects_tampered_bundle [fs, process, env, error] { |c
     p"usr/share/laputa/trust/seed/ca-certificates.crt",
     "-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n",
     "expected 118 certificates",
-  )?
+  )
 }
 
 test ca_certificate_proof_rejects_retained_emsign_root [fs, process, env, error] { |ctx|
@@ -88,13 +88,13 @@ test ca_certificate_proof_rejects_retained_emsign_root [fs, process, env, error]
     p"usr/share/laputa/trust/seed/ca-certificates.crt",
     p"packages/ca-certificates/files/cacert.pem".read_text()? + "MIICTjCCAdOgAgIKPPYHqWhwDtqLhDAKB",
     "bundle retains the removed emSign G3 root",
-  )?
+  )
 }
 
 test ca_certificate_proof_rejects_malformed_bundle [fs, process, env, error] { |ctx|
   var malformed_bundle = ""
   for _ in range(118) { malformed_bundle += "-----BEGIN CERTIFICATE-----\nAQ==\n-----END CERTIFICATE-----\n" }
-  prove_fails(ctx, "certificate malformed bundle", p"usr/share/laputa/trust/seed/ca-certificates.crt", malformed_bundle, "certificate")?
+  prove_fails(ctx, "certificate malformed bundle", p"usr/share/laputa/trust/seed/ca-certificates.crt", malformed_bundle, "certificate")
 }
 
 test ca_certificate_proof_rejects_malformed_policy [fs, process, env, error] { |ctx|
@@ -104,7 +104,7 @@ test ca_certificate_proof_rejects_malformed_policy [fs, process, env, error] { |
     p"usr/share/laputa/trust/seed/trust-policy",
     "laputa-trust-policy-v1\ngeneration 1\nblocked-spki-sha256 NOT-A-DIGEST\n",
     "policy contains an unknown or malformed field",
-  )?
+  )
 }
 
 test ca_certificate_proof_rejects_missing_blocked_spki [fs, process, env, error] { |ctx|
@@ -117,16 +117,16 @@ test ca_certificate_proof_rejects_missing_blocked_spki [fs, process, env, error]
       with: "",
     ),
     "trust policy is missing blocked SPKI",
-  )?
+  )
 }
 
 test ca_certificate_proof_rejects_bad_key [fs, process, env, error] { |ctx|
-  prove_fails(ctx, "certificate bad key", p"etc/laputa/trust-update-key", "short", "exactly 32 raw Ed25519 bytes")?
+  prove_fails(ctx, "certificate bad key", p"etc/laputa/trust-update-key", "short", "exactly 32 raw Ed25519 bytes")
 }
 
 test ca_certificate_proof_rejects_bad_metadata [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "certificate bad metadata")?
-  stage_layout(root)?
+  stage_layout(root)
   let stderr = fp"{root}/proof.stderr"
   let xsh = runner()?
   let metadata = fp"{root}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"

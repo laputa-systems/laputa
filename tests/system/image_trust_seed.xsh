@@ -9,7 +9,7 @@ proc seed_overlay(ctx: TestContext, name: Str) [fs, error] -> Result[Path, Error
     overlay,
     p"packages/ca-certificates/files/cacert.pem",
     p"packages/ca-certificates/files/trust-policy",
-  )?
+  )
   overlay
 }
 

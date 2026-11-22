@@ -124,7 +124,7 @@ export proc release_verify(input: SignedReleaseInput) [error] -> Result[Verified
     input.next_policy.sha256().hex() == release.trust_policy_sha256,
     "trust policy digest does not match signed metadata",
   )
-  net.validate_root_bundle(input.root_bundle)?
+  net.validate_root_bundle(input.root_bundle)
 
   {
     root_bundle: input.root_bundle,

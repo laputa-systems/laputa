@@ -5,4 +5,4 @@ proc main(root: Path) [process, error] -> Result[Unit, Error] {
   fail "selected package successor behavior failed" unless status.ok
 }
 
-main(@args)?
+main(@args)

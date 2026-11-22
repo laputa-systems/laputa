@@ -119,7 +119,7 @@ proc options(services: List[Str]) -> Result[quiesce.QuiesceOptions, Error] {
 
 proc transitions(rig: Rig) [fs, error] -> Result[List[Str], Error] {
   let log = fp"{rig.env.state_dir}/stub.log"
-  if ! log.exists()? {
+  if ! log.exists() {
     return Ok([])
   }
   Ok(log.read_text()?.lines() |> where .trim() != "" |> collect)
@@ -171,8 +171,8 @@ test test_a_service_that_was_stopped_stays_stopped [fs, process, time, io, error
   let r = rig(ctx, "quiesce-prior-down", {logger: "up", "dhcp-eth0": "down"})?
   let record = plan(r, ["logger", "dhcp-eth0"])?
   assert record.services[0].acquired and ! record.services[1].acquired
-  quiesce.quiesce_write_record(r.env, record)?
-  quiesce.quiesce_stop_service(r.env, record, "logger")?
+  quiesce.quiesce_write_record(r.env, record)
+  quiesce.quiesce_stop_service(r.env, record, "logger")
   assert transitions(r)? == ["logger down"]
   assert quiesce.quiesce_release_record(r.env, "backup", 0)?
   assert transitions(r)? == ["logger down", "logger up"]
@@ -185,8 +185,8 @@ test test_every_stop_and_release_request_carries_the_attempts_token [fs, process
   test.timeout(ctx, 60s)
   let r = rig(ctx, "quiesce-tokens", {logger: "up"})?
   let record = plan(r, ["logger"])?
-  quiesce.quiesce_write_record(r.env, record)?
-  quiesce.quiesce_stop_service(r.env, record, "logger")?
+  quiesce.quiesce_write_record(r.env, record)
+  quiesce.quiesce_stop_service(r.env, record, "logger")
   assert quiesce.quiesce_release_record(r.env, "backup", 0)?
   let requests = fp"{r.env.state_dir}/requests.log".read_text()?.lines() |> where .trim() != "" |> collect
   assert requests.len() == 2
@@ -198,8 +198,8 @@ test test_partial_quiesce_restores_only_what_was_stopped [fs, process, time, io,
   test.timeout(ctx, 60s)
   let r = rig(ctx, "quiesce-partial", {logger: "up", "dhcp-eth0": "up"})?
   let record = plan(r, ["logger", "dhcp-eth0"])?
-  quiesce.quiesce_write_record(r.env, record)?
-  quiesce.quiesce_stop_service(r.env, record, "logger")?
+  quiesce.quiesce_write_record(r.env, record)
+  quiesce.quiesce_stop_service(r.env, record, "logger")
   fp"{r.env.state_dir}/fail-stop-dhcp-eth0".write("x")
   assert quiesce.quiesce_stop_service(r.env, record, "dhcp-eth0") is Err(_)
   assert quiesce.quiesce_release_record(r.env, "backup", 0)?
@@ -213,7 +213,7 @@ test test_interruption_between_durable_steps_never_strands_or_double_starts [fs,
 
   # After the record is durable and before any stop: nothing was taken, so nothing is started.
   let early = rig(ctx, "quiesce-cut-record", {logger: "up", "dhcp-eth0": "up"})?
-  quiesce.quiesce_write_record(early.env, plan(early, ["logger", "dhcp-eth0"])?)?
+  quiesce.quiesce_write_record(early.env, plan(early, ["logger", "dhcp-eth0"])?)
   assert quiesce.quiesce_release_record(early.env, "backup", 0)?
   assert transitions(early)? == []
   assert quiesce.quiesce_read_record(early.env, "backup")? == null
@@ -221,28 +221,28 @@ test test_interruption_between_durable_steps_never_strands_or_double_starts [fs,
   # After every stop and before the release: both come back, once each.
   let late = rig(ctx, "quiesce-cut-stops", {logger: "up", "dhcp-eth0": "up"})?
   let record = plan(late, ["logger", "dhcp-eth0"])?
-  quiesce.quiesce_write_record(late.env, record)?
-  quiesce.quiesce_stop_service(late.env, record, "logger")?
-  quiesce.quiesce_stop_service(late.env, record, "dhcp-eth0")?
+  quiesce.quiesce_write_record(late.env, record)
+  quiesce.quiesce_stop_service(late.env, record, "logger")
+  quiesce.quiesce_stop_service(late.env, record, "dhcp-eth0")
   assert quiesce.quiesce_release_record(late.env, "backup", 0)?
   assert transitions(late)? == ["logger down", "dhcp-eth0 down", "logger up", "dhcp-eth0 up"]
 
   # After the first service was handed back and before the second: only the second is started.
   let middle = rig(ctx, "quiesce-cut-release", {logger: "up", "dhcp-eth0": "up"})?
   let held = plan(middle, ["logger", "dhcp-eth0"])?
-  quiesce.quiesce_write_record(middle.env, held)?
-  quiesce.quiesce_stop_service(middle.env, held, "logger")?
-  quiesce.quiesce_stop_service(middle.env, held, "dhcp-eth0")?
-  quiesce.quiesce_release_service(middle.env, held, "logger", 1500)?
+  quiesce.quiesce_write_record(middle.env, held)
+  quiesce.quiesce_stop_service(middle.env, held, "logger")
+  quiesce.quiesce_stop_service(middle.env, held, "dhcp-eth0")
+  quiesce.quiesce_release_service(middle.env, held, "logger", 1500)
   assert quiesce.quiesce_release_record(middle.env, "backup", 0)?
   assert transitions(middle)? == ["logger down", "dhcp-eth0 down", "logger up", "dhcp-eth0 up"]
 
   # After the last release and before the record was retired: a repeat costs no transition.
   let final = rig(ctx, "quiesce-cut-retire", {logger: "up"})?
   let last = plan(final, ["logger"])?
-  quiesce.quiesce_write_record(final.env, last)?
-  quiesce.quiesce_stop_service(final.env, last, "logger")?
-  quiesce.quiesce_release_service(final.env, last, "logger", 1500)?
+  quiesce.quiesce_write_record(final.env, last)
+  quiesce.quiesce_stop_service(final.env, last, "logger")
+  quiesce.quiesce_release_service(final.env, last, "logger", 1500)
   let before = transitions(final)?
   assert quiesce.quiesce_release_record(final.env, "backup", 0)?
   assert transitions(final)? == before
@@ -252,9 +252,9 @@ test test_an_operator_stop_after_acquisition_survives_recovery [fs, process, tim
   test.timeout(ctx, 60s)
   let r = rig(ctx, "quiesce-operator-stop", {logger: "up", "dhcp-eth0": "up"})?
   let record = plan(r, ["logger", "dhcp-eth0"])?
-  quiesce.quiesce_write_record(r.env, record)?
-  quiesce.quiesce_stop_service(r.env, record, "logger")?
-  quiesce.quiesce_stop_service(r.env, record, "dhcp-eth0")?
+  quiesce.quiesce_write_record(r.env, record)
+  quiesce.quiesce_stop_service(r.env, record, "logger")
+  quiesce.quiesce_stop_service(r.env, record, "dhcp-eth0")
   let operator = process.run(process.command_argv(r.env.xinit[0], r.env.xinit + ["stop", "logger"]))?
   assert operator.ok
   let release = test.run_script(ctx, """use system.backup_quiesce as quiesce
@@ -275,8 +275,8 @@ test test_an_operator_start_after_acquisition_is_not_restarted [fs, process, tim
   test.timeout(ctx, 60s)
   let r = rig(ctx, "quiesce-operator-start", {logger: "up"})?
   let record = plan(r, ["logger"])?
-  quiesce.quiesce_write_record(r.env, record)?
-  quiesce.quiesce_stop_service(r.env, record, "logger")?
+  quiesce.quiesce_write_record(r.env, record)
+  quiesce.quiesce_stop_service(r.env, record, "logger")
   assert process.run(process.command_argv(r.env.xinit[0], r.env.xinit + ["start", "logger"]))?.ok
   assert quiesce.quiesce_release_record(r.env, "backup", 0)?
   assert transitions(r)? == ["logger down", "logger up"]
@@ -286,9 +286,9 @@ test test_a_failed_release_keeps_the_record_and_a_retry_completes [fs, process, 
   test.timeout(ctx, 60s)
   let r = rig(ctx, "quiesce-release-retry", {logger: "up", "dhcp-eth0": "up"})?
   let record = plan(r, ["logger", "dhcp-eth0"])?
-  quiesce.quiesce_write_record(r.env, record)?
-  quiesce.quiesce_stop_service(r.env, record, "logger")?
-  quiesce.quiesce_stop_service(r.env, record, "dhcp-eth0")?
+  quiesce.quiesce_write_record(r.env, record)
+  quiesce.quiesce_stop_service(r.env, record, "logger")
+  quiesce.quiesce_stop_service(r.env, record, "dhcp-eth0")
   fp"{r.env.state_dir}/fail-start-logger".write("1000")
 
   assert quiesce.quiesce_release_record(r.env, "backup", 400) is Err(_)
@@ -309,8 +309,8 @@ test test_transient_start_failures_are_retried_within_one_release [fs, process, 
   test.timeout(ctx, 60s)
   let r = rig(ctx, "quiesce-release-transient", {logger: "up"})?
   let record = plan(r, ["logger"])?
-  quiesce.quiesce_write_record(r.env, record)?
-  quiesce.quiesce_stop_service(r.env, record, "logger")?
+  quiesce.quiesce_write_record(r.env, record)
+  quiesce.quiesce_stop_service(r.env, record, "logger")
   fp"{r.env.state_dir}/fail-start-logger".write("2")
   assert quiesce.quiesce_release_record(r.env, "backup", 0)?
   assert status_of(r, "logger")? == "up"
@@ -321,7 +321,7 @@ test test_recovery_waits_for_a_queued_request_before_deciding [fs, process, time
   test.timeout(ctx, 60s)
   let r = rig(ctx, "quiesce-queued", {logger: "up"})?
   let record = plan(r, ["logger"])?
-  quiesce.quiesce_write_record(r.env, record)?
+  quiesce.quiesce_write_record(r.env, record)
   fp"{r.env.state_dir}/inbox".mkdir()
   fp"{r.env.state_dir}/inbox/logger".write(f"down owner={record.token}")
   assert quiesce.quiesce_release_record(r.env, "backup", 300) is Err(_)
@@ -346,7 +346,7 @@ test test_only_a_supervised_attempt_may_quiesce [fs, process, time, io, error] {
   assert quiesce.quiesce_read_record(r.env, "backup")? == null
 
   fp"{r.env.writers}/backup.json".write(json.encode({pid: session, attempt: 1})?)
-  quiesce.quiesce_acquire(r.env, "backup", 1, opts)?
+  quiesce.quiesce_acquire(r.env, "backup", 1, opts)
   assert transitions(r)? == ["logger down"]
   let held = quiesce.quiesce_read_record(r.env, "backup")?
   assert held != null

@@ -43,7 +43,7 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
 
     tempdir tmp at fp"{root}/var/tmp/proof-play" {
       let tone = fp"{tmp}/tone.wav"
-      square_wave_wav(tone)?
+      square_wave_wav(tone)
       let played = run.text $player "--no-config" "--vo=null" "--ao=null" "--term-playing-msg=duration=\${duration}" $tone
       proof.ensure("duration=0.5\n" in played, "player-wav-playback", f"unexpected playback output:\n{played}")
     }

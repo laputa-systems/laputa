@@ -113,8 +113,8 @@ export pure missing_elf_runtime_dependencies_with_allowed(
 proc library_link_reaches_file(root: Path, link: Path) [fs, error] -> Result[Bool, Error] {
   var current = link
   for _ in range(8) {
-    return false unless current.exists()?
-    return current.is_file()? unless current.is_symlink()?
+    return false unless current.exists()
+    return current.is_file()? unless current.is_symlink()
     let target = current.readlink()?.display()
     current = if target.starts_with("/") { fp"{root}{target}" } else { fp"{current.parent}/{target}" }
   }
@@ -139,8 +139,8 @@ export proc collect_library_providers(root: Path) [fs, error] -> Result[Map[Str]
     for rel_path in manifest {
       let path_value = fp"{root}/{rel_path}"
 
-      if path_value.is_symlink()? {
-        if path_may_provide_library(rel_path) and library_link_reaches_file(root, path_value)? {
+      if path_value.is_symlink() {
+        if path_may_provide_library(rel_path) and library_link_reaches_file(root, path_value) {
           providers[path_basename_text(rel_path)] = entry.name
         }
         continue

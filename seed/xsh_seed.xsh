@@ -177,7 +177,7 @@ export proc xsh_seed_command_ok(docker: Path, argv: List[Str], cwd: Path) [fs, p
 }
 
 proc xsh_seed_run(docker: Path, argv: List[Str], cwd: Path, what: Str) {
-  return Err(SeedError.Failed(f"{what} failed")) unless xsh_seed_command_ok(docker, argv, cwd)?
+  return Err(SeedError.Failed(f"{what} failed")) unless xsh_seed_command_ok(docker, argv, cwd)
 }
 
 ## Report whether a local Docker image exists.

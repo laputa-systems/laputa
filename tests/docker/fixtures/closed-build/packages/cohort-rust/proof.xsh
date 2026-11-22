@@ -3,4 +3,4 @@ proc main(root: Path) [fs, process, error] {
   assert output.trim() == "declared Rust payload"
 }
 
-main(@args)?
+main(@args)

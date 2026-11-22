@@ -198,7 +198,7 @@ proc main() [fs, process, env, time, net, error] {
 
   let stopped = unix.kill_all("mdevd", "TERM")?
   require(stopped.matched >= 1, "coldplug", "no running mdevd to restart")
-  time.sleep(1s)?
+  time.sleep(1s)
   p"/dev/vda".remove()
   let unanswered = process.run(
     process.command_argv(

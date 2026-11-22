@@ -128,7 +128,7 @@ export proc image_exists(docker: Path, tag: Str, cwd: Path) [fs, process, error]
 }
 
 proc docker_step(docker: Path, argv: List[Str], cwd: Path, what: Str) {
-  return Err(SeedImageError.Failed(f"{what} failed")) unless xsh_seed.xsh_seed_command_ok(docker, argv, cwd)?
+  return Err(SeedImageError.Failed(f"{what} failed")) unless xsh_seed.xsh_seed_command_ok(docker, argv, cwd)
 }
 
 ## Fetch the published base by digest.

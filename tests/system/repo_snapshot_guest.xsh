@@ -27,7 +27,7 @@ proc guest_tool_or_skip(name: Str) [fs, process, error] -> Result[Path, Error] {
 }
 
 proc guest_file_or_skip(path_value: Path, label: Str) [fs, error] {
-  guard path_value.exists()? else {
+  guard path_value.exists() else {
     test.skip(f"guest proof needs {label} at {path_value.display()}")
     return
   }
@@ -35,7 +35,7 @@ proc guest_file_or_skip(path_value: Path, label: Str) [fs, error] {
 
 proc guest_kernel() [fs, error] -> Result[Path, Error] {
   for candidate in GUEST_KERNEL_CANDIDATES {
-    if fp"{candidate}".exists()? {
+    if fp"{candidate}".exists() {
       return fp"{candidate}"
     }
   }
@@ -58,7 +58,7 @@ proc guest_modules_dir() [fs, error] -> Result[Path, Error] {
   }
 
   for name in GUEST_MODULES {
-    guest_file_or_skip(fp"{found}/kernel/{guest_module_path(name)}.ko.gz", f"module {name}")?
+    guest_file_or_skip(fp"{found}/kernel/{guest_module_path(name)}.ko.gz", f"module {name}")
   }
 
   found
@@ -107,7 +107,7 @@ proc build_initramfs(root: Path, output: Path) [fs, process, error] -> Result[Un
   }
 
   let list_file = fp"{root}.list"
-  list_file.write(bytes.from_text(entries.join("\n") + "\n"))?
+  list_file.write(bytes.from_text(entries.join("\n") + "\n"))
   let command = process.command_argv(
     "cpio",
     ["cpio", "--format=newc", "--owner=0:0", "-o"],
@@ -134,7 +134,7 @@ proc build_store_disk(path_value: Path, size_mb: Int) [fs, process, error] -> Re
 proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] -> Result[Str, Error] {
   var tries = 0
   while tries < attempts {
-    if log.exists()? {
+    if log.exists() {
       let text = log.read_text()?
       if marker in text {
         return text
@@ -145,11 +145,11 @@ proc wait_for_marker(log: Path, marker: Str, attempts: Int) [fs, time, error] ->
       }
     }
 
-    time.sleep(2s)?
+    time.sleep(2s)
     tries += 1
   }
 
-  let tail = if log.exists()? { log.read_text()? } else { "<no serial log>" }
+  let tail = if log.exists() { log.read_text()? } else { "<no serial log>" }
   assert false, f"guest never printed {marker}; serial tail: {tail}"
   
 }
@@ -165,11 +165,11 @@ proc guest_alive(pid: Int) [process, error] -> Result[Bool, Error] {
 proc wait_for_exit(pid: Int, attempts: Int) [process, time, error] -> Result[Unit, Error] {
   var tries = 0
   while tries < attempts {
-    guard guest_alive(pid)? else {
+    guard guest_alive(pid) else {
       return
     }
 
-    time.sleep(2s)?
+    time.sleep(2s)
     tries += 1
   }
 
@@ -229,13 +229,13 @@ proc stage_initramfs(
   for dir in ["bin", "guest", "lib/guest", "lib/pm", "lib/modules", "etc/laputa", "store", "proc", "sys", "dev", "tmp"] {
     fp"{root}/{dir}".mkdir(parents: true)
   }
-  xsh.copy(to: fp"{root}/bin/xsh", overwrite: true)?
+  xsh.copy(to: fp"{root}/bin/xsh", overwrite: true)
   fp"{root}/bin/xsh".chmod(0o755)
-  p"guest/bootstrap.xsh".copy(to: fp"{root}/lib/guest/bootstrap.xsh", overwrite: true)?
-  p"guest/trust-guest-init.xsh".copy(to: fp"{root}/init", overwrite: true)?
+  p"guest/bootstrap.xsh".copy(to: fp"{root}/lib/guest/bootstrap.xsh", overwrite: true)
+  p"guest/trust-guest-init.xsh".copy(to: fp"{root}/init", overwrite: true)
   fp"{root}/init".chmod(0o755)
   if main_script == "" {
-    p"guest/repo-snapshot-guest.xsh".copy(to: fp"{root}/guest/main.xsh", overwrite: true)?
+    p"guest/repo-snapshot-guest.xsh".copy(to: fp"{root}/guest/main.xsh", overwrite: true)
   } else {
     fp"{root}/guest/main.xsh".write(bytes.from_text(main_script))
   }
@@ -243,12 +243,12 @@ proc stage_initramfs(
   let source = (e"LAPUTA_REPO_GUEST_MODULE_ROOT" ?? ".").trim()
   for entry in fs.children(fp"{source}/pm")? {
     if entry.name.ends_with(".xsh") {
-      entry.path.copy(to: fp"{root}/lib/pm/{entry.name}", overwrite: true)?
+      entry.path.copy(to: fp"{root}/lib/pm/{entry.name}", overwrite: true)
     }
   }
   for name in ["signing-key", "next-key"] {
     let key = fp"tests/pm/fixtures/repo-snapshot/keys/{name}.public.base64".read_text()?.trim().base64_decode()?
-    fp"{root}/guest/{name}".write(key)?
+    fp"{root}/guest/{name}".write(key)
   }
   if ! provisioned_keys.is_empty() {
     var keys = bytes.from_text("")
@@ -268,10 +268,10 @@ proc stage_initramfs(
 proc wait_for_port(port_file: Path) [fs, time, error] -> Result[Int, Error] {
   var tries = 0
   while tries < 100 {
-    if port_file.exists()? {
+    if port_file.exists() {
       return port_file.read_text()?.trim().parse_int_decimal()
     }
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
   test.fail("HTTP fixture server did not publish its port")
@@ -561,17 +561,17 @@ proc rotation_boot(
   let staging = stage_initramfs(ctx, xsh, modules_dir, root_name: f"{name}-root", main_script: script, provisioned_keys: keys)?
   let work = test.temp_dir(ctx, name: f"{name}-work")?
   let initramfs = fp"{work}/initramfs.cpio"
-  build_initramfs(staging, initramfs)?
+  build_initramfs(staging, initramfs)
   let boot = launch_guest(ctx, name, kernel, initramfs, store, url)?
   defer stop_guest(boot.pid)
   let _ = wait_for_marker(boot.log, marker, 100)?
-  wait_for_exit(boot.pid, 100)?
+  wait_for_exit(boot.pid, 100)
   let final = boot.log.read_text()?
   assert "LAPUTA_REPO_ROTATE FAIL" not in final
 }
 
 test signed_repo_key_rotation_and_recovery_survive_reboot [fs, process, env, time, error] { |ctx|
-  guest_file_or_skip(p"/dev/kvm", "KVM")?
+  guest_file_or_skip(p"/dev/kvm", "KVM")
   let kernel = guest_kernel()?
   let modules_dir = guest_modules_dir()?
   let xsh = guest_xsh()?
@@ -587,7 +587,7 @@ test signed_repo_key_rotation_and_recovery_survive_reboot [fs, process, env, tim
   defer server.cancel(signal: "TERM", kill_after: 5s)
   let url = f"http://10.0.2.2:{wait_for_port(port_file)?}"
   let store = fp"{work}/rotation-store.ext4"
-  build_store_disk(store, 64)?
+  build_store_disk(store, 64)
   let script = REPO_ROTATION_GUEST
   let phases = [
     {name: "repo-rotate-gen1", keys: ["signing-key"], marker: "PHASE0_OK generation=1"},
@@ -596,12 +596,12 @@ test signed_repo_key_rotation_and_recovery_survive_reboot [fs, process, env, tim
     {name: "repo-rotate-replay", keys: ["next-key"], marker: "ROTATE_OK generation=3 time_floor=1994999500"},
   ]
   for phase in phases {
-    rotation_boot(ctx, phase.name, kernel, xsh, modules_dir, script, phase.keys, store, url, phase.marker)?
+    rotation_boot(ctx, phase.name, kernel, xsh, modules_dir, script, phase.keys, store, url, phase.marker)
   }
 }
 
 test signed_repo_fetch_survives_reboot_and_rejects_tamper_and_rollback [fs, process, env, time, error] { |ctx|
-  guest_file_or_skip(p"/dev/kvm", "KVM")?
+  guest_file_or_skip(p"/dev/kvm", "KVM")
   let kernel = guest_kernel()?
   let modules_dir = guest_modules_dir()?
   let xsh = guest_xsh()?
@@ -618,14 +618,14 @@ test signed_repo_fetch_survives_reboot_and_rejects_tamper_and_rollback [fs, proc
   let port = wait_for_port(port_file)?
   let staging = stage_initramfs(ctx, xsh, modules_dir)?
   let initramfs = fp"{work}/initramfs.cpio"
-  build_initramfs(staging, initramfs)?
+  build_initramfs(staging, initramfs)
   let store = fp"{work}/store.ext4"
-  build_store_disk(store, 64)?
+  build_store_disk(store, 64)
   let boot = launch_guest(ctx, "repo-guest", kernel, initramfs, store, f"http://10.0.2.2:{port}")?
-  defer stop_guest(boot.pid)?
+  defer stop_guest(boot.pid)
   let text = wait_for_marker(boot.log, "ROLLBACK_REJECTED", 50)?
   assert "ACCEPT_AND_TAMPER_OK generation=2" in text
   assert "ROLLBACK_REJECTED generation=2" in text
-  wait_for_exit(boot.pid, 50)?
+  wait_for_exit(boot.pid, 50)
   assert "LAPUTA_REPO_GUEST FAIL" not in boot.log.read_text()?
 }

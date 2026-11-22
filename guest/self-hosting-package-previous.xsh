@@ -5,4 +5,4 @@ proc main(root: Path) [process, error] -> Result[Unit, Error] {
   fail "previous installed package changed" unless status.ok
 }
 
-main(@args)?
+main(@args)

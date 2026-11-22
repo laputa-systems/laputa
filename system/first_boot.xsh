@@ -614,18 +614,18 @@ export proc apply(root: Path, document: Str, crash_at: Str = "") [fs, error] -> 
   }
   let staged = fs.open_root(staging)?
   write_tree(staged, config)
-  fs.fsync(staging)?
+  fs.fsync(staging)
 
   if crash_at == "stage" {
     fail "injected first-boot crash before publication"
   }
 
   if live_present {
-    fs.rename_exchange(staging, root)?
+    fs.rename_exchange(staging, root)
   } else {
-    staging.rename(to: root)?
+    staging.rename(to: root)
   }
-  fs.fsync(root.parent)?
+  fs.fsync(root.parent)
 }
 
 ## One explicit inode owner for a maintained state image.

@@ -774,9 +774,9 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, time, err
   assert calls.read_text()? == "first\nsecond\n"
   kbuild.run_archive_plan_output(plan, second, 1)
   assert calls.read_text()? == "first\nsecond\n"
-  fs.set_times(second, mtime_sec: 4039372800)?
+  fs.set_times(second, mtime_sec: 4039372800)
   source.write("changed")
-  fs.set_times(source, mtime_sec: 4070908800)?
+  fs.set_times(source, mtime_sec: 4070908800)
   kbuild.run_archive_plan_output(plan, second, 1)
   assert first.read_text()? == "changed"
   assert second.read_text()? == "changedsecond"
@@ -894,7 +894,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
   fake.mkdir()
   fp"{fake}/xsh".write("#!/bin/sh\nprintf x >> \"$(dirname \"$0\")/calls\"\nexec /bin/cp \"$3\" \"$4\"\n", mode: 0o755)
   helper.write(p"packages/linux/efi-stubcopy.xsh".read_text()?)
-  fs.set_times(helper, mtime_sec: 1000000000)?
+  fs.set_times(helper, mtime_sec: 1000000000)
   fp"{recipe}/kbuild-archive-analysis-worker.xsh".write(p"packages/linux/kbuild-archive-analysis-worker.xsh".read_text()?)
   fp"{root}/drivers/firmware/efi/libstub".mkdir()
   fp"{root}/.config".write("CONFIG_X86=y\n")
@@ -926,7 +926,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
       let fingerprint = p".xsh-kbuild-archive-plan.fingerprint"
       let before = fingerprint.read_text()?
       helper.write(helper.read_text()? + "\n")
-      fs.set_times(helper, mtime_sec: 1000000000)?
+      fs.set_times(helper, mtime_sec: 1000000000)
       let second = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       assert second.missing_sources.is_empty()
       assert fingerprint.read_text()? != before
@@ -1394,7 +1394,7 @@ test test_kbuild_compile_flags_cache_binds_parsed_include [fs, process, env, tim
   let included = fp"{root}/flags.include"
   let replacement = fp"{root}/replacement"
   replacement.write("CFLAGS_foo.o := -DNEW\n")
-  fs.mkfifo(included, 0o600)?
+  fs.mkfifo(included, 0o600)
   let command = process.command_argv(
     p"/bin/sh",
     ["/bin/sh", "-c", "exec 3>\"$1\"; printf 'CFLAGS_foo.o := -DOLD\\n' >&3; mv \"$2\" \"$1\"; exec 3>&-", "fixture", included, replacement],
@@ -1414,7 +1414,7 @@ test test_kbuild_compile_flags_cache_binds_parsed_include [fs, process, env, tim
     assert "-DOLD" in tasks[0].argv
     assert "-DNEW" not in tasks[0].argv
     included.remove(missing_ok: false)
-    fs.mkfifo(included, 0o600)?
+    fs.mkfifo(included, 0o600)
     replacement.write("CFLAGS_foo.o := -DNEW\n")
     let second_writer = spawn command?
     defer second_writer.cancel(kill_after: 0ms)
@@ -1438,7 +1438,7 @@ test test_kbuild_archive_plan_cache_binds_parsed_compile_flags [fs, process, env
   let included = fp"{root}/flags.include"
   let replacement = fp"{root}/replacement"
   replacement.write("CFLAGS_foo.o := -DNEW\n")
-  fs.mkfifo(included, 0o600)?
+  fs.mkfifo(included, 0o600)
   let command = process.command_argv(
     p"/bin/sh",
     ["/bin/sh", "-c", "exec 3>\"$1\"; printf 'CFLAGS_foo.o := -DOLD\\n' >&3; mv \"$2\" \"$1\"; exec 3>&-", "fixture", included, replacement],
@@ -1525,7 +1525,7 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
       original_report.write(report_text)
       changed_report.write(report_text.replace("/usr/bin/false", with: "/usr/bin/cc"))
       report.remove(missing_ok: false)
-      fs.mkfifo(report, 0o600)?
+      fs.mkfifo(report, 0o600)
       let replace_report = process.command_argv(
         p"/bin/sh",
         ["/bin/sh", "-c", "exec 3>\"$1\"; cat \"$2\" >&3; mv \"$3\" \"$1\"; exec 3>&-", "fixture", report, original_report, changed_report],
@@ -1553,12 +1553,12 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
         assert repaired_summary.task_count == repaired.task_count
       }?
       let reports = [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"]
-      for report in reports { report.chmod(0o000)? }
+      for report in reports { report.chmod(0o000) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count
       }?
-      for report in reports { report.chmod(0o644)? }
+      for report in reports { report.chmod(0o644) }
       let report_texts = [report.read_text()? for report in reports]
       for report in reports { report.remove(missing_ok: false) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {

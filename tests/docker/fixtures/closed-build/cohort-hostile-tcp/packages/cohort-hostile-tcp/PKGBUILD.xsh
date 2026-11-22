@@ -36,7 +36,7 @@ match linux.connect(fd, {family: "inet", address: "127.0.0.1", port: 9}) {
 export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
   let recipe = fp"{env("XSH_PM_RECIPE_DIR")?}"
   let helper = fp"{recipe}/tcp-probe.xsh"
-  helper.write(tcp_probe())?
+  helper.write(tcp_probe())
   let out = fp"{recipe}/tcp-probe.out"
   let xsh = process.which("xsh")?
   let status = process.run(process.command_argv(xsh, [xsh, helper], recipe, {}, b"", out))?

@@ -8,7 +8,7 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
 
   let scratch = fs.tempdir()?
   let source = fp"{scratch.host_path()?}/command.xsh"
-  source.write(argv[1])?
+  source.write(argv[1])
   let status = process.run(process.command_argv(p"/bin/xsh", ["/bin/xsh", source.display()], fs.cwd()?, {}))?
 
   if ! status.ok {
@@ -20,4 +20,4 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
   }
 }
 
-main(@args)?
+main(@args)

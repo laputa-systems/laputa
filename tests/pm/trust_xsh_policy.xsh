@@ -5,14 +5,14 @@ proc fixture(name: Str) -> Path {
 proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
-    if port_file.exists()? {
+    if port_file.exists() {
       let text = port_file.read_text()?.trim()
       if text != "" {
         return text.parse_int_decimal()
       }
     }
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
 
@@ -26,7 +26,7 @@ proc serve_chain(ctx: TestContext, name: Str, python: Str, chain: Str, key: Str)
   let dir = test.temp_dir(ctx, name:)?
   let routes = fp"{dir}/routes"
   routes.mkdir()
-  fp"{routes}/hello".write(bytes.from_text("hello\n"))?
+  fp"{routes}/hello".write(bytes.from_text("hello\n"))
   let port_file = fp"{dir}/port"
   let script = fixture("tls_server.py")
   let child = spawn run $python $script $chain $key $port_file $routes ?
@@ -85,17 +85,17 @@ test xsh_enforces_intermediate_policy_across_cross_signed_chains [fs, process, e
   let python = python_or_skip()?
   let control = serve_chain(ctx, "xsh-policy-control", python, fixture("tls/chain-control.pem").display(), fixture("tls/ee-control.key").display())?
   defer stop_server(control)
-  run_client(ctx, "control", control.port, "cross-r1", "verify", "accept", true)?
+  run_client(ctx, "control", control.port, "cross-r1", "verify", "accept", true)
   let omitted = serve_chain(ctx, "xsh-policy-omitted-issuer", python, fixture("tls/ee-cross.crt").display(), fixture("tls/ee-cross.key").display())?
   defer stop_server(omitted)
-  run_client(ctx, "omitted-issuer-without-policy", omitted.port, "cross-r1", "disabled", "accept", false)?
-  run_client(ctx, "omitted-issuer-with-policy", omitted.port, "cross-r1", "disabled", "reject", true)?
-  run_client(ctx, "control-disabled", control.port, "cross-r1", "disabled", "reject", true)?
+  run_client(ctx, "omitted-issuer-without-policy", omitted.port, "cross-r1", "disabled", "accept", false)
+  run_client(ctx, "omitted-issuer-with-policy", omitted.port, "cross-r1", "disabled", "reject", true)
+  run_client(ctx, "control-disabled", control.port, "cross-r1", "disabled", "reject", true)
   for entry in [["cross-r1", "cross-r1"], ["cross-r2", "cross-r2"]] {
     let server = serve_chain(ctx, f"xsh-policy-{entry[0]}", python, fixture(f"tls/chain-{entry[0]}.pem").display(), fixture("tls/ee-cross.key").display())?
     defer stop_server(server)
-    run_client(ctx, f"{entry[0]}-baseline", server.port, entry[1], "verify", "accept", false)?
-    run_client(ctx, entry[0], server.port, entry[1], "verify", "reject", true)?
-    run_client(ctx, f"{entry[0]}-disabled", server.port, entry[1], "disabled", "reject", true)?
+    run_client(ctx, f"{entry[0]}-baseline", server.port, entry[1], "verify", "accept", false)
+    run_client(ctx, entry[0], server.port, entry[1], "verify", "reject", true)
+    run_client(ctx, f"{entry[0]}-disabled", server.port, entry[1], "disabled", "reject", true)
   }
 }

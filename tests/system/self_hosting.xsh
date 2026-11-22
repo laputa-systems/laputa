@@ -14,13 +14,13 @@ test test_self_hosting_observation_requires_the_actual_receipt_and_boot [fs, err
   let console = fp"{directory}/console.log"
   let expected = receipt()
   let valid = marker(expected.id, 7, expected.root_digest)?
-  console.write(valid)?
+  console.write(valid)
   assert boot.self_hosting_boot_report_complete(console, expected, 7)?
-  console.write(valid.replace("\n", with: "\r\n"))?
+  console.write(valid.replace("\n", with: "\r\n"))
   assert boot.self_hosting_boot_report_complete(console, expected, 7)?
-  console.write("LAPUTA_SELF_HOSTING_SUCCESSOR_BOOTED\n")?
+  console.write("LAPUTA_SELF_HOSTING_SUCCESSOR_BOOTED\n")
   assert ! boot.self_hosting_boot_report_complete(console, expected, 7)?
-  console.write("LAPUTA_SELF_HOSTING_ACTIVATION {\"boot_serial\":")?
+  console.write("LAPUTA_SELF_HOSTING_ACTIVATION {\"boot_serial\":")
   assert ! boot.self_hosting_boot_report_complete(console, expected, 7)?
   for invalid in [
     valid + valid,
@@ -30,7 +30,7 @@ test test_self_hosting_observation_requires_the_actual_receipt_and_boot [fs, err
     marker(expected.id, 7, bytes.from_text("other").sha256().hex())?,
     "LAPUTA_SELF_HOSTING_ACTIVATION {}\n",
   ] {
-    console.write(invalid)?
+    console.write(invalid)
     assert boot.self_hosting_boot_report_complete(console, expected, 7) is Err(_)
   }
 }
