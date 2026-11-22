@@ -13,14 +13,15 @@ pure unreadable(cause: fact.Cause, detail: Str) -> fact.Unreadable {
 }
 
 pure report(execution: transport.Execution) -> Result[Str, fact.Unreadable] {
-  if execution.code != 0 {
+  guard execution.code == 0 else {
     let stderr = execution.stderr.utf8() ?? "(stderr is not text)"
     return Err(unreadable(.Unavailable, f"exit {execution.code}: {stderr.trim()}"))
   }
 
-  match execution.stdout.utf8() {
-    Ok(text) => Ok(text)
-    Err(_) => Err(unreadable(.Malformed, "the report is not valid UTF-8"))
+  if let Ok(text) = execution.stdout.utf8() {
+    Ok(text)
+  } else {
+    Err(unreadable(.Malformed, "the report is not valid UTF-8"))
   }
 }
 
@@ -33,7 +34,7 @@ export proc path_state(connection: transport.Connection, target: Str) [fs, proce
   let execution = read(connection, .PathState, [target])?
   match report(execution) {
     Ok(text) => Ok(probe.path_fact(text))
-    Err(reason) => Ok(fact.Unseen(reason))
+    Err(reason) => Ok(.Unseen(reason))
   }
 }
 
@@ -42,7 +43,7 @@ proc package_state(connection: transport.Connection, spec: model.PackageSpec) [f
   let execution = read(connection, .PackageState, [spec.name, wanted])?
   match report(execution) {
     Ok(text) => Ok(probe.package_fact(text))
-    Err(reason) => Ok(fact.PackageUnseen(reason))
+    Err(reason) => Ok(.PackageUnseen(reason))
   }
 }
 
@@ -50,7 +51,7 @@ proc accounts(connection: transport.Connection) [fs, process, error] -> Result[p
   let execution = read(connection, .AccountsState, [])?
   match report(execution) {
     Ok(text) => Ok(probe.accounts(text))
-    Err(reason) => Ok(probe.AccountsUnseen(reason))
+    Err(reason) => Ok(.AccountsUnseen(reason))
   }
 }
 
@@ -60,14 +61,14 @@ proc service_state(connection: transport.Connection, spec: model.ServiceSpec) [f
       let execution = read(connection, .ServiceState, [spec.name, spec.runlevel])?
       match report(execution) {
         Ok(text) => Ok(probe.service_fact(text))
-        Err(reason) => Ok(fact.ServiceUnseen(reason))
+        Err(reason) => Ok(.ServiceUnseen(reason))
       }
     }
     model.Xinit => {
       let execution = read(connection, .XinitServiceState, [spec.name])?
       match report(execution) {
         Ok(text) => Ok(probe.xinit_service_fact(text))
-        Err(reason) => Ok(fact.ServiceUnseen(reason))
+        Err(reason) => Ok(.ServiceUnseen(reason))
       }
     }
   }
@@ -78,35 +79,35 @@ proc guard_state(connection: transport.Connection, invocation: model.Invocation)
     model.Argv(argv) => read(connection, .RunArgv, argv)?
     model.Shell(text) => read(connection, .RunShell, [text])?
   }
-  Ok(fact.Exited(execution.code))
+  Ok(.Exited(execution.code))
 }
 
 ## Read the fact a resource's spec is compared with.
 export proc observe(connection: transport.Connection, spec: model.Spec) [fs, process, error] -> Result[fact.Fact, transport.TransportError] {
   match spec {
-    model.Directory(directory) => Ok(fact.OnPath(path_state(connection, directory.path)?))
-    model.File(file) => Ok(fact.OnPath(path_state(connection, file.path)?))
-    model.Link(link) => Ok(fact.OnPath(path_state(connection, link.path)?))
-    model.Package(package) => Ok(fact.OnPackage(package_state(connection, package)?))
+    model.Directory(directory) => Ok(.OnPath(path_state(connection, directory.path)?))
+    model.File(file) => Ok(.OnPath(path_state(connection, file.path)?))
+    model.Link(link) => Ok(.OnPath(path_state(connection, link.path)?))
+    model.Package(package) => Ok(.OnPackage(package_state(connection, package)?))
     model.PackageIndex(_) => Ok(fact.Nothing)
     model.GroupAccount(account_group) => {
       match accounts(connection)? {
-        probe.AccountsFound(found) => Ok(fact.OnGroup(probe.group_fact(found, account_group.name)))
-        probe.AccountsUnseen(reason) => Ok(fact.OnGroup(fact.GroupUnseen(reason)))
+        probe.AccountsFound(found) => Ok(.OnGroup(probe.group_fact(found, account_group.name)))
+        probe.AccountsUnseen(reason) => Ok(.OnGroup(.GroupUnseen(reason)))
       }
     }
     model.UserAccount(account) => {
       match accounts(connection)? {
-        probe.AccountsFound(found) => Ok(fact.OnUser(probe.user_fact(found, account.name)))
-        probe.AccountsUnseen(reason) => Ok(fact.OnUser(fact.UserUnseen(reason)))
+        probe.AccountsFound(found) => Ok(.OnUser(probe.user_fact(found, account.name)))
+        probe.AccountsUnseen(reason) => Ok(.OnUser(.UserUnseen(reason)))
       }
     }
-    model.Service(service) => Ok(fact.OnService(service_state(connection, service)?))
+    model.Service(service) => Ok(.OnService(service_state(connection, service)?))
     model.Exec(command) => {
       match command.guard {
-        model.Creates(target) => Ok(fact.OnPath(path_state(connection, target)?))
-        model.SkipIf(invocation) => Ok(fact.OnGuard(guard_state(connection, invocation)?))
-        model.OnlyIf(invocation) => Ok(fact.OnGuard(guard_state(connection, invocation)?))
+        model.Creates(target) => Ok(.OnPath(path_state(connection, target)?))
+        model.SkipIf(invocation) => Ok(.OnGuard(guard_state(connection, invocation)?))
+        model.OnlyIf(invocation) => Ok(.OnGuard(guard_state(connection, invocation)?))
         model.Always => Ok(fact.Nothing)
         model.OnChange => Ok(fact.Nothing)
       }

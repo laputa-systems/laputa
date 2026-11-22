@@ -26,13 +26,14 @@ export pure decode_hex(text: Str) -> Result[Str, Error] {
     fail "odd number of hex digits"
   }
 
-  var values: List[Int] = []
   var offset = 0
-  while offset < text.byte_len() {
-    let high = hex_value(text.byte_slice(offset, 1))?
-    let low = hex_value(text.byte_slice(offset + 1, 1))?
-    values += [high * 16 + low]
-    offset += 2
+  let values = collect {
+    while offset < text.byte_len() {
+      let high = hex_value(text.byte_slice(offset, 1))?
+      let low = hex_value(text.byte_slice(offset + 1, 1))?
+      yield high * 16 + low
+      offset += 2
+    }
   }
 
   bytes.from_ints(values)?.utf8()
@@ -105,14 +106,14 @@ export pure path_fact(stdout: Str) -> fact.PathState {
     "missing" => fact.Missing
     "found" => {
       match path_info(table) {
-        Ok(info) => fact.Found(info)
-        Err(error) => fact.Unseen(malformed(f"path report: {error.message}"))
+        Ok(info) => .Found(info)
+        Err(error) => .Unseen(malformed(f"path report: {error.message}"))
       }
     }
-    "blocked" => fact.Blocked(fact.Unreadable(cause: .Conflict, detail: detail_of(table)))
-    "denied" => fact.Unseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
-    "error" => fact.Unseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
-    else => fact.Unseen(malformed(f"path report has no state: {stdout}"))
+    "blocked" => .Blocked(fact.Unreadable(cause: .Conflict, detail: detail_of(table)))
+    "denied" => .Unseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
+    "error" => .Unseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
+    else => .Unseen(malformed(f"path report has no state: {stdout}"))
   }
 }
 
@@ -128,19 +129,18 @@ export pure package_fact(stdout: Str) -> fact.PackageState {
         "gt" => .Newer
         else => null
       }
-      match table.get("version") {
-        Ok(version) => {
-          if table.get("ordering") is Ok("unknown") {
-            fact.PackageUnseen(malformed(f"apk could not order version {version}"))
-          } else {
-            fact.Installed(fact.InstalledPackage(version:, ordering:))
-          }
+      if let Ok(version) = table.get("version") {
+        if table.get("ordering") is Ok("unknown") {
+          .PackageUnseen(malformed(f"apk could not order version {version}"))
+        } else {
+          .Installed(fact.InstalledPackage(version:, ordering:))
         }
-        Err(_) => fact.PackageUnseen(malformed("package report has no version"))
+      } else {
+        .PackageUnseen(malformed("package report has no version"))
       }
     }
-    "unavailable" => fact.PackageUnseen(fact.Unreadable(cause: .Unavailable, detail: "apk database is not readable"))
-    else => fact.PackageUnseen(malformed(f"package report has no state: {stdout}"))
+    "unavailable" => .PackageUnseen(fact.Unreadable(cause: .Unavailable, detail: "apk database is not readable"))
+    else => .PackageUnseen(malformed(f"package report has no state: {stdout}"))
   }
 }
 
@@ -154,7 +154,7 @@ pure group_line(line: Str) -> Result[fact.GroupInfo, Error] {
   }
 
   let members = if parts[3] == "" { [] } else { parts[3].split(",") }
-  Ok(fact.GroupInfo(name: parts[0], gid: parts[2].parse_int()?, members:))
+  Ok(fact.GroupInfo(name: parts[0], gid: parts[2] as Int, members:))
 }
 
 pure passwd_line(line: Str, groups: List[fact.GroupInfo]) -> Result[fact.UserInfo, Error] {
@@ -164,13 +164,13 @@ pure passwd_line(line: Str, groups: List[fact.GroupInfo]) -> Result[fact.UserInf
   }
 
   let name = parts[0]
-  let gid = parts[3].parse_int()?
-  let owners = groups |> where { |entry| entry.gid == gid } |> map { |entry| entry.name } |> collect()
+  let gid = parts[3] as Int
+  let owners = groups |> where .gid == gid |> map .name |> collect()
   let primary: Str? = if owners.is_empty() { null } else { owners[0] }
-  let memberships = groups |> where { |entry| name in entry.members } |> map { |entry| entry.name } |> collect()
+  let memberships = groups |> where name in .members |> map .name |> collect()
   Ok(fact.UserInfo(
     name:,
-    uid: parts[2].parse_int()?,
+    uid: parts[2] as Int,
     gid:,
     group: primary,
     home: parts[5],
@@ -181,7 +181,7 @@ pure passwd_line(line: Str, groups: List[fact.GroupInfo]) -> Result[fact.UserInf
 
 pure section_lines(stdout: Str, marker: Str, next: Str?) -> List[Str] {
   var inside = false
-  var lines: List[Str] = []
+  var lines = []
   for line in stdout.lines() {
     if line == marker {
       inside = true
@@ -210,19 +210,21 @@ export pure accounts(stdout: Str) -> AccountsState {
     return AccountsUnseen(malformed(f"account report has no state: {stdout}"))
   }
 
-  var groups: List[fact.GroupInfo] = []
-  for line in section_lines(stdout, "@@group@@", null) {
-    match group_line(line) {
-      Ok(entry) => groups += [entry]
-      Err(error) => return AccountsUnseen(malformed(error.message))
+  let groups: List[fact.GroupInfo] = collect {
+    for line in section_lines(stdout, "@@group@@", null) {
+      match group_line(line) {
+        Ok(entry) => yield entry
+        Err(error) => return AccountsUnseen(malformed(error.message))
+      }
     }
   }
 
-  var users: List[fact.UserInfo] = []
-  for line in section_lines(stdout, "@@passwd@@", "@@group@@") {
-    match passwd_line(line, groups) {
-      Ok(entry) => users += [entry]
-      Err(error) => return AccountsUnseen(malformed(error.message))
+  let users: List[fact.UserInfo] = collect {
+    for line in section_lines(stdout, "@@passwd@@", "@@group@@") {
+      match passwd_line(line, groups) {
+        Ok(entry) => yield entry
+        Err(error) => return AccountsUnseen(malformed(error.message))
+      }
     }
   }
 
@@ -231,14 +233,14 @@ export pure accounts(stdout: Str) -> AccountsState {
 
 ## The state of the named group in a parsed account database.
 export pure group_fact(accounts: Accounts, name: Str) -> fact.GroupState {
-  let found = accounts.groups |> where { |entry| entry.name == name } |> collect()
-  if found.is_empty() { fact.NoGroup } else { fact.GroupFound(found[0]) }
+  let found = accounts.groups |> where .name == name |> collect()
+  if found.is_empty() { fact.NoGroup } else { .GroupFound(found[0]) }
 }
 
 ## The state of the named user in a parsed account database.
 export pure user_fact(accounts: Accounts, name: Str) -> fact.UserState {
-  let found = accounts.users |> where { |entry| entry.name == name } |> collect()
-  if found.is_empty() { fact.NoUser } else { fact.UserFound(found[0]) }
+  let found = accounts.users |> where .name == name |> collect()
+  if found.is_empty() { fact.NoUser } else { .UserFound(found[0]) }
 }
 
 ## Parse the `service_state` script output into the state of one service.
@@ -246,7 +248,7 @@ export pure service_fact(stdout: Str) -> fact.ServiceState {
   let table = fields(stdout)
   match table.get("state") ?? "" {
     "missing" => fact.NoService
-    "unavailable" => fact.ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "rc-service is not installed"))
+    "unavailable" => .ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "rc-service is not installed"))
     "found" => {
       let running: fact.Running = match table.get("status") ?? "" {
         "0" => .Started
@@ -256,12 +258,12 @@ export pure service_fact(stdout: Str) -> fact.ServiceState {
       }
       let enabled = table.get("enabled") ?? ""
       if enabled == "yes" or enabled == "no" {
-        fact.ServiceFound(fact.ServiceInfo(enabled: enabled == "yes", running:, ready: null))
+        .ServiceFound(fact.ServiceInfo(enabled: enabled == "yes", running:, ready: null))
       } else {
-        fact.ServiceUnseen(malformed("service report has no enablement"))
+        .ServiceUnseen(malformed("service report has no enablement"))
       }
     }
-    else => fact.ServiceUnseen(malformed(f"service report has no state: {stdout}"))
+    else => .ServiceUnseen(malformed(f"service report has no state: {stdout}"))
   }
 }
 
@@ -272,9 +274,9 @@ export pure xinit_service_fact(stdout: Str) -> fact.ServiceState {
   let table = fields(stdout)
   match table.get("state") ?? "" {
     "missing" => fact.NoService
-    "unavailable" => fact.ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "xinit is not installed"))
-    "denied" => fact.ServiceUnseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
-    "error" => fact.ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
+    "unavailable" => .ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "xinit is not installed"))
+    "denied" => .ServiceUnseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
+    "error" => .ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
     "found" => {
       let running: fact.Running = match table.get("running") ?? "" {
         "running" => .Started
@@ -288,12 +290,12 @@ export pure xinit_service_fact(stdout: Str) -> fact.ServiceState {
       }
       let readiness = table.get("ready") ?? ""
       guard readiness == "true" or readiness == "false" else {
-        return fact.ServiceUnseen(malformed("xinit status report has no readiness"))
+        return .ServiceUnseen(malformed("xinit status report has no readiness"))
       }
 
-      fact.ServiceFound(fact.ServiceInfo(enabled: null, running:, ready: readiness == "true"))
+      .ServiceFound(fact.ServiceInfo(enabled: null, running:, ready: readiness == "true"))
     }
-    else => fact.ServiceUnseen(malformed(f"xinit service report has no state: {stdout}"))
+    else => .ServiceUnseen(malformed(f"xinit service report has no state: {stdout}"))
   }
 }
 
@@ -302,9 +304,9 @@ export type Capabilities = {present: List[Str], absent: List[Str], uid: Int}
 
 ## Parse the `capabilities` script output.
 export pure capabilities(stdout: Str) -> Result[Capabilities, Error] {
-  var present: List[Str] = []
-  var absent: List[Str] = []
-  var uid: Int? = null
+  var present = []
+  var absent = []
+  var uid = null
   var shell_ok = false
   for line in stdout.lines() {
     if line == "shell ok" {
@@ -314,7 +316,7 @@ export pure capabilities(stdout: Str) -> Result[Capabilities, Error] {
     } else if line.starts_with("lack ") {
       absent += [line.byte_slice(5)]
     } else if line.starts_with("uid ") {
-      uid = line.byte_slice(4).parse_int()?
+      uid = line.byte_slice(4) as Int
     }
   }
 

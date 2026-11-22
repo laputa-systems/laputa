@@ -13,14 +13,14 @@ proc module_root() [fs, env, error] -> Result[Path] {
 
 type TrustCliResult = {ok: Bool, code: Int, err: Str, out: Str}
 
-proc trust_run(args: List[Str], err: Path, out: Path) [fs, process, env, error] -> Result[TrustCliResult, Error] {
+proc trust_run(args: List[Str], err: Path, out: Path) -> Result[TrustCliResult, Error] {
   let xsh = runner()?
   let modules = module_root()?
   let command = process.command_argv(
-    xsh.display(),
+    xsh,
     [xsh.display(), p"trust.xsh".display(), "--"].extend(args),
     modules,
-    {XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display()},
+    {XSH_MODULE_PATH: modules, XSH_HOST: xsh},
     stdout: out,
     stderr: err,
   )
@@ -76,12 +76,12 @@ proc fixture(name: Str) -> Path {
 }
 
 proc stage_system(ctx: TestContext, name: Str, key: Str) -> Result[Path, Error] {
-  let root = test.temp_dir(ctx, name: name)?
+  let root = test.temp_dir(ctx, name:)?
   let seed_bundle = fp"{root}/usr/share/laputa/trust/seed/ca-certificates.crt"
   let seed_policy = fp"{root}/usr/share/laputa/trust/seed/trust-policy"
   let key_path = fp"{root}/etc/laputa/trust-update-key"
   for parent in [seed_bundle.parent, key_path.parent, fp"{root}/etc/ssl/certs", fp"{root}/var/lib/xsh-pm/packages/ca-certificates"] {
-    parent.mkdir(parents: true)
+    parent.mkdir()
   }
 
   seed_bundle.write(p"packages/ca-certificates/files/cacert.pem".read_bytes()?)
@@ -94,8 +94,8 @@ proc stage_system(ctx: TestContext, name: Str, key: Str) -> Result[Path, Error] 
 }
 
 proc stage_release(ctx: TestContext, name: Str, which: Str) -> Result[Path, Error] {
-  let out = fp"{test.temp_dir(ctx, name: name)?}/release"
-  out.mkdir(parents: true)
+  let out = fp"{test.temp_dir(ctx, name:)?}/release"
+  out.mkdir()
   for file in ["metadata", "metadata.sig", "ca-certificates.crt", "trust-policy"] {
     fp"{fixture(which)}/{file}".copy(to: fp"{out}/{file}")
   }
@@ -107,17 +107,15 @@ proc active_bundle(root: Path) [fs, error] -> Result[Bytes, Error] {
   fp"{root}/var/lib/laputa/trust/active/ca-certificates.crt".read_bytes()
 }
 
-proc wait_for_port_file(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port_file(port_file: Path, attempts: Int) -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
-    if port_file.exists()? {
+    if port_file.exists() {
       let text = port_file.read_text()?.trim()
-      if text != "" {
-        return text.parse_int_decimal()
-      }
+      return text.parse_int_decimal() when text != ""
     }
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
 
@@ -137,7 +135,7 @@ proc spawn_fixture_server(
   drip: Str,
   delay_ms: Str,
 ) [fs, process, env, time, error] -> Result[TrustFixtureServer, Error] {
-  let dir = test.temp_dir(ctx, name: name)?
+  let dir = test.temp_dir(ctx, name:)?
   let port_file = fp"{dir}/port"
   let script = fp"tests/pm/fixtures/trust-update/tls_server.py"
   if drip != "" {
@@ -162,12 +160,11 @@ proc kill_child(pid: Int, handle: ProcessHandle) [process, error] {
 }
 
 test trust_update_url_converges_with_from [fs, process, env, time, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let root = stage_system(ctx, "trust-update-url", "signing-key")?
@@ -183,7 +180,7 @@ test trust_update_url_converges_with_from [fs, process, env, time, error] { |ctx
     "",
     "",
   )?
-  defer kill_child(server.pid, server.handle)?
+  defer kill_child(server.pid, server.handle)
 
   let url = f"https://127.0.0.1:{server.port}/"
   let out = test.temp_path(ctx, name: "trust-update-url.out")
@@ -191,10 +188,10 @@ test trust_update_url_converges_with_from [fs, process, env, time, error] { |ctx
   let xsh = runner()?
   let modules = module_root()?
   let fetch = process.command_argv(
-    xsh.display(),
-    [xsh.display(), fp"{modules}/trust.xsh".display(), "--", "update", "--url", url, "--root", root.display()],
+    xsh,
+    [xsh, fp"{modules}/trust.xsh", "--", "update", "--url", url, "--root", root],
     modules,
-    {XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display(), SSL_CERT_FILE: bundle.display()},
+    {XSH_MODULE_PATH: modules, XSH_HOST: xsh, SSL_CERT_FILE: bundle},
     stdout: out,
     stderr: err,
   )
@@ -204,12 +201,11 @@ test trust_update_url_converges_with_from [fs, process, env, time, error] { |ctx
 }
 
 test trust_update_interrupted_download_leaves_no_store_mutation [fs, process, env, time, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    return
   }
 
   let root = stage_system(ctx, "trust-update-trickle", "signing-key")?
@@ -225,14 +221,14 @@ test trust_update_interrupted_download_leaves_no_store_mutation [fs, process, en
     "2048",
     "100",
   )?
-  defer kill_child(server.pid, server.handle)?
+  defer kill_child(server.pid, server.handle)
 
   let xsh = runner()?
   let modules = module_root()?
   let url = f"https://127.0.0.1:{server.port}/"
   let child = spawn run XSH_MODULE_PATH=$modules XSH_HOST=$xsh SSL_CERT_FILE=$bundle $xsh trust.xsh -- update --url $url --root $root ?
-  time.sleep(2s)?
-  process.kill(child.pid, signal: "KILL")?
+  time.sleep(2s)
+  process.kill(child.pid, signal: "KILL")
   let _ = wait [child]?
 
   assert ! fp"{root}/var/lib/laputa/trust/generations".exists()?
@@ -241,10 +237,10 @@ test trust_update_interrupted_download_leaves_no_store_mutation [fs, process, en
   let out = test.temp_path(ctx, name: "trust-update-resume.out")
   let err = test.temp_path(ctx, name: "trust-update-resume.err")
   let resume_command = process.command_argv(
-    xsh.display(),
-    [xsh.display(), fp"{modules}/trust.xsh".display(), "--", "update", "--url", url, "--root", root.display()],
+    xsh,
+    [xsh, fp"{modules}/trust.xsh", "--", "update", "--url", url, "--root", root],
     modules,
-    {XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display(), SSL_CERT_FILE: bundle.display()},
+    {XSH_MODULE_PATH: modules, XSH_HOST: xsh, SSL_CERT_FILE: bundle},
     stdout: out,
     stderr: err,
   )
@@ -260,13 +256,16 @@ test trust_update_killed_mid_transaction_recovers_cleanly [fs, process, env, tim
     let xsh = runner()?
     let modules = module_root()?
     let child = spawn run XSH_MODULE_PATH=$modules XSH_HOST=$xsh $xsh trust.xsh -- update --from $source --root $root ?
-    time.sleep(time.millis(delay_ms))?
-    process.kill(child.pid, signal: "KILL")?
+    time.sleep(time.millis(delay_ms))
+    process.kill(child.pid, signal: "KILL")
     let _ = wait [child]?
 
-    let active = match trust_store.trust_store_read_active(trust_store.trust_store_paths(root)) {
-      Ok(generation) => generation,
-      Err(_) => "none",
+    let active = if let Ok(generation) = trust_store.trust_store_read_active(
+      trust_store.trust_store_paths(root),
+    ) {
+      generation
+    } else {
+      "none"
     }
     if active == "none" {
       assert ! fp"{root}/var/lib/laputa/trust/generations/2".exists()?
@@ -285,11 +284,12 @@ test trust_update_killed_mid_transaction_recovers_cleanly [fs, process, env, tim
   }
 }
 
-proc store_snapshot(root: Path) [fs, error] -> Result[Str, Error] {
-  var entries: List[Str] = []
-  for entry in fs.walk(fp"{root}/var/lib/laputa/trust", hidden: true)? {
-    let rel = entry.path.strip_prefix(root)?
-    entries += [f"{rel.display()} {entry.kind} {entry.size}"]
+proc store_snapshot(root: Path) -> Result[Str, Error] {
+  let entries = collect {
+    for entry in fs.walk(fp"{root}/var/lib/laputa/trust", hidden: true)? {
+      let rel = entry.path.strip_prefix(root)?
+      yield f"{rel.display()} {entry.kind} {entry.size}"
+    }
   }
 
   entries.join("\n")
@@ -302,18 +302,17 @@ test trust_update_changes_admissions_without_restarting_services [fs, process, e
   let sentinel = fp"{fake_path}/service-restarted"
   for name in ["xinit", "systemctl", "service"] {
     let launcher = fp"{fake_path}/{name}"
-    launcher.write(bytes.from_text(f"#!/bin/sh\ntouch {sentinel.display()}\n"))?
-    launcher.chmod(0o755)
+    launcher.write(bytes.from_text(f"#!/bin/sh\ntouch {sentinel}\n"), mode: 0o755)
   }
   let xsh = runner()?
   let modules = module_root()?
   let out = test.temp_path(ctx, name: "trust-update-no-cutover.out")
   let err = test.temp_path(ctx, name: "trust-update-no-cutover.err")
   let command = process.command_argv(
-    xsh.display(),
-    [xsh.display(), fp"{modules}/trust.xsh".display(), "--", "update", "--from", source.display(), "--root", root.display()],
+    xsh,
+    [xsh, fp"{modules}/trust.xsh", "--", "update", "--from", source, "--root", root],
     modules,
-    {PATH: fake_path.display(), XSH_MODULE_PATH: modules.display(), XSH_HOST: xsh.display()},
+    {PATH: fake_path, XSH_MODULE_PATH: modules, XSH_HOST: xsh},
     stdout: out,
     stderr: err,
   )
@@ -330,16 +329,16 @@ test trust_cli_status_is_read_only_under_concurrency [fs, process, env, time, er
   let source = stage_release(ctx, "trust-cli-status-race-source", "release-b")?
   let _ = trust_update.trust_update_from_dir(root, source)?
 
-  fp"{root}/var/lib/laputa/trust/sentinel-keep".write("keep\n")?
-  fp"{root}/var/lib/laputa/trust/generations/2/sentinel-keep".write("keep\n")?
+  fp"{root}/var/lib/laputa/trust/sentinel-keep".write("keep\n")
+  fp"{root}/var/lib/laputa/trust/generations/2/sentinel-keep".write("keep\n")
   let before = store_snapshot(root)?
 
   let xsh = runner()?
   let modules = module_root()?
   let iodir = test.temp_dir(ctx, name: "trust-status-race-io")?
   let script = fp"{modules}/trust.xsh"
-  var outputs: List[Path] = []
-  var handles: List[ProcessHandle] = []
+  var outputs = []
+  var handles = []
   for index in range(8) {
     let err = fp"{iodir}/status-{index}.err"
     let out = fp"{iodir}/status-{index}.out"

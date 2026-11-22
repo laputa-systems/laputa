@@ -58,11 +58,8 @@ export proc release(connection: transport.Connection, held: Held) [fs, process, 
 
 ## Describe the holder of a host's lock, or null when it is free.
 export proc inspect(connection: transport.Connection, lock_path: Str) [fs, process, error] -> Result[Str?, LockError] {
-  let execution = match transport.exec(connection, .InspectLock, [lock_path], privileged: true) {
-    Err(error) => {
-      return Err(LockError.Failed(error.message), cause: error)
-    }
-    Ok(found) => found
+  let execution = transport.exec(connection, .InspectLock, [lock_path], privileged: true) ?? {
+    return Err(LockError.Failed(.message), cause: .)
   }
 
   if execution.code != 0 {
@@ -70,11 +67,9 @@ export proc inspect(connection: transport.Connection, lock_path: Str) [fs, proce
   }
 
   let text = execution.stdout.utf8() ?? ""
-  if text.starts_with("state free") {
-    return Ok(null)
-  }
+  return Ok(null) when text.starts_with("state free")
 
-  let table = text.lines() |> where { |line| line.starts_with("holder ") } |> collect()
+  let table = text.lines() |> where .starts_with("holder ") |> collect()
   Ok(if table.is_empty() { "(unknown holder)" } else { hex_or_raw(table[0].byte_slice(7)) })
 }
 

@@ -9,14 +9,14 @@ pure guest_failed(output: Str) -> Bool {
     or "Heap allocation error" in output
 }
 
-proc process_live(pid: Int) [process, error] -> Result[Bool] {
+proc process_live(pid: Int) -> Result[Bool] {
   for entry in process.list()? |> where .pid == pid {
     return entry.status != "Z"
   }
   false
 }
 
-proc log_text(console_log: Path, backend_log: Path) [fs, error] -> Result[Str, Error] {
+proc log_text(console_log: Path, backend_log: Path) -> Result[Str, Error] {
   let console = if console_log.exists() { console_log.read_text()? } else { "" }
   let backend = if backend_log.exists() { backend_log.read_text()? } else { "" }
   f"""{console}
@@ -35,13 +35,13 @@ cli main(
   backend_log: Path,
   kill_marker: Str,
   timeout_seconds: Int,
-  memory_mib: Int = 1024,
+  memory_mib = 1024,
 ) [fs, process, time, env, error] {
   guard kind == "firecracker" or kind == "qemu" else { fail f"storage runner: unknown kind {kind}" }
   console.remove()
   backend_log.remove()
 
-  var argv: List[Str] = []
+  var argv = []
   if kind == "firecracker" {
     argv = [firecracker, "--no-api", "--config-file", config]
   } else {
@@ -51,8 +51,8 @@ cli main(
       kernel: fp"{kernel}",
       initramfs: fp"{initramfs}",
       disk: fp"{root}",
-      memory_mib: memory_mib,
-      data_disk: qemu.DataDisk(fp"{state}"),
+      memory_mib:,
+      data_disk: .DataDisk(fp"{state}"),
       network: qemu.NoNetwork,
       control: qemu.NoControl,
     )
@@ -66,7 +66,7 @@ cli main(
   var deadline = deadline_start + timeout_seconds * 1000000000
   var completed = false
   var killed = false
-  while process_live(launched.pid)? {
+  while process_live(launched.pid) {
     let output = log_text(console, backend_log)?
     guard !guest_failed(output) else { fail "storage guest reported a kernel or proof failure" }
     if kill_marker != "" {
@@ -74,7 +74,7 @@ cli main(
         fail "storage guest finished before its kill marker"
       }
       if kill_marker in output {
-        launched.cancel(signal: "KILL", kill_after: 0ms)?
+        launched.cancel(signal: "KILL", kill_after: 0ms)
         killed = true
         break
       }
@@ -85,7 +85,7 @@ cli main(
     if time.monotonic()? >= deadline {
       fail "storage guest timed out"
     }
-    time.sleep(50ms)?
+    time.sleep(50ms)
   }
 
   if killed {

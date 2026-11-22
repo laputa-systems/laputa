@@ -60,5 +60,5 @@ pure rules_for(mode: Str) -> Result[List[types.Rule], Error] {
 }
 
 proc main(...argv: List[Str]) [fs, error] {
-  fp"{argv[1]}".write(json.encode({rules: rules_for(argv[0])?})?)?
+  fp"{argv[1]}".write(json.encode({rules: rules_for(argv[0])?})?)
 }

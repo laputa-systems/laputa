@@ -15,7 +15,7 @@ const top_fields = ["defaults", "hosts", "groups"]
 export type Inventory = {hosts: List[model.Host]}
 
 pure table(value: Any, what: Str) -> Result[Map[Str, Any], Error] {
-  ctx what { value.require(Map[Str, Any])? }
+  ctx what { value.require()? }
 }
 
 pure only_fields(what: Str, entries: Map[Str, Any], allowed: List[Str]) -> Result[Unit, Error] {
@@ -27,29 +27,25 @@ pure only_fields(what: Str, entries: Map[Str, Any], allowed: List[Str]) -> Resul
 }
 
 pure text_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[Str?, Error] {
-  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require(Str?)?) }
+  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require()?) }
 }
 
 pure int_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[Int?, Error] {
-  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require(Int?)?) }
+  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require()?) }
 }
 
 pure bool_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[Bool?, Error] {
-  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require(Bool?)?) }
+  ctx f"{what}.{key}" { Ok(json.get(entries, [key], null).require()?) }
 }
 
 pure list_of(what: Str, entries: Map[Str, Any], key: Str) -> Result[List[Str], Error] {
-  if key not in entries.keys() {
-    return Ok([])
-  }
+  return Ok([]) when key not in entries.keys()
 
-  ctx f"{what}.{key}" { Ok(entries.get(key)?.require(List[Str])?) }
+  ctx f"{what}.{key}" { Ok(entries.get(key)?.require()?) }
 }
 
 pure vars_of(what: Str, entries: Map[Str, Any]) -> Result[Map[Str, Any], Error] {
-  if "vars" not in entries.keys() {
-    return Ok({})
-  }
+  return Ok({}) when "vars" not in entries.keys()
 
   table(entries.get("vars")?, f"{what}.vars")
 }
@@ -114,7 +110,7 @@ pure build_host(
     fail f"{what}: host names are lowercase letters, digits, dot, underscore and hyphen"
   }
 
-  only_fields(what, entries, host_fields)?
+  only_fields(what, entries, host_fields)
   let transport = transport_of(what, pick_text(text_of(what, entries, "transport")?, text_of("defaults", defaults, "transport")?))?
   let dialect = dialect_of(what, pick_text(text_of(what, entries, "dialect")?, text_of("defaults", defaults, "dialect")?))?
   let address = text_of(what, entries, "address")?
@@ -125,13 +121,13 @@ pure build_host(
   let privilege = privilege_of(what, pick_text(text_of(what, entries, "privilege")?, text_of("defaults", defaults, "privilege")?))?
   let timeout = pick_int(int_of(what, entries, "timeout_ms")?, int_of("defaults", defaults, "timeout_ms")?) ?? 10000
   let transfer = pick_int(int_of(what, entries, "transfer_timeout_ms")?, int_of("defaults", defaults, "transfer_timeout_ms")?) ?? 600000
-  let reads = bool_of(what, entries, "escalate_reads")? ?? bool_of("defaults", defaults, "escalate_reads")? ?? privilege == model.Doas
+  let reads = bool_of(what, entries, "escalate_reads")? ?? bool_of("defaults", defaults, "escalate_reads")? ?? privilege == .Doas
   let groups = list_of(what, entries, "groups")?
   guard timeout > 0 and transfer > 0 else {
     fail f"{what}.timeout_ms and transfer_timeout_ms must be positive"
   }
 
-  guard dialect == model.Posix or privilege != model.Doas else {
+  guard dialect == .Posix or privilege != .Doas else {
     fail f"{what}: the xsh dialect has no doas escalation; use privilege plain or root"
   }
 
@@ -145,7 +141,7 @@ pure build_host(
   }
 
   vars = merged(vars, vars_of(what, entries)?)
-  if transport == model.Local {
+  if transport == .Local {
     return Ok(model.Host(
       name:,
       transport:,
@@ -189,7 +185,7 @@ pure build_host(
     fail f"{what}.port must be 1..65535"
   }
 
-  check.account_ok(f"{what}.user", wanted_user)?
+  check.account_ok(f"{what}.user", wanted_user)
   let key = if wanted_key.starts_with("/") { fp"{wanted_key}" } else { fp"{base}/{wanted_key}" }
   Ok(model.Host(
     name:,
@@ -214,15 +210,15 @@ pure build_host(
 ## missing connection details are errors; nothing is connected.
 export pure parse(text: Str, base: Path) -> Result[Inventory, Error] {
   let document = table(toml.decode(text)?, "inventory")?
-  only_fields("inventory", document, top_fields)?
+  only_fields("inventory", document, top_fields)
   let defaults = table(json.get(document, ["defaults"], {}), "defaults")?
-  only_fields("defaults", defaults, default_fields)?
+  only_fields("defaults", defaults, default_fields)
   var group_vars: Map[Str, Map[Str, Any]] = {}
   if "groups" in document.keys() {
     let groups = table(document.get("groups")?, "groups")?
     for key in groups.keys() {
       let entries = table(groups.get(key)?, f"groups.{key}")?
-      only_fields(f"groups.{key}", entries, group_fields)?
+      only_fields(f"groups.{key}", entries, group_fields)
       group_vars[key] = vars_of(f"groups.{key}", entries)?
     }
   }
@@ -254,12 +250,10 @@ export proc load(file: Path) [fs, error] -> Result[Inventory, Error] {
 ## Choose hosts by name or group. Every limit must name a host or a group;
 ## the result keeps inventory order without repeats. No limit selects all.
 export pure select(inventory: Inventory, limit: List[Str]) -> Result[List[model.Host], Error] {
-  if limit.is_empty() {
-    return Ok(inventory.hosts)
-  }
+  return Ok(inventory.hosts) when limit.is_empty()
 
   for item in limit {
-    let known = inventory.hosts |> any { |host| host.name == item or item in host.groups }
+    let known = inventory.hosts |> any .name == item or item in .groups
     guard known else {
       fail f"--limit {item} matches no host or group"
     }

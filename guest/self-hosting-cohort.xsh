@@ -1,10 +1,10 @@
 use pm.build
 
-proc main(repository: Path) [fs, process, env, error] -> Result[Unit, Error] {
+proc main(repository: Path) [fs, process, env, error] {
   let executor = build.executor_provenance()?
   assert executor.xsh_sha256 == hash.sha256(p"/bin/xsh")?.hex()
   assert executor.xsht_sha256 == hash.sha256(p"/bin/xsht")?.hex()
-  json.write(p"/output/executor.json", executor)?
+  json.write(p"/output/executor.json", executor)
   if repository == p"/checkout-two" {
     for file in ["test_printf_long_double", "test_seq_arbitrary_precision_and_hex"] {
       let log = fp"/output/{file}.log"
@@ -15,7 +15,7 @@ proc main(repository: Path) [fs, process, env, error] -> Result[Unit, Error] {
       fail f"replacement runner failed {file}" unless tests.ok
     }
   }
-  let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/cohort/build.xsh", "--", repository.display()])
+  let command = process.command_argv(p"/bin/xsh", ["/bin/xsh", "/cohort/build.xsh", "--", repository])
   let status = process.run(command)?
   fail "closed cohort build failed" unless status.ok
   var artifacts = 0
@@ -30,4 +30,3 @@ proc main(repository: Path) [fs, process, env, error] -> Result[Unit, Error] {
   assert artifacts == 3
 }
 
-main(@args)?

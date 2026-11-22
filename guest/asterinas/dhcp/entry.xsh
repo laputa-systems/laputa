@@ -2,7 +2,7 @@
 use lib.dhcp_apply as apply
 use lib.dhcp_net as network
 use lib.dhcp_wire as wire
-use lib.gnu as gnu
+use lib.gnu
 use lib.net_state as state
 use lib.nettools_fixture as fixture
 
@@ -43,12 +43,13 @@ pure significant(state: Str) -> Str {
   if acquiring(state) { "acquiring" } else { state }
 }
 
-proc client_state() [fs, error] -> Str {
+proc client_state() -> Str {
   let status = fp"{WORK}/run/eth0.status"
-  guard status.exists()? else { return "none" }
-  match json.read(status) {
-    Ok(parsed) => parsed.require(ClientStatus)?.state
-    Err(_) => "unreadable"
+  guard status.exists() else { return "none" }
+  if let Ok(parsed) = json.read(status) {
+    parsed.require(ClientStatus)?.state
+  } else {
+    "unreadable"
   }
 }
 
@@ -56,7 +57,7 @@ proc start_client() [fs, process, error] -> Result[Client] {
   let log = fp"{WORK}/client.log"
   let command = process.command_argv(
     p"/usr/bin/xsh",
-    [p"/usr/bin/xsh", p"/usr/lib/xsh/core/dhcpc", "--lease-dir", fp"{WORK}/lease".display(), "--run-dir", fp"{WORK}/run".display(), "--resolv-dir", fp"{WORK}/etc".display(), "--static-file", fp"{WORK}/etc/resolv.static".display(), "eth0"],
+    [p"/usr/bin/xsh", p"/usr/lib/xsh/core/dhcpc", "--lease-dir", fp"{WORK}/lease", "--run-dir", fp"{WORK}/run", "--resolv-dir", fp"{WORK}/etc", "--static-file", fp"{WORK}/etc/resolv.static", "eth0"],
     WORK,
     {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"},
     b"",
@@ -65,47 +66,47 @@ proc start_client() [fs, process, error] -> Result[Client] {
     timeout: 1800s,
   )
   let client = unix.spawn_process_group_log(command, log)?
-  Ok(Client(pid: client.pid))
+  Ok(Client(client.pid))
 }
 
 proc stop_client(client: Client) [process, time, error] {
   let _ = unix.shutdown_process_groups([client.pid], 3s, 100ms)?
 }
 
-proc crash_client(client: Client) [fs, process, time, error] {
-  process.kill_group(client.pid, "KILL")?
+proc crash_client(client: Client) {
+  process.kill_group(client.pid, "KILL")
   time.sleep(500ms)
   let status = fp"{WORK}/run/eth0.status"
-  if status.exists()? { status.remove()? }
+  if status.exists() { status.remove() }
 }
 
-proc elapsed_ms() [time, error] -> Result[Int] {
+proc elapsed_ms() -> Result[Int] {
   time.monotonic()? / 1000000
 }
 
-proc show_client_log() [fs, error] {
+proc show_client_log() {
   let log = fp"{WORK}/client.log"
-  if log.exists()? {
-    for line in log.read_text()?.lines() { eprint --flush f"NET_DHCP_CLIENT_LOG {line}" }
+  if log.exists() {
+    for line in log.read_lines()? { eprint --flush f"NET_DHCP_CLIENT_LOG {line}" }
   }
 }
 
-proc await_state(label: Str, wanted: Str, timeout_ms: Int) [fs, time, error] {
+proc await_state(label: Str, wanted: Str, timeout_ms: Int) {
   let deadline = elapsed_ms()? + timeout_ms
   while elapsed_ms()? < deadline {
-    if significant(client_state()) == wanted { return }
+    return when significant(client_state()) == wanted
     time.sleep(POLL_MS * 1ms)
   }
   eprint --flush f"NET_DHCP_{label}_TIMEOUT waiting for {wanted}, last {client_state()}"
-  show_client_log()?
+  show_client_log()
 }
 
-proc watch_states(label: Str, duration_ms: Int) [fs, time, error] {
-  var sequence: List[Str] = []
+proc watch_states(label: Str, duration_ms: Int) {
+  var sequence = []
   let deadline = elapsed_ms()? + duration_ms
   while elapsed_ms()? < deadline {
-    let state = significant(client_state())
-    if sequence.is_empty() or sequence[sequence.len() - 1] != state { sequence += [state] }
+    let state = client_state() |> significant(_)
+    if sequence.is_empty() or sequence[-1] != state { sequence += [state] }
     time.sleep(POLL_MS * 1ms)
   }
   eprint --flush f"NET_DHCP_{label}_STATES {sequence.join(">")}"
@@ -160,10 +161,10 @@ pure packet_address(ifindex: Int, protocol: Int) -> Result[Bytes, Error] {
   bytes.concat([bytes.pack_le(17, 2)?, bytes.pack_be(protocol, 2)?, bytes.pack_le(ifindex, 4)?, bytes.zero(12)?])
 }
 
-proc open_capture(ifindex: Int) [process, net, error] -> Result[Int] {
+proc open_capture(ifindex: Int) -> Result[Int] {
   let c = linux.net_constants()
   let socket = linux.socket(c.AF_PACKET, c.SOCK_RAW.bit_or(c.SOCK_NONBLOCK), bytes.unpack_le(bytes.pack_be(ETH_P_ALL, 2)?, 2)?)?
-  linux.bind(socket, packet_address(ifindex, ETH_P_ALL)?)?
+  linux.bind(socket, packet_address(ifindex, ETH_P_ALL)?)
   Ok(socket)
 }
 
@@ -171,14 +172,11 @@ proc messages(label: Str, capture: Int) [fs, process, net, time, error] {
   time.sleep(300ms)
   var previous = ""
   while unix.poll_fd(capture, ["readable"], 0)? != [] {
-    match unix.read_fd(capture, 2048) {
-      Ok(frame) => {
-        if let text = client_message(frame) {
-          if text != previous { eprint --flush f"NET_DHCP_{label}_MSG {text}" }
-          previous = text
-        }
+    if let Ok(frame) = unix.read_fd(capture, 2048) {
+      if let text = client_message(frame) {
+        if text != previous { eprint --flush f"NET_DHCP_{label}_MSG {text}" }
+        previous = text
       }
-      Err(_) => {}
     }
   }
 }
@@ -188,13 +186,13 @@ proc start_tcp_client() [fs, process, error] -> Result[Client] {
   let program = p"/usr/lib/asterinas/case/tcp-client"
   let command = process.command_argv(program, [program, "disrupted"], WORK, {LC_ALL: "C"}, b"", result, result, timeout: 300s)
   let client = unix.spawn_process_group_log(command, result)?
-  Ok(Client(pid: client.pid))
+  Ok(Client(client.pid))
 }
 
-proc await_file(file: Path, timeout_ms: Int) [fs, time, error] -> Result[Bool] {
+proc await_file(file: Path, timeout_ms: Int) -> Result[Bool] {
   let deadline = elapsed_ms()? + timeout_ms
   while elapsed_ms()? < deadline {
-    if file.exists()? { return Ok(true) }
+    return Ok(true) when file.exists()
     time.sleep(POLL_MS * 1ms)
   }
   Ok(false)
@@ -206,11 +204,11 @@ pure static_route(destination: Str, prefix: Int, gateway: Str, metric: Int) -> R
   Ok({destination: destination_address, prefix: prefix, gateway: gateway_address, table: network.TABLE_MAIN, tos: 0, priority: metric, protocol: STATIC_ROUTE_PROTOCOL})
 }
 
-proc add_foreign_routes() [process, net, error] {
+proc add_foreign_routes() {
   let ifindex = fixture.index_of("eth0")
   let routes = [static_route("203.0.113.0", 24, "192.0.2.1", 50)?, static_route("0.0.0.0", 0, "192.0.2.254", 700)?]
   for route in routes {
-    apply.mutate("eth0", ifindex, network.AddRoute(route))?
+    apply.mutate("eth0", ifindex, .AddRoute(route))
   }
 }
 
@@ -258,7 +256,7 @@ proc link_lines(label: Str) [fs, process, env, net, error] {
   let listing = fp"{WORK}/ifconfig.out"
   let status = process.run(process.command_argv(p"/usr/bin/xsh", [p"/usr/bin/xsh", p"/usr/lib/xsh/core/ifconfig", "eth0"], WORK, {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", listing, listing))?
   guard status.ok else { fail f"ifconfig eth0 failed: {listing.read_text()?}" }
-  for line in listing.read_text()?.lines() {
+  for line in listing.read_lines()? {
     if line.trim().starts_with("TX errors") { eprint --flush f"NET_DHCP_{label}_IFCONFIG {line.trim()}" }
   }
 }
@@ -267,14 +265,14 @@ pure foreign_route(destination: Str, table: Int, scope: Int, route_type: Int, ho
   {family: .Inet, table: table, destination: destination, prefix: 24, source: null, source_prefix: 0, preferred_source: null, tos: 0, priority: 0, protocol: STATIC_ROUTE_PROTOCOL, scope: scope, route_type: route_type, flags: 0, hops: [hop], other_attributes: []}
 }
 
-proc route_change(label: Str, change: state.Change) [process, net, error] {
+proc route_change(label: Str, change: state.Change) {
   match state.apply(change) {
     Ok(_) => eprint --flush f"NET_DHCP_reject_{label} ok"
     Err(failure) => eprint --flush f"NET_DHCP_reject_{label} {failure.message}"
   }
 }
 
-proc connect_through(label: Str, address: Str) [process, net, error] {
+proc connect_through(label: Str, address: Str) {
   let c = linux.net_constants()
   let fd = linux.socket(c.AF_INET, c.SOCK_DGRAM)?
   defer unix.close_fd(fd)
@@ -302,48 +300,49 @@ proc await_default_route(label: Str, timeout_ms: Int) [process, env, time, net, 
   eprint --flush f"NET_DHCP_{label}_TIMEOUT waiting for the default route"
 }
 
-proc reject_routes() [fs, process, env, time, net, error] {
-  let none: state.Hop = {ifindex: null, gateway: null}
+proc reject_routes() {
+  let none: state.Hop = state.Hop(ifindex: null, gateway: null)
   let eth0 = fixture.index_of("eth0")
   let rejecting = [RTN_BLACKHOLE, RTN_UNREACHABLE, RTN_PROHIBIT, RTN_THROW]
-  for route_type in rejecting + [RTN_LOCAL, 3, 4, 5] {
-    route_change(f"ADD type={route_type}", state.AddRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))?
+  for route_type in [@rejecting, RTN_LOCAL, 3, 4, 5] {
+    route_change(f"ADD type={route_type}", .AddRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))
   }
-  reject_route_lines("added")?
-  fixture.link_down("eth0")?
-  await_state("down", "no_link", 15000)?
-  reject_route_lines("down")?
-  fixture.link_up("eth0")?
-  await_state("up", "bound", 40000)?
-  await_default_route("rebound", 10000)?
+  reject_route_lines("added")
+  fixture.link_down("eth0")
+  await_state("down", "no_link", 15000)
+  reject_route_lines("down")
+  fixture.link_up("eth0")
+  await_state("up", "bound", 40000)
+  await_default_route("rebound", 10000)
   let _ = snapshot("rebound")?
-  reject_route_lines("rebound")?
-  for route_type in rejecting { connect_through("rejected", f"203.0.{route_type + 100}.1")? }
-  route_change("THROW_FALLBACK", state.AddRoute(foreign_route("203.0.109.0", TABLE_DEFAULT, 0, RTN_UNICAST, {ifindex: eth0, gateway: "192.0.2.1"})))?
-  connect_through("thrown", "203.0.109.1")?
-  route_change("WITH_GATEWAY", state.AddRoute(foreign_route("203.0.120.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, {ifindex: null, gateway: "192.0.2.1"})))?
-  route_change("WITH_DEVICE", state.AddRoute(foreign_route("203.0.121.0", network.TABLE_MAIN, 0, RTN_UNREACHABLE, {ifindex: eth0, gateway: null})))?
-  route_change("DUPLICATE", state.AddRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))?
-  route_change("NOWHERE_SCOPE", state.AddRoute(foreign_route("203.0.122.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_PROHIBIT, none)))?
-  route_change("HOST_SCOPE", state.AddRoute(foreign_route("203.0.123.0", network.TABLE_MAIN, SCOPE_HOST, RTN_BLACKHOLE, none)))?
-  route_change("UNICAST_NOWHERE_SCOPE", state.AddRoute(foreign_route("203.0.124.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_UNICAST, {ifindex: eth0, gateway: null})))?
+  reject_route_lines("rebound")
+  for route_type in rejecting { connect_through("rejected", f"203.0.{route_type + 100}.1") }
+  route_change("THROW_FALLBACK", .AddRoute(foreign_route("203.0.109.0", TABLE_DEFAULT, 0, RTN_UNICAST, {ifindex: eth0, gateway: "192.0.2.1"})))
+  connect_through("thrown", "203.0.109.1")
+  route_change("WITH_GATEWAY", .AddRoute(foreign_route("203.0.120.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, {ifindex: null, gateway: "192.0.2.1"})))
+  route_change("WITH_DEVICE", .AddRoute(foreign_route("203.0.121.0", network.TABLE_MAIN, 0, RTN_UNREACHABLE, {ifindex: eth0, gateway: null})))
+  route_change("DUPLICATE", .AddRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))
+  route_change("NOWHERE_SCOPE", .AddRoute(foreign_route("203.0.122.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_PROHIBIT, none)))
+  route_change("HOST_SCOPE", .AddRoute(foreign_route("203.0.123.0", network.TABLE_MAIN, SCOPE_HOST, RTN_BLACKHOLE, none)))
+  route_change("UNICAST_NOWHERE_SCOPE", .AddRoute(foreign_route("203.0.124.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_UNICAST, {ifindex: eth0, gateway: null})))
   for route_type in [0, 10, 12] {
-    route_change(f"INVALID type={route_type}", state.AddRoute(foreign_route("203.0.125.0", network.TABLE_MAIN, 0, route_type, none)))?
+    route_change(f"INVALID type={route_type}", .AddRoute(foreign_route("203.0.125.0", network.TABLE_MAIN, 0, route_type, none)))
   }
   for route_type in rejecting {
-    route_change(f"DELETE type={route_type}", state.RemoveRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))?
+    route_change(f"DELETE type={route_type}", .RemoveRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))
   }
-  route_change("DELETE_AGAIN", state.RemoveRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))?
-  connect_through("released", "203.0.106.1")?
-  reject_route_lines("deleted")?
+  route_change("DELETE_AGAIN", .RemoveRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))
+  connect_through("released", "203.0.106.1")
+  reject_route_lines("deleted")
 }
 
 pure syslog_record(line: Str) -> Str {
-  var fields: List[Str] = []
-  for field in rx" header_time=\x22[^\x22]*\x22".replace(line, with: "").split(" ") {
-    let name = field.split("=")[0]
-    guard !(name in ["seq", "boot", "boottime_ns", "kseq", "ktime_us", "tag_pid"]) else { continue }
-    if name == "pid" and field != "pid=-" { fields += ["pid=N"] } else { fields += [field] }
+  let fields = collect {
+    for field in rx" header_time=\x22[^\x22]*\x22".replace(line, with: "").split(" ") {
+      let name = field.split("=")[0]
+      guard !(name in ["seq", "boot", "boottime_ns", "kseq", "ktime_us", "tag_pid"]) else { continue }
+      if name == "pid" and field != "pid=-" { yield "pid=N" } else { yield field }
+    }
   }
   fields.join(" ")
 }
@@ -370,7 +369,7 @@ proc kmsg_write(label: Str, text: Str) [fs, error] {
   }
 }
 
-proc kmsg_device() [fs, process, net, error] {
+proc kmsg_device() {
   let fd = unix.open_fd(p"/dev/kmsg", nonblock: true)?
   defer unix.close_fd(fd)
   let _ = unix.seek_fd(fd, 0, whence: "end")?
@@ -396,7 +395,7 @@ proc kmsg_device() [fs, process, net, error] {
   defer unix.close_fd(behind)
   let _ = unix.seek_fd(behind, 0, whence: "end")?
   let filler = ["f" for _ in range(960)].join("")
-  for index in range(600) { p"/dev/kmsg".write(f"laputa-kmsg fill {index} {filler}")? }
+  for index in range(600) { p"/dev/kmsg".write(f"laputa-kmsg fill {index} {filler}") }
   kmsg_errno("overrun", unix.read_fd(behind, KMSG_RECORD_LIMIT))
   match unix.read_fd(behind, KMSG_RECORD_LIMIT) {
     Ok(_) => eprint --flush "NET_DHCP_kmsg_after_overrun record"
@@ -407,21 +406,21 @@ proc kmsg_device() [fs, process, net, error] {
 proc syslog_consumer() [fs, process, env, time, net, error] {
   let log = fp"{WORK}/syslog.out"
   let errors = fp"{WORK}/syslog.err"
-  let command = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/lib/xsh/core/syslogd", "--state", WORK.display(), "--socket", "/dev/log", "--kmsg", "/dev/kmsg"], WORK, {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", log, errors, timeout: 600s)
+  let command = process.command_argv(p"/usr/bin/xsh", ["/usr/bin/xsh", "/usr/lib/xsh/core/syslogd", "--state", WORK, "--socket", "/dev/log", "--kmsg", "/dev/kmsg"], WORK, {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", log, errors, timeout: 600s)
   let receiver = unix.spawn_process_group_log(command, log)?
   let deadline = elapsed_ms()? + 15000
-  while elapsed_ms()? < deadline and !p"/dev/log".exists()? { time.sleep(50ms) }
+  while elapsed_ms()? < deadline and !p"/dev/log".exists() { time.sleep(50ms) }
   eprint --flush f"NET_DHCP_syslog_SOCKET published={p"/dev/log".exists()?}"
   for mode in ["basic", "multiline", "forge"] {
     let status = process.run(process.command_argv(p"/usr/lib/asterinas/case/syslog-client", [p"/usr/lib/asterinas/case/syslog-client", mode]))?
     eprint --flush f"NET_DHCP_syslog_CLIENT {mode} ok={status.ok}"
   }
   let logged = elapsed_ms()? + 10000
-  while elapsed_ms()? < logged and !(log.exists()? and "forged" in log.read_text()?) { time.sleep(POLL_MS * 1ms) }
-  p"/dev/kmsg".write("<14>laputa-syslog: a kernel ring record\n")?
+  while elapsed_ms()? < logged and !(log.exists() and "forged" in log.read_text()?) { time.sleep(POLL_MS * 1ms) }
+  p"/dev/kmsg".write("<14>laputa-syslog: a kernel ring record\n")
   time.sleep(1s)
   let _ = unix.shutdown_process_groups([receiver.pid], 3s, 100ms)?
-  for line in log.read_text()?.lines() {
+  for line in log.read_lines()? {
     guard !("source=kmsg" in line) or "laputa-syslog" in line else { continue }
     guard !line.starts_with("event=stop") else {
       eprint --flush f"NET_DHCP_syslog_STOP {[field for field in line.split(" ") if field.starts_with("dropped_") or field.starts_with("senders=")].join(" ")}"
@@ -429,14 +428,14 @@ proc syslog_consumer() [fs, process, env, time, net, error] {
     }
     eprint --flush f"NET_DHCP_syslog_LINE {syslog_record(line)}"
   }
-  if errors.exists()? {
-    for line in errors.read_text()?.lines() { eprint --flush f"NET_DHCP_syslog_ERR {line}" }
+  if errors.exists() {
+    for line in errors.read_lines()? { eprint --flush f"NET_DHCP_syslog_ERR {line}" }
   }
 }
 
 proc state_lines() [fs, process, env, time, net, error] -> Result[List[Str]] {
   let dump = linux.network_dump()?
-  var lines: List[Str] = []
+  var lines = []
   var eth0 = 0
   var names: Map[Int, Str] = {}
   for link in dump.links {
@@ -453,8 +452,8 @@ proc state_lines() [fs, process, env, time, net, error] -> Result[List[Str]] {
     lines += [f"ROUTE {route.destination ?? "default"}/{route.destination_prefix_length} via={route.gateway ?? "-"} table={route.table} proto={route.protocol} scope={route.scope} type={route.route_type} prio={route.priority ?? 0}"]
   }
   let resolv = fp"{WORK}/etc/resolv.conf"
-  if resolv.exists()? {
-    for line in resolv.read_text()?.lines() {
+  if resolv.exists() {
+    for line in resolv.read_lines()? {
       guard line.starts_with("nameserver") else { continue }
       lines += [f"RESOLV {line}"]
     }
@@ -462,7 +461,7 @@ proc state_lines() [fs, process, env, time, net, error] -> Result[List[Str]] {
   Ok(lines)
 }
 
-proc snapshot(label: Str) [fs, process, env, time, net, error] -> Result[List[Str]] {
+proc snapshot(label: Str) -> Result[List[Str]] {
   let lines = state_lines()?
   for line in lines { eprint --flush f"NET_DHCP_{label}_{line}" }
   Ok(lines)
@@ -480,34 +479,34 @@ proc require_state(label: Str, lines: List[Str], present: List[Str], absent: Lis
 proc main() [fs, process, env, time, net, io, error] {
   let mode = p"/usr/lib/asterinas/case/mode".read_text()?.trim()
   eprint --flush f"NET_BEGIN {mode}"
-  fp"{WORK}/etc".mkdir(parents: true)?
-  fp"{WORK}/etc/resolv.static".write(f"nameserver {FOREIGN_RESOLVER}\n")?
-  fixture.link_up("eth0")?
-  fixture.address_add4("lo", FOREIGN, 32, FOREIGN, "")?
+  fp"{WORK}/etc".mkdir()
+  fp"{WORK}/etc/resolv.static".write(f"nameserver {FOREIGN_RESOLVER}\n")
+  fixture.link_up("eth0")
+  fixture.address_add4("lo", FOREIGN, 32, FOREIGN, "")
   let capture = open_capture(fixture.index_of("eth0"))?
   var client = start_client()?
   match mode {
     "lease-acquire" => {
-      await_state("bound", "bound", 30000)?
-      messages("bound", capture)?
+      await_state("bound", "bound", 30000)
+      messages("bound", capture)
       let _ = snapshot("bound")?
     }
     "lifecycle" => {
-      await_state("bound", "bound", 30000)?
+      await_state("bound", "bound", 30000)
       let _ = snapshot("bound")?
-      watch_states("lease", 24000)?
-      messages("lease", capture)?
+      watch_states("lease", 24000)
+      messages("lease", capture)
       let _ = snapshot("expired")?
     }
     "renewal" => {
-      await_state("bound", "bound", 30000)?
+      await_state("bound", "bound", 30000)
       time.sleep(24s)
-      messages("renewed", capture)?
+      messages("renewed", capture)
       let _ = snapshot("renewed")?
     }
     "reconfigure" => {
-      await_state("bound", "bound", 30000)?
-      add_foreign_routes()?
+      await_state("bound", "bound", 30000)
+      add_foreign_routes()
       let first = snapshot("bound")?
       require_state(
         "bound",
@@ -521,9 +520,9 @@ proc main() [fs, process, env, time, net, io, error] {
           "RESOLV nameserver 192.0.2.1",
         ],
         [],
-      )?
+      )
       time.sleep(14s)
-      messages("renewed", capture)?
+      messages("renewed", capture)
       let renewed = snapshot("renewed")?
       require_state(
         "renewed",
@@ -544,64 +543,64 @@ proc main() [fs, process, env, time, net, io, error] {
           "ROUTE default/0 via=192.0.2.1 table=254 proto=16 scope=0 type=1 prio=100",
           "RESOLV nameserver 192.0.2.1",
         ],
-      )?
+      )
     }
     "nak" => {
-      await_state("bound", "bound", 30000)?
+      await_state("bound", "bound", 30000)
       time.sleep(24s)
-      messages("nak", capture)?
+      messages("nak", capture)
       let _ = snapshot("after_nak")?
     }
     "restart" => {
-      await_state("bound", "bound", 30000)?
+      await_state("bound", "bound", 30000)
       let _ = snapshot("bound")?
-      crash_client(client)?
+      crash_client(client)
       let _ = snapshot("crashed")?
       client = start_client()?
-      await_state("restarted", "bound", 30000)?
-      messages("restarted", capture)?
+      await_state("restarted", "bound", 30000)
+      messages("restarted", capture)
       let _ = snapshot("restarted")?
     }
     "carrier" => {
-      await_state("bound", "bound", 30000)?
+      await_state("bound", "bound", 30000)
       let _ = snapshot("bound")?
-      link_lines("bound")?
+      link_lines("bound")
       for cycle in [1, 2, 3] {
-        fixture.link_down("eth0")?
-        await_state(f"down{cycle}", "no_link", 15000)?
+        fixture.link_down("eth0")
+        await_state(f"down{cycle}", "no_link", 15000)
         let _ = snapshot(f"down{cycle}")?
-        link_lines(f"down{cycle}")?
-        fixture.link_up("eth0")?
-        await_state(f"up{cycle}", "bound", 40000)?
-        messages(f"up{cycle}", capture)?
+        link_lines(f"down{cycle}")
+        fixture.link_up("eth0")
+        await_state(f"up{cycle}", "bound", 40000)
+        messages(f"up{cycle}", capture)
         let _ = snapshot(f"up{cycle}")?
-        link_lines(f"up{cycle}")?
+        link_lines(f"up{cycle}")
       }
     }
     "reject-routes" => {
-      await_state("bound", "bound", 30000)?
-      reject_routes()?
+      await_state("bound", "bound", 30000)
+      reject_routes()
     }
     "syslog" => {
-      await_state("bound", "bound", 30000)?
-      kmsg_device()?
-      syslog_consumer()?
+      await_state("bound", "bound", 30000)
+      kmsg_device()
+      syslog_consumer()
     }
     "tcp" => {
-      await_state("bound", "bound", 30000)?
+      await_state("bound", "bound", 30000)
       let before = run.text /usr/lib/asterinas/case/tcp-client "transfer"
       eprint --flush f"NET_DHCP_tcp_before {before.trim()}"
       let _ = start_tcp_client()?
-      if !await_file(fp"{WORK}/halfway", 60000)? { eprint --flush "NET_DHCP_tcp_TIMEOUT waiting for the halfway mark" }
-      fixture.link_down("eth0")?
-      await_state("down", "no_link", 15000)?
-      fixture.link_up("eth0")?
-      await_state("up", "bound", 40000)?
+      if !await_file(fp"{WORK}/halfway", 60000) { eprint --flush "NET_DHCP_tcp_TIMEOUT waiting for the halfway mark" }
+      fixture.link_down("eth0")
+      await_state("down", "no_link", 15000)
+      fixture.link_up("eth0")
+      await_state("up", "bound", 40000)
       time.sleep(500ms)
       let _ = snapshot("rebound")?
-      fp"{WORK}/resume".write("x\n")?
-      if !await_file(fp"{WORK}/tcp-done", 150000)? { eprint --flush "NET_DHCP_tcp_TIMEOUT waiting for the transfer" }
-      for line in fp"{WORK}/tcp-result".read_text()?.lines() {
+      fp"{WORK}/resume".write("x\n")
+      if !await_file(fp"{WORK}/tcp-done", 150000) { eprint --flush "NET_DHCP_tcp_TIMEOUT waiting for the transfer" }
+      for line in fp"{WORK}/tcp-result".read_lines()? {
         if line.starts_with("DHCP_DETAIL") { eprint --flush $line } else { eprint --flush f"NET_DHCP_tcp_disrupted {line}" }
       }
       let after = run.text /usr/lib/asterinas/case/tcp-client "transfer"
@@ -609,8 +608,8 @@ proc main() [fs, process, env, time, net, io, error] {
     }
     other => fail f"unknown dhcp mode {other}"
   }
-  stop_client(client)?
-  show_client_log()?
+  stop_client(client)
+  show_client_log()
   eprint --flush "NET_DONE"
 }
 main()

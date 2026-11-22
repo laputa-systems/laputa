@@ -58,10 +58,11 @@ export pure render(result: report.Report, options: Options) -> Result[Str, Error
 }
 
 proc declare_all(hosts: List[model.Host], deployed: deployment.Deployment) [fs, env, error] -> Result[List[workload.Workload], Error] {
-  var declared: List[workload.Workload] = []
-  for host in hosts {
-    let resources = ctx f"host {host.name}" { deployed.resources(host)? }
-    declared += [workload.Workload(host:, resources:)]
+  let declared: List[workload.Workload] = collect {
+    for host in hosts {
+      let resources = ctx f"host {host.name}" { deployed.resources(host)? }
+      yield workload.Workload(host:, resources:)
+    }
   }
 
   Ok(declared)
@@ -112,18 +113,12 @@ export proc unlock_command(inventory_file: Path, host_name: Str, token: Str?, lo
   }
 
   let target = lock_path.replace("{host}", with: host_name)
-  let connection = match transport.connect(hosts[0]) {
-    Ok(opened) => opened
-    Err(error) => {
-      fail error.message
-    }
+  let connection = transport.connect(hosts[0]) ?? { |error|
+    fail error.message
   }
 
-  let holder = match lock.inspect(connection, target) {
-    Ok(found) => found
-    Err(error) => {
-      fail error.message
-    }
+  let holder = lock.inspect(connection, target) ?? { |error|
+    fail error.message
   }
 
   if token == null {

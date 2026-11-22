@@ -26,7 +26,7 @@ main(@args)?
   let runner = if configured != "" { fp"{configured}" } else { process.which("xsh")? }
   let first = spawn run $runner $script $url $a $ready_a $release $root ?
   let second = spawn run $runner $script $url $b $ready_b $release $root ?
-  wait until ready_a.exists()? and ready_b.exists()? within 10s every 10ms
+  wait until ready_a.exists() and ready_b.exists() within 10s every 10ms
   release.write("go")
   let statuses = wait [first, second]?
   assert statuses[0].ok != statuses[1].ok

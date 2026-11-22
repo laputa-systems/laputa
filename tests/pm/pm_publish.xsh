@@ -1,7 +1,7 @@
 ##! Behavior coverage for verified BuildPlan repository snapshots and immutable file publication.
 use pm.catalog
-use pm.execute as execute
-use pm.local as local
+use pm.execute
+use pm.local
 use pm.plan
 use pm.plan_json
 use pm.policy
@@ -128,7 +128,7 @@ proc stage_plan_artifacts(
     payload.write(if package_kind == "meta" { "laputa metapackage payload marker\n" } else { f"payload {node.package_id}\n" })
     let payload_sha256 = hash.sha256(payload)?.hex()
     let runtime_dependencies = [
-      dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime
+      dependency.name for dependency in node.dependencies if dependency.kind == .Runtime
     ]
     if include_package_kind {
       json.write(
@@ -141,10 +141,10 @@ proc stage_plan_artifacts(
           rel: node.rel,
           deps: if dependency_order.is_empty() or runtime_dependencies.is_empty() { runtime_dependencies } else { dependency_order },
           runtime_only_deps: [
-            dependency.name for dependency in node.dependencies if dependency.kind == types.RuntimeOnly
+            dependency.name for dependency in node.dependencies if dependency.kind == .RuntimeOnly
           ],
-          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildHost],
-          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildTarget],
+          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == .BuildHost],
+          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == .BuildTarget],
           package_kind,
           filetree: [],
           manifest: [],
@@ -161,12 +161,12 @@ proc stage_plan_artifacts(
           additional_metadata: {source: "recipe"},
           ver: node.ver,
           rel: node.rel,
-          deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime],
+          deps: [dependency.name for dependency in node.dependencies if dependency.kind == .Runtime],
           runtime_only_deps: [
-            dependency.name for dependency in node.dependencies if dependency.kind == types.RuntimeOnly
+            dependency.name for dependency in node.dependencies if dependency.kind == .RuntimeOnly
           ],
-          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildHost],
-          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildTarget],
+          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == .BuildHost],
+          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == .BuildTarget],
           filetree: [],
           manifest: [],
           metadata_sha256: "",
@@ -199,7 +199,7 @@ test test_snapshot_defaults_only_omitted_legacy_package_kind_to_payload [fs, env
   let legacy = repo.snapshot(value, legacy_store)?
 
   for publication in legacy.packages {
-    assert publication.kind == types.Payload
+    assert publication.kind == .Payload
   }
 
   let invalid_store = test.temp_dir(ctx, name: "publish-invalid-package-kind-store")?
@@ -395,11 +395,11 @@ export let filetree = []
     remote.plan_artifact_from_package_at_repo(entry, remote_url, index_cache)?
     for entry in index
   ]
-  let remote_snapshot: types.RemoteSnapshot = {
-    target,
+  let remote_snapshot: types.RemoteSnapshot = types.RemoteSnapshot(
+    target:,
     index_sha256: hash.sha256(index_path)?.hex(),
     packages: remote_packages,
-  }
+  )
   let imported_plan = plan.resolve(
     catalog.load_for_target(repo_root, target)?,
     remote_snapshot,
@@ -433,7 +433,7 @@ export let filetree = []
 
   let selector_artifact = [package for package in remote_packages if package.name == "selector"][0]
   let remote_metadata = fp"{remote_root}/{selector_row.metadata}"
-  let original_metadata: local.PackageMetadataDto = json.read(remote_metadata)?.require(local.PackageMetadataDto)?
+  let original_metadata: local.PackageMetadataDto = json.read(remote_metadata)?.require()?
   let selector_remote_node = {...selector_node, remote: selector_artifact.retrieval}
   json.write(remote_metadata, {...original_metadata, package_kind: "payload"})
   let wrong_kind_node = {
@@ -523,7 +523,7 @@ export let filetree = []
   }
 }
 
-test test_remote_decoder_keeps_payload_states_unambiguous [fs, net, env, error] { |ctx|
+test test_remote_decoder_keeps_payload_states_unambiguous [fs, net, env, error] {
   let empty_meta = remote.decode_remote_package(remote_decoder_row(true, "", "", 0))?
   let meta_plan = remote.plan_artifact_from_package(empty_meta)?
   assert types.remote_payload_is_metadata_only(meta_plan.retrieval.payload)

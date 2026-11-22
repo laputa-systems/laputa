@@ -7,22 +7,20 @@ const label = "xinfra-fixture"
 
 type State = {containers: List[Str]}
 
-proc docker_text(...argv: List[Str]) [process, error] -> Result[Str] {
+proc docker_text(...argv: List[Str]) -> Result[Str] {
   let out = run.text docker @argv
   Ok(out.trim())
 }
 
-proc fingerprint(pub: Path) [process, error] -> Result[Str] {
+proc fingerprint(pub: Path) -> Result[Str] {
   let line = run.text ssh-keygen -lf $pub
   Ok(line.fields()[1])
 }
 
-proc wait_for_sshd(container: Str) [process, time, error] -> Result[Unit] {
+proc wait_for_sshd(container: Str) {
   for _ in range(50) {
     let status = run.status docker exec $container nc -z 127.0.0.1 22
-    if status.ok {
-      return
-    }
+    return when status.ok
 
     time.sleep(200ms)
   }
@@ -30,7 +28,7 @@ proc wait_for_sshd(container: Str) [process, time, error] -> Result[Unit] {
   fail f"sshd in {container} did not start"
 }
 
-proc keygen(file: Path) [process, error] {
+proc keygen(file: Path) {
   run ssh-keygen -q -t ed25519 -N "" -f $file
 }
 
@@ -40,16 +38,16 @@ cli main build() [process, error] {
 }
 
 ## Start COUNT hosts and write DIR/inventory.toml.
-cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, error] {
+cli main up(count: UInt = 3, dir = p".work/fixtures") [fs, process, time, error] {
   guard count >= 1 and count <= 8 else {
     fail "count must be 1..8"
   }
 
   let run_id = f"{time.now()}"
-  fp"{dir}".mkdir(parents: true)
+  dir.mkdir()
   let client = fp"{dir}/client"
-  if ! fp"{client}".exists()? {
-    keygen(client)?
+  if ! client.exists() {
+    keygen(client)
   }
 
   var lines = [
@@ -60,10 +58,10 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
     "timeout_ms = 10000",
     "",
   ]
-  var ids: List[Str] = []
+  var ids = []
   for index in range(1, count + 1) {
     let host_key = fp"{dir}/host-{run_id}-{index}"
-    keygen(host_key)?
+    keygen(host_key)
     let pin = fingerprint(fp"{host_key}.pub")?
     let name = f"xinfra-fx-{run_id}-{index}"
     let container = docker_text(
@@ -74,7 +72,7 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
       image,
     )?
     ids += [container]
-    wait_for_sshd(container)?
+    wait_for_sshd(container)
     let port = docker_text("inspect", "-f", "{{(index (index .NetworkSettings.Ports \"22/tcp\") 0).HostPort}}", container)?
     lines += [
       f"[hosts.fx-{index}]",
@@ -99,17 +97,15 @@ cli main up(count: UInt = 3, dir: Path = p".work/fixtures") [fs, process, time, 
     ]
   }
 
-  fp"{dir}/inventory.toml".write(lines.join("\n") + "\n")
-  json.write(fp"{dir}/containers.json", {containers: ids})?
+  fp"{dir}/inventory.toml".write_lines(lines)
+  json.write(fp"{dir}/containers.json", {containers: ids})
   print f"started {ids.len()} host(s); inventory at {dir}/inventory.toml"
 }
 
 ## Remove the containers recorded in DIR/containers.json.
-cli main down(dir: Path = p".work/fixtures") [fs, process, error] {
+cli main down(dir = p".work/fixtures") [fs, process, error] {
   let record = fp"{dir}/containers.json"
-  if ! record.exists()? {
-    return
-  }
+  return unless record.exists()
 
   let state = json.read(record)?.require(State)?
   for container in state.containers {

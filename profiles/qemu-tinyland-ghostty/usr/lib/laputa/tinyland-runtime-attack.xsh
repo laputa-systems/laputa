@@ -14,9 +14,9 @@ proc main() [fs, process, error] {
   let session = user.lookup("laputa")?
   let identity = unix.id()?
   guard identity.uid == attacker.uid and identity.euid == attacker.uid else { fail "runtime attack has wrong identity" }
-  permission_denied(fs.symlink(p"/etc", p"/run/user/laputa-attack"))?
-  permission_denied(fs.symlink(p"/etc", fp"/run/user/{session.uid}/laputa-attack"))?
-  permission_denied(fs.rename_noreplace(fp"/run/user/{session.uid}", p"/run/user/laputa-displaced"))?
+  permission_denied(p"/run/user/laputa-attack".symlink(to: p"/etc"))
+  permission_denied(fp"/run/user/{session.uid}/laputa-attack".symlink(to: p"/etc"))
+  permission_denied(fs.rename_noreplace(fp"/run/user/{session.uid}", p"/run/user/laputa-displaced"))
 }
 
 main()

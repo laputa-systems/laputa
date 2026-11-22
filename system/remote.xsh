@@ -20,6 +20,8 @@ export type RemoteTarget = {
 
 ## The remote protocol version the guest program speaks.
 export const REMOTE_PROTOCOL = "laputa-remote-1"
+const CONTROL_CHARACTERS = "\u{0}\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\u{b}\u{c}\u{d}\u{e}\u{f}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{1a}\u{1b}\u{1c}\u{1d}\u{1e}\u{1f}\u{7f}"
+
 ## Reads the reviewed remote program from a Laputa checkout.
 export proc remote_program(root: Path) [fs, error] -> Result[Str, Error] {
   fp"{root}/system/remote_guest.xsh".read_text()?
@@ -39,8 +41,6 @@ export type ExecResult = {
   stderr: Bytes,
 }
 
-const CONTROL_CHARACTERS = "\u{0}\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\u{b}\u{c}\u{d}\u{e}\u{f}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{1a}\u{1b}\u{1c}\u{1d}\u{1e}\u{1f}\u{7f}"
-
 # Guest-supplied text with its control and escape characters removed, so it is safe to show.
 pure plain(text: Str) -> Str {
   text.delete(CONTROL_CHARACTERS)
@@ -49,24 +49,24 @@ pure plain(text: Str) -> Str {
 ## Decodes one remote program run into its reply record or a typed refusal.
 export proc remote_decode_reply(result: ExecResult) [error] -> Result[Record, Error] {
   guard ! result.missing else {
-    return Err(RemoteError.Malformed(message: "the remote program ended without a completion status"))
+    return Err(RemoteError.Malformed("the remote program ended without a completion status"))
   }
   guard result.exit_code == 0 else {
     return Err(RemoteError.Failed(exit_code: result.exit_code, message: plain(result.stderr.utf8()?.trim())))
   }
   let text = result.stdout.utf8()?.trim()
   guard ! text.is_empty() and "\n" not in text else {
-    return Err(RemoteError.Malformed(message: "the remote program must answer with exactly one line"))
+    return Err(RemoteError.Malformed("the remote program must answer with exactly one line"))
   }
   let reply = json.decode(text)?.require(Record)?
   guard json.get(reply, ["protocol"], "") == REMOTE_PROTOCOL else {
-    return Err(RemoteError.Malformed(message: "the remote program speaks another protocol"))
+    return Err(RemoteError.Malformed("the remote program speaks another protocol"))
   }
-  if json.get(reply, ["ok"], false).require(Bool)? {
+  if json.get(reply, ["ok"], false).require(Bool) {
     return json.get(reply, ["result"], {}).require(Record)?
   }
   let failure = json.get(reply, ["error"], {}).require(Record)?
-  Err(RemoteError.Refused(kind: plain(json.get(failure, ["kind"], "").require(Str)?), message: plain(json.get(failure, ["message"], "").require(Str)?)))
+  Err(RemoteError.Refused(kind: plain(json.get(failure, ["kind"], "").require()?), message: plain(json.get(failure, ["message"], "").require()?)))
 }
 
 proc call(session: RemoteSession, program: Str, request: Any, payload: Path?, timeout_ms: Int) [fs, net, error] -> Result[Record, Error] {
@@ -94,26 +94,28 @@ export type RemoteLog = {path: Str, readable: Bool, lines: List[Str]}
 ## Bounded evidence for a failure.
 export type RemoteDiagnosis = {services: List[RemoteService], unhealthy: List[RemoteService], logs: List[RemoteLog]}
 
-proc services_of(value: Any) [error] -> Result[List[RemoteService], Error] {
-  var found: List[RemoteService] = []
-  for item in value.require(List[Record])? {
-    found += [{
-      name: json.get(item, ["name"], "").require(Str)?,
-      state: json.get(item, ["state"], "").require(Str)?,
-      restarts: json.get(item, ["restarts"], 0).require(Int)?,
-    }]
+proc services_of(value: Any) -> Result[List[RemoteService], Error] {
+  let found: List[RemoteService] = collect {
+    for item in value.require(List[Record])? {
+      yield {
+        name: json.get(item, ["name"], "").require(Str)?,
+        state: json.get(item, ["state"], "").require(Str)?,
+        restarts: json.get(item, ["restarts"], 0).require(Int)?,
+      }
+    }
   }
   found
 }
 
-proc logs_of(value: Any) [error] -> Result[List[RemoteLog], Error] {
-  var found: List[RemoteLog] = []
-  for item in value.require(List[Record])? {
-    found += [{
-      path: json.get(item, ["path"], "").require(Str)?,
-      readable: json.get(item, ["readable"], false).require(Bool)?,
-      lines: json.get(item, ["lines"], []).require(List[Str])?,
-    }]
+proc logs_of(value: Any) -> Result[List[RemoteLog], Error] {
+  let found: List[RemoteLog] = collect {
+    for item in value.require(List[Record])? {
+      yield {
+        path: json.get(item, ["path"], "").require(Str)?,
+        readable: json.get(item, ["readable"], false).require(Bool)?,
+        lines: json.get(item, ["lines"], []).require(List[Str])?,
+      }
+    }
   }
   found
 }
@@ -125,8 +127,8 @@ export proc remote_inspect(session: RemoteSession, program: Str) [fs, net, error
     generation: json.get(reply, ["generation"], null),
     health: json.get(reply, ["health"], null),
     services: services_of(json.get(reply, ["services"], []))?,
-    kernel: json.get(reply, ["kernel"], "").require(Str)?,
-    hostname: json.get(reply, ["hostname"], "").require(Str)?,
+    kernel: json.get(reply, ["kernel"], "").require()?,
+    hostname: json.get(reply, ["hostname"], "").require()?,
   }
 }
 
@@ -139,14 +141,14 @@ export pure remote_run_request(argv: List[Str], timeout_ms: Int, environment: Ma
 }
 
 ## Runs an explicit argv, without a shell, with the operator's authority.
-export proc remote_run(session: RemoteSession, program: Str, argv: List[Str], timeout_ms: Int = 30000, environment: Map[Str]? = null, cwd: Str? = null) [fs, net, error] -> Result[RemoteRun, Error] {
+export proc remote_run(session: RemoteSession, program: Str, argv: List[Str], timeout_ms = 30000, environment: Map[Str]? = null, cwd: Str? = null) [fs, net, error] -> Result[RemoteRun, Error] {
   let reply = call(session, program, remote_run_request(argv, timeout_ms, environment, cwd), null, timeout_ms + 15000)?
   {
-    exit_code: json.get(reply, ["exit_code"], -1).require(Int)?,
-    signaled: json.get(reply, ["signaled"], false).require(Bool)?,
+    exit_code: json.get(reply, ["exit_code"], -1).require()?,
+    signaled: json.get(reply, ["signaled"], false).require()?,
     stdout: json.get(reply, ["stdout_b64"], "").require(Str)?.base64_decode()?,
     stderr: json.get(reply, ["stderr_b64"], "").require(Str)?.base64_decode()?,
-    truncated: json.get(reply, ["truncated"], false).require(Bool)?,
+    truncated: json.get(reply, ["truncated"], false).require()?,
   }
 }
 
@@ -162,14 +164,14 @@ export proc remote_digest(source: Path) [fs, error] -> Result[Str, Error] {
 ## named `name` is refused, and a refused or interrupted transfer leaves no file.
 ## A failure after the request left is never retried here; reconcile with `remote_staged`.
 ## Verified staging is not an authenticity claim.
-export proc remote_stage(session: RemoteSession, program: Str, source: Path, name: Str, sha256: Str, timeout_ms: Int = 600000) [fs, net, error] -> Result[RemoteStage, Error] {
+export proc remote_stage(session: RemoteSession, program: Str, source: Path, name: Str, sha256: Str, timeout_ms = 600000) [fs, net, error] -> Result[RemoteStage, Error] {
   let size = source.metadata()?.size
   let reply = call(session, program, {protocol: REMOTE_PROTOCOL, op: "stage", name: name, size: size, sha256: sha256}, source, timeout_ms)?
   {
-    outcome: json.get(reply, ["outcome"], "").require(Str)?,
-    path: json.get(reply, ["path"], "").require(Str)?,
-    size: json.get(reply, ["size"], 0).require(Int)?,
-    sha256: json.get(reply, ["sha256"], "").require(Str)?,
+    outcome: json.get(reply, ["outcome"], "").require()?,
+    path: json.get(reply, ["path"], "").require()?,
+    size: json.get(reply, ["size"], 0).require()?,
+    sha256: json.get(reply, ["sha256"], "").require()?,
   }
 }
 
@@ -177,10 +179,10 @@ export proc remote_stage(session: RemoteSession, program: Str, source: Path, nam
 export proc remote_staged(session: RemoteSession, program: Str, name: Str) [fs, net, error] -> Result[RemoteStaged, Error] {
   let reply = call(session, program, {protocol: REMOTE_PROTOCOL, op: "staged", name: name}, null, 30000)?
   {
-    present: json.get(reply, ["present"], false).require(Bool)?,
-    size: json.get(reply, ["size"], 0).require(Int)?,
-    sha256: json.get(reply, ["sha256"], "").require(Str)?,
-    incoming: json.get(reply, ["incoming"], []).require(List[Str])?,
+    present: json.get(reply, ["present"], false).require()?,
+    size: json.get(reply, ["size"], 0).require()?,
+    sha256: json.get(reply, ["sha256"], "").require()?,
+    incoming: json.get(reply, ["incoming"], []).require()?,
   }
 }
 
@@ -199,5 +201,4 @@ export proc remote_diagnose_afresh(target: RemoteTarget, program: Str) [fs, net,
   with session = remote_connect(target)? {
     return remote_diagnose(session, program)?
   }
-  Err(RemoteError.Malformed(message: "unreachable"))
 }

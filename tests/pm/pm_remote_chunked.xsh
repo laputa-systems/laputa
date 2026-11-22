@@ -17,18 +17,18 @@ test immutable_http_publication_across_chunk_boundary [fs, process, env, time, n
   let root = test.temp_dir(ctx, name: "chunked-mirror")?
   let data = fp"{root}/data"
   let output = fp"{root}/server.log"
-  let configured = env.get("LAPUTA_MIRROR_BIN") ?? ""
+  let configured = e"LAPUTA_MIRROR_BIN" ?? ""
   guard configured != "" else {
     return test.fail("LAPUTA_MIRROR_BIN must name a built laputa-mirror; run this test through make test-pm")
   }
   let mirror = path.absolute(fp"{configured}")?
   let child = spawn run $mirror --local $data --listen "127.0.0.1:0" > $output 2> $output ?
-  defer stop_mirror(child)?
-  wait until output.exists()? and "(local mode, no auth)" in output.read_text()? within 20s every 50ms
+  defer stop_mirror(child)
+  wait until output.exists() and "(local mode, no auth)" in output.read_text()? within 20s every 50ms
   let url = output.read_text()?.split(" ")[0]
   let source = fp"{root}/source"
-  source.write(b"laputa")?
-  source.truncate(67108864)?
+  source.write(b"laputa")
+  source.truncate(67108864)
   let work = fp"{root}/work"
   let exact = p"sources/zlib/zlib-1.3.2-5-aarch64-src.tar.bz2"
   let large = p"sources/zlib/zlib-1.3.2-6-aarch64-src.tar.bz2"
@@ -36,7 +36,7 @@ test immutable_http_publication_across_chunk_boundary [fs, process, env, time, n
   let fetched = fp"{root}/fetched"
   assert remote.try_fetch_repo_file(url, exact, fetched)? == ""
   assert fetched.read_bytes()? == source.read_bytes()?
-  source.truncate(67108865)?
+  source.truncate(67108865)
   let _ = bytes.write_at(source, 67108864, b"a")?
   assert remote.upload_immutable_repo_file(url, large, source, "", work)?
   assert remote.try_fetch_repo_file(url, large, fetched)? == ""

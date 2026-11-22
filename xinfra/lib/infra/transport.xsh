@@ -45,8 +45,8 @@ export pure certainty_of(error: SshError) -> ssh.Certainty {
 
 pure transport_error(error: SshError) -> TransportError {
   match certainty_of(error) {
-    ssh.Certainty.NotSubmitted => TransportError.NotSubmitted(error.message)
-    ssh.Certainty.Submitted => TransportError.Interrupted(error.message)
+    ssh.Certainty.NotSubmitted => .NotSubmitted(error.message)
+    ssh.Certainty.Submitted => .Interrupted(error.message)
   }
 }
 
@@ -79,7 +79,7 @@ pure ssh_connection(host: model.Host, session: Session) -> Connection {
     host: host.name,
     kind: .Ssh,
     dialect: host.dialect,
-    session: session,
+    session:,
     privilege: host.privilege,
     escalate_reads: host.escalate_reads,
     timeout_ms: host.timeout_ms,
@@ -89,11 +89,11 @@ pure ssh_connection(host: model.Host, session: Session) -> Connection {
 
 pure ssh_target(host: model.Host) -> Result[Record, TransportError] {
   guard let key = host.key else {
-    return Err(TransportError.Refused(f"{host.name}: an ssh host needs a key"))
+    fail .Refused(f"{host.name}: an ssh host needs a key")
   }
 
   guard let host_key = host.host_key else {
-    return Err(TransportError.Refused(f"{host.name}: an ssh host needs a pinned host_key"))
+    fail .Refused(f"{host.name}: an ssh host needs a pinned host_key")
   }
 
   Ok(ssh_options(host, key, host_key))
@@ -107,7 +107,7 @@ export proc connect(host: model.Host) [error] -> Result[Connection, TransportErr
       let options = ssh_target(host)?
       match ssh.connect(options) {
         Ok(session) => Ok(ssh_connection(host, session))
-        Err(error) => Err(TransportError.Unreachable(f"{host.name}: {error.message}"))
+        Err(error) => Err(.Unreachable(f"{host.name}: {error.message}"))
       }
     }
   }
@@ -117,13 +117,14 @@ export proc connect(host: model.Host) [error] -> Result[Connection, TransportErr
 ## order. The sessions belong to the calling scope. A host that stalls or fails
 ## fails only itself.
 export proc connect_all(hosts: List[model.Host], jobs: Int) [error] -> List[Result[Connection, TransportError]] {
-  var targets: List[Record] = []
   var refusals: Map[Str, TransportError] = {}
-  for host in hosts {
-    if host.transport == model.Ssh {
-      match ssh_target(host) {
-        Ok(options) => targets += [options]
-        Err(error) => refusals[host.name] = error
+  let targets: List[Record] = collect {
+    for host in hosts {
+      if host.transport == .Ssh {
+        match ssh_target(host) {
+          Ok(options) => yield options
+          Err(error) => refusals[host.name] = error
+        }
       }
     }
   }
@@ -136,27 +137,25 @@ export proc connect_all(hosts: List[model.Host], jobs: Int) [error] -> List[Resu
     }
   }
 
-  var results: List[Result[Connection, TransportError]] = []
   var next = 0
-  for host in hosts {
-    if host.transport == model.Local {
-      results += [Ok(local_connection(host))]
-      continue
-    }
-
-    match refusals.get(host.name) {
-      Ok(refusal) => {
-        results += [Err(refusal)]
+  let results: List[Result[Connection, TransportError]] = collect {
+    for host in hosts {
+      if host.transport == .Local {
+        yield Ok(local_connection(host))
         continue
       }
-      Err(_) => {}
-    }
 
-    match opened[next] {
-      Ok(session) => results += [Ok(ssh_connection(host, session))]
-      Err(error) => results += [Err(TransportError.Unreachable(f"{host.name}: {error.message}"))]
+      if let Ok(refusal) = refusals.get(host.name) {
+        yield Err(refusal)
+        continue
+      }
+
+      match opened[next] {
+        Ok(session) => yield Ok(ssh_connection(host, session))
+        Err(error) => yield Err(.Unreachable(f"{host.name}: {error.message}"))
+      }
+      next += 1
     }
-    next += 1
   }
 
   results
@@ -169,9 +168,10 @@ export proc usable(connection: Connection) [error] -> Bool {
     return true
   }
 
-  match ssh.info(session) {
-    Ok(info) => info.usable
-    Err(_) => false
+  if let Ok(info) = ssh.info(session) {
+    info.usable
+  } else {
+    false
   }
 }
 
@@ -191,17 +191,17 @@ pure render(connection: Connection, script: Str, args: List[Str], privileged: Bo
       let rendered = if escalate { shell.escalated_command(script, args) } else { shell.command(script, args) }
       match rendered {
         Ok(text) => Ok(text)
-        Err(error) => Err(TransportError.Refused(error.message), cause: error)
+        Err(error) => Err(.Refused(error.message), cause: error)
       }
     }
     model.Xsh => {
       guard ! (privileged and connection.privilege == .Doas) else {
-        return Err(TransportError.Refused("the xsh dialect has no doas escalation; use privilege plain or root"))
+        fail .Refused("the xsh dialect has no doas escalation; use privilege plain or root")
       }
 
       match shell.xsh_command(script, args) {
         Ok(text) => Ok(text)
-        Err(error) => Err(TransportError.Refused(error.message), cause: error)
+        Err(error) => Err(.Refused(error.message), cause: error)
       }
     }
   }
@@ -211,11 +211,11 @@ type Captured = {status: Status, stdout: Bytes, stderr: Bytes}
 
 pure capture_result(captured: Result[Captured, ProcessError]) -> Result[Execution, TransportError] {
   match captured {
-    Err(ProcessError.Timeout {message}) => Err(TransportError.Interrupted(message))
-    Err(error) => Err(TransportError.NotSubmitted(error.message), cause: error)
+    Err(ProcessError.Timeout {message}) => Err(.Interrupted(message))
+    Err(error) => Err(.NotSubmitted(error.message), cause: error)
     Ok(out) => {
       if out.status.signaled() {
-        Err(TransportError.Abnormal(f"the command was killed by a signal"))
+        Err(.Abnormal(f"the command was killed by a signal"))
       } else {
         Ok(Execution(code: out.status.exit_code() ?? 255, stdout: out.stdout, stderr: out.stderr))
       }
@@ -224,29 +224,20 @@ pure capture_result(captured: Result[Captured, ProcessError]) -> Result[Executio
 }
 
 proc exec_local_xsh(command: Str, stdin: Bytes?, stdin_path: Path?, timeout_ms: Int) [fs, process, error] -> Result[Execution, TransportError] {
-  let interpreter = match process.which("xsh") {
-    Ok(found) => found
-    Err(error) => {
-      return Err(TransportError.Refused(f"a local xsh target needs an xsh interpreter on PATH: {error.message}"))
-    }
+  let interpreter = process.which("xsh") ?? { |error|
+    fail .Refused(f"a local xsh target needs an xsh interpreter on PATH: {error.message}")
   }
-  let source = match fs.tempfile() {
-    Ok(found) => found
-    Err(error) => {
-      return Err(TransportError.NotSubmitted(error.message), cause: error)
-    }
+  let source = fs.tempfile() ?? { |error|
+    return Err(.NotSubmitted(error.message), cause: error)
   }
-  let root_path = match source.root.host_path() {
-    Ok(found) => found
-    Err(error) => {
-      return Err(TransportError.NotSubmitted(error.message), cause: error)
-    }
+  let root_path = source.root.host_path() ?? { |error|
+    return Err(.NotSubmitted(error.message), cause: error)
   }
-  let source_path = fp"{root_path}/{source.path.display()}"
+  let source_path = fp"{root_path}/{source.path}"
   match source_path.write(command) {
     Ok(_) => {}
     Err(error) => {
-      return Err(TransportError.NotSubmitted(error.message), cause: error)
+      return Err(.NotSubmitted(error.message), cause: error)
     }
   }
 
@@ -295,9 +286,9 @@ proc exec_ssh(session: Session, command: Str, stdin: Bytes?, stdin_path: Path?, 
     Err(error) => Err(transport_error(error), cause: error)
     Ok(result) => {
       if result.signal != "" {
-        Err(TransportError.Abnormal(f"the command was killed by signal {result.signal}"))
+        Err(.Abnormal(f"the command was killed by signal {result.signal}"))
       } else if result.missing {
-        Err(TransportError.Abnormal("the channel closed without an exit status"))
+        Err(.Abnormal("the channel closed without an exit status"))
       } else {
         Ok(Execution(code: result.exit_code, stdout: result.stdout, stderr: result.stderr))
       }
@@ -320,7 +311,7 @@ proc exec_rendered(
     model.Local => exec_local(command, connection.dialect, stdin, stdin_path, limit)
     model.Ssh => {
       guard let session = connection.session else {
-        return Err(TransportError.Refused("an ssh connection has no session"))
+        fail .Refused("an ssh connection has no session")
       }
 
       exec_ssh(session, command, stdin, stdin_path, limit)
@@ -342,11 +333,8 @@ export proc exec(
   stdin_path: Path? = null,
   timeout_ms: Int? = null,
 ) [fs, process, error] -> Result[Execution, TransportError] {
-  let script = match scripts.source(connection.dialect, operation) {
-    Ok(found) => found
-    Err(error) => {
-      return Err(TransportError.Refused(error.message), cause: error)
-    }
+  let script = scripts.source(connection.dialect, operation) ?? { |error|
+    return Err(.Refused(error.message), cause: error)
   }
   exec_rendered(connection, script, args, privileged, stdin, stdin_path, timeout_ms)
 }
@@ -364,7 +352,7 @@ export proc exec_script(
   timeout_ms: Int? = null,
 ) [fs, process, error] -> Result[Execution, TransportError] {
   guard connection.dialect == .Posix else {
-    return Err(TransportError.Refused("a raw POSIX script cannot run on an xsh target"))
+    fail .Refused("a raw POSIX script cannot run on an xsh target")
   }
   exec_rendered(connection, script, args, privileged, stdin, stdin_path, timeout_ms)
 }

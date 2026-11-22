@@ -23,7 +23,7 @@ proc report_xsh_tests(rows: Stream[Str]) [process, error] -> Result[Bool, Error]
   Ok(nonempty and passed)
 }
 
-proc stream_xsh_tests(source_root: Path, test_selection: Str) [process, env, error] -> Result[Bool, Error] {
+proc stream_xsh_tests(source_root: Path, test_selection: Str) -> Result[Bool, Error] {
   cd (source_root) {
     if test_selection == "all" {
       report_xsh_tests(run.stream --text HOME=/root XSH_MODULE_PATH="/usr/lib/asterinas/xsh-source" /usr/bin/xsht test --jobs 1 --nocapture ?)?
@@ -134,9 +134,10 @@ proc main() [fs, process, env, time, net, error] {
   let renamed = fp"{test_dir}/renamed.txt"
   let link = fp"{test_dir}/alias.txt"
   link.symlink(to: p"renamed.txt")
-  var names = []
-  for entry in fs.children(test_dir)? {
-    names += [entry.name]
+  let names = collect {
+    for entry in fs.children(test_dir)? {
+      yield entry.name
+    }
   }
   require("payload.txt" in names and "alias.txt" in names, "directory", "directory traversal missed an entry")
 
@@ -156,7 +157,7 @@ proc main() [fs, process, env, time, net, error] {
     "new tmpfs directory was not visible through rooted enumeration",
   )
   let raw_name = b"raw\xfffile" as Path
-  raw_tmp_root.write(raw_name.require(RelPath)?, b"ok")
+  raw_tmp_root.write(raw_name.require()?, b"ok")
   require(raw_tmp_dir.exists()?, "tmpfs-path", "rooted create removed its parent path")
   require(
     raw_tmp_root.children(p".")?.children == [raw_name],
@@ -180,7 +181,7 @@ proc main() [fs, process, env, time, net, error] {
   )
 
   let block_numbers = p"/sys/class/block/vda/dev".read_text()?.trim().split(":")
-  let expected_rdev = block_numbers[0].parse_int()? * 256 + block_numbers[1].parse_int()?
+  let expected_rdev = block_numbers[0] as Int * 256 + block_numbers[1] as Int
 
   for round in range(3) {
     if round > 0 {
@@ -198,7 +199,7 @@ proc main() [fs, process, env, time, net, error] {
 
   let stopped = unix.kill_all("mdevd", "TERM")?
   require(stopped.matched >= 1, "coldplug", "no running mdevd to restart")
-  time.sleep(1s)?
+  time.sleep(1s)
   p"/dev/vda".remove()
   let unanswered = process.run(
     process.command_argv(
@@ -241,20 +242,18 @@ proc main() [fs, process, env, time, net, error] {
     let source_root = p"/usr/lib/asterinas/xsh-source"
     let git_marker = fp"{source_root}/.git"
     git_marker.mkdir()
-    var failed_selections = []
-
-    for test_selection in test_selection_path.read_text()?.lines() {
-      if test_selection.trim() == "" { continue }
-      eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
-      let test_run = try { stream_xsh_tests(source_root, test_selection)? }
-      match test_run {
-        Ok(passed) => {
-          if ! passed { failed_selections += [test_selection] }
-        },
-        Err(problem) => {
-          eprint --flush f"XSH test selection could not run: {test_selection}: {problem.message}"
-          failed_selections += [test_selection]
-        },
+    let failed_selections = collect {
+      for test_selection in test_selection_path.read_lines()? {
+        continue when test_selection.trim() == ""
+        eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
+        let test_run = try { stream_xsh_tests(source_root, test_selection)? }
+        match test_run {
+          Ok(passed) => yield test_selection unless passed,
+          Err(problem) => {
+            eprint --flush f"XSH test selection could not run: {test_selection}: {problem.message}"
+            yield test_selection
+          },
+        }
       }
     }
 

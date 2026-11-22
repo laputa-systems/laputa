@@ -1,7 +1,7 @@
 ##! Recipe target policy and real recipe boundary behavior.
+use pm.recipe
 use pm.target
 use pm.types
-use pm.recipe
 
 test typed_target_mappings_preserve_supported_abis [error] {
   let arm = target.lp64_musl_abi(types.Aarch64LinuxMusl)?

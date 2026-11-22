@@ -51,12 +51,12 @@ pure scenario_of(name: Str) -> Result[Scenario, Error] {
   }
 }
 
-proc docker_text(...argv: List[Str]) [process, error] -> Result[Str] {
+proc docker_text(...argv: List[Str]) -> Result[Str] {
   let out = run.text docker @argv
   Ok(out.trim())
 }
 
-proc address_of(container: Str) [process, error] -> Result[Str] {
+proc address_of(container: Str) -> Result[Str] {
   docker_text("inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container)
 }
 
@@ -64,7 +64,7 @@ pure count_of(output: Str, needle: Str) -> Int {
   output.lines() |> where { |line| needle in line } |> count()
 }
 
-proc pyinfra_run(address: Str, work: Path, deploy: Str, key: Str = "client", port: Int = 22) [process, error] -> Result[Run] {
+proc pyinfra_run(address: Str, work: Path, deploy: Str, key = "client", port = 22) -> Result[Run] {
   let mount = f"{work}:/work"
   let script = f"/work/{deploy}.py"
   let keyfile = f"/work/{key}"
@@ -73,21 +73,21 @@ proc pyinfra_run(address: Str, work: Path, deploy: Str, key: Str = "client", por
   Ok(Run(ok: out.status.ok, changed: count_of(output, "] Success") > 0))
 }
 
-proc xinfra_run(inventory: Path, deploy: Str, host: Str) [process, error] -> Result[Run] {
+proc xinfra_run(inventory: Path, deploy: Str, host: Str) -> Result[Run] {
   let program = f"fixtures/pyinfra/{deploy}.xsh"
   let out = run.capture --text xsh bin/xinfra.xsh apply $inventory $program --limit $host
-  let changed = out.stdout.lines() |> where { |line| line.starts_with("apply:") and ! (", 0 changed," in line) } |> count()
+  let changed = out.stdout.lines() |> where .starts_with("apply:") and ! (", 0 changed," in .) |> count()
   Ok(Run(ok: out.status.ok, changed: changed > 0))
 }
 
-proc probe_of(container: Str, script: Str) [process, error] -> Result[Str] {
+proc probe_of(container: Str, script: Str) -> Result[Str] {
   let out = run.capture --text docker exec $container sh -c $script
-  Ok(f"{out.stdout}")
+  Ok(out.stdout)
 }
 
-proc fixture_container(inventory: Path, host: Str) [fs, error] -> Result[Str] {
+proc fixture_container(inventory: Path, host: Str) -> Result[Str] {
   let state = json.read(fp"{inventory.parent()}/containers.json")?.require(State)?
-  let index = host.replace("fx-", with: "").parse_int()? - 1
+  let index = host.replace("fx-", with: "") as Int - 1
   Ok(state.containers[index])
 }
 
@@ -123,10 +123,10 @@ proc compare_scenario(scenario: Scenario, inventory: Path, host: Str, work: Path
   Ok(agreed)
 }
 
-proc compare_unreachable(inventory: Path, host: Str, work: Path, target: Str, address: Str) [fs, process, error] -> Result[Bool] {
+proc compare_unreachable(work: Path, address: Str) -> Result[Bool] {
   let stranger = fp"{work}/stranger"
-  stranger.remove(missing_ok: true)
-  fp"{work}/stranger.pub".remove(missing_ok: true)
+  stranger.remove()
+  fp"{work}/stranger.pub".remove()
   run ssh-keygen -q -t ed25519 -N "" -f $stranger
   let theirs_refused = pyinfra_run("127.0.0.1", work, "failures-fixed", port: 1)?
   let theirs_denied = pyinfra_run(address, work, "failures-fixed", key: "stranger")?
@@ -150,18 +150,18 @@ cli main build() [process, error] {
 }
 
 ## Compare pyinfra's results with xsh-infra's for SCENARIO on fixture host HOST.
-cli main diff(scenario: Str = "all", inventory: Path = p".work/fixtures/inventory.toml", host: Str = "fx-2", dir: Path = p".work/pyinfra") [fs, process, time, error] {
+cli main diff(scenario = "all", inventory = p".work/fixtures/inventory.toml", host = "fx-2", dir = p".work/pyinfra") [fs, process, time, error] {
   let names = if scenario == "all" { ["files", "packages", "services", "commands", "failures"] } else { [scenario] }
-  var chosen: List[Scenario] = []
-  for name in names {
-    chosen += [scenario_of(name)?]
+  let chosen: List[Scenario] = collect {
+    for name in names {
+      yield scenario_of(name)?
+    }
   }
 
-  dir.mkdir(parents: true)
+  dir.mkdir()
   let client = fp"{inventory.parent()}/client"
   let work = dir.resolve()?
-  fp"{work}/client".write(client.read_bytes()?)
-  fp"{work}/client".chmod(0o600)
+  fp"{work}/client".write(client.read_bytes()?, mode: 0o600)
   fp"{work}/motd".write("hello\n")
   for source in fs.children(p"fixtures/pyinfra")? {
     if source.name.ends_with(".py") or source.name == "xinfradiff" {
@@ -170,8 +170,8 @@ cli main diff(scenario: Str = "all", inventory: Path = p".work/fixtures/inventor
   }
 
   let host_key = fp"{work}/host_ed25519"
-  host_key.remove(missing_ok: true)
-  fp"{work}/host_ed25519.pub".remove(missing_ok: true)
+  host_key.remove()
+  fp"{work}/host_ed25519.pub".remove()
   run ssh-keygen -q -t ed25519 -N "" -f $host_key -C pyinfra-target
   let target = docker_text(
     "run", "-d", "--rm", "--label", "xinfra-fixture=pyinfra",
@@ -187,11 +187,11 @@ cli main diff(scenario: Str = "all", inventory: Path = p".work/fixtures/inventor
   let container = fixture_container(inventory, host)?
   var agreed = true
   for item in chosen {
-    if ! compare_scenario(item, inventory, host, work, target, address, container)? {
+    if ! compare_scenario(item, inventory, host, work, target, address, container) {
       agreed = false
     }
 
-    if item.name == "failures" and ! compare_unreachable(inventory, host, work, target, address)? {
+    if item.name == "failures" and ! compare_unreachable(work, address) {
       agreed = false
     }
   }

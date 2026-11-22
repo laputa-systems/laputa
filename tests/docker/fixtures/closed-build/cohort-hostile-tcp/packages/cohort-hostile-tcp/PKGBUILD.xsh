@@ -1,12 +1,12 @@
 ##! Closed-build hostile TCP package: a TCP connection must fail under confinement.
 ## Package name.
-export let name = "cohort-hostile-tcp"
+export const name = "cohort-hostile-tcp"
 ## Installable package kind.
-export let package_kind = "payload"
+export const package_kind = "payload"
 ## Package version.
-export let ver = "1.0.0"
+export const ver = "1.0.0"
 ## Package release.
-export let rel = "1"
+export const rel = "1"
 ## No runtime dependencies.
 export let deps = []
 ## No build host dependencies.
@@ -16,11 +16,11 @@ export let mkdeps_target = []
 ## No upstream sources.
 export let upstream_sources = []
 ## Preserve the outputs.
-export let nostrip = true
+export const nostrip = true
 ## Installed payload contract.
-export let filetree = [{path: p"usr/share/cohort-hostile-tcp", kind: "file"}]
+export const filetree = [{path: p"usr/share/cohort-hostile-tcp", kind: "file"}]
 
-error Escape = Failed(message: Str)
+error Escape = Failed
 
 pure tcp_probe() -> Str {
   r"""let c = linux.net_constants()
@@ -33,10 +33,10 @@ match linux.connect(fd, {family: "inet", address: "127.0.0.1", port: 9}) {
 }
 
 ## The helper inherits the build child's Landlock domain, so its TCP connect is confined too.
-export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
+export proc build(_: Path) [fs, process, env, error] -> Result[Unit, Error] {
   let recipe = fp"{env("XSH_PM_RECIPE_DIR")?}"
   let helper = fp"{recipe}/tcp-probe.xsh"
-  helper.write(tcp_probe())?
+  helper.write(tcp_probe())
   let out = fp"{recipe}/tcp-probe.out"
   let xsh = process.which("xsh")?
   let status = process.run(process.command_argv(xsh, [xsh, helper], recipe, {}, b"", out))?

@@ -8,7 +8,7 @@ const runtime_dirs = ["bin", "lib"]
 ## Install xinfra under PREFIX.
 cli main(prefix: Path) [fs, error] {
   let share = fp"{prefix}/share/xinfra"
-  share.mkdir(parents: true)
+  share.mkdir()
   for name in runtime_files {
     fp"{name}".copy(to: fp"{share}/{name}", overwrite: true)
   }
@@ -18,9 +18,9 @@ cli main(prefix: Path) [fs, error] {
   }
 
   let bin = fp"{prefix}/bin"
-  bin.mkdir(parents: true)
+  bin.mkdir()
   let link = fp"{bin}/xinfra"
-  link.remove(missing_ok: true)
+  link.remove()
   link.symlink(to: fp"{share}/bin/xinfra.xsh")
   print f"installed {link}"
 }

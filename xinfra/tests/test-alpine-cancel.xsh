@@ -43,8 +43,8 @@ type Invocation = {code: Int, stdout: Str, stderr: Str}
 
 type Cancelled = {code: Int, stdout: Str, stderr: Str}
 
-proc inventory() [env, error] -> Result[Path, Error] {
-  Ok(fp"{env.get("XINFRA_TEST_INVENTORY")?}")
+proc inventory_path() [env, error] -> Result[Path, Error] {
+  Ok(fp"{e"XINFRA_TEST_INVENTORY"?}")
 }
 
 proc apply_args(inventory: Path, deploy: Path, limit: Str, lock_path: Str) -> List[Str] {
@@ -66,11 +66,11 @@ proc spawn_apply(
 ) [fs, process, error] -> Result[ProcessHandle, ProcessError] {
   let out = fp"{dir}/apply.out"
   let err = fp"{dir}/apply.err"
-  out.remove(missing_ok: true)
-  err.remove(missing_ok: true)
+  out.remove()
+  err.remove()
   let command = process.command_argv(
     "xsh",
-    ["xsh"] + apply_args(inventory, deploy, limit, lock_path),
+    ["xsh", @apply_args(inventory, deploy, limit, lock_path)],
     p".",
     {},
     b"",
@@ -102,13 +102,12 @@ proc wait_for_remote(host: model.Host, script: Str, args: List[Str], limit_ms: I
   Ok(found)
 }
 
-proc lost_patience(handle: ProcessHandle) [process, error] -> Result[Unit, Error] {
+proc lost_patience(handle: ProcessHandle) [process, error] {
   let _ = process.kill(handle.pid, signal: "KILL")
   let _ = wait handle?
 }
 
 proc apply_again(
-  dir: Path,
   inventory: Path,
   host: model.Host,
   deploy: Path,
@@ -119,24 +118,23 @@ proc apply_again(
 }
 
 proc apply_again_with_apk_lock_retry(
-  dir: Path,
   inventory: Path,
   host: model.Host,
   deploy: Path,
   lock_path: Str,
 ) [fs, process, time, error] -> Result[Invocation, Error] {
   var attempt = 0
-  var result = apply_again(dir, inventory, host, deploy, lock_path)?
+  var result = apply_again(inventory, host, deploy, lock_path)?
   while result.code != 0 and "Unable to lock database" in result.stdout and attempt < 4 {
     attempt += 1
     time.sleep(500ms)
-    result = apply_again(dir, inventory, host, deploy, lock_path)?
+    result = apply_again(inventory, host, deploy, lock_path)?
   }
 
   Ok(result)
 }
 
-proc assert_lock_free(host: model.Host, lock_path: Str) [fs, env, process, error] -> Result[Unit, Error] {
+proc assert_lock_free(host: model.Host, lock_path: Str) [fs, env, process, error] {
   let connection = transport.connect(host)?
   let held = lock.inspect(connection, lock_path)?
   let _ = transport.disconnect(connection)
@@ -167,17 +165,13 @@ proc assert_cancelled(cancelled: Cancelled, id: Str, kind: Str) [error] {
 
 proc rerun_status(invocation: Invocation, id: Str) [error] -> Str {
   for line in invocation.stdout.lines() {
-    if line.trim() == "" {
-      continue
-    }
+    continue when line.trim() == ""
 
     let record = json.decode(line)?.require(Record)?
     let kind = record.get("type")?.require(Str)?
     if kind == "entry" {
       let identity = record.get("id")?.require(Str)?
-      if identity == id {
-        return record.get("status")?.require(Str)?
-      }
+      return record.get("status")?.require()? when identity == id
     }
   }
 
@@ -203,11 +197,11 @@ proc apply_cancelled_at_gate(
   let handle = spawn_apply(dir, inventory, deploy, host.name, lock_path)?
   let reached = wait_for_remote(host, "test -e \"$1\" && echo yes || echo no", [f"{mark}/started"], 60000)?
   if ! reached {
-    lost_patience(handle)?
+    lost_patience(handle)
   }
 
   assert reached, f"the apply never reached the gate at {mark}"
-  process.kill(handle.pid, signal: signal)?
+  process.kill(handle.pid, signal:)
   let status = wait handle?
   let code = status.exit_code() ?? -1
   let _ = testing.remote_text(host, "rm -f -- \"$1/hold\"", [mark])?
@@ -227,11 +221,11 @@ proc cancelled_inflight(
   let handle = spawn_apply(dir, inventory, deploy, host.name, lock_path)?
   let reached = wait_for_remote(host, script, args, 60000)?
   if ! reached {
-    lost_patience(handle)?
+    lost_patience(handle)
   }
 
   assert reached, "the mutation never reached its in-flight marker"
-  process.kill(handle.pid, signal: signal)?
+  process.kill(handle.pid, signal:)
   let status = wait handle?
   let code = status.exit_code() ?? -1
   collect(dir, code)
@@ -258,13 +252,13 @@ test cancellation_before_and_after_a_directory_is_reported_from_the_target_side_
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   for direction in ["before", "after"] {
     let base = f"/var/tmp/{testing.scratch_name(dir)}-directory-{direction}"
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
-    let deploy = write_deploy(dir, directory_body(base, mark, direction))?
+    let deploy = directory_body(base, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -275,8 +269,8 @@ test cancellation_before_and_after_a_directory_is_reported_from_the_target_side_
       assert_entry_status(cancelled, "target", "directory", "changed")
       assert mode(host, base)? == "750\n"
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again(inventory, host, deploy, lock_path)?
     assert again.code == 0, again.stderr
     if direction == "before" {
       assert rerun_status(again, "target") == "changed"
@@ -312,13 +306,13 @@ test cancellation_before_and_after_a_file_is_reported_from_the_target_side_and_c
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   for direction in ["before", "after"] {
     let base = f"/var/tmp/{testing.scratch_name(dir)}-file-{direction}"
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
-    let deploy = write_deploy(dir, file_body(base, mark, direction))?
+    let deploy = file_body(base, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -329,8 +323,8 @@ test cancellation_before_and_after_a_file_is_reported_from_the_target_side_and_c
       assert_entry_status(cancelled, "target", "file", "changed")
       assert testing.remote_text(host, "cat \"$1\"/motd", [base], privileged: true)? == "hello\n"
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again(inventory, host, deploy, lock_path)?
     assert again.code == 0, again.stderr
     if direction == "before" {
       assert rerun_status(again, "target") == "changed"
@@ -369,13 +363,13 @@ test cancellation_before_and_after_a_symlink_is_reported_from_the_target_side_an
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   for direction in ["before", "after"] {
     let base = f"/var/tmp/{testing.scratch_name(dir)}-symlink-{direction}"
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
-    let deploy = write_deploy(dir, symlink_body(base, mark, direction))?
+    let deploy = symlink_body(base, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -386,8 +380,8 @@ test cancellation_before_and_after_a_symlink_is_reported_from_the_target_side_an
       assert_entry_status(cancelled, "target", "symlink", "changed")
       assert testing.remote_text(host, "readlink -- \"$1/link\"", [base], privileged: true)? == "source\n"
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again(inventory, host, deploy, lock_path)?
     assert again.code == 0, again.stderr
     if direction == "before" {
       assert rerun_status(again, "target") == "changed"
@@ -424,13 +418,13 @@ test cancellation_before_and_after_a_command_is_reported_from_the_target_side_an
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   for direction in ["before", "after"] {
     let base = f"/var/tmp/{testing.scratch_name(dir)}-command-{direction}"
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
-    let deploy = write_deploy(dir, command_body(base, mark, direction))?
+    let deploy = command_body(base, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -442,8 +436,8 @@ test cancellation_before_and_after_a_command_is_reported_from_the_target_side_an
       assert exists(host, f"{base}/created")?
       assert testing.remote_text(host, "wc -l < \"$1/log\"", [base])? == "1\n"
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again(inventory, host, deploy, lock_path)?
     assert again.code == 0, again.stderr
     if direction == "before" {
       assert rerun_status(again, "target") == "changed"
@@ -470,13 +464,13 @@ test an_in_flight_command_cancellation_is_unknown_blocks_dependents_and_is_not_r
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   let base = f"/var/tmp/{testing.scratch_name(dir)}-inflight-command"
   let mark = f"{base}.mark"
   let lock_path = f"{base}.lock"
   let _ = testing.remote_text(host, "rm -rf -- \"$1\" \"$2\"", [base, mark], privileged: true)?
   let _ = testing.remote_text(host, "mkdir -p -- \"$1\" && : > \"$1/hold\"", [mark])?
-  let deploy = write_deploy(dir, held_command_body(base, mark))?
+  let deploy = held_command_body(base, mark) |> write_deploy(dir, _)?
   let cancelled = cancelled_inflight(
     dir,
     inventory,
@@ -492,9 +486,9 @@ test an_in_flight_command_cancellation_is_unknown_blocks_dependents_and_is_not_r
   assert ! exists(host, f"{mark}/finished")?
   assert ! exists(host, f"{base}/after")?
   assert testing.remote_text(host, "wc -l < \"$1/log\"", [base])? == "1\n"
-  assert_lock_free(host, lock_path)?
+  assert_lock_free(host, lock_path)
   let _ = testing.remote_text(host, "rm -f -- \"$1/hold\"", [mark])?
-  let again = apply_again(dir, inventory, host, deploy, lock_path)?
+  let again = apply_again(inventory, host, deploy, lock_path)?
   assert again.code == 0, again.stderr
   assert rerun_status(again, "target") == "changed"
   assert exists(host, f"{mark}/finished")?
@@ -517,11 +511,11 @@ test an_in_flight_file_transfer_cancellation_is_unknown_and_never_publishes_a_pa
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   let base = f"/var/tmp/{testing.scratch_name(dir)}-inflight-file"
   let blob = fp"{dir}/artifact.bin"
   run dd if=/dev/urandom of=$blob bs=1M count=40 status=none
-  let deploy = write_deploy(dir, file_stream_body(base, blob))?
+  let deploy = file_stream_body(base, blob) |> write_deploy(dir, _)?
   let lock_path = f"{base}.lock"
   let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [base], privileged: true)?
   let cancelled = cancelled_inflight(
@@ -535,11 +529,11 @@ test an_in_flight_file_transfer_cancellation_is_unknown_and_never_publishes_a_pa
     "INT",
   )?
   assert_cancelled(cancelled, "target", "file")
-  if exists(host, f"{base}/artifact.bin")? {
+  if exists(host, f"{base}/artifact.bin") {
     assert testing.remote_text(host, "sha256sum < \"$1/artifact.bin\"", [base], privileged: true)?.fields()[0] == hash.sha256(blob)?.hex()
   }
-  assert_lock_free(host, lock_path)?
-  let again = apply_again(dir, inventory, host, deploy, lock_path)?
+  assert_lock_free(host, lock_path)
+  let again = apply_again(inventory, host, deploy, lock_path)?
   assert again.code == 0, again.stderr
   assert testing.remote_text(host, "sha256sum < \"$1/artifact.bin\"", [base], privileged: true)?.fields()[0] == hash.sha256(blob)?.hex()
   let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [base], privileged: true)?
@@ -580,14 +574,14 @@ test cancellation_before_and_after_a_package_and_package_index_is_reported_and_c
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   for direction in ["before", "after"] {
     let base = f"/var/tmp/{testing.scratch_name(dir)}-package-{direction}"
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
     let _ = testing.remote_text(host, "apk del -q zstd >/dev/null 2>&1 || true", [], privileged: true)?
-    let deploy = write_deploy(dir, package_body(mark, direction))?
+    let deploy = package_body(mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -598,8 +592,8 @@ test cancellation_before_and_after_a_package_and_package_index_is_reported_and_c
       assert_entry_status(cancelled, "target", "package", "changed")
       assert testing.remote_text(host, "apk info -e zstd", [], privileged: true)? == "zstd\n"
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again_with_apk_lock_retry(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again_with_apk_lock_retry(inventory, host, deploy, lock_path)?
     assert again.code == 0, f"{again.stderr}\n{again.stdout}"
     if direction == "before" {
       assert rerun_status(again, "target") == "changed"
@@ -615,7 +609,7 @@ test cancellation_before_and_after_a_package_and_package_index_is_reported_and_c
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
-    let deploy = write_deploy(dir, package_index_body(mark, direction))?
+    let deploy = package_index_body(mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -624,8 +618,8 @@ test cancellation_before_and_after_a_package_and_package_index_is_reported_and_c
     } else {
       assert_entry_status(cancelled, "target", "package-index", "changed")
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again_with_apk_lock_retry(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again_with_apk_lock_retry(inventory, host, deploy, lock_path)?
     assert again.code == 0, again.stderr
     assert rerun_status(again, "target") == "changed"
   }
@@ -652,7 +646,7 @@ test cancellation_before_and_after_a_group_is_reported_from_the_target_side_and_
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   let token = testing.scratch_name(dir).replace("-", with: "")
   let name = f"xg{token.byte_slice(0, 10)}"
   for direction in ["before", "after"] {
@@ -661,7 +655,7 @@ test cancellation_before_and_after_a_group_is_reported_from_the_target_side_and_
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
     let _ = testing.remote_text(host, "delgroup \"$1\" >/dev/null 2>&1 || true", [name], privileged: true)?
-    let deploy = write_deploy(dir, group_body(name, mark, direction))?
+    let deploy = group_body(name, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -672,8 +666,8 @@ test cancellation_before_and_after_a_group_is_reported_from_the_target_side_and_
       assert_entry_status(cancelled, "target", "group", "changed")
       assert name in testing.remote_text(host, "getent group \"$1\"", [name])?
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again(inventory, host, deploy, lock_path)?
     assert again.code == 0, again.stderr
     if direction == "before" {
       assert rerun_status(again, "target") == "changed"
@@ -706,7 +700,7 @@ test cancellation_before_and_after_a_user_is_reported_from_the_target_side_and_c
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   let token = testing.scratch_name(dir).replace("-", with: "")
   let name = f"xu{token.byte_slice(0, 10)}"
   for direction in ["before", "after"] {
@@ -715,7 +709,7 @@ test cancellation_before_and_after_a_user_is_reported_from_the_target_side_and_c
     let lock_path = f"{base}.lock"
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
     let _ = testing.remote_text(host, "deluser \"$1\" >/dev/null 2>&1 || true", [name], privileged: true)?
-    let deploy = write_deploy(dir, user_body(name, mark, direction))?
+    let deploy = user_body(name, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -726,8 +720,8 @@ test cancellation_before_and_after_a_user_is_reported_from_the_target_side_and_c
       assert_entry_status(cancelled, "target", "user", "changed")
       assert testing.remote_text(host, "id -u \"$1\"", [name])? == "4322\n"
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again(inventory, host, deploy, lock_path)?
     assert again.code == 0, again.stderr
     if direction == "before" {
       assert rerun_status(again, "target") == "changed"
@@ -739,7 +733,7 @@ test cancellation_before_and_after_a_user_is_reported_from_the_target_side_and_c
   }
 }
 
-proc service_cleanup(host: model.Host, name: Str) [fs, env, process, error] -> Result[Unit, Error] {
+proc service_cleanup(host: model.Host, name: Str) [fs, env, process, error] {
   let _ = testing.remote_text(host, "rc-service \"$1\" stop >/dev/null 2>&1 || true; rc-update del \"$1\" default >/dev/null 2>&1 || true; rm -f \"/etc/init.d/$1\" \"/var/tmp/$1\".*", [name], privileged: true)?
 }
 
@@ -760,7 +754,7 @@ proc service_body(name: Str, script: Str, mark: Str, direction: Str) -> Str {
   }
 }
 
-proc service_notify_body(name: Str, value: Str, script: Str, mark: Str) -> Str {
+proc service_notify_body(name: Str, value: Str, script: Str) -> Str {
   let init_line = f"    declare.file(id: \"init\", at: \"/etc/init.d/{name}\", text: r\"\"\"{script}\"\"\", mode: 0o755)?,"
   let conf_line = f"    declare.file(id: \"conf\", at: \"/var/tmp/{name}.conf\", text: \"{value}\\n\", needs: [\"init\"])?,"
   [
@@ -777,16 +771,16 @@ test cancellation_before_and_after_a_service_is_reported_from_the_target_side_an
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   let token = testing.scratch_name(dir).replace("-", with: "")
   let name = f"xs{token.byte_slice(0, 10)}"
   for direction in ["before", "after"] {
     let base = f"/var/tmp/{testing.scratch_name(dir)}-service-{direction}"
     let mark = f"{base}.mark"
     let lock_path = f"{base}.lock"
-    service_cleanup(host, name)?
+    service_cleanup(host, name)
     let _ = testing.remote_text(host, "rm -rf -- \"$1\"", [mark], privileged: true)?
-    let deploy = write_deploy(dir, service_body(name, quick_service_script, mark, direction))?
+    let deploy = service_body(name, quick_service_script, mark, direction) |> write_deploy(dir, _)?
     let cancelled = apply_cancelled_at_gate(dir, inventory, host, deploy, lock_path, mark, boundary_signal(direction))?
     assert cancelled.code == 3, f"the cancelled apply exited {cancelled.code}: {cancelled.stderr}"
     assert_entry_status(cancelled, "gate", "command", "unknown")
@@ -799,8 +793,8 @@ test cancellation_before_and_after_a_service_is_reported_from_the_target_side_an
       assert "started" in testing.remote_text(host, "rc-service \"$1\" status 2>&1 || true", [name], privileged: true)?
       assert name in testing.remote_text(host, "ls /etc/runlevels/default", [], privileged: true)?
     }
-    assert_lock_free(host, lock_path)?
-    let again = apply_again(dir, inventory, host, deploy, lock_path)?
+    assert_lock_free(host, lock_path)
+    let again = apply_again(inventory, host, deploy, lock_path)?
     assert again.code == 0, again.stderr
     if direction == "before" {
       assert rerun_status(again, "target") == "changed"
@@ -808,7 +802,7 @@ test cancellation_before_and_after_a_service_is_reported_from_the_target_side_an
       assert rerun_status(again, "target") == "unchanged"
     }
     assert "started" in testing.remote_text(host, "rc-service \"$1\" status 2>&1 || true", [name], privileged: true)?
-    service_cleanup(host, name)?
+    service_cleanup(host, name)
   }
 }
 
@@ -819,16 +813,16 @@ test an_in_flight_service_notification_cancellation_is_unknown_and_converges { |
   }
 
   let dir = test.temp_dir(ctx)?
-  let inventory = inventory()?
+  let inventory = inventory_path()?
   let token = testing.scratch_name(dir).replace("-", with: "")
   let name = f"xi{token.byte_slice(0, 10)}"
-  service_cleanup(host, name)?
+  service_cleanup(host, name)
   let lock_path = f"/var/tmp/{testing.scratch_name(dir)}-inflight-service.lock"
-  let first_deploy = write_deploy(dir, service_notify_body(name, "1", notify_service_script, f"/var/tmp/{name}.mark"))?
-  let first = apply_again(dir, inventory, host, first_deploy, lock_path)?
+  let first_deploy = service_notify_body(name, "1", notify_service_script) |> write_deploy(dir, _)?
+  let first = apply_again(inventory, host, first_deploy, lock_path)?
   assert first.code == 0, first.stderr
   assert "started" in testing.remote_text(host, "rc-service \"$1\" status 2>&1 || true", [name], privileged: true)?
-  let deploy = write_deploy(dir, service_notify_body(name, "2", notify_service_script, f"/var/tmp/{name}.mark"))?
+  let deploy = service_notify_body(name, "2", notify_service_script) |> write_deploy(dir, _)?
   let cancelled = cancelled_inflight(
     dir,
     inventory,
@@ -842,9 +836,9 @@ test an_in_flight_service_notification_cancellation_is_unknown_and_converges { |
   assert_cancelled(cancelled, "target", "service")
   assert "started" in testing.remote_text(host, "rc-service \"$1\" status 2>&1 || true", [name], privileged: true)?
   assert testing.remote_text(host, "cat \"$1\"", [f"/var/tmp/{name}.conf"], privileged: true)? == "2\n"
-  assert_lock_free(host, lock_path)?
-  let again = apply_again(dir, inventory, host, deploy, lock_path)?
+  assert_lock_free(host, lock_path)
+  let again = apply_again(inventory, host, deploy, lock_path)?
   assert again.code == 0, again.stderr
   assert "started" in testing.remote_text(host, "rc-service \"$1\" status 2>&1 || true", [name], privileged: true)?
-  service_cleanup(host, name)?
+  service_cleanup(host, name)
 }

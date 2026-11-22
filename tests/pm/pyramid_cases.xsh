@@ -15,7 +15,7 @@ proc pyramid_repository(ctx: TestContext, name: Str) [fs, env, error] -> Result[
   repository
 }
 
-proc pyramid_plan(repository: Path, roots: List[Str]) [fs, env, error] -> Result[types.BuildPlan] {
+proc pyramid_plan(repository: Path, roots: List[Str]) -> Result[types.BuildPlan] {
   plan.resolve(
     catalog.load_for_target(repository, types.X86_64LinuxMusl)?,
     {target: types.X86_64LinuxMusl, index_sha256: "pyramid-offline-empty", packages: []},
@@ -64,10 +64,10 @@ test test_pyramid_pm_selected_fresh_build_and_reuse [fs, net, process, env, time
   let prepared = execute.build_plan(dependencies, repository, object_store, "", 1)?
   assert [receipt.package_name for receipt in prepared.artifacts] == ["execute-dep", "execute-tool"]
   let value = pyramid_plan(repository, ["execute-app"])?
-  var reused: List[Str] = []
-  var fresh: List[Str] = []
+  var reused = []
+  var fresh = []
   for node in value.nodes {
-    if store.artifact_path(object_store, node.artifact_key).exists()? {
+    if store.artifact_path(object_store, node.artifact_key).exists() {
       reused += [node.name]
     } else {
       fresh += [node.name]

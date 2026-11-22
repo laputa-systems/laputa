@@ -18,10 +18,7 @@ pure raw_config(fields: Record) -> Result[Any, Error] {
     retention: {keep_last: 3},
     rustic: "/usr/bin/rustic",
   }
-  var merged: Map[Any] = {}
-  for key in base.keys() {
-    merged[key] = base[key]
-  }
+  var merged: Map[Any] = {key: base[key] for key in base.keys()}
   for key in fields.keys() {
     merged[key] = fields[key]
   }
@@ -38,10 +35,7 @@ pure raw_receipt(fields: Record) -> Result[Any, Error] {
     kept_snapshot_ids: [ID_A, ID_B],
     check: {ok: true, wall_ms: BASE + 1},
   }
-  var merged: Map[Any] = {}
-  for key in base.keys() {
-    merged[key] = base[key]
-  }
+  var merged: Map[Any] = {key: base[key] for key in base.keys()}
   for key in fields.keys() {
     merged[key] = fields[key]
   }
@@ -67,9 +61,7 @@ type QuiesceBound = {transition_ms: Int, release_ms: Int, retry_ms: Int, attempt
 pure quiesce_flag(command: List[Str], flag: Str) -> Result[Int, Error] {
   var index = 0
   while index < command.len() - 1 {
-    if command[index] == flag {
-      return Ok(command[index + 1].parse_int()?)
-    }
+    return Ok(command[index + 1] as Int) when command[index] == flag
     index += 1
   }
   Err(error.failure(f"the shipped quiesce command does not publish {flag}"))

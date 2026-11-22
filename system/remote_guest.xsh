@@ -13,7 +13,7 @@ const chunk = 1048576
 error RemoteError = Refused(kind: Str, message: Str)
 
 proc refuse(kind: Str, message: Str) -> RemoteError {
-  RemoteError.Refused(kind: kind, message: message)
+  .Refused(kind:, message:)
 }
 
 proc read_header() [io, error] -> Result[Record, Error] {
@@ -29,21 +29,24 @@ proc read_header() [io, error] -> Result[Record, Error] {
 }
 
 proc maybe_json(file: Path) [fs, error] -> Result[Any, Error] {
-  if file.exists()? {
-    return json.read(file)?
-  }
+  return json.read(file)? when file.exists()
   null
 }
 
 type ServiceState = {name: Str, state: Str, restarts: Int}
 
 proc services() [fs, error] -> Result[List[ServiceState], Error] {
-  var found: List[ServiceState] = []
-  for item in g"/run/xinit/*.json" {
-    let value = json.read(item)?
-    let name = json.get(value, ["name"], "").require(Str)?
-    if name != "" {
-      found += [{name: name, state: json.get(value, ["state"], "").require(Str)?, restarts: json.get(value, ["restarts"], 0).require(Int)?}]
+  let found: List[ServiceState] = collect {
+    for item in g"/run/xinit/*.json" {
+      let value = json.read(item)?
+      let name = json.get(value, ["name"], "").require(Str)?
+      if name != "" {
+        yield {
+          name: name,
+          state: json.get(value, ["state"], "").require(Str)?,
+          restarts: json.get(value, ["restarts"], 0).require(Int)?,
+        }
+      }
     }
   }
   found |> sort-by .name |> collect
@@ -60,16 +63,13 @@ proc inspect() [fs, error] -> Result[Record, Error] {
 }
 
 proc read_log(file: Path, count: Int) [fs, error] -> Result[Record, Error] {
-  if ! file.exists()? {
-    return {path: file.display(), readable: true, lines: []}
-  }
-  match file.read_text() {
-    Ok(text) => {
-      let lines = text.lines()
-      let kept = if lines.len() <= count { lines } else { lines[lines.len() - count..] }
-      {path: file.display(), readable: true, lines: kept}
-    }
-    Err(_) => {path: file.display(), readable: false, lines: []}
+  return {path: file.display(), readable: true, lines: []} unless file.exists()
+  if let Ok(text) = file.read_text() {
+    let lines = text.lines()
+    let kept = if lines.len() <= count { lines } else { lines[lines.len() - count..] }
+    {path: file.display(), readable: true, lines: kept}
+  } else {
+    {path: file.display(), readable: false, lines: []}
   }
 }
 
@@ -109,13 +109,13 @@ proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[
       }
       overlay = overlay.set(name, value)
     }
-    let requested: Str? = json.get(header, ["cwd"], null).require(Str?)?
+    let requested: Str? = json.get(header, ["cwd"], null).require()?
     if requested != null {
       guard requested.starts_with("/") and "\u{0}" not in requested else {
         return Err(refuse("cwd", "cwd must be an absolute directory"))
       }
-      dir = Path(requested)
-      guard dir.exists()? and dir.is_dir()? else {
+      dir = fp"{requested}"
+      guard dir.exists() and dir.is_dir() else {
         return Err(refuse("cwd", "cwd must be an existing directory"))
       }
     }
@@ -125,8 +125,7 @@ proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[
       run.capture --bytes --timeout=time.millis(timeout_ms) @argv
     }?
   }?
-  let stdout = result.stdout
-  let stderr = result.stderr
+  let {stdout, stderr, ..} = result
   {
     exit_code: if result.status.exited() { result.status.exit_code()? } else { -1 },
     signaled: ! result.status.exited(),
@@ -137,7 +136,7 @@ proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[
 }
 
 proc staging_root() [env, fs, error] -> Result[Path, Error] {
-  let home = env.get("HOME")?
+  let home = e"HOME"?
   guard home.starts_with("/") and ".." not in home else {
     return Err(refuse("home", "HOME is not an absolute path"))
   }
@@ -153,13 +152,10 @@ proc validated_name(header: Record) [error] -> Result[Str, Error] {
 }
 
 proc incoming_names(root: Path) [fs, error] -> Result[List[Str], Error] {
-  if ! root.exists()? {
-    return []
-  }
-  var names: List[Str] = []
-  for entry in fs.children(root)? {
-    if entry.name.starts_with(".incoming-") {
-      names += [entry.name]
+  return [] unless root.exists()
+  let names = collect {
+    for entry in fs.children(root)? {
+      yield entry.name when entry.name.starts_with(".incoming-")
     }
   }
   names
@@ -169,9 +165,7 @@ proc staged_state(header: Record) [env, fs, error] -> Result[Record, Error] {
   let root = staging_root()?
   let target = fp"{root}/{validated_name(header)?}"
   let incoming = incoming_names(root)?
-  if ! target.exists()? {
-    return {present: false, size: 0, sha256: "", incoming: incoming}
-  }
+  return {present: false, size: 0, sha256: "", incoming: incoming} unless target.exists()
   {present: true, size: target.metadata()?.size, sha256: hash.sha256(target)?.hex(), incoming: incoming}
 }
 
@@ -186,61 +180,58 @@ proc stage(header: Record) [env, fs, io, error] -> Result[Record, Error] {
     return Err(refuse("sha256", "sha256 must be 64 hexadecimal digits"))
   }
   let root = staging_root()?
-  root.mkdir(parents: true)?
+  root.mkdir()
   let target = fp"{root}/{name}"
   let scratch = fp"{root}/.incoming-{name}"
-  scratch.remove(missing_ok: true)?
+  scratch.remove()
   var received = 0
-  let created = bytes.write_at(scratch, 0, bytes.zero(0)?, create: true)?
+  let _ = bytes.write_at(scratch, 0, bytes.zero(0)?, create: true)?
   while received < size {
     let want = if size - received < chunk { size - received } else { chunk }
     let data = io.stdin_read(want)?
     if data.is_empty() {
-      scratch.remove(missing_ok: true)?
+      scratch.remove()
       return Err(refuse("short-payload", f"payload ended after {received} of {size} bytes"))
     }
     let _ = bytes.write_at(scratch, received, data)?
     received += data.len()
   }
   if ! io.stdin_read(1)?.is_empty() {
-    scratch.remove(missing_ok: true)?
+    scratch.remove()
     return Err(refuse("long-payload", "payload is longer than size"))
   }
-  fs.fsync(scratch)?
+  fs.fsync(scratch)
   let actual = hash.sha256(scratch)?.hex()
   if actual != sha256.lower() {
-    scratch.remove(missing_ok: true)?
+    scratch.remove()
     return Err(refuse("digest-mismatch", f"payload digest is {actual}"))
   }
-  if target.exists()? {
-    scratch.remove(missing_ok: true)?
+  if target.exists() {
+    scratch.remove()
     if hash.sha256(target)?.hex() == actual {
       return {outcome: "present", path: target.display(), size: size, sha256: actual}
     }
     return Err(refuse("exists", "a different file already has this name"))
   }
-  fs.rename_noreplace(scratch, target)?
-  fs.fsync(root)?
+  fs.rename_noreplace(scratch, target)
+  fs.fsync(root)
   {outcome: "staged", path: target.display(), size: size, sha256: actual}
 }
 
 proc reply_ok(result: Any) [io, error] {
-  io.write_stdout(json.encode({protocol: protocol, ok: true, result: result})? + "\n")?
-  io.flush_stdout()?
+  io.write_stdout(json.encode({protocol: protocol, ok: true, result: result})? + "\n")
+  io.flush_stdout()
 }
 
 proc reply_error(kind: Str, message: Str) [io, error] {
-  io.write_stdout(json.encode({protocol: protocol, ok: false, error: {kind: kind, message: message}})? + "\n")?
-  io.flush_stdout()?
+  io.write_stdout(json.encode({protocol: protocol, ok: false, error: {kind: kind, message: message}})? + "\n")
+  io.flush_stdout()
 }
 
 proc main() [env, fs, io, process, error] {
-  let header = match read_header() {
-    Ok(value) => value,
-    Err(error) => {
-      reply_error("request", error.message)?
-      return
-    }
+  let header = read_header() ?? {
+    reply_error("request", .message)
+    return
   }
   let op = json.get(header, ["op"], "").require(Str)?
   let outcome = match op {
@@ -254,13 +245,14 @@ proc main() [env, fs, io, process, error] {
   }
   match outcome {
     Ok(result) => reply_ok(result)?,
-    Err(error) => match error {
-      RemoteError.Refused {kind, message} => {
+    Err(error) => {
+      if let RemoteError.Refused {kind, message} = error {
         if kind == "env" or kind == "cwd" { reply_error(kind, message)? } else { reply_error("failed", message)? }
-      },
-      other => reply_error("failed", error.message)?,
+      } else {
+        reply_error("failed", error.message)?
+      }
     },
   }
 }
 
-main()?
+main()

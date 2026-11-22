@@ -56,7 +56,7 @@ export proc upload_repo_file(repo: Str, rel: Path, source: Path, token: Str, _: 
   net_put_file(util.repo_url_for(repo, rel)?, source, token)
 }
 
-proc upload_immutable_chunks(repo: Str, rel: Path, source: Path, token: Str, size: Int) [fs, net, env, error] -> Result[Int, Error] {
+proc upload_immutable_chunks(repo: Str, rel: Path, source: Path, token: Str, size: Int) -> Result[Int, Error] {
   let upload_id = f"{hash.sha256(source)?.hex()}-{random.bytes(16)?.sha256().hex()}"
   let headers = remote_auth_headers(token)
   var offset = 0
@@ -143,9 +143,9 @@ export proc upload_immutable_repo_file(
   match fs.rename_noreplace(temporary, dest) {
     Ok(_) => true
     Err(problem) => {
-      return Err(problem) unless dest.exists()?
+      return Err(problem) unless dest.exists()
       return false when dest.read_bytes()? == temporary.read_bytes()?
-      return Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
+      Err(types.PmError.PackageConflict(f"immutable remote object {rel} already exists with different bytes"))
     }
   }
 }
@@ -357,7 +357,7 @@ export proc write_remote_index_cache(out: Path, index: List[types.RemotePackage]
 ## Exported PM declaration `write_remote_index_to_repo`.
 export proc write_remote_index_to_repo(
   repo: Str,
-  work: Path,
+  _: Path,
   out: Path,
   index: List[types.RemotePackage],
   token: Str,

@@ -1,11 +1,11 @@
 use infra.declare
 use infra.engine
 use infra.lock
-use infra.report
-use infra.workload
 use infra.model
+use infra.report
 use infra.testing
 use infra.transport
+use infra.workload
 
 const slow_deploy = r"""
 ##! A deployment whose single command holds the host for a while.
@@ -20,7 +20,7 @@ export proc resources(host: model.Host) [fs, error] -> Result[List[model.Resourc
 """
 
 proc fixtures() [env, error] -> Result[Path, Error] {
-  Ok(fp"{env.get("XINFRA_TEST_INVENTORY")?}")
+  Ok(fp"{e"XINFRA_TEST_INVENTORY"?}")
 }
 
 proc apply_args(inventory: Path, deploy: Path, lock_path: Str) -> List[Str] {
@@ -29,9 +29,7 @@ proc apply_args(inventory: Path, deploy: Path, lock_path: Str) -> List[Str] {
 
 proc wait_for_lock(connection: transport.Connection, lock_path: Str) [fs, env, process, time, error] -> Result[Bool, Error] {
   for _ in range(100) {
-    if lock.inspect(connection, lock_path)? != null {
-      return Ok(true)
-    }
+    return Ok(true) when lock.inspect(connection, lock_path)? != null
 
     time.sleep(100ms)
   }
@@ -121,14 +119,14 @@ test a_transfer_that_outlives_its_timeout_leaves_the_destination_and_reports_an_
     return
   }
 
-  let host: model.Host = {...found, transfer_timeout_ms: 150}
+  let host = {...found, transfer_timeout_ms: 150}
   let dir = test.temp_dir(ctx)?
   let base = f"/var/tmp/{testing.scratch_name(dir)}"
   let blob = fp"{dir}/big.bin"
   run truncate -s 600M $blob
   let small = fp"{dir}/small.bin"
   small.write("original\n")
-  let settings = engine.Settings(jobs: 1, policy: .Host, lock_path: f"{base}.lock")
+  let settings = engine.Settings(1, .Host, f"{base}.lock")
   let first = engine.apply(workload.prepare([workload.Workload(host:, resources: [
     declare.directory(id: "base", at: base, parents: true)?,
     declare.file(id: "bin", at: f"{base}/app.bin", source: small, needs: ["base"])?,
@@ -146,7 +144,7 @@ test a_transfer_that_outlives_its_timeout_leaves_the_destination_and_reports_an_
   let after = testing.remote_text(reader, "cat \"$1\"/app.bin", [base], privileged: true)?
   assert after == "original\n"
 
-  let healed = engine.apply(workload.prepare([workload.Workload(host: reader, resources: [
+  let healed = engine.apply(workload.prepare([workload.Workload(reader, [
     declare.directory(id: "base", at: base, parents: true)?,
     declare.file(id: "bin", at: f"{base}/app.bin", source: small, needs: ["base"])?,
   ])])?, settings)

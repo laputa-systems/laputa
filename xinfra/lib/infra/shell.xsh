@@ -2,11 +2,12 @@
 
 const single_quote = "'"
 const nul = "\0"
+const hex_digits = "0123456789abcdef"
 
 ## Quote one value as a single POSIX shell word. A value with a NUL byte has no
 ## shell representation and is refused instead of truncated.
 export pure quote(value: Str) -> Result[Str, Error] {
-  if value.find(nul) != null {
+  guard value.find(nul) == null else {
     fail "a remote shell word cannot contain a NUL byte"
   }
 
@@ -14,9 +15,10 @@ export pure quote(value: Str) -> Result[Str, Error] {
 }
 
 pure quote_all(values: List[Str]) -> Result[List[Str], Error] {
-  var quoted: List[Str] = []
-  for value in values {
-    quoted += [quote(value)?]
+  let quoted = collect {
+    for value in values {
+      yield quote(value)?
+    }
   }
 
   Ok(quoted)
@@ -26,7 +28,7 @@ pure quote_all(values: List[Str]) -> Result[List[Str], Error] {
 ## constant single-quoted word run by `/bin/sh -c`, and every request value
 ## follows it as a positional argument.
 export pure command(script: Str, args: List[Str]) -> Result[Str, Error] {
-  let words = ["/bin/sh", "-c", quote(script)?, "xinfra"] + quote_all(args)?
+  let words = ["/bin/sh", "-c", quote(script)?, "xinfra", @quote_all(args)?]
   Ok(words.join(" "))
 }
 
@@ -34,8 +36,6 @@ export pure command(script: Str, args: List[Str]) -> Result[Str, Error] {
 export pure escalated_command(script: Str, args: List[Str]) -> Result[Str, Error] {
   Ok(f"doas -n {command(script, args)?}")
 }
-
-const hex_digits = "0123456789abcdef"
 
 pure xsh_hex_byte(byte: Int) -> Str {
   f"\\x{hex_digits.byte_slice(byte / 16, 1)}{hex_digits.byte_slice(byte % 16, 1)}"
@@ -46,7 +46,7 @@ pure xsh_hex_byte(byte: Int) -> Str {
 ## whatever the value contains; a value with a NUL byte has no representation
 ## on an SSH command line and is refused instead of truncated.
 export pure xsh_quote(value: Str) -> Result[Str, Error] {
-  if value.find(nul) != null {
+  guard value.find(nul) == null else {
     fail "a remote command string cannot contain a NUL byte"
   }
 
@@ -82,9 +82,10 @@ export pure xsh_quote(value: Str) -> Result[Str, Error] {
 ## emitted as escaped XSH string literals, so an operand cannot change the
 ## program.
 export pure xsh_command(script: Str, args: List[Str]) -> Result[Str, Error] {
-  var quoted: List[Str] = []
-  for value in args {
-    quoted += [xsh_quote(value)?]
+  let quoted = collect {
+    for value in args {
+      yield xsh_quote(value)?
+    }
   }
 
   Ok(f"let xinfra_args: List[Str] = [{quoted.join(", ")}]\n{script}\n")

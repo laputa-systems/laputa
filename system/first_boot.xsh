@@ -593,7 +593,7 @@ proc write_tree(rootfs: FsRoot, config: FirstBoot) {
 ## live root untouched; only uniquely named staging siblings are abandoned.
 ## Passing "stage" as `crash_at` fails after staging but before publication
 ## to exercise that path; production callers omit it.
-export proc apply(root: Path, document: Str, crash_at: Str = "") [fs, error] -> Result[Unit, Error] {
+export proc apply(root: Path, document: Str, crash_at = "") [fs, error] -> Result[Unit, Error] {
   let config = parse(document)?
   let live_present = root.exists()?
   let key_present = if live_present {
@@ -606,7 +606,7 @@ export proc apply(root: Path, document: Str, crash_at: Str = "") [fs, error] -> 
   identity_ok(key_present, config.identity)
 
   let staging = fs.temp_sibling(root)?
-  defer staging.remove(missing_ok: true)
+  defer staging.remove()
   if live_present {
     let _ = fs.copy_tree(root, staging)?
   } else {
@@ -614,18 +614,18 @@ export proc apply(root: Path, document: Str, crash_at: Str = "") [fs, error] -> 
   }
   let staged = fs.open_root(staging)?
   write_tree(staged, config)
-  fs.fsync(staging)?
+  fs.fsync(staging)
 
   if crash_at == "stage" {
     fail "injected first-boot crash before publication"
   }
 
   if live_present {
-    fs.rename_exchange(staging, root)?
+    fs.rename_exchange(staging, root)
   } else {
-    staging.rename(to: root)?
+    staging.rename(to: root)
   }
-  fs.fsync(root.parent)?
+  fs.fsync(root.parent)
 }
 
 ## One explicit inode owner for a maintained state image.
@@ -647,7 +647,7 @@ export proc state_ownership(root: Path) [fs, error] -> Result[List[StateInodeOwn
     guard fields[5] == f"/home/{config.operator}" else { fail "operator home does not match the applied document" }
     let home = f"home/{config.operator}"
     for entry in ["home", home] {
-      let info = tree.stat(fp"{entry}".require(RelPath)?, follow_symlinks: false)?
+      let info = tree.stat(fp"{entry}".require()?, follow_symlinks: false)?
       guard info.kind == "dir" else { fail f"operator state path is not a dir: {entry}" }
       if entry == home { guard info.mode.bit_and(0o022) == 0 else { fail "operator home must not be group or world writable" } }
     }

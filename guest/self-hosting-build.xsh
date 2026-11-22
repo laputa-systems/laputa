@@ -1,4 +1,4 @@
-proc main(mode: Str = "verification") [fs, process, env, error] -> Result[Unit, Error] {
+proc main(mode = "verification") [fs, process, env, error] {
   let toolchain = "/seed/rust/lib/rustlib/x86_64-unknown-linux-musl/bin"
   var build_environment = {
     PATH: f"/bin:/usr/lib/xsh/core:/usr/bin:/seed/rust/bin:{toolchain}",
@@ -26,9 +26,9 @@ proc main(mode: Str = "verification") [fs, process, env, error] -> Result[Unit, 
   let cargo = p"/seed/rust/bin/cargo"
   var argv = [cargo.display(), "build", "--locked", "--offline", "--profile", "verification", "-j", "2", "--target", "x86_64-unknown-linux-musl", "-p", "xsh", "-p", "xsht", "--no-default-features", "--features", "xsh/net xsh/tools xsht/native-tests", "--bin", "xsh", "--bin", "xsht", "--config", "source.crates-io.replace-with=\"vendored-sources\"", "--config", "source.vendored-sources.directory=\"/inputs/vendor\""]
   if mode == "debug" {
-    process.set_rlimit("stack", soft: 8 * 1024 * 1024, hard: 8 * 1024 * 1024)?
+    process.set_rlimit("stack", soft: 8MiB, hard: 8MiB)
     let limit = process.rlimit("stack")?
-    assert limit.soft == 8 * 1024 * 1024 and limit.hard == 8 * 1024 * 1024
+    assert limit.soft == 8MiB and limit.hard == 8MiB
     let text = json.encode(limit)?
     print "LAP19_STACK_LIMIT" $text
     build_environment.CARGO_TARGET_DIR = "/output/target-debug"
@@ -49,4 +49,3 @@ proc main(mode: Str = "verification") [fs, process, env, error] -> Result[Unit, 
   print "LAPUTA_SELF_HOSTING_COMPILED"
 }
 
-main(@args)?

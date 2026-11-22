@@ -45,9 +45,10 @@ test a_file_needs_exactly_one_content_source {
 
 test secret_content_marks_the_file_sensitive {
   let resource = declare.file(id: "f", at: "/etc/f", secret_env: "TOKEN")?
-  match resource.spec {
-    model.File(spec) => assert spec.sensitive
-    else => assert false, "not a file"
+  if let .File(spec) = resource.spec {
+    assert spec.sensitive
+  } else {
+    assert false, "not a file"
   }
 }
 
@@ -65,18 +66,18 @@ test a_present_symlink_needs_a_target {
 
 test package_versions_follow_apk_syntax {
   let bound = declare.package(id: "p", name: "curl", version: ">=8.0.1-r0")?
-  match bound.spec {
-    model.Package(spec) => {
-      guard let constraint = spec.constraint else {
-        assert false, "no constraint"
-        return
-      }
-
-      assert constraint.op == .Ge
-      assert constraint.version == "8.0.1-r0"
+  if let .Package(spec) = bound.spec {
+    guard let constraint = spec.constraint else {
+      assert false, "no constraint"
+      return
     }
-    else => assert false, "not a package"
+  
+    assert constraint.op == .Ge
+    assert constraint.version == "8.0.1-r0"
+  } else {
+    assert false, "not a package"
   }
+
   assert refused(declare.package(id: "p", name: "Bad Name"), "invalid package name")
   assert refused(declare.package(id: "p", name: "curl", version: ">=x"), "invalid package version")
   assert refused(declare.package(id: "p", name: "curl", presence: .Absent, version: "1.0"), "absent package takes no version")
@@ -106,15 +107,15 @@ test an_xinit_service_declares_no_enablement_or_runlevel {
   assert refused(declare.xinit_service(id: "s", name: "logger"), "declare running")
   assert refused(declare.xinit_service(id: "s", name: "bad name", running: true), "invalid service name")
   let resource = declare.xinit_service(id: "s", name: "logger", running: true, restart_on: ["conf"])?
-  match resource.spec {
-    model.Service(spec) => {
-      assert spec.adapter == .Xinit
-      assert spec.enabled == null
-      assert spec.running == true
-      assert spec.runlevel == ""
-    }
-    else => assert false, "not a service"
+  if let .Service(spec) = resource.spec {
+    assert spec.adapter == .Xinit
+    assert spec.enabled == null
+    assert spec.running == true
+    assert spec.runlevel == ""
+  } else {
+    assert false, "not a service"
   }
+
   assert model.dependencies(resource) == ["conf"]
 }
 

@@ -166,10 +166,7 @@ test test_cargo_proof_accepts_rust_std_at_declared_lib_path [fs, process, env, e
   }
   let readelf_found = match process.which("readelf") {
     Ok(_) => true,
-    Err(_) => match process.which("llvm-readelf") {
-      Ok(_) => true,
-      Err(_) => false,
-    },
+    Err(_) => process.which("llvm-readelf") is Ok(_),
   }
   guard readelf_found else {
     test.skip("readelf or llvm-readelf is unavailable for cargo's ELF proof")
@@ -426,7 +423,7 @@ test test_recipe_infers_identity_and_neutral_source_defaults [fs, env, error] { 
   let pkg = recipe.load_package_for_target(dir, types.X86_64LinuxMusl)?
   assert pkg.name == dir.name
   assert pkg.rel == "1"
-  assert pkg.kind == types.Payload
+  assert pkg.kind == .Payload
   assert pkg.upstream_sources[0].architectures == ["all"]
   assert pkg.upstream_sources[0].checksums[0].arch == "all"
   assert recipe.redundant_defaults(dir)? == []
@@ -485,7 +482,7 @@ test test_recipe_loads_proof_dependencies_without_running_the_proof [fs, env, er
   }
 }
 
-test test_ca_certificates_installs_managed_symlinks_and_seeds { |ctx|
+test test_ca_certificates_installs_managed_symlinks_and_seeds {
   let pkg = recipe.load_package(p"packages/ca-certificates")?
   let paths = [entry.path.display() for entry in pkg.filetree]
   let joined = paths.join("\n")
@@ -502,7 +499,7 @@ test test_ca_certificates_installs_managed_symlinks_and_seeds { |ctx|
   }
 }
 
-test test_laputa_pm_ships_the_trust_command { |ctx|
+test test_laputa_pm_ships_the_trust_command {
   let pkg = recipe.load_package(p"packages/laputa-pm")?
   let paths = [entry.path.display() for entry in pkg.filetree]
   for expected in ["usr/bin/trust", "usr/lib/pm/trust.xsh", "usr/lib/pm/trust"] {

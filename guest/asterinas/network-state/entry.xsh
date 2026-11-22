@@ -1,16 +1,15 @@
 #!/bin/xsh --
-error NetworkStateError = Failed(message: Str)
+error NetworkStateError = Failed
 
 type Attribute = {data: Bytes, kind: Int}
 
 pure attribute_text(attributes: List[Attribute]) -> Str {
-  [f"{attribute.kind}:{attribute.data.base64()}" for attribute in attributes].join(",")
+  [f"{entry.kind}:{entry.data.base64()}" for entry in attributes].join(",")
 }
 
 proc report(label: Str, only_device: Str, link_state: Bool) [fs, process, env, time, net, error] {
   let dump = linux.network_dump()?
-  var names: Map[Int, Str] = {}
-  for link in dump.links { names[link.ifindex] = link.name ?? "-" }
+  var names = {link.ifindex: link.name ?? "-" for link in dump.links}
   let links = dump.links |> where .name != "sit0"
   for link in links |> where only_device == "" or .name == only_device {
     let state = if link_state { f" flags={link.flags} oper={link.operstate ?? 0}" } else { "" }
@@ -44,7 +43,7 @@ pure be32(value: Int) -> Result[Bytes, Error] {
 
 pure ipv4(text: Str) -> Result[Int, Error] {
   var value = 0
-  for part in text.split(".") { value = value * 256 + part.parse_int()? }
+  for part in text.split(".") { value = value * 256 + part as Int }
   Ok(value)
 }
 
@@ -66,10 +65,10 @@ proc send_request(label: Str, kind: Int, flags: Int, payload: Bytes) [process, n
   }
 }
 
-proc probe(label: Str, host: Str) [process, net, error] {
+proc probe(label: Str, host: Str) {
   let c = linux.net_constants()
   let fd = linux.socket(c.AF_INET, c.SOCK_STREAM)?
-  linux.set_socket_timeout(fd, c.SO_SNDTIMEO, 3000)?
+  linux.set_socket_timeout(fd, c.SO_SNDTIMEO, 3000)
   match linux.connect(fd, {family: "inet", address: host, port: 9}) {
     Ok(_) => eprint --flush f"NET_{label}_PROBE connected"
     Err(error) => eprint --flush f"NET_{label}_PROBE {error.message}"
@@ -91,49 +90,49 @@ pure route_payload(ifindex: Int, item: Route, add: Bool) -> Result[Bytes, Error]
   Ok(bytes.concat([header, destination, via, device, priority]))
 }
 
-proc add_route(label: Str, name: Str, item: Route) [fs, process, env, time, net, error] {
+proc add_route(label: Str, name: Str, item: Route) {
   let c = linux.net_constants()
   let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
   send_request(label, c.RTM_NEWROUTE, flags, route_payload(ifindex_of(name)?, item, true)?)
-  report(label, "", false)?
+  report(label, "", false)
 }
 
-proc delete_route(label: Str, name: Str, item: Route) [fs, process, env, time, net, error] {
+proc delete_route(label: Str, name: Str, item: Route) {
   let c = linux.net_constants()
   send_request(label, c.RTM_DELROUTE, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), route_payload(ifindex_of(name)?, item, false)?)
-  report(label, "", false)?
+  report(label, "", false)
 }
 
 proc ifindex_of(name: Str) [fs, process, env, time, net, error] -> Result[Int] {
-  for link in linux.network_dump()?.links { if link.name == name { return link.ifindex } }
+  for link in linux.network_dump()?.links { return link.ifindex when link.name == name }
   Err(NetworkStateError.Failed(f"no link {name}"))
 }
 
-proc add_address(label: Str, name: Str, item: Address) [fs, process, env, time, net, error] {
+proc add_address(label: Str, name: Str, item: Address) {
   let c = linux.net_constants()
   let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
   send_request(label, c.RTM_NEWADDR, flags, address_payload(ifindex_of(name)?, item, c.RT_SCOPE_UNIVERSE, true)?)
-  report(label, "", false)?
+  report(label, "", false)
 }
 
-proc delete_address(label: Str, name: Str, item: Address) [fs, process, env, time, net, error] {
+proc delete_address(label: Str, name: Str, item: Address) {
   let c = linux.net_constants()
   send_request(label, c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(ifindex_of(name)?, item, c.RT_SCOPE_UNIVERSE, false)?)
-  report(label, "", false)?
+  report(label, "", false)
 }
 
 proc wait_for_operstate(name: Str, expected: Int) [fs, process, env, time, net, error] {
   let deadline = time.monotonic()? + 5000000000
   while time.monotonic()? < deadline {
     for link in linux.network_dump()?.links {
-      if link.name == name and (link.operstate ?? 0) == expected { return }
+      return when link.name == name and (link.operstate ?? 0) == expected
     }
     time.sleep(50ms)
   }
   eprint --flush f"NET_TIMEOUT {name} operstate {expected}"
 }
 
-proc step(label: Str, name: Str, up: Bool, expected: Int) [fs, process, env, time, net, error] {
+proc step(label: Str, name: Str, up: Bool, expected: Int) {
   let result = if up { linux.link_up(name) } else { linux.link_down(name) }
   match result {
     Ok(_) => {
@@ -145,7 +144,7 @@ proc step(label: Str, name: Str, up: Bool, expected: Int) [fs, process, env, tim
   report(label, "", true)
 }
 
-proc ip_step(label: Str, name: Str, state_word: Str, expected: Int) [fs, process, env, time, net, error] {
+proc ip_step(label: Str, name: Str, state_word: Str, expected: Int) {
   let output = p"/run/ip-link.out"
   let status = process.run(process.command_argv(p"/usr/bin/xsh", [p"/usr/bin/xsh", p"/usr/lib/xsh/core/ip", "link", "set", "dev", name, state_word], p"/", {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", output, output))?
   if status.ok {
@@ -172,7 +171,7 @@ pure attributes_of(payload: Bytes, start: Int) -> List[Attribute] {
 }
 
 pure attribute_of(attributes: List[Attribute], kind: Int) -> Bytes? {
-  for attribute in attributes { return attribute.data when attribute.kind == kind }
+  for entry in attributes { return entry.data when entry.kind == kind }
   null
 }
 
@@ -218,8 +217,7 @@ pure describe_event(message: Bytes, names: Map[Int, Str]) -> Result[Str, Error] 
 }
 
 proc drain_events(label: Str, listener: Int) [fs, process, env, time, net, error] {
-  var names: Map[Int, Str] = {}
-  for link in linux.network_dump()?.links { names[link.ifindex] = link.name ?? "-" }
+  var names = {link.ifindex: link.name ?? "-" for link in linux.network_dump()?.links}
   while unix.poll_fd(listener, ["readable"], 300)? == ["readable"] {
     match unix.read_fd(listener, 65536) {
       Ok(message) => {
@@ -243,7 +241,7 @@ pure describe_frame(frame: Bytes) -> Result[Str?, Error] {
     let sender = ip_text(frame, 28)
     let peer_checks_neighbor = operation == 1 and sender == "192.0.2.1"
     let answer_to_peer_check = operation == 2 and sender == "192.0.2.10" and destination == "unicast"
-    if peer_checks_neighbor or answer_to_peer_check { return Ok(null) }
+    return Ok(null) when peer_checks_neighbor or answer_to_peer_check
     return Ok(f"ARP op={bytes.unpack_be(frame, 2, 20)?} {ip_text(frame, 28)}>{ip_text(frame, 38)} dst={destination} len={frame.len()}")
   }
   if ethertype == 2048 {
@@ -268,10 +266,10 @@ pure broadcast_udp(mac: Bytes) -> Result[Bytes, Error] {
   bytes.concat([b"\xff\xff\xff\xff\xff\xff", mac, bytes.pack_be(2048, 2)?, bytes.from_ints([69, 0])?, bytes.pack_be(32, 2)?, bytes.zero(4)?, bytes.from_ints([64, 17])?, bytes.zero(2)?, bytes.zero(4)?, bytes.from_ints([255, 255, 255, 255])?, bytes.pack_be(68, 2)?, bytes.pack_be(67, 2)?, bytes.pack_be(12, 2)?, bytes.zero(2)?, payload])
 }
 
-proc open_packet_socket(protocol: Int, ifindex: Int) [process, net, error] -> Result[Int, Error] {
+proc open_packet_socket(protocol: Int, ifindex: Int) -> Result[Int, Error] {
   let c = linux.net_constants()
   let socket = linux.socket(c.AF_PACKET, c.SOCK_RAW.bit_or(c.SOCK_NONBLOCK), bytes.unpack_le(bytes.pack_be(protocol, 2)?, 2)?)?
-  if ifindex != 0 { linux.bind(socket, packet_address(ifindex, protocol, b"")?)? }
+  if ifindex != 0 { linux.bind(socket, packet_address(ifindex, protocol, b"")?) }
   Ok(socket)
 }
 
@@ -313,7 +311,7 @@ proc address_ioctl(label: Str, fd: Int, request: Int, name: Str, family: Int, oc
   ioctl_result(label, linux.ioctl(fd, request, ifreq(name, sockaddr_in(family, octets)?)?, 0))
 }
 
-proc route_ioctl(label: Str, operation: Str, destination: Str, genmask: Str, gateway: Str, device: Str) [process, error] {
+proc route_ioctl(label: Str, operation: Str, destination: Str, genmask: Str, gateway: Str, device: Str) {
   let text = run.text /usr/lib/asterinas/case/ioctl-route-probe ${label} ${operation} ${destination} ${genmask} ${gateway} ${device}
   eprint --flush text.trim()
 }
@@ -322,47 +320,47 @@ proc main() [fs, process, env, time, net, error] {
   let mode = p"/usr/lib/asterinas/case/mode".read_text()?.trim()
   eprint --flush f"NET_BEGIN {mode}"
   match mode {
-    "loopback" => report("initial", "lo", false)?
+    "loopback" => report("initial", "lo", false)
     "link" => {
-      report("initial", "", true)?
-      step("eth0_up", "eth0", true, 6)?
-      step("eth0_down", "eth0", false, 2)?
-      step("eth0_up_again", "eth0", true, 6)?
-      step("lo_down", "lo", false, 2)?
-      step("lo_up", "lo", true, 0)?
-      step("missing", "missing0", true, 0)?
+      report("initial", "", true)
+      step("eth0_up", "eth0", true, 6)
+      step("eth0_down", "eth0", false, 2)
+      step("eth0_up_again", "eth0", true, 6)
+      step("lo_down", "lo", false, 2)
+      step("lo_up", "lo", true, 0)
+      step("missing", "missing0", true, 0)
     }
     "netlink-link" => {
-      report("initial", "", true)?
-      ip_step("eth0_up", "eth0", "up", 6)?
-      ip_step("eth0_down", "eth0", "down", 2)?
-      ip_step("eth0_down_again", "eth0", "down", 2)?
-      ip_step("eth0_up_again", "eth0", "up", 6)?
-      ip_step("lo_down", "lo", "down", 2)?
-      ip_step("lo_up", "lo", "up", 0)?
+      report("initial", "", true)
+      ip_step("eth0_up", "eth0", "up", 6)
+      ip_step("eth0_down", "eth0", "down", 2)
+      ip_step("eth0_down_again", "eth0", "down", 2)
+      ip_step("eth0_up_again", "eth0", "up", 6)
+      ip_step("lo_down", "lo", "down", 2)
+      ip_step("lo_up", "lo", "up", 0)
     }
     "address" => {
-      step("up", "eth0", true, 6)?
-      let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
-      let second: Address = {local: "192.0.2.77", prefix: 24, broadcast: null}
-      let host: Address = {local: "198.51.100.5", prefix: 32, broadcast: null}
-      probe("before_address", "192.0.2.1")?
-      add_address("add_primary", "eth0", primary)?
-      probe("with_address", "192.0.2.1")?
-      add_address("add_primary_again", "eth0", primary)?
-      add_address("add_second_in_subnet", "eth0", second)?
-      add_address("add_host", "eth0", host)?
-      delete_address("delete_second", "eth0", second)?
-      delete_address("delete_second_again", "eth0", second)?
-      step("down", "eth0", false, 2)?
-      probe("while_down", "192.0.2.1")?
-      step("up_again", "eth0", true, 6)?
-      delete_address("delete_primary", "eth0", primary)?
-      probe("after_delete", "192.0.2.1")?
-      delete_address("delete_host", "eth0", host)?
-      add_address("add_primary_for_promotion", "eth0", primary)?
-      add_address("add_second_for_promotion", "eth0", second)?
-      delete_address("delete_primary_with_secondary", "eth0", primary)?
+      step("up", "eth0", true, 6)
+      let primary: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
+      let second: Address = Address(local: "192.0.2.77", prefix: 24, broadcast: null)
+      let host: Address = Address(local: "198.51.100.5", prefix: 32, broadcast: null)
+      probe("before_address", "192.0.2.1")
+      add_address("add_primary", "eth0", primary)
+      probe("with_address", "192.0.2.1")
+      add_address("add_primary_again", "eth0", primary)
+      add_address("add_second_in_subnet", "eth0", second)
+      add_address("add_host", "eth0", host)
+      delete_address("delete_second", "eth0", second)
+      delete_address("delete_second_again", "eth0", second)
+      step("down", "eth0", false, 2)
+      probe("while_down", "192.0.2.1")
+      step("up_again", "eth0", true, 6)
+      delete_address("delete_primary", "eth0", primary)
+      probe("after_delete", "192.0.2.1")
+      delete_address("delete_host", "eth0", host)
+      add_address("add_primary_for_promotion", "eth0", primary)
+      add_address("add_second_for_promotion", "eth0", second)
+      delete_address("delete_primary_with_secondary", "eth0", primary)
       let c = linux.net_constants()
       let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
       send_request("missing_link", c.RTM_NEWADDR, flags, address_payload(4242, primary, c.RT_SCOPE_UNIVERSE, true)?)
@@ -371,145 +369,145 @@ proc main() [fs, process, env, time, net, error] {
     }
     "route" => {
       let c = linux.net_constants()
-      let address: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
-      let default: Route = {destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP}
-      let slower: Route = {...default, priority: 200}
-      let network: Route = {destination: "10.20.0.0", prefix: 16, gateway: "192.0.2.1", priority: 0, protocol: c.RTPROT_STATIC}
-      let direct: Route = {destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC}
-      step("up", "eth0", true, 6)?
-      add_address("address", "eth0", address)?
-      add_route("add_default", "eth0", default)?
-      add_route("add_default_again", "eth0", default)?
-      add_route("add_slower_default", "eth0", slower)?
-      add_route("add_network", "eth0", network)?
-      add_route("add_direct", "eth0", direct)?
-      add_route("add_unreachable_gateway", "eth0", {...network, destination: "10.99.0.0", gateway: "172.16.0.1"})?
-      add_route("add_host_bits", "eth0", {...network, destination: "10.20.0.5"})?
+      let address: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
+      let default: Route = Route(destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP)
+      let slower = {...default, priority: 200}
+      let network: Route = Route(destination: "10.20.0.0", prefix: 16, gateway: "192.0.2.1", priority: 0, protocol: c.RTPROT_STATIC)
+      let direct: Route = Route(destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC)
+      step("up", "eth0", true, 6)
+      add_address("address", "eth0", address)
+      add_route("add_default", "eth0", default)
+      add_route("add_default_again", "eth0", default)
+      add_route("add_slower_default", "eth0", slower)
+      add_route("add_network", "eth0", network)
+      add_route("add_direct", "eth0", direct)
+      add_route("add_unreachable_gateway", "eth0", {...network, destination: "10.99.0.0", gateway: "172.16.0.1"})
+      add_route("add_host_bits", "eth0", {...network, destination: "10.20.0.5"})
       send_request("add_missing_link", c.RTM_NEWROUTE, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL), route_payload(4242, network, true)?)
-      delete_route("delete_default", "eth0", default)?
-      delete_route("delete_default_again", "eth0", default)?
-      delete_route("delete_network_by_destination", "eth0", {...network, priority: 0})?
-      step("down", "eth0", false, 2)?
-      step("up_again", "eth0", true, 6)?
-      add_route("add_while_down_default", "eth0", default)?
-      delete_address("delete_address_keeps_routes", "eth0", address)?
-      delete_route("delete_slower_default", "eth0", slower)?
-      add_route("add_without_address", "eth0", default)?
+      delete_route("delete_default", "eth0", default)
+      delete_route("delete_default_again", "eth0", default)
+      delete_route("delete_network_by_destination", "eth0", {...network, priority: 0})
+      step("down", "eth0", false, 2)
+      step("up_again", "eth0", true, 6)
+      add_route("add_while_down_default", "eth0", default)
+      delete_address("delete_address_keeps_routes", "eth0", address)
+      delete_route("delete_slower_default", "eth0", slower)
+      add_route("add_without_address", "eth0", default)
     }
     "events" => {
       let c = linux.net_constants()
       let listener = linux.netlink_open(c.NETLINK_ROUTE, c.RTMGRP_LINK.bit_or(c.RTMGRP_IPV4_IFADDR).bit_or(c.RTMGRP_IPV4_ROUTE))?
       defer unix.close_fd(listener)
       let flags = c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK).bit_or(c.NLM_F_CREATE).bit_or(c.NLM_F_EXCL)
-      let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
-      let second: Address = {local: "192.0.2.77", prefix: 24, broadcast: null}
-      let host: Address = {local: "198.51.100.5", prefix: 32, broadcast: null}
-      let default: Route = {destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP}
-      let direct: Route = {destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC}
+      let primary: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
+      let second: Address = Address(local: "192.0.2.77", prefix: 24, broadcast: null)
+      let host: Address = Address(local: "198.51.100.5", prefix: 32, broadcast: null)
+      let default: Route = Route(destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP)
+      let direct: Route = Route(destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC)
       let index = ifindex_of("eth0")?
-      linux.link_up("eth0")?
-      drain_events("up", listener)?
-      linux.link_up("eth0")?
-      drain_events("up_again", listener)?
+      linux.link_up("eth0")
+      drain_events("up", listener)
+      linux.link_up("eth0")
+      drain_events("up_again", listener)
       send_request("add_primary", c.RTM_NEWADDR, flags, address_payload(index, primary, c.RT_SCOPE_UNIVERSE, true)?)
-      drain_events("add_primary", listener)?
+      drain_events("add_primary", listener)
       send_request("add_second", c.RTM_NEWADDR, flags, address_payload(index, second, c.RT_SCOPE_UNIVERSE, true)?)
-      drain_events("add_second", listener)?
+      drain_events("add_second", listener)
       send_request("add_host", c.RTM_NEWADDR, flags, address_payload(index, host, c.RT_SCOPE_UNIVERSE, true)?)
-      drain_events("add_host", listener)?
+      drain_events("add_host", listener)
       send_request("add_default", c.RTM_NEWROUTE, flags, route_payload(index, default, true)?)
-      drain_events("add_default", listener)?
+      drain_events("add_default", listener)
       send_request("add_default_again", c.RTM_NEWROUTE, flags, route_payload(index, default, true)?)
-      drain_events("add_default_again", listener)?
+      drain_events("add_default_again", listener)
       send_request("add_direct", c.RTM_NEWROUTE, flags, route_payload(index, direct, true)?)
-      drain_events("add_direct", listener)?
+      drain_events("add_direct", listener)
       send_request("delete_direct", c.RTM_DELROUTE, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), route_payload(index, direct, false)?)
-      drain_events("delete_direct", listener)?
+      drain_events("delete_direct", listener)
       send_request("delete_second", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(index, second, c.RT_SCOPE_UNIVERSE, false)?)
-      drain_events("delete_second", listener)?
-      linux.link_down("eth0")?
-      drain_events("down", listener)?
-      linux.link_up("eth0")?
-      drain_events("up_with_addresses", listener)?
+      drain_events("delete_second", listener)
+      linux.link_down("eth0")
+      drain_events("down", listener)
+      linux.link_up("eth0")
+      drain_events("up_with_addresses", listener)
       send_request("add_default_again_after_up", c.RTM_NEWROUTE, flags, route_payload(index, default, true)?)
-      drain_events("add_default_again_after_up", listener)?
+      drain_events("add_default_again_after_up", listener)
       send_request("delete_primary", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(index, primary, c.RT_SCOPE_UNIVERSE, false)?)
-      drain_events("delete_primary", listener)?
+      drain_events("delete_primary", listener)
       send_request("delete_last_address", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(index, host, c.RT_SCOPE_UNIVERSE, false)?)
-      drain_events("delete_last_address", listener)?
-      report("after_last_address", "eth0", false)?
+      drain_events("delete_last_address", listener)
+      report("after_last_address", "eth0", false)
       send_request("add_primary_for_promotion", c.RTM_NEWADDR, flags, address_payload(index, primary, c.RT_SCOPE_UNIVERSE, true)?)
       send_request("add_second_for_promotion", c.RTM_NEWADDR, flags, address_payload(index, second, c.RT_SCOPE_UNIVERSE, true)?)
-      drain_events("add_for_promotion", listener)?
+      drain_events("add_for_promotion", listener)
       send_request("delete_primary_with_secondary", c.RTM_DELADDR, c.NLM_F_REQUEST.bit_or(c.NLM_F_ACK), address_payload(index, primary, c.RT_SCOPE_UNIVERSE, false)?)
-      drain_events("delete_primary_with_secondary", listener)?
-      linux.link_down("eth0")?
-      drain_events("down_without_addresses", listener)?
+      drain_events("delete_primary_with_secondary", listener)
+      linux.link_down("eth0")
+      drain_events("down_without_addresses", listener)
       send_request("add_primary_while_down", c.RTM_NEWADDR, flags, address_payload(index, primary, c.RT_SCOPE_UNIVERSE, true)?)
-      drain_events("add_primary_while_down", listener)?
-      linux.link_up("eth0")?
-      drain_events("up_last", listener)?
+      drain_events("add_primary_while_down", listener)
+      linux.link_up("eth0")
+      drain_events("up_last", listener)
     }
     "packet" => {
-      let primary: Address = {local: "192.0.2.10", prefix: 24, broadcast: null}
-      step("up", "eth0", true, 6)?
-      add_address("address", "eth0", primary)?
+      let primary: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
+      step("up", "eth0", true, 6)
+      add_address("address", "eth0", primary)
       let index = ifindex_of("eth0")?
       let c = linux.net_constants()
       let ip = open_packet_socket(c.ETH_P_IP, index)?
       let arp = open_packet_socket(c.ETH_P_ARP, index)?
       let everything = open_packet_socket(c.ETH_P_ALL, index)?
       let anywhere = open_packet_socket(c.ETH_P_ARP, 0)?
-      probe("first", "192.0.2.1")?
-      drain_packets("ip", ip)?
-      drain_packets("arp", arp)?
-      drain_packets("everything", everything)?
-      drain_packets("anywhere", anywhere)?
+      probe("first", "192.0.2.1")
+      drain_packets("ip", ip)
+      drain_packets("arp", arp)
+      drain_packets("everything", everything)
+      drain_packets("anywhere", anywhere)
       var mac = b""
       for link in linux.network_dump()?.links { if link.name == "eth0" { mac = link.address ?? b"" } }
       let broadcast = b"\xff\xff\xff\xff\xff\xff"
       let _ = linux.sendto(arp, arp_request(mac, [192, 0, 2, 10], [192, 0, 2, 1])?, packet_address(index, c.ETH_P_ARP, broadcast)?)?
-      drain_packets("arp_after_send", arp)?
+      drain_packets("arp_after_send", arp)
       let _ = linux.sendto(ip, broadcast_udp(mac)?, packet_address(index, c.ETH_P_IP, broadcast)?)?
-      drain_packets("ip_after_send", ip)?
-      drain_packets("everything_after_send", everything)?
-      drain_packets("anywhere_after_send", anywhere)?
-      step("down", "eth0", false, 2)?
-      drain_packets("ip_after_down", ip)?
-      drain_packets("anywhere_after_down", anywhere)?
-      step("up_again", "eth0", true, 6)?
-      probe("second", "192.0.2.1")?
-      drain_packets("ip_after_up", ip)?
-      drain_packets("anywhere_after_up", anywhere)?
+      drain_packets("ip_after_send", ip)
+      drain_packets("everything_after_send", everything)
+      drain_packets("anywhere_after_send", anywhere)
+      step("down", "eth0", false, 2)
+      drain_packets("ip_after_down", ip)
+      drain_packets("anywhere_after_down", anywhere)
+      step("up_again", "eth0", true, 6)
+      probe("second", "192.0.2.1")
+      drain_packets("ip_after_up", ip)
+      drain_packets("anywhere_after_up", anywhere)
       for socket in [ip, arp, everything, anywhere] { let _ = unix.close_fd(socket) }
     }
     "ioctl-config" => {
       let c = linux.net_constants()
-      step("up", "eth0", true, 6)?
+      step("up", "eth0", true, 6)
       let fd = linux.socket(c.AF_INET, c.SOCK_DGRAM)?
       defer unix.close_fd(fd)
-      report("start", "eth0", false)?
+      report("start", "eth0", false)
       address_ioctl("addr_set", fd, c.SIOCSIFADDR, "eth0", c.AF_INET, [192, 0, 2, 10])
-      report("addr_set", "eth0", false)?
+      report("addr_set", "eth0", false)
       address_ioctl("addr_same", fd, c.SIOCSIFADDR, "eth0", c.AF_INET, [192, 0, 2, 10])
-      report("addr_same", "eth0", false)?
+      report("addr_same", "eth0", false)
       address_ioctl("mask_same", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET, [255, 255, 255, 0])
-      report("mask_same", "eth0", false)?
+      report("mask_same", "eth0", false)
       address_ioctl("mask_wide", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET, [255, 255, 0, 0])
-      report("mask_wide", "eth0", false)?
+      report("mask_wide", "eth0", false)
       address_ioctl("mask_restore", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET, [255, 255, 255, 0])
-      report("mask_restore", "eth0", false)?
+      report("mask_restore", "eth0", false)
       address_ioctl("mask_bad", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET, [255, 0, 255, 0])
       address_ioctl("addr_missing", fd, c.SIOCSIFADDR, "missing0", c.AF_INET, [192, 0, 2, 11])
       address_ioctl("mask_missing", fd, c.SIOCSIFNETMASK, "missing0", c.AF_INET, [255, 255, 255, 0])
       address_ioctl("addr_family", fd, c.SIOCSIFADDR, "eth0", c.AF_INET6, [192, 0, 2, 12])
       address_ioctl("mask_family", fd, c.SIOCSIFNETMASK, "eth0", c.AF_INET6, [255, 255, 255, 0])
-      report("after_address_errors", "eth0", false)?
+      report("after_address_errors", "eth0", false)
       route_ioctl("route_add_default", "add", "0.0.0.0", "0.0.0.0", "192.0.2.1", "eth0")
-      report("route_add_default", "eth0", false)?
+      report("route_add_default", "eth0", false)
       route_ioctl("route_add_default_again", "add", "0.0.0.0", "0.0.0.0", "192.0.2.1", "eth0")
       route_ioctl("route_add_network", "add", "10.20.0.0", "255.255.0.0", "-", "eth0")
-      report("route_add_network", "eth0", false)?
+      report("route_add_network", "eth0", false)
       route_ioctl("route_add_network_again", "add", "10.20.0.0", "255.255.0.0", "-", "eth0")
       route_ioctl("route_add_bad_mask", "add-bad-mask", "10.0.0.0", "255.255.0.0", "192.0.2.1", "eth0")
       route_ioctl("route_add_family", "add-family", "10.40.0.0", "255.255.0.0", "192.0.2.1", "eth0")
@@ -518,7 +516,7 @@ proc main() [fs, process, env, time, net, error] {
       route_ioctl("route_del_network_again", "del", "10.20.0.0", "255.255.0.0", "-", "eth0")
       route_ioctl("route_del_default", "del", "0.0.0.0", "0.0.0.0", "192.0.2.1", "eth0")
       route_ioctl("route_del_default_again", "del", "0.0.0.0", "0.0.0.0", "192.0.2.1", "eth0")
-      report("final", "eth0", false)?
+      report("final", "eth0", false)
     }
     other => fail f"unknown network-state mode {other}"
   }

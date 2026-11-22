@@ -3,24 +3,24 @@
 const protocol = "laputa-remote-1"
 const zeros = "0000000000000000000000000000000000000000000000000000000000000000"
 
-proc ask(ctx: TestContext, home: Path, request: Str, payload: Bytes = bytes.from_text("")) -> Result[Record] {
+proc ask(ctx: TestContext, home: Path, request: Str, payload = bytes.from_text("")) -> Result[Record] {
   let program = p"system/remote_guest.xsh".resolve()?
   let input = fp"{home}/request.bin"
-  input.write(bytes.concat([bytes.from_text(request + "\n"), payload]))?
+  input.write(bytes.concat([bytes.from_text(request + "\n"), payload]))
   let output = fp"{home}/reply.json"
   let status = process.run(process.command_argv(
     ctx.xsh_bin,
-    [ctx.xsh_bin.display(), program.display()],
+    [ctx.xsh_bin, program],
     stdin: input,
     stdout: output,
-    env: {HOME: home.display()},
+    env: {HOME: home},
     timeout: 20s,
   ))?
   guard status.ok else { fail "the remote program must always answer with exit status zero" }
   json.read(output)?.require(Record)?
 }
 
-proc header(op: Str, fields: Str = "") -> Str {
+proc header(op: Str, fields = "") -> Str {
   f"{{\"protocol\":\"{protocol}\",\"op\":\"{op}\"{fields}}}"
 }
 

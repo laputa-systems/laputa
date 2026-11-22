@@ -1,44 +1,43 @@
 #!/bin/xsh --
-const probe = p"/usr/lib/asterinas/case/device-probe"
 const disk_group = 9
 const disk_mode = 0o660
 const memory_mode = 0o666
 
-error DeviceCaseError = Failed(message: Str)
+error DeviceCaseError = Failed
 
 proc require(condition: Bool, message: Str) [error] {
   guard condition else {
     eprint --flush f"DEV_FAILED {message}"
-    return Err(DeviceCaseError.Failed(message:))
+    return Err(DeviceCaseError.Failed(message))
   }
 }
 
-proc coldplug() [process, error] {
+proc coldplug() {
   let result = process.run(process.command_argv(p"/usr/bin/mdevd-coldplug", ["mdevd-coldplug", "-O", "4"]))?
-  require(result.ok, "mdevd-coldplug failed")?
+  require(result.ok, "mdevd-coldplug failed")
 }
 
-proc show_node(name: Str, expected_kind: Str, expected_mode: Int, expected_group: Int) [fs, error] {
+proc show_node(name: Str, expected_kind: Str, expected_mode: Int, expected_group: Int) {
   let node = fs.stat(fp"/dev/{name}")?
   eprint --flush f"DEV_NODE name={name} kind={node.kind} major={node.rdev / 256} minor={node.rdev % 256} mode={node.mode % 4096} owner={node.uid} group={node.gid}"
-  require(node.kind == expected_kind, f"/dev/{name} is a {node.kind}, expected a {expected_kind}")?
-  require(node.mode % 4096 == expected_mode, f"/dev/{name} has mode {node.mode % 4096}, expected {expected_mode}")?
-  require(node.uid == 0 and node.gid == expected_group, f"/dev/{name} belongs to {node.uid}:{node.gid}, expected 0:{expected_group}")?
+  require(node.kind == expected_kind, f"/dev/{name} is a {node.kind}, expected a {expected_kind}")
+  require(node.mode % 4096 == expected_mode, f"/dev/{name} has mode {node.mode % 4096}, expected {expected_mode}")
+  require(node.uid == 0 and node.gid == expected_group, f"/dev/{name} belongs to {node.uid}:{node.gid}, expected 0:{expected_group}")
 }
 
-proc nodes() [fs, process, error] {
+proc nodes() {
   for name in ["vda", "vdb", "vdb1", "vdb2"] {
     fp"/dev/{name}".remove()
   }
   for name in ["null", "zero", "full", "random", "urandom"] {
     fp"/dev/{name}".chmod(0o600)
   }
-  coldplug()?
+  coldplug()
   for name in ["vda", "vdb", "vdb1", "vdb2"] {
-    show_node(name, "block", disk_mode, disk_group)?
+    show_node(name, "block", disk_mode, disk_group)
   }
   for name in ["null", "zero", "full", "random", "urandom"] {
-    show_node(name, "char", memory_mode, 0)?
+    show_node(name, "char", memory_mode, 0)
   }
 }
 
@@ -48,17 +47,17 @@ proc main() [fs, process, error] {
   match mode {
     "sysfs" => {
       let status = run.status /usr/lib/asterinas/case/device-probe sysfs vda vdb vdb1 vdb2 null zero full random urandom
-      require(status.exited_with(0), "the sysfs layout differs from Linux")?
+      require(status.exited_with(0), "the sysfs layout differs from Linux")
     }
     "add" => {
       let status = run.status /usr/lib/asterinas/case/device-probe events vda vdb vdb1 vdb2 null zero full random urandom
-      require(status.exited_with(0), "an add event is wrong or missing")?
+      require(status.exited_with(0), "an add event is wrong or missing")
     }
     "missing" => {
       let status = run.status /usr/lib/asterinas/case/device-probe missing vdb
-      require(status.exited_with(0), "an expected add event never arrived")?
+      require(status.exited_with(0), "an expected add event never arrived")
     }
-    "nodes" => nodes()?
+    "nodes" => nodes()
     other => fail f"unknown device mode {other}"
   }
   eprint --flush "DEV_DONE"

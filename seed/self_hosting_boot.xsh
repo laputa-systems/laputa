@@ -1,17 +1,17 @@
-use system.build
 use system.activation
+use system.build
 use system.launcher
-use system.self_hosting
 use system.profile
 use system.qemu
+use system.self_hosting
 use system.types
 
-proc record_failed_pending(state: Path) [fs, time, error] {
+proc record_failed_pending(state: Path) {
   let record = activation.activation_status(state)?
-  if record.pending != null { activation.activation_boot_failed(state)? }
+  if record.pending != null { activation.activation_boot_failed(state) }
 }
 
-proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, process, net, env, time, io, error] -> Result[Unit, Error] {
+proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, process, net, env, time, io, error] {
   let declared = profile.load_system_profile("qemu-self-hosting", fp"{repository}/profiles")?
   let runtime_proof = completion_marker in ["LAPUTA_SELF_HOSTING_SUCCESSOR_BOOTED", "LAPUTA_SELF_HOSTING_PREVIOUS_BOOTED"]
   let intent = if runtime_proof { {...declared, qemu_memory: "4G"} } else { declared }
@@ -41,7 +41,7 @@ proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, proc
   }
   let output_access = if runtime_proof { qemu.InspectOutput } else { qemu.BuildOutput }
   argv += qemu.qemu_self_hosting_disks_argv(config.target, fp"{output_root}/inputs.ext4", fp"{output_root}/output.ext4", output_access)
-  let child = spawn process.command_argv(config.qemu, argv, output_root, env: {TMPDIR: output_root.display()}, stdout: outputs.console_log, stderr: outputs.qemu_log)?
+  let child = spawn process.command_argv(config.qemu, argv, output_root, env: {TMPDIR: output_root}, stdout: outputs.console_log, stderr: outputs.qemu_log)?
   defer child.cancel(signal: "TERM", kill_after: 5s)
   let start = time.monotonic()?
   var paused = false
@@ -53,14 +53,14 @@ proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, proc
       fail f"guest failed; inspect {outputs.console_log} and {outputs.qemu_log}"
     }
     if ! paused and "LAP27_PAUSE_READY" in log {
-      qemu.qemu_control(outputs.qmp_socket, qemu.QemuStop)?
+      qemu.qemu_control(outputs.qmp_socket, qemu.QemuStop)
       print "LAP27_HOST_PAUSED"
-      io.flush_stdout()?
+      io.flush_stdout()
       fail "guest resume marker preceded the QMP stop acknowledgment" when "LAP27_RESUME_OBSERVED" in qemu.qemu_log_text(outputs.console_log, outputs.qemu_log)?
       time.sleep(3s)
-      qemu.qemu_control(outputs.qmp_socket, qemu.QemuContinue)?
+      qemu.qemu_control(outputs.qmp_socket, qemu.QemuContinue)
       print "LAP27_HOST_RESUMED"
-      io.flush_stdout()?
+      io.flush_stdout()
       paused = true
     }
     if completion_marker in log and (generations == null or "LAPUTA_SELF_HOSTING_ACTIVATION " in log) {
@@ -80,4 +80,3 @@ proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, proc
   }
 }
 
-main(@args)?

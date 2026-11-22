@@ -6,7 +6,7 @@ const white = 16777215
 const band_width = 60
 const band_height = 6
 
-proc ppm(columns: List[Int]) [error] -> Result[Bytes, Error] {
+proc ppm(columns: List[Int]) -> Result[Bytes, Error] {
   let header = bytes.from_text(f"P6\n{band_width} {band_height}\n255\n")
   let row = bytes.from_ints(
     [
@@ -28,11 +28,11 @@ pure gap(width: Int) -> List[Int] {
 
 pure line(words: List[List[Int]]) -> List[Int] {
   var columns: List[Int] = gap(2)
-  for item in words { columns = columns + item + gap(4) }
+  for item in words { columns = [@columns, @item, @gap(4)] }
   columns + gap(band_width - columns.len())
 }
 
-proc words_of(columns: List[Int]) [error] -> Result[List[text_pixels.Run], Error] {
+proc words_of(columns: List[Int]) -> Result[List[text_pixels.Run], Error] {
   let screen = text_pixels.raster(ppm(columns)?)?
   text_pixels.runs(screen, 0, band_width, 0, band_height, [black])
 }

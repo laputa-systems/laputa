@@ -88,13 +88,12 @@ test test_ext4_applies_explicit_inode_owners_and_rejects_invalid_paths [fs, proc
   let source = fp"{root}/source"
   let image = fp"{root}/state.ext4"
   let owners = fp"{root}/owners.json"
-  source.mkdir()?
-  fp"{source}/a".write("private")?
-  fp"{source}/a".chmod(0o600)?
-  fp"{source}/b".write("root")?
-  image.write(b"")?
-  image.truncate(8MiB)?
-  json.write(owners, [{path: "a", uid: 1001, gid: 1002}])?
+  source.mkdir()
+  fp"{source}/a".write("private", mode: 0o600)
+  fp"{source}/b".write("root")
+  image.write(b"")
+  image.truncate(8MiB)
+  json.write(owners, [{path: "a", uid: 1001, gid: 1002}])
   let xsh = runner()?
   let args = [xsh.display(), "packages/laputa-fs/files/mkfs.ext4.xsh", "--", "-d", source.display(), "--inode-owners", owners.display(), image.display()]
   assert process.run(process.command_argv(xsh, args))?.ok
@@ -113,12 +112,12 @@ test test_ext4_applies_explicit_inode_owners_and_rejects_invalid_paths [fs, proc
     [{path: "/a", uid: 1001, gid: 1002}],
     [{path: "a", uid: 65536, gid: 1002}],
   ] {
-    json.write(owners, bad)?
+    json.write(owners, bad)
     assert !process.run(process.command_argv(xsh, args))?.ok
     assert hash.sha256(image)?.hex() == before
   }
-  fp"{source}/link".symlink(to: p"a")?
-  json.write(owners, [{path: "link", uid: 1001, gid: 1002}])?
+  fp"{source}/link".symlink(to: p"a")
+  json.write(owners, [{path: "link", uid: 1001, gid: 1002}])
   assert !process.run(process.command_argv(xsh, args))?.ok
   assert hash.sha256(image)?.hex() == before
 }

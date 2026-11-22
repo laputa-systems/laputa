@@ -1,17 +1,20 @@
-use packages.laputa-net.network_plan as policy
-use packages.laputa-net.network_kernel as kernel
 use lib.net_state
+use packages.laputa-net.network_kernel as kernel
+use packages.laputa-net.network_plan as policy
+
+const static6 = 192
+const settled6 = 128
 
 pure request_of(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Request, Error] {
   Ok(net_state.request(kernel.network_change(plan, index)?)?)
 }
 
-proc fixture_plan() [fs, error] -> Result[policy.NetworkPlan, Error] {
+proc fixture_plan() -> Result[policy.NetworkPlan, Error] {
   let raw = p"tests/system/fixtures/network-policy-conflict.json".read_text()?
   let input: policy.NetworkPlanInput = json.decode(raw)?.require()?
-  var intent = input.intent
-  intent.address.local = "192.0.3.3"
-  policy.network_plan(intent, input.owned, input.observed)
+  var changed = input.intent
+  changed.address.local = "192.0.3.3"
+  policy.network_plan(changed, input.owned, input.observed)
 }
 
 pure primary_dump() -> LinuxNetworkDump {
@@ -53,19 +56,21 @@ test test_default_route_requests_include_exact_metric_gateway_and_interface [fs,
 
 test test_forged_foreign_removal_is_rejected_before_encoding [fs, error] {
   var plan = fixture_plan()?
-  plan.operations = [policy.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
-  match kernel.network_change(plan, 0) {
-    Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
-    Ok(_) => assert false
+  plan.operations = [.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
+  if let Err(problem) = kernel.network_change(plan, 0) {
+    assert problem.message == "operation is not part of a valid policy plan"
+  } else {
+    assert false
   }
 }
 
 test test_incomplete_dump_never_becomes_empty_success [fs, error] {
   let plan = fixture_plan()?
   let dump: LinuxNetworkDump = {state: "partial", enumeration_succeeded: false, issues: [], links: [], addresses: [], routes: [], rules: []}
-  match kernel.network_project_dump(dump, plan.intent, 1) {
-    Err(problem) => assert problem.message == "a partial dump reports no issue"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_project_dump(dump, plan.intent, 1) {
+    assert problem.message == "a partial dump reports no issue"
+  } else {
+    assert false
   }
 }
 
@@ -74,9 +79,10 @@ test test_secondary_addresses_block_mutation_without_a_promotion_policy [fs, err
   var dump = primary_dump()
   let secondary: LinuxNetworkAddress = {...dump.addresses[0], address: "192.0.2.3", local: "192.0.2.3", flags: 129}
   dump.addresses = dump.addresses + [secondary]
-  match kernel.network_project_dump(dump, plan.intent, 1) {
-    Err(problem) => assert problem.message == "selected secondary IPv4 addresses require explicit promotion policy"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_project_dump(dump, plan.intent, 1) {
+    assert problem.message == "selected secondary IPv4 addresses require explicit promotion policy"
+  } else {
+    assert false
   }
 }
 
@@ -84,9 +90,10 @@ test test_foreign_route_preferred_source_blocks_even_on_another_interface [fs, e
   let plan = fixture_plan()?
   var dump = primary_dump()
   dump.routes = [{attributes: [], destination: "203.0.113.0", destination_prefix_length: 24, family: "inet", flags: 0, gateway: "198.51.100.1", input_ifindex: null, nexthops: [], output_ifindex: 9, preferred_source: "192.0.2.2", priority: 300, protocol: 3, route_type: 1, scope: 0, source: null, source_prefix_length: 0, table: 254, tos: 0}]
-  match kernel.network_project_dump(dump, plan.intent, 1) {
-    Err(problem) => assert problem.message == "foreign preferred-source route depends on a selected IPv4 address"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_project_dump(dump, plan.intent, 1) {
+    assert problem.message == "foreign preferred-source route depends on a selected IPv4 address"
+  } else {
+    assert false
   }
 }
 
@@ -98,9 +105,10 @@ test test_only_exact_address_derived_kernel_routes_are_excluded_from_foreign_own
   assert projected.addresses == [{local: "192.0.2.2", prefix: 24}]
   assert projected.routes.is_empty()
   dump.routes = [{...dump.routes[0], destination: "203.0.113.0"}]
-  match kernel.network_project_dump(dump, plan.intent, 1) {
-    Err(problem) => assert problem.message == "foreign preferred-source route depends on a selected IPv4 address"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_project_dump(dump, plan.intent, 1) {
+    assert problem.message == "foreign preferred-source route depends on a selected IPv4 address"
+  } else {
+    assert false
   }
 }
 
@@ -116,9 +124,10 @@ test test_customized_kernel_routes_are_never_exempted_as_address_derived [fs, er
   for route in variants {
     var dump = primary_dump()
     dump.routes = [route]
-    match kernel.network_project_dump(dump, plan.intent, 1) {
-      Err(problem) => assert problem.message == "foreign preferred-source route depends on a selected IPv4 address"
-      Ok(_) => assert false, "customized route was treated as an owned address derivative"
+    if let Err(problem) = kernel.network_project_dump(dump, plan.intent, 1) {
+      assert problem.message == "foreign preferred-source route depends on a selected IPv4 address"
+    } else {
+      assert false, "customized route was treated as an owned address derivative"
     }
   }
 }
@@ -130,9 +139,10 @@ pure ordinary_default() -> LinuxNetworkRoute {
 proc rejects_default(plan: policy.NetworkPlan, routes: List[LinuxNetworkRoute], message: Str) {
   var dump = primary_dump()
   dump.routes = routes
-  match kernel.network_project_dump(dump, plan.intent, 1) {
-    Err(problem) => assert problem.message == message
-    Ok(_) => assert false, message
+  if let Err(problem) = kernel.network_project_dump(dump, plan.intent, 1) {
+    assert problem.message == message
+  } else {
+    assert false, message
   }
 }
 
@@ -182,9 +192,10 @@ test test_same_prefix_addition_is_rejected_before_any_request [fs, error] {
   var desired = original.intent
   desired.address.local = "192.0.2.3"
   let plan = policy.network_plan(desired, original.owned, original.before)?
-  match kernel.network_change(plan, 0) {
-    Err(problem) => assert problem.message == "same-prefix IPv4 additions require explicit promotion policy"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_change(plan, 0) {
+    assert problem.message == "same-prefix IPv4 additions require explicit promotion policy"
+  } else {
+    assert false
   }
 }
 
@@ -197,9 +208,10 @@ test test_consecutive_dumps_must_agree_before_projection [fs, error] {
   assert snapshot.routes.len() == 1
   var changed = first
   changed.routes = [{...ordinary_default(), priority: 200, attributes: [{kind: 15, data: b"\xfe\x00\x00\x00"}, {kind: 5, data: b"\xc0\x00\x02\x01"}, {kind: 4, data: b"\x07\x00\x00\x00"}, {kind: 6, data: b"\xc8\x00\x00\x00"}]}]
-  match kernel.network_project_stable_states(state, net_state.project(changed)?, plan.intent, 1) {
-    Err(problem) => assert problem.message == "network observation changed between consecutive dumps"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_project_stable_states(state, net_state.project(changed)?, plan.intent, 1) {
+    assert problem.message == "network observation changed between consecutive dumps"
+  } else {
+    assert false
   }
 }
 
@@ -208,18 +220,22 @@ test test_outcomes_and_lost_notices_map_to_replay_events [fs, error] {
   assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Refused(errno: 101, message: "Network is unreachable"))) == policy.NetworkDenied(2)
   assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Transport("deadline"))) == policy.NetworkFailed(2)
   assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Unencodable("multipath"))) == policy.NetworkFailed(2)
-  assert kernel.network_lost_events(net_state.Lost("overrun")) == policy.NetworkLostEvents
+  assert kernel.network_lost_events(.Lost("overrun")) == policy.NetworkLostEvents
   assert kernel.network_lost_events(net_state.Changed) == null
   assert kernel.network_lost_events(net_state.Quiet) == null
 }
 
 pure retired_route_plan() -> Result[policy.NetworkPlan, Error] {
-  let observed: policy.NetworkSnapshot = {
-    sequence: 1, ifindex: 7, name: "veth-test", kind: "veth", up: true,
+  let observed: policy.NetworkSnapshot = policy.NetworkSnapshot(
+    sequence: 1,
+    ifindex: 7,
+    name: "veth-test",
+    kind: "veth",
+    up: true,
     addresses: [{local: "192.0.2.2", prefix: 24}],
     routes: [{gateway: "192.0.2.1", metric: 100}, {gateway: "192.0.2.1", metric: 300}],
-  }
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 100}, {gateway: "192.0.2.1", metric: 300}]}
+  )
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 100}, {gateway: "192.0.2.1", metric: 300}])
   policy.network_plan(intent(), owned, observed)
 }
 
@@ -231,7 +247,7 @@ test test_retired_owned_default_route_with_a_nonzero_metric_is_removable [fs, er
   let plan = retired_route_plan()?
   assert plan.operations == [policy.NetworkRemoveDefaultRoute({gateway: "192.0.2.1", metric: 300})]
   match kernel.network_change(plan, 0) {
-    Ok(net_state.RemoveRoute(route)) => {
+    Ok(.RemoveRoute(route)) => {
       assert route.priority == 300
       assert route.protocol == 3
       assert route.route_type == 1
@@ -244,12 +260,16 @@ test test_retired_owned_default_route_with_a_nonzero_metric_is_removable [fs, er
 }
 
 test test_zero_metric_default_route_removal_is_refused_before_any_request [error] {
-  let observed: policy.NetworkSnapshot = {
-    sequence: 1, ifindex: 7, name: "veth-test", kind: "veth", up: true,
+  let observed: policy.NetworkSnapshot = policy.NetworkSnapshot(
+    sequence: 1,
+    ifindex: 7,
+    name: "veth-test",
+    kind: "veth",
+    up: true,
     addresses: [{local: "192.0.2.2", prefix: 24}],
     routes: [{gateway: "192.0.2.1", metric: 0}, {gateway: "192.0.2.1", metric: 300}],
-  }
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 0}]}
+  )
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 0}])
   let plan = policy.network_plan(intent(), owned, observed)?
   assert plan.operations == [policy.NetworkAddDefaultRoute({gateway: "192.0.2.1", metric: 100}), policy.NetworkRemoveDefaultRoute({gateway: "192.0.2.1", metric: 0})]
   let message = "a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"
@@ -258,13 +278,16 @@ test test_zero_metric_default_route_removal_is_refused_before_any_request [error
     Ok(_) => {}
     Err(problem) => assert false, problem.message
   }
-  match kernel.network_change(plan, 1) {
-    Err(problem) => assert problem.message == message
-    Ok(_) => assert false, message
+  if let Err(problem) = kernel.network_change(plan, 1) {
+    assert problem.message == message
+  } else {
+    assert false, message
   }
-  match kernel.network_changes(plan) {
-    Err(problem) => assert problem.message == message
-    Ok(_) => assert false, "a whole plan encoded a zero-metric removal"
+
+  if let Err(problem) = kernel.network_changes(plan) {
+    assert problem.message == message
+  } else {
+    assert false, "a whole plan encoded a zero-metric removal"
   }
 }
 
@@ -284,21 +307,24 @@ test test_change_set_is_complete_ordered_and_empty_for_a_no_change_plan [error] 
   for index in range(changes.len()) {
     assert changes[index] == kernel.network_change(plan, index)?
   }
-  match kernel.network_change(plan, changes.len()) {
-    Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_change(plan, changes.len()) {
+    assert problem.message == "operation is not part of a valid policy plan"
+  } else {
+    assert false
   }
+
   var settled = empty_snapshot()
   settled.up = true
   settled.addresses = [intent().address]
   settled.routes = [{gateway: "192.0.2.1", metric: 100}]
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 100}]}
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [intent().address], routes: [{gateway: "192.0.2.1", metric: 100}])
   let no_change = policy.network_plan(intent(), owned, settled)?
   assert no_change.operations.is_empty()
   assert kernel.network_changes(no_change)?.is_empty()
-  match kernel.network_change(no_change, 0) {
-    Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
-    Ok(_) => assert false, "a no-change plan produced a change"
+  if let Err(problem) = kernel.network_change(no_change, 0) {
+    assert problem.message == "operation is not part of a valid policy plan"
+  } else {
+    assert false, "a no-change plan produced a change"
   }
 }
 
@@ -308,18 +334,22 @@ test test_unmodeled_route_attributes_never_become_a_removal [fs, error] {
   customized.attributes += [{kind: 8, data: b"\x00\x00\x00\x00"}]
   var dump = primary_dump()
   dump.routes = [customized]
-  match kernel.network_project_dump(dump, plan.intent, 1) {
-    Err(problem) => assert problem.message == "selected default route carries unsupported attributes"
-    Ok(_) => assert false, "a customized route entered the projected cohort"
+  if let Err(problem) = kernel.network_project_dump(dump, plan.intent, 1) {
+    assert problem.message == "selected default route carries unsupported attributes"
+  } else {
+    assert false, "a customized route entered the projected cohort"
   }
+
   let selected = net_state.project(dump)?
   let route = selected.routes[0]
   assert route.other_attributes == [8]
-  match net_state.request(net_state.RemoveRoute(route)) {
-    Ok(encoded) => assert encoded.message_type == 25
-    Err(_) => assert false, "an unexpected removal encode failure"
+  if let Ok(encoded) = net_state.request(.RemoveRoute(route)) {
+    assert encoded.message_type == 25
+  } else {
+    assert false, "an unexpected removal encode failure"
   }
-  match net_state.request(net_state.AddRoute(route)) {
+
+  match net_state.request(.AddRoute(route)) {
     Err(net_state.ChangeFailure.Unencodable {message}) => assert "cannot be encoded" in message
     Ok(_) => assert false, "an addition silently dropped an unmodeled attribute"
   }
@@ -332,7 +362,7 @@ test test_projected_route_identity_matches_the_removal_request_exactly [fs, erro
   let state = net_state.project(dump)?
   let projected = kernel.network_project_state(state, plan.intent, 1)?
   assert projected.routes == [{gateway: "192.0.2.1", metric: 100}]
-  let settled: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: [{gateway: "192.0.2.1", metric: 100}]}
+  let settled: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: [{gateway: "192.0.2.1", metric: 100}])
   let desired = policy.network_plan({...plan.intent, address: {local: "192.0.2.2", prefix: 24}}, settled, projected)?
   assert desired.operations.is_empty()
   let removal = policy.network_plan({...plan.intent, address: {local: "192.0.2.2", prefix: 24}, metric: 200}, {ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: [{gateway: "192.0.2.1", metric: 100}]}, projected)?
@@ -356,29 +386,39 @@ test test_projected_route_identity_matches_the_removal_request_exactly [fs, erro
 test test_reconcile_result_reports_conflicts_instead_of_rolling_back [fs, error] {
   let plan = healthy_plan()?
   assert plan.operations == [policy.NetworkAddAddress({local: "192.0.2.3", prefix: 24}), policy.NetworkRemoveAddress({local: "192.0.2.2", prefix: 24})]
-  let stale: policy.NetworkSnapshot = {...plan.before, sequence: 2, routes: []}
-  let conflict: kernel.NetworkReconcile = {
-    plan,
+  let stale = {...plan.before, sequence: 2, routes: []}
+  let conflict: kernel.NetworkReconcile = kernel.NetworkReconcile(
+    plan:,
     attempts: 0,
     observed: stale,
-    events: [policy.NetworkPrecondition(plan.before)],
-    result: policy.NetworkReobserve("observation changed before operation 0"),
-  }
+    events: [.NetworkPrecondition(plan.before)],
+    result: .NetworkReobserve("observation changed before operation 0"),
+  )
   assert conflict.attempts == 0
-  match conflict.result {
-    policy.NetworkReobserve(reason) => assert reason == "observation changed before operation 0"
-    else => assert false
+  if let .NetworkReobserve(reason) = conflict.result {
+    assert reason == "observation changed before operation 0"
+  } else {
+    assert false
   }
-  let diverged: kernel.NetworkReconcile = {...conflict, attempts: 1, result: policy.NetworkReobserve("operation 0 was acknowledged but the observation diverged")}
-  match diverged.result {
-    policy.NetworkReobserve(reason) => assert reason == "operation 0 was acknowledged but the observation diverged"
-    else => assert false
+
+  let diverged = kernel.NetworkReconcile(
+    plan: conflict.plan,
+    attempts: 1,
+    observed: conflict.observed,
+    events: conflict.events,
+    result: .NetworkReobserve("operation 0 was acknowledged but the observation diverged"),
+  )
+  if let .NetworkReobserve(reason) = diverged.result {
+    assert reason == "operation 0 was acknowledged but the observation diverged"
+  } else {
+    assert false
   }
+
   assert kernel.same_cohort(plan.before, {...plan.before, sequence: 9})
   assert !kernel.same_cohort(plan.before, stale)
 }
 
-proc healthy_plan() [fs, error] -> Result[policy.NetworkPlan, Error] {
+proc healthy_plan() -> Result[policy.NetworkPlan, Error] {
   let raw = p"tests/system/fixtures/network-policy-conflict.json".read_text()?
   let input: policy.NetworkPlanInput = json.decode(raw)?.require()?
   policy.network_plan(input.intent, input.owned, input.observed)
@@ -400,13 +440,11 @@ pure dump6(addresses: List[LinuxNetworkAddress], routes: List[LinuxNetworkRoute]
   {...primary_dump(), addresses, routes}
 }
 
-const static6 = 192
-const settled6 = 128
-
 proc rejects6(addresses: List[LinuxNetworkAddress], routes: List[LinuxNetworkRoute], message: Str) {
-  match kernel.network_project_dump(dump6(addresses, routes), intent6(), 1) {
-    Err(problem) => assert problem.message == message, problem.message
-    Ok(_) => assert false, message
+  if let Err(problem) = kernel.network_project_dump(dump6(addresses, routes), intent6(), 1) {
+    assert problem.message == message, problem.message
+  } else {
+    assert false, message
   }
 }
 
@@ -424,7 +462,7 @@ test test_ipv6_cohort_projects_static_addresses_and_defaults_and_ignores_kernel_
   assert projected.addresses == [{local: "2001:db8:1::2", prefix: 64}, {local: "2001:db8:ff::2", prefix: 64}]
   assert projected.routes == [{gateway: "2001:db8:1::1", metric: 300}, {gateway: "fe80::1", metric: 1024}]
   assert projected.kind == "veth" and projected.up
-  let settled: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [{gateway: "fe80::1", metric: 1024}]}
+  let settled: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [{gateway: "fe80::1", metric: 1024}])
   let plan = policy.network_plan(intent6(), settled, projected)?
   assert plan.operations.is_empty()
 }
@@ -490,9 +528,8 @@ test test_router_advertisement_defaults_are_foreign_state_outside_the_cohort [er
   assert projected.routes == [{gateway: "fe80::1", metric: 300}]
   let plan = policy.network_plan(intent6(), {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [{gateway: "fe80::1", metric: 300}]}, projected)?
   for operation in plan.operations {
-    match operation {
-      policy.NetworkRemoveDefaultRoute(route) => assert route.gateway == "fe80::1"
-      else => {}
+    if let .NetworkRemoveDefaultRoute(route) = operation {
+      assert route.gateway == "fe80::1"
     }
   }
   let retired = policy.network_plan(intent6(), {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [{gateway: "fe80::1", metric: 300}]}, projected)?
@@ -527,16 +564,19 @@ test test_each_family_ignores_the_other_familys_state_even_when_it_is_unsupporte
 
 test test_ipv6_incomplete_dumps_and_issues_never_become_empty_success [error] {
   let partial: LinuxNetworkDump = {state: "partial", enumeration_succeeded: false, issues: [], links: [], addresses: [], routes: [], rules: []}
-  match kernel.network_project_dump(partial, intent6(), 1) {
-    Err(problem) => assert problem.message == "a partial dump reports no issue"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_project_dump(partial, intent6(), 1) {
+    assert problem.message == "a partial dump reports no issue"
+  } else {
+    assert false
   }
+
   for object in ["address", "route", "link", "socket"] {
     let issue: LinuxNetworkIssue = {errno: null, error_kind: "protocol", message: f"{object} dump was cut short", object, state: "truncated"}
     let truncated: LinuxNetworkDump = {...dump6([address6("2001:db8:1::2", settled6, 0)], [default6("fe80::1", 1024)]), state: "partial", enumeration_succeeded: false, issues: [issue]}
-    match kernel.network_project_dump(truncated, intent6(), 1) {
-      Err(problem) => assert f"{object} dump was cut short" in problem.message, problem.message
-      Ok(_) => assert false, f"a truncated {object} dump projected"
+    if let Err(problem) = kernel.network_project_dump(truncated, intent6(), 1) {
+      assert f"{object} dump was cut short" in problem.message, problem.message
+    } else {
+      assert false, f"a truncated {object} dump projected"
     }
   }
 }
@@ -544,17 +584,20 @@ test test_ipv6_incomplete_dumps_and_issues_never_become_empty_success [error] {
 test test_ipv6_consecutive_dumps_must_agree_before_projection [error] {
   let first = net_state.project(dump6([address6("2001:db8:1::2", static6, 0)], [default6("fe80::1", 1024)]))?
   let again = net_state.project(dump6([address6("2001:db8:1::2", settled6, 0)], [default6("fe80::1", 1024)]))?
-  match kernel.network_project_stable_states(first, again, intent6(), 1) {
-    Err(problem) => assert problem.message == "network observation changed between consecutive dumps"
-    Ok(_) => assert false, "duplicate address detection settling is a changed observation, not a stable one"
+  if let Err(problem) = kernel.network_project_stable_states(first, again, intent6(), 1) {
+    assert problem.message == "network observation changed between consecutive dumps"
+  } else {
+    assert false, "duplicate address detection settling is a changed observation, not a stable one"
   }
+
   let settled = net_state.project(dump6([address6("2001:db8:1::2", settled6, 0)], [default6("fe80::1", 1024)]))?
   let snapshot = kernel.network_project_stable_states(settled, settled, intent6(), 1)?
   assert snapshot.addresses == [{local: "2001:db8:1::2", prefix: 64}]
   let changed = net_state.project(dump6([address6("2001:db8:1::2", settled6, 0)], [default6("fe80::1", 300)]))?
-  match kernel.network_project_stable_states(settled, changed, intent6(), 1) {
-    Err(problem) => assert problem.message == "network observation changed between consecutive dumps"
-    Ok(_) => assert false
+  if let Err(problem) = kernel.network_project_stable_states(settled, changed, intent6(), 1) {
+    assert problem.message == "network observation changed between consecutive dumps"
+  } else {
+    assert false
   }
 }
 
@@ -603,8 +646,8 @@ test test_ipv6_requests_select_exact_local_prefix_gateway_interface_and_metric [
 }
 
 test test_ipv6_has_no_primary_secondary_rule_so_same_prefix_additions_are_planned [error] {
-  let observed: policy.NetworkSnapshot = {...empty6(), addresses: [{local: "2001:db8:1::2", prefix: 64}]}
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: []}
+  let observed = {...empty6(), addresses: [{local: "2001:db8:1::2", prefix: 64}]}
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [])
   let plan = policy.network_plan({...intent6(), address: {local: "2001:db8:1::3", prefix: 64}}, owned, observed)?
   assert plan.operations[0] == policy.NetworkAddAddress({local: "2001:db8:1::3", prefix: 64})
   let changes = kernel.network_changes(plan)?
@@ -614,40 +657,48 @@ test test_ipv6_has_no_primary_secondary_rule_so_same_prefix_additions_are_planne
 test test_ipv6_zero_metric_is_never_sent_and_a_zero_metric_removal_is_refused [error] {
   let plan = policy.network_plan(intent6(), empty_ownership(), empty6())?
   let changes = kernel.network_changes(plan)?
-  match changes[1] {
-    net_state.AddRoute(route) => assert route.priority == 1024
-    else => assert false, "the default route was not added"
+  if let .AddRoute(route) = changes[1] {
+    assert route.priority == 1024
+  } else {
+    assert false, "the default route was not added"
   }
-  let observed: policy.NetworkSnapshot = {...empty6(), routes: [{gateway: "fe80::9", metric: 0}]}
-  let owned: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [], routes: [{gateway: "fe80::9", metric: 0}]}
+
+  let observed = {...empty6(), routes: [{gateway: "fe80::9", metric: 0}]}
+  let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [], routes: [{gateway: "fe80::9", metric: 0}])
   let retiring = policy.network_plan(intent6(), owned, observed)?
   assert policy.NetworkRemoveDefaultRoute({gateway: "fe80::9", metric: 0}) in retiring.operations
   let message = "a zero-metric default route cannot be removed exactly; the kernel treats a zero priority as a wildcard over every metric"
-  match kernel.network_changes(retiring) {
-    Err(problem) => assert problem.message == message
-    Ok(_) => assert false, "a zero-metric IPv6 removal was encoded"
+  if let Err(problem) = kernel.network_changes(retiring) {
+    assert problem.message == message
+  } else {
+    assert false, "a zero-metric IPv6 removal was encoded"
   }
 }
 
 test test_forged_ipv6_operations_are_rejected_before_encoding [error] {
   let plan = policy.network_plan(intent6(), empty_ownership(), empty6())?
   var forged = plan
-  forged.operations = [policy.NetworkRemoveAddress({local: "2001:db8:ff::2", prefix: 64})]
-  match kernel.network_changes(forged) {
-    Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
-    Ok(_) => assert false
+  forged.operations = [.NetworkRemoveAddress({local: "2001:db8:ff::2", prefix: 64})]
+  if let Err(problem) = kernel.network_changes(forged) {
+    assert problem.message == "operation is not part of a valid policy plan"
+  } else {
+    assert false
   }
+
   var extended = plan
-  extended.operations = plan.operations + [policy.NetworkRemoveDefaultRoute({gateway: "fe80::bad", metric: 1024})]
-  match kernel.network_change(extended, 0) {
-    Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
-    Ok(_) => assert false
+  extended.operations = plan.operations + [.NetworkRemoveDefaultRoute({gateway: "fe80::bad", metric: 1024})]
+  if let Err(problem) = kernel.network_change(extended, 0) {
+    assert problem.message == "operation is not part of a valid policy plan"
+  } else {
+    assert false
   }
+
   var stale = plan
   stale.before = {...plan.before, up: false}
-  match kernel.network_changes(stale) {
-    Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
-    Ok(_) => assert false, "a plan whose precondition no longer matches its operations was accepted"
+  if let Err(problem) = kernel.network_changes(stale) {
+    assert problem.message == "operation is not part of a valid policy plan"
+  } else {
+    assert false, "a plan whose precondition no longer matches its operations was accepted"
   }
 }
 

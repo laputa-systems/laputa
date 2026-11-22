@@ -176,7 +176,7 @@ proc installer_root_size_mb(rootfs: Path, override_mb: Str) -> Result[Int] {
   rootfs_size.image_size_mib(rootfs_size.tree_blocks(rootfs)?)
 }
 
-proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, root_end_lba: Int) [fs, error] {
+proc write_iso_hybrid_gpt(image: Path, total_sectors: Int, root_start_lba: Int, root_end_lba: Int) {
   let entry_count = 8
   let entry_size = 128
   let entry_sectors = ceil_div(entry_count * entry_size, 512)

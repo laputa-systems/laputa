@@ -2,7 +2,7 @@
 use pm.generation
 use pm.types as pm_types
 
-proc run_guest_proof() [fs, process, env, error] -> Result[Unit, Error] {
+proc run_guest_proof() {
   let receipt = generation.read_generation_receipt(p"/")?
   assert receipt.profile.name == "qemu-self-hosting"
   let expected = match system.uname()?.machine {
@@ -14,12 +14,12 @@ proc run_guest_proof() [fs, process, env, error] -> Result[Unit, Error] {
   assert "LAPUTA_SELF_HOSTING_PROOF=1" in p"/proc/cmdline".read_text()?.trim().split(" ")
   assert unix.id()?.uid == 0
   let root = p"/mnt/self-hosting"
-  root.mkdir()?
-  linux.mount(b"/dev/vdb", root, fstype: "ext4", options: ["ro", "nosuid", "nodev"])?
+  root.mkdir()
+  linux.mount(b"/dev/vdb", root, fstype: "ext4", options: ["ro", "nosuid", "nodev"])
   let entry = fp"{root}/inputs/entry.xsh"
   let status = process.run(process.command_argv(
     p"/usr/bin/xsh",
-    ["/usr/bin/xsh", entry.display(), root.display()],
+    ["/usr/bin/xsh", entry, root],
     env: {XSH_MODULE_PATH: f"{root}/inputs/laputa:/usr/lib/pm:/usr/lib/xsh/core"},
   ))?
   fail "self-hosting guest entry failed" unless status.ok
@@ -30,7 +30,7 @@ proc run_guest_proof() [fs, process, env, error] -> Result[Unit, Error] {
     assert ids.len() == 1 and serials.len() == 1
     print "LAPUTA_SELF_HOSTING_ACTIVATION" json.encode({
       generation_id: ids[0].replace("LAPUTA_GENERATION_ID=", with: ""),
-      boot_serial: serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "").parse_int()?,
+      boot_serial: serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "") as Int,
       root_digest: receipt.generation_sha256,
     })?
   }

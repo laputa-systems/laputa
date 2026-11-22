@@ -2,7 +2,7 @@
 
 proc ready() -> Result[Bool] {
   let status = p"/run/xinit/oxish.json"
-  return false unless status.exists()?
+  return false unless status.exists()
   json.get(json.read(status)?, ["state"], "").require(Str)? == "running"
 }
 
@@ -41,11 +41,11 @@ proc cap_marker_lines(lines: List[Str], keep: Int) -> List[Str] {
 
 proc append_boot_marker(path_value: Path, line: Str) {
   path_value.parent.mkdir()
-  var lines: List[Str] = []
+  var lines = []
   if path_value.exists() {
-    lines = path_value.read_text()?.lines() |> where .trim() != "" |> collect
+    lines = path_value.read_lines()? |> where .trim() != "" |> collect
   }
-  lines = cap_marker_lines(lines + [line], 20)
+  lines = cap_marker_lines([@lines, line], 20)
   path_value.write_atomic(lines.join("\n") + "\n")
   fs.fsync(path_value)
 }
@@ -57,14 +57,15 @@ proc main() {
   return when ids.is_empty() and serials.is_empty()
   guard ids.len() == 1 and serials.len() == 1 else { fail "ambiguous boot selection" }
   let id = ids[0].replace("LAPUTA_GENERATION_ID=", with: "")
-  let serial = serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "").trim().parse_int()?
+  let serial = serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "").trim() as Int
   wait until ready() within 30s every 100ms
   let receipt = json.read(p"/run/laputa-running-generation.json")?
-  var services: List[Record] = []
-  for item in g"/run/xinit/*.json" {
-    let value = json.read(item)?
-    let name = json.get(value, ["name"], "").require(Str)?
-    if name != "" { services += [{name: name, state: json.get(value, ["state"], "").require(Str)?}] }
+  let services: List[Record] = collect {
+    for item in g"/run/xinit/*.json" {
+      let value = json.read(item)?
+      let name = json.get(value, ["name"], "").require(Str)?
+      yield {name: name, state: json.get(value, ["state"], "").require(Str)?} when name != ""
+    }
   }
   let report = {
     format: "laputa-guest-health-1",
@@ -77,16 +78,16 @@ proc main() {
   let encoded = json.encode(report)?
   p"/run/laputa-health.json".write(encoded + "\n")
   p"/dev/console".write(f"LAPUTA_ACTIVATION_HEALTH {encoded}\n")
-  let failed = boot_failed_id(cmdline)?
-  let marker = boot_marker_line(id, serial, failed, report.root_digest, report.profile, services)?
-  var pre_lines: List[Str] = []
+  let marker = boot_failed_id(cmdline)? |> boot_marker_line(id, serial, _, report.root_digest, report.profile, services)?
+  var pre_lines = []
   if p"/var/log/boot-markers.log".exists() {
-    pre_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect
+    pre_lines = p"/var/log/boot-markers.log".read_lines()? |> where .trim() != "" |> collect
   }
-  var laputa_files: List[Str] = []
-  if p"/var/lib/laputa".exists() {
-    for entry in fs.children(p"/var/lib/laputa")? {
-      laputa_files += [entry.name]
+  let laputa_files = collect {
+    if p"/var/lib/laputa".exists() {
+      for entry in fs.children(p"/var/lib/laputa")? {
+        yield entry.name
+      }
     }
   }
   p"/dev/console".write(f"LAPUTA_BOOT_STATE markers_before={pre_lines.len()} laputa_dir={laputa_files.join(",")}\n")
@@ -95,7 +96,7 @@ proc main() {
     append_boot_marker(p"/var/log/boot-markers.log", marker)
   }
   if p"/var/log/boot-markers.log".exists() {
-    let marker_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect
+    let marker_lines = p"/var/log/boot-markers.log".read_lines()? |> where .trim() != "" |> collect
     p"/dev/console".write(f"LAPUTA_BOOT_MARKER_COUNT {marker_lines.len()}\n")
   }
 }

@@ -22,9 +22,9 @@ type State = {vms: List[Vm]}
 type Capture = {code: Int, stdout: Str, stderr: Str}
 
 proc ensure_base(cache: Path) [fs, net, process, error] -> Result[Path] {
-  cache.mkdir(parents: true)
+  cache.mkdir()
   let base = fp"{cache}/{base_name}"
-  if ! base.exists()? {
+  if ! base.exists() {
     let downloaded = net.download({url: base_url, dest: base, overwrite: true})?
     guard downloaded.status == 200 else {
       fail f"download {base_url} returned HTTP {downloaded.status}"
@@ -39,13 +39,11 @@ proc ensure_base(cache: Path) [fs, net, process, error] -> Result[Path] {
   Ok(base)
 }
 
-proc free_port(start: Int) [process, error] -> Result[Int] {
+proc free_port(start: Int) -> Result[Int] {
   var port = start
   while port < 65000 {
     let listeners = process.port(port)? |> collect()
-    if listeners.is_empty() {
-      return Ok(port)
-    }
+    return Ok(port) when listeners.is_empty()
 
     port += 1
   }
@@ -53,19 +51,17 @@ proc free_port(start: Int) [process, error] -> Result[Int] {
   fail "no free TCP port"
 }
 
-proc start_seed(seed: Path, port: Int, out: Path, err: Path) [fs, process, time, error] -> Result[Int] {
+proc start_seed(seed: Path, port: Int, out: Path, err: Path) -> Result[Int] {
   let argv = ["python3", "-m", "http.server", "--bind", "127.0.0.1", "--directory", f"{seed}", f"{port}"]
   let command = process.command_argv("python3", argv, p".", {}, b"", out, err, detach: true, new_session: true, ignore_hup: true)
   let spawned = process.spawn(command)?
   for _ in range(20) {
-    if ! fp"/proc/{spawned.pid}".exists()? {
+    guard fp"/proc/{spawned.pid}".exists() else {
       fail f"seed HTTP server on port {port} exited: {err.read_text()?.trim()}"
     }
 
     let listeners = process.port(port)? |> collect()
-    if ! listeners.is_empty() {
-      return Ok(spawned.pid)
-    }
+    return Ok(spawned.pid) unless listeners.is_empty()
 
     time.sleep(100ms)
   }
@@ -74,17 +70,13 @@ proc start_seed(seed: Path, port: Int, out: Path, err: Path) [fs, process, time,
   fail f"seed HTTP server on port {port} did not listen: {err.read_text()?.trim()}"
 }
 
-proc stop_process(pid: Int, grace_ms: Int) [fs, process, time, error] -> Result[Unit] {
-  if pid <= 0 {
-    return
-  }
+proc stop_process(pid: Int, grace_ms: Int) {
+  return when pid <= 0
 
   let _ = process.kill(pid, signal: "TERM")
   let started = time.now()
   while time.now() - started < grace_ms {
-    if ! fp"/proc/{pid}".exists()? {
-      return
-    }
+    return unless fp"/proc/{pid}".exists()
 
     time.sleep(100ms)
   }
@@ -93,20 +85,18 @@ proc stop_process(pid: Int, grace_ms: Int) [fs, process, time, error] -> Result[
   time.sleep(200ms)
 }
 
-proc ssh_capture(client: Path, port: Int, account: Str, script: Str) [process, error] -> Result[Capture] {
+proc ssh_capture(client: Path, port: Int, account: Str, script: Str) -> Result[Capture] {
   let out = run.capture --text timeout 30 ssh -i $client -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -p $port f"{account}@127.0.0.1" $script
   Ok({code: out.status.exit_code() ?? -1, stdout: out.stdout, stderr: out.stderr})
 }
 
-proc wait_ready(client: Path, port: Int) [process, time, error] -> Result[Unit] {
+proc wait_ready(client: Path, port: Int) {
   let started = time.now()
   var last = ""
   while time.now() - started < boot_timeout_ms {
     let probe = ssh_capture(client, port, "deploy", "cloud-init status 2>/dev/null")?
     last = f"exit {probe.code}: {probe.stdout.trim()} {probe.stderr.trim()}"
-    if "status: done" in probe.stdout {
-      return
-    }
+    return when "status: done" in probe.stdout
 
     time.sleep(2s)
   }
@@ -114,7 +104,7 @@ proc wait_ready(client: Path, port: Int) [process, time, error] -> Result[Unit] 
   fail f"guest on port {port} did not finish cloud-init ({last})"
 }
 
-proc verify_guest(client: Path, port: Int) [process, error] -> Result[Unit] {
+proc verify_guest(client: Path, port: Int) {
   let comm = ssh_capture(client, port, "deploy", "cat /proc/1/comm")?
   guard comm.code == 0 and comm.stdout.trim() == "init" else {
     fail f"guest on port {port}: PID 1 is not init: exit {comm.code}: {comm.stdout.trim()} {comm.stderr.trim()}"
@@ -136,7 +126,7 @@ proc verify_guest(client: Path, port: Int) [process, error] -> Result[Unit] {
   }
 }
 
-proc host_key_pin(port: Int, keyfile: Path) [fs, process, time, error] -> Result[Str] {
+proc host_key_pin(port: Int, keyfile: Path) -> Result[Str] {
   let started = time.now()
   while time.now() - started < boot_timeout_ms {
     let out = run.capture --text ssh-keyscan -T 5 -t ed25519 -p $port 127.0.0.1
@@ -157,7 +147,7 @@ proc host_key_pin(port: Int, keyfile: Path) [fs, process, time, error] -> Result
   fail f"no ed25519 host key from 127.0.0.1:{port}"
 }
 
-proc start_qemu(base: Path, vm: Vm) [fs, process, error] -> Result[Int] {
+proc start_qemu(base: Path, vm: Vm) -> Result[Int] {
   let overlay = f"{vm.work}/disk.qcow2"
   let args = [
     "-name", vm.name,
@@ -188,11 +178,11 @@ proc start_qemu(base: Path, vm: Vm) [fs, process, error] -> Result[Int] {
   }
 
   let pidfile = fp"{vm.work}/qemu.pid"
-  guard pidfile.exists()? else {
+  guard pidfile.exists() else {
     fail f"qemu for {vm.name} did not write {pidfile}"
   }
 
-  Ok(pidfile.read_text()?.trim().parse_int()?)
+  Ok(pidfile.read_text()?.trim() as Int)
 }
 
 proc seed_text(name: Str, run_id: Str, pubkey: Str) -> Str {
@@ -241,7 +231,7 @@ runcmd:
 """
 }
 
-proc cleanup(vms: List[Vm]) [fs, process, time, error] {
+proc cleanup(vms: List[Vm]) {
   for vm in vms {
     let _ = stop_process(vm.pid, 2000)
     let _ = stop_process(vm.server_pid, 2000)
@@ -251,7 +241,7 @@ proc cleanup(vms: List[Vm]) [fs, process, time, error] {
 
 ## Download the pinned base image and start COUNT VMs beginning at host number
 ## FIRST, writing DIR/inventory.toml.
-cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [fs, net, process, time, error] {
+cli main up(count = 2, first = 1, dir = p".work/fixtures/vm") [fs, net, process, time, error] {
   guard count >= 1 and count <= 2 else {
     fail "count must be 1..2: at most two VMs run at once"
   }
@@ -260,18 +250,18 @@ cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [f
     fail "first must be at least 1"
   }
 
-  fp"{dir}".mkdir(parents: true)
-  let root = fp"{dir}".resolve()?
+  dir.mkdir()
+  let root = dir.resolve()?
   let cache = fp"{root}/cache"
   let base = ensure_base(cache)?
   let client = fp"{root}/client"
-  if ! client.exists()? {
+  if ! client.exists() {
     run ssh-keygen -q -t ed25519 -N "" -f $client
   }
 
   let pubkey = fp"{client}.pub".read_text()?.trim()
   let record = fp"{root}/vms.json"
-  guard ! record.exists()? else {
+  guard ! record.exists() else {
     fail f"{record} exists; run down first"
   }
 
@@ -292,7 +282,7 @@ cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [f
     let name = f"fx-{number}"
     let work = f"{root}/vm-{run_id}-{name}"
     let seed = fp"{work}/seed"
-    seed.mkdir(parents: true)
+    seed.mkdir()
     fp"{seed}/meta-data".write(f"instance-id: iid-{run_id}-{name}\nlocal-hostname: {name}\n")
     fp"{seed}/user-data".write(seed_text(name, run_id, pubkey))
     fp"{seed}/vendor-data".write("")
@@ -306,11 +296,11 @@ cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [f
     vms += [{...vm, server_pid: server_pid}]
     let pid = start_qemu(base, {...vm, server_pid: server_pid})?
     vms[vms.len() - 1] = {...vm, pid: pid, server_pid: server_pid}
-    wait_ready(client, ssh_port)?
-    verify_guest(client, ssh_port)?
+    wait_ready(client, ssh_port)
+    verify_guest(client, ssh_port)
     let pin = host_key_pin(ssh_port, fp"{work}/host.pub")?
-    stop_process(server_pid, 2000)?
-    guard ! fp"/proc/{server_pid}".exists()? else {
+    stop_process(server_pid, 2000)
+    guard ! fp"/proc/{server_pid}".exists() else {
       fail f"{name}: seed server pid {server_pid} is still running"
     }
 
@@ -339,27 +329,25 @@ cli main up(count: Int = 2, first: Int = 1, dir: Path = p".work/fixtures/vm") [f
     ]
   }
 
-  fp"{root}/inventory.toml".write(lines.join("\n") + "\n")
-  json.write(record, {vms: vms})?
+  fp"{root}/inventory.toml".write_lines(lines)
+  json.write(record, {vms: vms})
   print f"started {vms.len()} VM(s) on Alpine {base_version}; inventory at {root}/inventory.toml"
 }
 
 ## Stop the VMs recorded in DIR/vms.json and remove their work directories.
-cli main down(dir: Path = p".work/fixtures/vm") [fs, process, time, error] {
+cli main down(dir = p".work/fixtures/vm") [fs, process, time, error] {
   let record = fp"{dir}/vms.json"
-  if ! record.exists()? {
-    return
-  }
+  return unless record.exists()
 
   let state = json.read(record)?.require(State)?
   for vm in state.vms {
-    stop_process(vm.pid, 10000)?
-    stop_process(vm.server_pid, 2000)?
-    guard ! fp"/proc/{vm.pid}".exists()? else {
+    stop_process(vm.pid, 10000)
+    stop_process(vm.server_pid, 2000)
+    guard ! fp"/proc/{vm.pid}".exists() else {
       fail f"{vm.name}: qemu pid {vm.pid} is still running"
     }
 
-    guard ! fp"/proc/{vm.server_pid}".exists()? else {
+    guard ! fp"/proc/{vm.server_pid}".exists() else {
       fail f"{vm.name}: seed server pid {vm.server_pid} is still running"
     }
 

@@ -28,7 +28,7 @@ export proc measure(content: model.Content) [fs, env, error] -> Result[compare.M
   }
 }
 
-proc render(source: model.TemplateSource) [fs, error] -> Result[Bytes, Error] {
+proc render(source: model.TemplateSource) -> Result[Bytes, Error] {
   ctx f"rendering {source.file}" {
     let text = source.file.read_text()?
     let data = json.decode(source.json)?
@@ -48,8 +48,9 @@ export proc inline_bytes(content: model.Content) [fs, env, error] -> Result[Byte
 
 ## The local file a source streams from, or none for an in-memory source.
 export pure streamed_path(content: model.Content) -> Path? {
-  match content {
-    model.FromFile(source) => source
-    else => null
+  if let .FromFile(source) = content {
+    source
+  } else {
+    null
   }
 }

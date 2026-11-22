@@ -1,14 +1,15 @@
 ##! Capture and offline replay of a disposable Docker veth ownership conflict.
 use packages.laputa-net.network_plan as policy
 
-error NetworkCaptureError = Failed(message: Str)
+error NetworkCaptureError = Failed
 ## Selected typed observation, empty ownership, and the exact resulting policy error.
 export type NetworkConflictCapture = {input: policy.NetworkPlanInput, error: Str}
 
 pure conflict(input: policy.NetworkPlanInput) -> Result[Str, Error] {
-  match policy.network_plan(input.intent, input.owned, input.observed) {
-    Err(problem) => Ok(problem.message)
-    Ok(_) => Err(NetworkCaptureError.Failed("Docker-owned resources unexpectedly admitted a plan"))
+  if let Err(problem) = policy.network_plan(input.intent, input.owned, input.observed) {
+    Ok(problem.message)
+  } else {
+    Err(NetworkCaptureError.Failed("Docker-owned resources unexpectedly admitted a plan"))
   }
 }
 
@@ -50,7 +51,7 @@ export pure select_capture(dump: LinuxNetworkDump) -> Result[NetworkConflictCapt
   Ok({input, error: problem})
 }
 
-proc capture() [process, error] -> Result[NetworkConflictCapture, Error] {
+proc capture() -> Result[NetworkConflictCapture, Error] {
   select_capture(linux.network_dump()?)
 }
 

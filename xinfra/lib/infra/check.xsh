@@ -33,9 +33,7 @@ export pure path_ok(what: Str, location: Str) -> Result[Unit, Error] {
     fail f"{what} is longer than {max_path_bytes} bytes"
   }
 
-  if location == "/" {
-    return
-  }
+  return when location == "/"
 
   guard ! location.ends_with("/") else {
     fail f"{what} must not end with a slash: {location}"
@@ -134,6 +132,6 @@ export pure id_number_ok(what: Str, value: Int) -> Result[Unit, Error] {
 ## Accept the identifier list of dependencies.
 export pure needs_ok(needs: List[Str]) -> Result[Unit, Error] {
   for id in needs {
-    identifier_ok(id)?
+    identifier_ok(id)
   }
 }

@@ -1,7 +1,7 @@
 ##! Behavior coverage for the local XSH seed and the content-keyed Laputa images.
 use pm.fingerprint as pm_fingerprint
-use pm.recipe as pm_recipe
 use pm.plan_json as pm_plan_json
+use pm.recipe as pm_recipe
 use pm.types as pm_types
 use seed.images
 use seed.world
@@ -54,9 +54,9 @@ test test_seed_rejects_registry_cache_after_cargo_source_changes [fs, process, e
   fp"{xsh_root}/.cargo".mkdir()
   fp"{xsh_root}/Cargo.lock".write("locked dependencies")
   fp"{xsh_root}/Dockerfile.test".write("image")
-  let init = process.run(process.command_argv(p"git", ["git", "init", "-q", xsh_root.display()], root))?
+  let init = process.run(process.command_argv(p"git", ["git", "init", "-q", xsh_root], root))?
   assert init.ok
-  let commit = process.run(process.command_argv(p"git", ["git", "-C", xsh_root.display(), "-c", "user.name=Seed test", "-c", "user.email=seed@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], root))?
+  let commit = process.run(process.command_argv(p"git", ["git", "-C", xsh_root, "-c", "user.name=Seed test", "-c", "user.email=seed@example.invalid", "commit", "-q", "--allow-empty", "-m", "fixture"], root))?
   assert commit.ok
   let revision = (run.text git -C $xsh_root rev-parse HEAD).trim()
   fp"{root}/infra/asterinas".mkdir()
@@ -64,7 +64,7 @@ test test_seed_rejects_registry_cache_after_cargo_source_changes [fs, process, e
   let config = fp"{xsh_root}/.cargo/config.toml"
   config.write("first source")
   let arch = xsh_seed.xsh_seed_arch("x86_64")?
-  xsh_seed.xsh_seed_fetch(p"/bin/true", root, xsh_root, arch)?
+  xsh_seed.xsh_seed_fetch(p"/bin/true", root, xsh_root, arch)
   config.write("different source")
 
   match xsh_seed.xsh_seed_build(p"/bin/true", root, xsh_root, arch, 1, false) {
@@ -336,9 +336,7 @@ pure split_at_image(words: List[Str], image: Str) -> ImageSplit {
   var index = 0
 
   while index < words.len() {
-    if words[index] == image {
-      return {docker: words[..index], cargo: words[index + 1..]}
-    }
+    return {docker: words[..index], cargo: words[index + 1..]} when words[index] == image
 
     index += 1
   }
@@ -418,7 +416,7 @@ test test_world_host_plan_scopes_the_mirror_and_keeps_typed_selection [fs, net, 
     world.host_pm_plan("", repo_root: repository, roots: ["app"], target: "aarch64-linux-musl", output:)
     let value = pm_plan_json.read(output)?
     assert value.roots == ["app"]
-    assert value.target == pm_types.Aarch64LinuxMusl
+    assert value.target == .Aarch64LinuxMusl
     assert e"XSH_PM_REPO"? == outer_repo
 
     match world.host_pm_plan("", repo_root: repository, roots: [], target: "aarch64-linux-musl", output:) {

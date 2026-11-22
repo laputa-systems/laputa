@@ -43,7 +43,7 @@ cli main(...unknown: List[Str]) with {name: "trust", help: TRUST_HELP} {
   }
 }
 
-cli main status(root: Str = "") with {
+cli main status(root = "") with {
   name: "trust status",
   help: TRUST_STATUS_HELP,
   parameters: {
@@ -54,7 +54,7 @@ cli main status(root: Str = "") with {
   let _ = trust_update.trust_status(system_root)?
 }
 
-cli main verify(source: Path, root: Str = "") with {
+cli main verify(source: Path, root = "") with {
   name: "trust verify",
   help: TRUST_VERIFY_HELP,
   parameters: {
@@ -66,7 +66,7 @@ cli main verify(source: Path, root: Str = "") with {
   let _ = trust_update.trust_verify(system_root, source)?
 }
 
-cli main update(from: Str = "", url: Str = "", root: Str = "") with {
+cli main update(from = "", url = "", root = "") with {
   name: "trust update",
   help: TRUST_UPDATE_HELP,
   parameters: {

@@ -33,7 +33,7 @@ pure clean(text: Str, secrets: List[Str]) -> Str {
 }
 
 pure find_resource(resources: List[model.Resource], id: Str) -> model.Resource? {
-  let found = resources |> where { |resource| resource.id == id } |> collect()
+  let found = resources |> where .id == id |> collect()
   if found.is_empty() { null } else { found[0] }
 }
 
@@ -62,31 +62,26 @@ pure planned_change(mode: Mode, verdict: compare.Verdict) -> Bool {
 
 pure material_for(prepared: workload.Prepared, host: Str, resource: model.Resource) -> compare.Material? {
   let found = prepared.materials.get(workload.material_key(host, resource.id))
-  match found {
-    Ok(material) => material
-    Err(_) => null
+  if let Ok(material) = found {
+    material
+  } else {
+    null
   }
 }
 
 proc survey_host(mode: Mode, entry: workload.Workload, prepared: workload.Prepared) [fs, env, process, error] -> report.HostReport {
   let name = entry.host.name
   let secrets = prepared.secrets
-  let connection = match transport.connect(entry.host) {
-    Ok(opened) => opened
-    Err(error) => {
-      return report.HostReport(host: name, ok: false, phase: "connect", detail: clean(error.message, secrets), entries: [])
-    }
+  let connection = transport.connect(entry.host) ?? {
+    return report.HostReport(host: name, ok: false, phase: "connect", detail: clean(.message, secrets), entries: [])
   }
 
   var entries: List[report.Entry] = []
-  var planned: List[Str] = []
+  var planned = []
   for resource in entry.resources {
-    let state = match observe.observe(connection, resource.spec) {
-      Ok(found) => found
-      Err(error) => {
-        let _ = transport.disconnect(connection)
-        return report.HostReport(host: name, ok: false, phase: "observe", detail: clean(f"{resource.id}: {error.message}", secrets), entries:)
-      }
+    let state = observe.observe(connection, resource.spec) ?? {
+      let _ = transport.disconnect(connection)
+      return report.HostReport(host: name, ok: false, phase: "observe", detail: clean(f"{resource.id}: {.message}", secrets), entries:)
     }
 
     let verdict = compare.verdict(resource.spec, state, material_for(prepared, name, resource), planned)
@@ -139,25 +134,24 @@ pure outcome_entry(host: Str, resource: model.Resource, result: outcome.Outcome,
 }
 
 pure failed_at(phase: outcome.Phase, message: Str) -> outcome.Outcome {
-  outcome.Failed(outcome.Failure(phase:, message:))
+  .Failed(outcome.Failure(phase:, message:))
 }
 
 pure unknown_at(phase: outcome.Phase, message: Str) -> outcome.Outcome {
-  outcome.OutcomeUnknown(outcome.Failure(phase:, message:))
+  .OutcomeUnknown(outcome.Failure(phase:, message:))
 }
 
 pure skip_reason(spec: model.Spec) -> Str {
-  match spec {
-    model.Exec(command) => {
-      match command.guard {
-        model.Creates(target) => f"{target} already exists"
-        model.SkipIf(_) => "the skip guard succeeded"
-        model.OnlyIf(_) => "the only-if guard failed"
-        model.OnChange => "no triggering resource changed"
-        model.Always => "always runs"
-      }
+  if let .Exec(command) = spec {
+    match command.guard {
+      model.Creates(target) => f"{target} already exists"
+      model.SkipIf(_) => "the skip guard succeeded"
+      model.OnlyIf(_) => "the only-if guard failed"
+      model.OnChange => "no triggering resource changed"
+      model.Always => "always runs"
     }
-    else => "condition not met"
+  } else {
+    "condition not met"
   }
 }
 
@@ -197,7 +191,7 @@ proc verify(
 }
 
 pure changed_fields(drift: compare.Drift) -> Str {
-  let fields = drift.changes |> map { |change| change.field } |> collect()
+  let fields = drift.changes |> map .field |> collect()
   fields.join(", ")
 }
 
@@ -207,8 +201,8 @@ proc confirm(
   drift: compare.Drift,
   material: compare.Material?,
 ) [fs, env, process, error] -> outcome.Outcome {
-  if ! verifiable(resource.spec) {
-    return outcome.Changed(outcome.Applied(changes: drift.changes, verified: false))
+  guard verifiable(resource.spec) else {
+    return .Changed(outcome.Applied(changes: drift.changes, verified: false))
   }
 
   verify(connection, resource, drift, material)
@@ -221,23 +215,26 @@ proc run_drift(
   drift: compare.Drift,
   material: compare.Material?,
 ) [fs, env, process, error] -> outcome.Outcome {
-  match mutate.apply(connection, resource, state, drift, declared_content(resource), material) {
-    Err(failure) => outcome.of_error(failure)
-    Ok(_) => confirm(connection, resource, drift, material)
+  if let Err(failure) = mutate.apply(connection, resource, state, drift, declared_content(resource), material) {
+    outcome.of_error(failure)
+  } else {
+    confirm(connection, resource, drift, material)
   }
 }
 
 pure declared_content(resource: model.Resource) -> model.Content? {
-  match resource.spec {
-    model.File(spec) => spec.content
-    else => null
+  if let .File(spec) = resource.spec {
+    spec.content
+  } else {
+    null
   }
 }
 
 pure file_spec(resource: model.Resource) -> model.FileSpec? {
-  match resource.spec {
-    model.File(spec) => spec
-    else => null
+  if let .File(spec) = resource.spec {
+    spec
+  } else {
+    null
   }
 }
 
@@ -250,9 +247,7 @@ proc fresh_material(resource: model.Resource) [fs, env, error] -> Result[compare
     return Ok(null)
   }
 
-  if spec.presence == .Absent {
-    return Ok(null)
-  }
+  return Ok(null) when spec.presence == .Absent
 
   let measured = content.measure(source)?
   Ok(measured)
@@ -268,7 +263,7 @@ proc settle(
   match compare.verdict(resource.spec, state, material, changed) {
     compare.Satisfied => {
       match resource.spec {
-        model.Exec(_) => outcome.Skipped(skip_reason(resource.spec))
+        model.Exec(_) => .Skipped(skip_reason(resource.spec))
         else => outcome.Unchanged
       }
     }
@@ -316,7 +311,7 @@ proc take_lock(state: HostState, lock_path: Str, secrets: List[Str]) [fs, env, p
     return Locked(host:, held: null, failure: "the host has no connection")
   }
 
-  let target = lock_path.replace("{host}", with: host)
+  let target = lock_path.replace(host, with: host)
   match lock.acquire(connection, target) {
     Ok(held) => Locked(host:, held:, failure: null)
     Err(lock.LockError.Contended {holder}) => Locked(host:, held: null, failure: clean(f"another apply holds {target}: {holder}", secrets))
@@ -344,13 +339,9 @@ pure with_fatal(state: HostState, phase: Str, message: Str) -> HostState {
 }
 
 pure blocked_reason(state: HostState, resource: model.Resource, aborted: Str?) -> Str? {
-  if aborted != null {
-    return aborted
-  }
+  return aborted when aborted != null
 
-  if state.stopped != null {
-    return state.stopped
-  }
+  return state.stopped when state.stopped != null
 
   let waiting = model.dependencies(resource) |> where { |id| id in state.unsettled } |> collect()
   if waiting.is_empty() { null } else { f"{waiting[0]} did not complete on this host" }
@@ -359,10 +350,10 @@ pure blocked_reason(state: HostState, resource: model.Resource, aborted: Str?) -
 pure absorb(state: HostState, done: Reconciled, policy: FailurePolicy) -> HostState {
   let settled = outcome.settled(done.outcome)
   let changed = match done.outcome {
-    outcome.Changed(_) => state.changed + [done.id]
+    outcome.Changed(_) => [@state.changed, done.id]
     else => state.changed
   }
-  let unsettled = if settled { state.unsettled } else { state.unsettled + [done.id] }
+  let unsettled = if settled { state.unsettled } else { [@state.unsettled, done.id] }
   let stopped = if outcome.bad(done.outcome) and policy == .Host and state.stopped == null {
     f"{done.id} failed earlier on this host"
   } else {
@@ -372,8 +363,8 @@ pure absorb(state: HostState, done: Reconciled, policy: FailurePolicy) -> HostSt
 }
 
 pure blocked_state(state: HostState, resource: model.Resource, reason: Str, secrets: List[Str]) -> HostState {
-  let entry = outcome_entry(state.workload.host.name, resource, outcome.Blocked(reason), secrets)
-  {...state, unsettled: state.unsettled + [resource.id], entries: state.entries + [entry]}
+  let entry = outcome_entry(state.workload.host.name, resource, .Blocked(reason), secrets)
+  {...state, unsettled: [@state.unsettled, resource.id], entries: state.entries + [entry]}
 }
 
 proc release_all(states: Map[Str, HostState]) [fs, env, process, error] {
@@ -412,15 +403,13 @@ proc settle_lock(state: HostState, secrets: List[Str]) [fs, env, process, error]
   }
 
   let released = if let connection = state.connection { transport.usable(connection) and release_on(connection, held) } else { false }
-  if released or release_fresh(state.workload.host, held) {
-    return {...state, held: null}
-  }
+  return {...state, held: null} when released or release_fresh(state.workload.host, held)
 
   let note = f"the lock {held.path} is still held with token {held.token}; release it with: xinfra unlock INVENTORY {state.workload.host.name} --token {held.token}"
   {...state, held: null, fatal: clean(note, secrets), fatal_phase: "release"}
 }
 
-pure host_report(state: HostState, secrets: List[Str]) -> report.HostReport {
+pure host_report(state: HostState) -> report.HostReport {
   report.HostReport(
     host: state.workload.host.name,
     ok: state.fatal == null,
@@ -446,16 +435,14 @@ pure cancelled_entry(host: Str, resource: model.Resource, status: Str, detail: S
 }
 
 pure recorded_ids(entries: List[report.Entry]) -> List[Str] {
-  entries |> map { |entry| entry.id } |> collect()
+  entries |> map .id |> collect()
 }
 
 pure cancelled_host(state: HostState, secrets: List[Str]) -> report.HostReport {
   var entries = state.entries
   let known = recorded_ids(entries)
   for resource in state.workload.resources {
-    if resource.id in known {
-      continue
-    }
+    continue when resource.id in known
 
     var status = "blocked"
     var detail = "the apply was cancelled before this resource ran"
@@ -485,11 +472,7 @@ pure cancelled_report(states: Map[Str, HostState], secrets: List[Str]) -> report
 ## are released however the run ends.
 export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, process, time, io, error] -> report.Report {
   let secrets = prepared.secrets
-  var states: Map[Str, HostState] = {}
-  for entry in prepared.workloads {
-    states[entry.host.name] = initial_state(entry)
-  }
-
+  var states: Map[Str, HostState] = {entry.host.name: initial_state(entry) for entry in prepared.workloads}
   var completed = false
   defer {
     release_all(states)
@@ -498,7 +481,7 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     }
   }
 
-  let opened = transport.connect_all(prepared.workloads |> map { |entry| entry.host } |> collect(), settings.jobs)
+  let opened = transport.connect_all(prepared.workloads |> map .host |> collect(), settings.jobs)
   var position = 0
   for entry in prepared.workloads {
     let name = entry.host.name
@@ -510,7 +493,7 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     position += 1
   }
 
-  let lockable = states.values() |> where { |state| state.fatal == null } |> collect()
+  let lockable = states.values() |> where .fatal == null |> collect()
   let locked = lockable |> par-map(jobs: settings.jobs) { |state| take_lock(state, settings.lock_path, secrets) } |> collect()
   for item in locked {
     let state = states.get(item.host) ?? initial_state(prepared.workloads[0])
@@ -521,24 +504,21 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     }
   }
 
-  var aborted: Str? = null
+  var aborted = null
   for id in prepared.operations {
-    var steps: List[Step] = []
-    for state in states.values() {
-      if state.fatal != null {
-        continue
-      }
+    let steps: List[Step] = collect {
+      for state in states.values() {
+        continue when state.fatal != null
 
-      let resource = find_resource(state.workload.resources, id)
-      if resource == null {
-        continue
-      }
+        let resource = find_resource(state.workload.resources, id)
+        continue when resource == null
 
-      let reason = blocked_reason(state, resource, aborted)
-      if reason == null {
-        steps += [Step(state:, resource:)]
-      } else {
-        states[state.workload.host.name] = blocked_state(state, resource, reason, secrets)
+        let reason = blocked_reason(state, resource, aborted)
+        if reason == null {
+          yield Step(state:, resource:)
+        } else {
+          states[state.workload.host.name] = blocked_state(state, resource, reason, secrets)
+        }
       }
     }
 
@@ -562,7 +542,7 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     states[name] = settle_lock(states.get(name) ?? initial_state(prepared.workloads[0]), secrets)
   }
 
-  let hosts = prepared.workloads |> map { |entry| host_report(states.get(entry.host.name) ?? initial_state(entry), secrets) } |> collect()
+  let hosts = prepared.workloads |> map host_report(states.get(.host.name) ?? initial_state(.)) |> collect()
   completed = true
   report.Report(mode: "apply", hosts:)
 }

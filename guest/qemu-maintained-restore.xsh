@@ -12,8 +12,6 @@
 ##! LAPUTA_RESTORE_VERIFY=1  check the repo (rustic and restic), re-back up,
 ##!   and require the re-backup diff to touch volatile paths only.
 
-const drill = p"/etc/laputa/drill"
-
 ## All drill temp files live on the backup disk, which every phase mounts.
 ## The restored state disk never carries drill scaffolding.
 const backup_mount = p"/mnt/backup"
@@ -25,12 +23,12 @@ proc console(text: Str) {
   p"/dev/console".write(text + "\n")
 }
 
-proc tool_env(password: Path) -> Result[Record] {
+proc tool_env(password_file: Path) -> Result[Record] {
   let home = fp"{backup_mount}/home"
   home.mkdir(true)
   Ok({
     RUSTIC_REPOSITORY: fp"{backup_mount}/repo".display(),
-    RUSTIC_PASSWORD_FILE: password.display(),
+    RUSTIC_PASSWORD_FILE: password_file.display(),
     RUSTIC_NO_CACHE: "true",
     LD_LIBRARY_PATH: fp"{backup_mount}/tools/lib".display(),
     HOME: home.display(),
@@ -40,30 +38,30 @@ proc tool_env(password: Path) -> Result[Record] {
 ## Run a tool, capturing stdout and stderr separately. Returns stdout on
 ## success and fails with the stderr tail otherwise, so log noise never
 ## reaches the JSON parser.
-proc tool_text(tool: Path, args: List[Str], password: Path) -> Result[Str] {
+proc tool_text(tool: Path, args: List[Str], password_file: Path) -> Result[Str] {
   let out = fp"{backup_mount}/tool.out"
   out.write("")
   let err = fp"{backup_mount}/tool.err"
   err.write("")
   let status = process.run(
-    process.command_argv(tool, args, p"/", tool_env(password)?, b"", out, err),
+    process.command_argv(tool, args, p"/", tool_env(password_file)?, b"", out, err),
   )?
   guard status.ok else {
     let tail = err.read_text()?
-    fail f"{tool.display()} {args.join(" ")} failed: {tail[-2000..]}"
+    fail f"{tool} {args.join(" ")} failed: {tail[-2000..]}"
   }
   out.read_text()?
 }
 
-proc rustic(args: List[Str], password: Path) -> Result[Str] {
+proc rustic(args: List[Str], password_file: Path) -> Result[Str] {
   let argv = ["rustic", "--no-cache"].extend(args)
-  tool_text(fp"{backup_mount}/tools/rustic", argv, password)?
+  tool_text(fp"{backup_mount}/tools/rustic", argv, password_file)?
 }
 
-proc restic(args: List[Str], password: Path) -> Result[Str] {
+proc restic(args: List[Str], password_file: Path) -> Result[Str] {
   let environ = {
     RESTIC_REPOSITORY: fp"{backup_mount}/repo".display(),
-    RESTIC_PASSWORD_FILE: password.display(),
+    RESTIC_PASSWORD_FILE: password_file.display(),
     LD_LIBRARY_PATH: fp"{backup_mount}/tools/lib".display(),
     HOME: fp"{backup_mount}/home".display(),
   }
@@ -86,8 +84,8 @@ proc mount_backup() {
   p"/mnt".mkdir()
   backup_mount.mkdir()
   linux.mount(backup_dev, backup_mount, fstype: "ext4", options: ["nosuid", "nodev"])
-  guard fp"{backup_mount}/tools/rustic".exists()? else { fail "backup disk has no rustic tool" }
-  guard fp"{backup_mount}/tools/restic".exists()? else { fail "backup disk has no restic tool" }
+  guard fp"{backup_mount}/tools/rustic".exists() else { fail "backup disk has no rustic tool" }
+  guard fp"{backup_mount}/tools/restic".exists() else { fail "backup disk has no restic tool" }
 }
 
 proc backup_sources() -> List[Str] {
@@ -96,16 +94,17 @@ proc backup_sources() -> List[Str] {
 
 proc password(name: Str) -> Result[Path] {
   let file = fp"{backup_mount}/keys/{name}"
-  guard file.exists()? else { fail f"drill password {name} is missing" }
+  guard file.exists() else { fail f"drill password {name} is missing" }
   file
 }
 
 proc snapshot_ids(text: Str) -> Result[List[Str]] {
   let groups = json.decode(text)?.require(List[Record])?
-  var ids: List[Str] = []
-  for grp in groups {
-    for snap in grp.get("snapshots")?.require(List[Record])? {
-      ids += [snap.get("id")?.require(Str)?]
+  let ids = collect {
+    for grp in groups {
+      for snap in grp.get("snapshots")?.require(List[Record])? {
+        yield snap.get("id")?.require(Str)?
+      }
     }
   }
   ids
@@ -113,14 +112,12 @@ proc snapshot_ids(text: Str) -> Result[List[Str]] {
 
 proc snapshot_paths(text: Str) -> Result[List[Str]] {
   let groups = json.decode(text)?.require(List[Record])?
-  var paths: List[Str] = []
-  for grp in groups {
-    for snap in grp.get("snapshots")?.require(List[Record])? {
-      for snap_path in snap.get("paths")?.require(List[Str])? {
-        paths += [snap_path]
-      }
-    }
-  }
+  var paths = [
+    snap_path
+    for grp in groups
+    for snap in grp.get("snapshots")?.require(List[Record])?
+    for snap_path in snap.get("paths")?.require(List[Str])?
+  ]
   paths
 }
 
@@ -140,21 +137,19 @@ proc identity_files() -> Result[List[Path]] {
 }
 
 proc hash_manifest(files: List[Path]) -> Result[Str] {
-  [f"{hash.sha256(item)?.hex()}  {item.display()}" for item in files].join("\n") + "\n"
+  [f"{hash.sha256(item)?.hex()}  {item}" for item in files].join("\n") + "\n"
 }
 
 proc steady_state() {
-  wait until p"/run/xinit/oxish.json".exists()? within 30s every 100ms
+  wait until p"/run/xinit/oxish.json".exists() within 30s every 100ms
   wait until json.get(json.read(p"/run/xinit/oxish.json")?, ["state"], "").require(Str)? == "running" within 30s every 100ms
-  wait until p"/run/dhcpc/eth0.status".exists()? within 30s every 100ms
+  wait until p"/run/dhcpc/eth0.status".exists() within 30s every 100ms
   var leased = ""
   var waited = 0
   while waited < 60 {
     leased = json.get(json.read(p"/run/dhcpc/eth0.status")?, ["state"], "").require(Str)?
-    if leased == "bound" {
-      break
-    }
-    time.sleep(1s)?
+    break when leased == "bound"
+    time.sleep(1s)
     waited += 1
   }
   guard leased == "bound" else { fail "dhcp lease never bound before backup" }
@@ -168,7 +163,7 @@ proc phase_backup() {
   let pw1 = password("password1")?
   let pw2 = password("password2")?
   let repo = fp"{backup_mount}/repo"
-  guard ! repo.exists()? else { fail "backup repo already exists" }
+  guard ! repo.exists() else { fail "backup repo already exists" }
   let _ = rustic(["init"], pw1)?
   let keys = fs.files(fp"{repo}/keys", hidden: true)? |> collect
   guard keys.len() == 1 else { fail "expected exactly one initial repository key" }
@@ -176,7 +171,7 @@ proc phase_backup() {
   let _ = rustic(["key", "add", "--new-password-file", pw2.display()], pw1)?
   let masterkey = fp"{backup_mount}/keys/masterkey.export"
   let _ = rustic(["key", "export", masterkey.display()], pw1)?
-  let mode = process.run(process.command_argv(p"/usr/bin/chmod", ["chmod", "600", masterkey.display()], p"/", {}, b"", fp"{backup_mount}/tool.out", fp"{backup_mount}/tool.err"))?
+  let mode = process.run(process.command_argv(p"/usr/bin/chmod", ["chmod", "600", masterkey], p"/", {}, b"", fp"{backup_mount}/tool.out", fp"{backup_mount}/tool.err"))?
   guard mode.ok else { fail "cannot protect exported masterkey" }
   let _ = rustic(["backup", "--exclude-if-present", ".no-backup", @backup_sources()], pw1)?
   let listed = rustic(["snapshots", "--json"], pw1)?
@@ -188,7 +183,7 @@ proc phase_backup() {
     }
   }
   fp"{backup_mount}/snap1.id".write(ids[0] + "\n")
-  let manifest = hash_manifest(identity_files()?)?
+  let manifest = identity_files()? |> hash_manifest(_)?
   fp"{backup_mount}/hashes-before.txt".write(manifest)
   let _ = rustic(["key", "remove", first_key], pw2)?
   let denied = process.run(
@@ -198,9 +193,9 @@ proc phase_backup() {
     ),
   )?
   guard ! denied.ok else { fail "removed first key still opens the repo" }
-  pw1.remove()?
-  guard ! pw1.exists()? else { fail "first password survived loss" }
-  linux.umount(backup_mount)?
+  pw1.remove()
+  guard ! pw1.exists() else { fail "first password survived loss" }
+  linux.umount(backup_mount)
   console(f"RESTORE_BACKUP_OK snapshot={ids[0]}")
 }
 
@@ -208,23 +203,24 @@ proc phase_restore() {
   mount_backup()
   blank_mount.mkdir()
   linux.mount(blank_dev, blank_mount, fstype: "ext4", options: ["nosuid", "nodev"])
-  guard ! fp"{backup_mount}/keys/password1".exists()? else { fail "first password survived loss" }
+  guard ! fp"{backup_mount}/keys/password1".exists() else { fail "first password survived loss" }
   let pw2 = password("password2")?
   let snap1 = fp"{backup_mount}/snap1.id".read_text()?.trim()
   guard snap1 != "" else { fail "snap1.id is missing" }
   let _ = rustic(["restore", "latest", blank_mount.display()], pw2)?
-  let before = fp"{backup_mount}/hashes-before.txt".read_text()?.lines() |> where .trim() != "" |> collect
-  guard before.len() > 0 else { fail "hash manifest is empty" }
-  var bare: List[Str] = []
-  for entry in before {
-    let fields = entry.split("  ")
-    guard fields.len() == 2 else { fail f"unparseable manifest line: {entry}" }
-    let restored = fp"{blank_mount}{fields[1]}"
-    guard restored.exists()? else { fail f"restore is missing {fields[1]}" }
-    guard hash.sha256(restored)?.hex() == fields[0] else {
-      fail f"restored {fields[1]} does not match the pre-loss hash"
+  let before = fp"{backup_mount}/hashes-before.txt".read_lines()? |> where .trim() != "" |> collect
+  guard ! before.is_empty() else { fail "hash manifest is empty" }
+  let bare = collect {
+    for entry in before {
+      let fields = entry.split("  ")
+      guard fields.len() == 2 else { fail f"unparseable manifest line: {entry}" }
+      let restored = fp"{blank_mount}{fields[1]}"
+      guard restored.exists() else { fail f"restore is missing {fields[1]}" }
+      guard hash.sha256(restored)?.hex() == fields[0] else {
+        fail f"restored {fields[1]} does not match the pre-loss hash"
+      }
+      yield fields[0]
     }
-    bare += [fields[0]]
   }
   ## Seed the maintained proof baseline the verify boot checks: the pre-loss
   ## identity hashes plus the deterministic supervised-services line.
@@ -236,8 +232,8 @@ proc phase_restore() {
   ## The state-format marker lives beside the backed-up trees, not inside
   ## them; lay it down as part of reinstalling the base.
   fp"{blank_mount}/format".write("laputa-maintained-state-1\n")
-  linux.umount(blank_mount)?
-  linux.umount(backup_mount)?
+  linux.umount(blank_mount)
+  linux.umount(backup_mount)
   console("RESTORE_RESTORE_OK identity files match the pre-loss hashes")
 }
 
@@ -255,21 +251,22 @@ pure expected_additions() -> List[Str] {
 }
 
 proc diff_paths(text: Str) -> Result[List[Str]] {
-  var changed: List[Str] = []
-  for line in text.lines() {
-    let trimmed = line.trim()
-    if trimmed == "" or trimmed.starts_with("Files") or trimmed.starts_with("Dirs") {
-      continue
-    }
-    let first = trimmed[..1]
-    if first == "+" or first == "-" or first == "M" or first == "U" {
-      let parts = trimmed.split("\"")
-      guard parts.len() >= 3 else { fail f"unparseable diff line: {trimmed}" }
-      var changed_path = parts[1]
-      if changed_path.starts_with("/") {
-        changed_path = changed_path[1..]
+  let changed = collect {
+    for line in text.lines() {
+      let trimmed = line.trim()
+      if trimmed == "" or trimmed.starts_with("Files") or trimmed.starts_with("Dirs") {
+        continue
       }
-      changed += [changed_path]
+      let first = trimmed[..1]
+      if first == "+" or first == "-" or first == "M" or first == "U" {
+        let parts = trimmed.split("\"")
+        guard parts.len() >= 3 else { fail f"unparseable diff line: {trimmed}" }
+        var changed_path = parts[1]
+        if changed_path.starts_with("/") {
+          changed_path = changed_path[1..]
+        }
+        yield changed_path
+      }
     }
   }
   changed
@@ -277,7 +274,7 @@ proc diff_paths(text: Str) -> Result[List[Str]] {
 
 proc phase_verify() {
   mount_backup()
-  guard ! fp"{backup_mount}/keys/password1".exists()? else { fail "first password survived loss" }
+  guard ! fp"{backup_mount}/keys/password1".exists() else { fail "first password survived loss" }
   let pw2 = password("password2")?
   let snap1 = fp"{backup_mount}/snap1.id".read_text()?.trim()
   let _ = rustic(["check"], pw2)?
@@ -290,8 +287,7 @@ proc phase_verify() {
   let snap1_listing = rustic(["find", snap1, "--path", "/etc/passwd"], pw2)?
   console(f"RESTORE_SNAP1_BEGIN\n{snap1_listing}RESTORE_SNAP1_END")
   let _ = rustic(["backup", "--exclude-if-present", ".no-backup", @backup_sources()], pw2)?
-  let listed = rustic(["snapshots", "--json"], pw2)?
-  let ids = snapshot_ids(listed)?
+  let ids = rustic(["snapshots", "--json"], pw2)? |> snapshot_ids(_)?
   guard snap1 in ids else { fail "the backup snapshot is gone from the repo" }
   guard ids.len() >= 2 else { fail "re-backup produced no new snapshot" }
   let snap2 = [id for id in ids if id != snap1][-1]
@@ -326,7 +322,7 @@ proc phase_verify() {
   guard snap1 in listed2 else { fail "second key cannot list the repo snapshots" }
   console("RESTORE_SECOND_KEY_OK second key opens the repo")
   let masterkey = fp"{backup_mount}/keys/masterkey.export"
-  guard masterkey.exists()? else { fail "exported masterkey is missing" }
+  guard masterkey.exists() else { fail "exported masterkey is missing" }
   let master_env = {
     RUSTIC_REPOSITORY: fp"{backup_mount}/repo".display(),
     RUSTIC_KEY_FILE: masterkey.display(),
@@ -341,7 +337,7 @@ proc phase_verify() {
   guard master.ok else { fail "exported masterkey cannot open the repo" }
   guard snap1 in fp"{backup_mount}/tool.out".read_text()? else { fail "masterkey cannot list the original snapshot" }
   console("RESTORE_MASTERKEY_OK exported masterkey opens the repo")
-  linux.umount(backup_mount)?
+  linux.umount(backup_mount)
   console("RESTORE_VERIFY_OK")
 }
 
@@ -349,20 +345,19 @@ proc dispatch() {
   let cmdline = p"/proc/cmdline".read_text()?
   if "LAPUTA_RESTORE_BACKUP=1" in cmdline {
     console("RESTORE_DRILL_START phase=backup")
-    phase_backup()?
+    phase_backup()
     return
   }
   if "LAPUTA_RESTORE_RESTORE=1" in cmdline {
     console("RESTORE_DRILL_START phase=restore")
-    phase_restore()?
+    phase_restore()
     return
   }
   if "LAPUTA_RESTORE_VERIFY=1" in cmdline {
     console("RESTORE_DRILL_START phase=verify")
-    phase_verify()?
+    phase_verify()
     return
   }
-  return
 }
 
 proc main() -> Result[Unit, Error] {

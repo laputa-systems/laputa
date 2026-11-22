@@ -48,7 +48,7 @@ test test_baselayout_inittab_runs_one_boot_scanner [fs, error] {
 
 test test_target_group_carries_the_xinit_control_group_of_baselayout {
   let lines = installer.installer_target_group().lines()
-  let baselayout = p"packages/baselayout/files/rootfs/etc/group".read_text()?.lines()
+  let baselayout = p"packages/baselayout/files/rootfs/etc/group".read_lines()?
 
   assert "xinit-admin:x:124:" in lines
   assert "xinit-admin:x:124:" in baselayout

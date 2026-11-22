@@ -34,7 +34,7 @@ test test_snapshot_local_clock_cannot_poison_the_persisted_time_floor [fs, error
   let state = repo_snapshot.snapshot_state_paths(test.temp_dir(ctx, name: "snapshot-local-clock")?, "https://example.invalid/repo")
   let keys = [key_bytes("signing-key")?]
   let verified = repo_snapshot.snapshot_verify({...verify_input(keys, null)?, now_epoch_seconds: reference_now() + 1000})?
-  repo_snapshot.snapshot_persist_accepted(state, verified)?
+  repo_snapshot.snapshot_persist_accepted(state, verified)
   let accepted = repo_snapshot.snapshot_read_accepted(state)?
   let corrected = repo_snapshot.snapshot_verify(verify_input(keys, accepted)?)?
   assert corrected.generation == verified.generation
@@ -146,7 +146,7 @@ test test_snapshot_verify_fails_closed_on_a_missing_or_incorrect_clock [fs, erro
 
   let state = repo_snapshot.snapshot_state_paths(test.temp_dir(ctx, name: "snapshot-missing-clock")?, "https://example.invalid/repo")
   let verified = repo_snapshot.snapshot_verify(base)?
-  repo_snapshot.snapshot_persist_accepted(state, verified)?
+  repo_snapshot.snapshot_persist_accepted(state, verified)
   let persisted = state.accepted.read_bytes()?
   let ahead_of_clock = {...base, accepted: {generation: verified.generation, index_sha256: verified.index_sha256, time_floor: reference_now() + 1}}
   expect_snapshot_rejected(ahead_of_clock, "behind the authenticated repository publication time")
@@ -190,7 +190,7 @@ test test_snapshot_verify_rejects_malformed_metadata_and_inputs [fs, error] { |_
   }
 
   expect_snapshot_rejected({...base, metadata: bytes.from_text(good_text.replace("generation 1", with: "generation 9")), signature: good_sig}, "signature is invalid")
-  expect_snapshot_rejected({...base, signature: good_sig.slice(0, 63)}, "64 raw Ed25519 bytes")
+  expect_snapshot_rejected({...base, signature: good_sig[..63]}, "64 raw Ed25519 bytes")
   expect_snapshot_rejected({...base, signature: bytes.from_text("")}, "64 raw Ed25519 bytes")
   expect_snapshot_rejected({...base, keys: []}, "no repository snapshot verification key")
   expect_snapshot_rejected({...base, keys: [key_bytes("signing-key")?.slice(0, 31)]}, "exactly 32 raw Ed25519 bytes")
@@ -266,7 +266,7 @@ test test_snapshot_key_file_and_accepted_state_round_trip [fs, error] { |ctx|
   }
 
   let verified = repo_snapshot.snapshot_verify(verify_input(keys, null)?)?
-  repo_snapshot.snapshot_persist_accepted(state, verified)?
+  repo_snapshot.snapshot_persist_accepted(state, verified)
   let stored = repo_snapshot.snapshot_read_accepted(state)?
 
   if stored == null {
@@ -276,7 +276,7 @@ test test_snapshot_key_file_and_accepted_state_round_trip [fs, error] { |ctx|
     assert stored.time_floor == reference_issued()
   }
 
-  repo_snapshot.snapshot_persist_accepted(state, verified)?
+  repo_snapshot.snapshot_persist_accepted(state, verified)
   let restored = repo_snapshot.snapshot_read_accepted(state)?
 
   if restored == null {
@@ -300,15 +300,15 @@ proc stage_snapshot_remote(ctx: TestContext, index_source: Path) -> Result[Path]
 }
 
 proc stage_snapshot_dir(ctx: TestContext, name: Str, which: Str) -> Result[Path] {
-  let dir = fp"{test.temp_dir(ctx, name: name)?}/snapshot"
-  dir.mkdir(parents: true)
+  let dir = fp"{test.temp_dir(ctx, name:)?}/snapshot"
+  dir.mkdir()
   fixture(f"{which}/metadata").copy(to: fp"{dir}/snapshot.json")
   fixture(f"{which}/metadata.sig").copy(to: fp"{dir}/snapshot.sig")
   dir
 }
 
 test test_publish_snapshot_binds_index_advances_and_freezes [fs, net, env, time, error] { |ctx|
-  let remote_root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let remote_root = fixture("index.json") |> stage_snapshot_remote(ctx, _)?
   let remote_url = f"file://{remote_root}"
   let both_keys = [key_bytes("signing-key")?, key_bytes("next-key")?]
   let work = test.temp_dir(ctx, name: "snapshot-publish-work")?
@@ -329,7 +329,7 @@ test test_publish_snapshot_binds_index_advances_and_freezes [fs, net, env, time,
     Err(problem) => assert "signature is invalid" in problem.message
   }
 
-  repo.publish_snapshot(remote_url, "", work, stage_snapshot_dir(ctx, "snapshot-gen2-again-dir", "snapshot-gen2")?, both_keys)?
+  repo.publish_snapshot(remote_url, "", work, stage_snapshot_dir(ctx, "snapshot-gen2-again-dir", "snapshot-gen2")?, both_keys)
   assert fp"{remote_root}/snapshot.json".read_bytes()? == snapshot_bytes("snapshot-gen2", "metadata")?
 
   match repo.publish_snapshot(remote_url, "", work, stage_snapshot_dir(ctx, "snapshot-gen1-again-dir", "snapshot-gen1")?, both_keys) {
@@ -339,7 +339,7 @@ test test_publish_snapshot_binds_index_advances_and_freezes [fs, net, env, time,
 }
 
 test test_publish_snapshot_rejects_unbound_and_incomplete_inputs [fs, net, env, time, error] { |ctx|
-  let remote_root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let remote_root = fixture("index.json") |> stage_snapshot_remote(ctx, _)?
   let remote_url = f"file://{remote_root}"
   let both_keys = [key_bytes("signing-key")?, key_bytes("next-key")?]
   let work = test.temp_dir(ctx, name: "snapshot-publish-reject-work")?
@@ -373,7 +373,7 @@ test test_publish_snapshot_rejects_unbound_and_incomplete_inputs [fs, net, env, 
 }
 
 test test_publish_snapshot_refuses_to_replace_a_legacy_publication [fs, net, env, time, error] { |ctx|
-  let root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let root = fixture("index.json") |> stage_snapshot_remote(ctx, _)?
   fixture("snapshot-v1/metadata").copy(to: fp"{root}/snapshot.json")
   fixture("snapshot-v1/metadata.sig").copy(to: fp"{root}/snapshot.sig")
   let before = fp"{root}/snapshot.json".read_bytes()?
@@ -579,7 +579,7 @@ test test_persist_accepted_refuses_generation_rollback_and_never_lowers_bound [f
   let gen2 = repo_snapshot.snapshot_verify({...verify_input(keys, null)?, metadata: snapshot_bytes("snapshot-gen2", "metadata")?, signature: snapshot_bytes("snapshot-gen2", "metadata.sig")?})?
   let gen1 = repo_snapshot.snapshot_verify(verify_input(keys, null)?)?
 
-  repo_snapshot.snapshot_persist_accepted(state, gen2)?
+  repo_snapshot.snapshot_persist_accepted(state, gen2)
   let before = state.accepted.read_bytes()?
 
   match repo_snapshot.snapshot_persist_accepted(state, gen1) {
@@ -594,10 +594,10 @@ test test_snapshot_acceptance_preserves_the_greatest_authenticated_issue_time [f
   let state = repo_snapshot.snapshot_state_paths(test.temp_dir(ctx, name: "signed-floor-max")?, "https://example.invalid/repo")
   let keys = [key_bytes("signing-key")?, key_bytes("next-key")?]
   let gen2 = repo_snapshot.snapshot_verify({...verify_input(keys, null)?, metadata: snapshot_bytes("snapshot-gen2", "metadata")?, signature: snapshot_bytes("snapshot-gen2", "metadata.sig")?})?
-  repo_snapshot.snapshot_persist_accepted(state, gen2)?
+  repo_snapshot.snapshot_persist_accepted(state, gen2)
   let accepted = repo_snapshot.snapshot_read_accepted(state)?
   let gen3 = repo_snapshot.snapshot_verify({...verify_input(keys, accepted)?, metadata: snapshot_bytes("snapshot-gen3-backdated", "metadata")?, signature: snapshot_bytes("snapshot-gen3-backdated", "metadata.sig")?})?
-  repo_snapshot.snapshot_persist_accepted(state, gen3)?
+  repo_snapshot.snapshot_persist_accepted(state, gen3)
   let stored = repo_snapshot.snapshot_read_accepted(state)?
   if stored == null {
     test.fail("accepted state disappeared")
@@ -613,7 +613,7 @@ test test_snapshot_acceptance_rechecks_the_signed_floor_under_its_lock [fs, erro
   let keys = [key_bytes("signing-key")?, key_bytes("next-key")?]
   let earlier = repo_snapshot.snapshot_verify({...verify_input(keys, null)?, now_epoch_seconds: reference_issued(), metadata: snapshot_bytes("snapshot-gen3-backdated", "metadata")?, signature: snapshot_bytes("snapshot-gen3-backdated", "metadata.sig")?})?
   let later = repo_snapshot.snapshot_verify({...verify_input(keys, null)?, metadata: snapshot_bytes("snapshot-gen2", "metadata")?, signature: snapshot_bytes("snapshot-gen2", "metadata.sig")?})?
-  repo_snapshot.snapshot_persist_accepted(state, later)?
+  repo_snapshot.snapshot_persist_accepted(state, later)
   let before = state.accepted.read_bytes()?
   match repo_snapshot.snapshot_persist_accepted(state, earlier) {
     Ok(_) => test.fail("acceptance used a clock behind the concurrently advanced signed floor"),
@@ -696,7 +696,7 @@ test test_persist_accepted_refuses_a_concurrent_writer [fs, error] { |ctx|
 }
 
 test test_signed_index_requires_digests_for_every_referenced_artifact [fs, error] { |_|
-  let item = remote.decode_remote_index(json.read(fixture("index.json"))?.require(List[Record])?)?[0]
+  let item = remote.decode_remote_index(json.read(fixture("index.json"))?.require()?)?[0]
   for invalid in [
     {...item, metadata_sha256: ""},
     {...item, sha256: ""},
@@ -713,7 +713,7 @@ test test_signed_index_requires_digests_for_every_referenced_artifact [fs, error
 }
 
 test test_snapshot_publication_retry_repairs_missing_commit_signature [fs, net, env, time, error] { |ctx|
-  let root = stage_snapshot_remote(ctx, fixture("index.json"))?
+  let root = fixture("index.json") |> stage_snapshot_remote(ctx, _)?
   let release = stage_snapshot_dir(ctx, "retry-release", "snapshot-gen1")?
   let work = test.temp_dir(ctx, name: "retry-work")?
   let url = f"file://{root}"

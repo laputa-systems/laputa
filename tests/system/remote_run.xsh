@@ -2,12 +2,17 @@ use system.remote
 
 proc guest(ctx: TestContext, request: Record) [fs, process, error] -> Result[Record, Error] {
   let source = p"system/remote_guest.xsh".read_text()?
-  let result = test.run_script(ctx, source, env: {REMOTE_INHERITED: "inherited"}, stdin: bytes.from_text(json.encode(request)? + "\n"))?
-  assert result.status == 0, result.stderr
+  let result = test.expect(
+    ctx,
+    source,
+    status: 0,
+    env: {REMOTE_INHERITED: "inherited"},
+    stdin: bytes.from_text(json.encode(request)? + "\n"),
+  )?
   json.decode(result.stdout)?.require(Record)?
 }
 
-proc stdout_text(reply: Record) [error] -> Result[Str, Error] {
+proc stdout_text(reply: Record) -> Result[Str, Error] {
   json.get(reply, ["result", "stdout_b64"], "").require(Str)?.base64_decode()?.utf8()?
 }
 

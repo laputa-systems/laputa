@@ -31,9 +31,7 @@ proc lines_of(log: Path) [fs] -> List[Str] {
 
 pure first_index(lines: List[Str], needle: Str) -> Int {
   for index in range(lines.len()) {
-    if needle in lines[index] {
-      return index
-    }
+    return index when needle in lines[index]
   }
 
   -1
@@ -70,19 +68,19 @@ test the_job_bound_limits_how_many_hosts_run_at_once { |ctx|
   let hosts = ["h1", "h2", "h3"] |> map { |name| on(name, [logged("one", log, name)?]) } |> collect()
   let serial = engine.apply(prepare(hosts)?, settings(dir, jobs: 1))
   assert report.exit_status(serial) == 0
-  let kinds = lines_of(log) |> map { |line| line.split(" ")[0] } |> collect()
+  let kinds = lines_of(log) |> map .split(" ")[0] |> collect()
   assert kinds == ["start", "end", "start", "end", "start", "end"]
 
   let wide = fp"{dir}/wide"
   let wide_hosts = ["h1", "h2", "h3"] |> map { |name| on(name, [logged("one", wide, name)?]) } |> collect()
   let parallel = engine.apply(prepare(wide_hosts)?, settings(dir, jobs: 3))
   assert report.exit_status(parallel) == 0
-  let overlapped = lines_of(wide) |> map { |line| line.split(" ")[0] } |> collect()
+  let overlapped = lines_of(wide) |> map .split(" ")[0] |> collect()
   assert overlapped[0..3] == ["start", "start", "start"]
 }
 
 test several_changed_files_coalesce_into_one_trigger { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let counter = fp"{dir}/runs"
   let resources = [
@@ -104,7 +102,7 @@ test several_changed_files_coalesce_into_one_trigger { |ctx|
 }
 
 test absent_resources_are_removed_and_never_recursively { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   fp"{dir}/file".write("x")
   fp"{dir}/empty".mkdir()
@@ -141,7 +139,7 @@ test a_command_that_outlives_its_timeout_has_an_unknown_outcome_and_is_not_retri
 }
 
 test secret_values_never_reach_a_report { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   env ({XINFRA_TEST_SECRET: "hunter2-secret"}) {
     let resources = [
@@ -177,7 +175,7 @@ test unset_secrets_and_missing_sources_are_refused_before_any_mutation { |ctx|
 }
 
 test hostile_paths_converge_like_any_other { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let odd = f"{dir}/it's a \"dir\"\nwith $(newline) -x"
   let resources = [
@@ -198,20 +196,19 @@ test hostile_paths_converge_like_any_other { |ctx|
 }
 
 test apply_recomputes_from_current_facts_not_from_the_plan { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let resources = [declare.file(id: "f", at: f"{dir}/f", text: "same\n")?]
   let prepared = prepare([on("h", resources)])?
   let planned = engine.survey(.Plan, prepared, settings(dir))
   assert testing.status_of(planned, "h", "f") == "drift"
-  fp"{dir}/f".write("same\n")
-  fp"{dir}/f".chmod(0o644)
+  fp"{dir}/f".write("same\n", mode: 0o644)
   let applied = engine.apply(prepared, settings(dir))
   assert testing.status_of(applied, "h", "f") == "unchanged"
 }
 
 test a_plan_marks_resources_that_depend_on_a_planned_change_as_conditional { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let resources = [
     declare.directory(id: "d", at: f"{dir}/d")?,
@@ -233,11 +230,11 @@ test a_plan_marks_resources_that_depend_on_a_planned_change_as_conditional { |ct
 }
 
 test a_binary_source_file_is_replaced_atomically_and_streamed { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let source = fp"{dir}/source.bin"
   run dd if=/dev/urandom of=$source bs=1M count=20 status=none
-  let resources = [declare.file(id: "blob", at: f"{dir}/blob", source: source, mode: 0o600)?]
+  let resources = [declare.file(id: "blob", at: f"{dir}/blob", source:, mode: 0o600)?]
   let prepared = prepare([on("h", resources)])?
   let first = engine.apply(prepared, settings(dir))
   assert testing.status_of(first, "h", "blob") == "changed"
@@ -247,7 +244,7 @@ test a_binary_source_file_is_replaced_atomically_and_streamed { |ctx|
 }
 
 test the_abort_policy_stops_every_host_after_a_failure { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let failing = [declare.file(id: "one", at: f"{dir}/nope/x", text: "x")?, declare.file(id: "two", at: f"{dir}/two-bad", text: "x")?]
   let fine = [declare.file(id: "one", at: f"{dir}/one-good", text: "x")?, declare.file(id: "two", at: f"{dir}/two-good", text: "x")?]

@@ -340,9 +340,9 @@ test test_first_boot_and_the_oxish_service_agree_on_the_state_disk_paths [error]
 
 test test_accounts_follow_the_applied_document_on_reapplication [fs, error] { |ctx|
   let root = prepare(ctx, name: "accounts-rotate")?
-  first_boot.apply(root, base("new"))?
+  first_boot.apply(root, base("new"))
   let rotated = base("new").replace(f"authorized-key ssh-ed25519 {other_ed25519} other\n", with: "")
-  first_boot.apply(root, rotated)?
+  first_boot.apply(root, rotated)
   assert fp"{root}/etc/oxish/accounts".read_text()? == f"# account  key\npazu ssh-ed25519 {ed25519} pazu@laputa\n"
 }
 
@@ -377,8 +377,7 @@ test test_first_boot_makes_shadow_root_only_and_keeps_public_identity_files_read
   fp"{root}/etc".mkdir()
   fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\n")
   fp"{root}/etc/group".write("root:x:0:\nxinit-admin:x:124:\n")
-  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\n")
-  fp"{root}/etc/shadow".chmod(0o644)
+  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\n", mode: 0o644)
   fp"{root}/etc/shells".write("/bin/xshi\n")
   first_boot.apply(root, base("new"))
   assert "pazu:*:0:0:99999:7:::" in fp"{root}/etc/shadow".read_lines()?
@@ -393,8 +392,7 @@ test test_first_boot_tightens_an_existing_shadow_mode_without_appending [fs, err
   fp"{root}/etc".mkdir()
   fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\npazu:x:1000:1000::/home/pazu:/usr/bin/xsh-login\n")
   fp"{root}/etc/group".write("root:x:0:\npazu:x:1000:\nxinit-admin:x:124:\n")
-  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\npazu:*:0:0:99999:7:::\n")
-  fp"{root}/etc/shadow".chmod(0o644)
+  fp"{root}/etc/shadow".write("root:*:0:0:99999:7:::\npazu:*:0:0:99999:7:::\n", mode: 0o644)
   fp"{root}/etc/shells".write("/bin/xshi\n")
   first_boot.apply(root, base("new"))
   assert fp"{root}/etc/shadow".read_text()? == "root:*:0:0:99999:7:::\npazu:*:0:0:99999:7:::\n"
@@ -454,26 +452,26 @@ test test_killed_writer_before_publish_leaves_no_partial_tree [fs, error] { |ctx
 
 test test_state_image_ownership_uses_allocated_operator_identity [fs, error] { |ctx|
   let root = prepare(ctx, name: "state-owner")?
-  fp"{root}/etc".mkdir()?
-  fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\noccupied:x:1000:1000::/home/occupied:/bin/false\n")?
-  first_boot.apply(root, base("new"))?
-  fp"{root}/format".write("laputa-maintained-state-1\n")?
+  fp"{root}/etc".mkdir()
+  fp"{root}/etc/passwd".write("root:x:0:0:root:/root:/bin/xshi\noccupied:x:1000:1000::/home/occupied:/bin/false\n")
+  first_boot.apply(root, base("new"))
+  fp"{root}/format".write("laputa-maintained-state-1\n")
   let owners = first_boot.state_ownership(root)?
   assert owners == [{path: "home/pazu", uid: 1001, gid: 1001}]
-  fp"{root}/etc/oxish/accounts".remove()?
-  fp"{root}/etc/oxish/accounts".symlink(to: p"/etc/passwd")?
+  fp"{root}/etc/oxish/accounts".remove()
+  fp"{root}/etc/oxish/accounts".symlink(to: p"/etc/passwd")
   assert first_boot.state_ownership(root) is Err(_)
 }
 
 test test_state_image_uses_existing_account_primary_group [fs, error] { |ctx|
   let root = prepare(ctx, name: "state-existing-account")?
-  fp"{root}/etc".mkdir()?
-  fp"{root}/etc/passwd".write("pazu:x:1001:100::/home/pazu:/bin/false\n")?
-  first_boot.apply(root, base("new"))?
-  fp"{root}/format".write("laputa-maintained-state-1\n")?
+  fp"{root}/etc".mkdir()
+  fp"{root}/etc/passwd".write("pazu:x:1001:100::/home/pazu:/bin/false\n")
+  first_boot.apply(root, base("new"))
+  fp"{root}/format".write("laputa-maintained-state-1\n")
   let owners = first_boot.state_ownership(root)?
-  assert owners |> all { |owner| owner.uid == 1001 and owner.gid == 100 }
-  fp"{root}/etc/passwd".write("pazu:x:1001:100::/home/pazu:/bin/false\npazu:x:1002:100::/home/pazu:/bin/false\n")?
+  assert owners |> all .uid == 1001 and .gid == 100
+  fp"{root}/etc/passwd".write("pazu:x:1001:100::/home/pazu:/bin/false\npazu:x:1002:100::/home/pazu:/bin/false\n")
   assert first_boot.state_ownership(root) is Err(_)
 }
 
@@ -481,27 +479,26 @@ test test_state_image_publication_preserves_old_output_on_invalid_state [fs, pro
   let root = prepare(ctx, name: "state-publish")?
   let source = fp"{root}/state"
   let image = fp"{root}/state.ext4"
-  first_boot.apply(source, base("new"))?
-  fp"{source}/format".write("laputa-maintained-state-1\n")?
-  let xsh = Path(e"XSH_HOST" ?? "xsh")
+  first_boot.apply(source, base("new"))
+  fp"{source}/format".write("laputa-maintained-state-1\n")
+  let xsh = fp"{e"XSH_HOST" ?? "xsh"}"
   let argv = [xsh.display(), "system/maintained_state_image.xsh", "--", source.display(), image.display(), "8388608", "packages/laputa-fs/files/mkfs.ext4.xsh", xsh.display()]
   assert process.run(process.command_argv(xsh, argv))?.ok
   assert image.metadata()?.mode.bit_and(0o777) == 0o600
   assert image.metadata()?.size == 8MiB
-  image.write("previous")?
-  fp"{source}/format".write("wrong\n")?
+  image.write("previous")
+  fp"{source}/format".write("wrong\n")
   assert !process.run(process.command_argv(xsh, argv))?.ok
   assert image.read_text()? == "previous"
 }
 
 test test_apply_tightens_preexisting_operator_paths_and_replaces_a_stale_accounts_file [fs, error] { |ctx|
   let root = prepare(ctx, name: "oxish-modes")?
-  fp"{root}/etc/oxish".mkdir(parents: true)?
-  fp"{root}/home/pazu".mkdir(parents: true)?
-  fp"{root}/home/pazu".chmod(0o777)?
-  fp"{root}/etc/oxish/accounts".write("stale\n")?
-  fp"{root}/etc/oxish/accounts".chmod(0o666)?
-  first_boot.apply(root, base("new"))?
+  fp"{root}/etc/oxish".mkdir()
+  fp"{root}/home/pazu".mkdir()
+  fp"{root}/home/pazu".chmod(0o777)
+  fp"{root}/etc/oxish/accounts".write("stale\n", mode: 0o666)
+  first_boot.apply(root, base("new"))
   assert fp"{root}/home/pazu".metadata()?.mode % 4096 == 0o755
   assert fp"{root}/etc/oxish/accounts".metadata()?.mode % 4096 == 0o644
   assert "stale" not in fp"{root}/etc/oxish/accounts".read_text()?
@@ -510,8 +507,8 @@ test test_apply_tightens_preexisting_operator_paths_and_replaces_a_stale_account
 test test_state_image_ownership_accepts_a_key_file_name_as_operator [fs, error] { |ctx|
   let root = prepare(ctx, name: "state-operator-authorized-keys")?
   let document = base("new").replace("operator pazu", with: "operator authorized_keys")
-  first_boot.apply(root, document)?
-  fp"{root}/format".write("laputa-maintained-state-1\n")?
+  first_boot.apply(root, document)
+  fp"{root}/format".write("laputa-maintained-state-1\n")
   let owners = first_boot.state_ownership(root)?
   assert owners == [{path: "home/authorized_keys", uid: 1000, gid: 1000}]
   assert "\nauthorized_keys ssh-ed25519 " in fp"{root}/etc/oxish/accounts".read_text()?

@@ -4,7 +4,7 @@ use infra.model
 
 pure duplicates(resources: List[model.Resource]) -> List[Str] {
   var seen: Set[Str] = set.empty()
-  var repeated: List[Str] = []
+  var repeated = []
   for resource in resources {
     if resource.id in seen {
       if resource.id not in repeated {
@@ -19,14 +19,15 @@ pure duplicates(resources: List[model.Resource]) -> List[Str] {
 }
 
 pure unknown_dependencies(resources: List[model.Resource]) -> List[Str] {
-  let known = resources |> map { |resource| resource.id } |> collect()
-  var problems: List[Str] = []
-  for resource in resources {
-    for dependency in model.dependencies(resource) {
-      if dependency == resource.id {
-        problems += [f"resource {resource.id} needs itself"]
-      } else if dependency not in known {
-        problems += [f"resource {resource.id} needs unknown resource {dependency}"]
+  let known = resources |> map .id |> collect()
+  let problems = collect {
+    for resource in resources {
+      for dependency in model.dependencies(resource) {
+        if dependency == resource.id {
+          yield f"resource {resource.id} needs itself"
+        } else if dependency not in known {
+          yield f"resource {resource.id} needs unknown resource {dependency}"
+        }
       }
     }
   }
@@ -38,29 +39,33 @@ pure unknown_dependencies(resources: List[model.Resource]) -> List[Str] {
 ## where every resource follows what it needs. Among resources that are ready
 ## together, declaration order wins.
 export pure order(resources: List[model.Resource]) -> Result[List[model.Resource], Error] {
-  var problems: List[Str] = []
-  for id in duplicates(resources) {
-    problems += [f"duplicate resource id {id}"]
-  }
+  let problems = collect {
+    for id in duplicates(resources) {
+      yield f"duplicate resource id {id}"
+    }
 
-  problems += unknown_dependencies(resources)
+    yield @unknown_dependencies(resources)
+  }
   guard problems.is_empty() else {
     fail problems.join("; ")
   }
 
   var placed: Set[Str] = set.empty()
   var remaining = resources
-  var ordered: List[model.Resource] = []
-  while ! remaining.is_empty() {
-    let ready = remaining |> where { |resource| model.dependencies(resource) |> all { |dependency| dependency in placed } } |> first()
-    guard let next = ready else {
-      let stuck = remaining |> map { |resource| resource.id } |> collect()
-      fail f"dependency cycle among resources: {stuck.join(", ")}"
-    }
+  let ordered: List[model.Resource] = collect {
+    while ! remaining.is_empty() {
+      let ready = remaining |> where { |resource|
+        model.dependencies(resource) |> all { |dependency| dependency in placed }
+      } |> first()
+      guard let next = ready else {
+        let stuck = remaining |> map .id |> collect()
+        fail f"dependency cycle among resources: {stuck.join(", ")}"
+      }
 
-    ordered += [next]
-    placed = placed.add(next.id)
-    remaining = remaining |> where { |resource| resource.id != next.id } |> collect()
+      yield next
+      placed = placed.add(next.id)
+      remaining = remaining |> where .id != next.id |> collect()
+    }
   }
 
   Ok(ordered)
@@ -71,7 +76,7 @@ export pure order(resources: List[model.Resource]) -> Result[List[model.Resource
 ## follows everything declared before it on any host. Hosts that order two
 ## shared identifiers differently have no consistent sequence and are refused.
 export pure merge_order(lists: List[List[Str]]) -> Result[List[Str], Error] {
-  var seen: List[Str] = []
+  var seen = []
   for list in lists {
     for id in list {
       if id not in seen {
@@ -82,16 +87,17 @@ export pure merge_order(lists: List[List[Str]]) -> Result[List[Str], Error] {
 
   var placed: Set[Str] = set.empty()
   var remaining = seen
-  var merged: List[Str] = []
-  while ! remaining.is_empty() {
-    let ready = remaining |> where { |id| ready_everywhere(id, lists, placed) } |> collect()
-    guard ! ready.is_empty() else {
-      fail f"hosts order these operations inconsistently: {remaining.join(", ")}"
-    }
+  let merged = collect {
+    while ! remaining.is_empty() {
+      let ready = remaining |> where { |id| ready_everywhere(id, lists, placed) } |> collect()
+      guard ! ready.is_empty() else {
+        fail f"hosts order these operations inconsistently: {remaining.join(", ")}"
+      }
 
-    merged += [ready[0]]
-    placed = placed.add(ready[0])
-    remaining = remaining |> where { |id| id != ready[0] } |> collect()
+      yield ready[0]
+      placed = placed.add(ready[0])
+      remaining = remaining |> where { |id| id != ready[0] } |> collect()
+    }
   }
 
   Ok(merged)
@@ -102,18 +108,12 @@ pure ready_everywhere(id: Str, lists: List[List[Str]], placed: Set[Str]) -> Bool
 }
 
 pure earlier_placed(id: Str, list: List[Str], placed: Set[Str]) -> Bool {
-  if id not in list {
-    return true
-  }
+  return true when id not in list
 
   for other in list {
-    if other == id {
-      return true
-    }
+    return true when other == id
 
-    if other not in placed {
-      return false
-    }
+    return false when other not in placed
   }
 
   true

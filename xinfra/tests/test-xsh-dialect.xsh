@@ -42,8 +42,7 @@ proc xinit_fixture(dir: Path) [fs, error] {
   let bin = fp"{dir}/bin"
   bin.mkdir()
   let fake = fp"{bin}/xinit"
-  fake.write(fake_xinit)
-  fake.chmod(0o755)
+  fake.write(fake_xinit, mode: 0o755)
   let services = fp"{dir}/services"
   services.mkdir()
   for name in ["logger", "sealed"] {
@@ -78,7 +77,7 @@ proc path_from(connection: transport.Connection, target: Str) [fs, process, erro
     fail f"path state exited {execution.code}: {execution.stderr.utf8() ?? ""}"
   }
 
-  Ok(probe.path_fact(execution.stdout.utf8()?))
+  Ok(probe.path_fact(execution.stdout as Str))
 }
 
 test the_xsh_dialect_round_trips_hostile_arguments_as_literals {
@@ -86,7 +85,7 @@ test the_xsh_dialect_round_trips_hostile_arguments_as_literals {
   let result = transport.exec(connection, .EchoArguments, hostile)?
   assert result.code == 0
   let expected = hostile |> map { |word| word + "\0" } |> collect()
-  assert result.stdout.utf8()? == expected.join("")
+  assert result.stdout as Str == expected.join("")
 }
 
 test posix_operations_still_resolve_to_the_original_constants {
@@ -108,13 +107,12 @@ test xsh_source_is_never_rendered_as_a_posix_command_string {
 }
 
 test a_dialect_missing_an_operation_is_a_typed_refusal_not_the_posix_script {
-  match scripts.source(.Xsh, .PackageState) {
-    Err(scripts.ScriptError.Missing {dialect, operation, message}) => {
-      assert dialect == .Xsh
-      assert operation == .PackageState
-      assert "no script for package-state" in message
-    }
-    else => assert false, "an xsh package probe resolved"
+  if let Err(scripts.ScriptError.Missing {dialect, operation, message}) = scripts.source(.Xsh, .PackageState) {
+    assert dialect == .Xsh
+    assert operation == .PackageState
+    assert "no script for package-state" in message
+  } else {
+    assert false, "an xsh package probe resolved"
   }
 
   assert scripts.source(.Posix, .PackageState) is Ok(_)
@@ -123,38 +121,38 @@ test a_dialect_missing_an_operation_is_a_typed_refusal_not_the_posix_script {
   assert ! scripts.supports(.Xsh, .RunShell)
 
   let connection = connect(testing.local_xsh_host())?
-  match transport.exec(connection, .RunShell, ["echo hi"]) {
-    Err(transport.TransportError.Refused {message}) => assert "no script for run-shell" in message
-    else => assert false, "a missing xsh script fell back to a shell"
+  if let Err(transport.TransportError.Refused {message}) = transport.exec(connection, .RunShell, ["echo hi"]) {
+    assert "no script for run-shell" in message
+  } else {
+    assert false, "a missing xsh script fell back to a shell"
   }
 
-  match transport.exec_script(connection, "echo hi") {
-    Err(transport.TransportError.Refused {message}) => assert "raw POSIX script" in message
-    else => assert false, "a raw POSIX script ran on an xsh target"
+  if let Err(transport.TransportError.Refused {message}) = transport.exec_script(connection, "echo hi") {
+    assert "raw POSIX script" in message
+  } else {
+    assert false, "a raw POSIX script ran on an xsh target"
   }
 }
 
 test workload_refuses_a_resource_kind_the_xsh_dialect_has_no_script_for {
   let resources = [declare.package(id: "jq", name: "jq")?]
-  match workload.prepare([workload.Workload(host: testing.local_xsh_host(), resources:)]) {
-    Err(error) => {
-      assert "no script for package-state" in error.message
-      assert "package resource" in error.message
-    }
-    Ok(_) => assert false, "an xsh host accepted a package resource"
+  if let Err(error) = workload.prepare([workload.Workload(host: testing.local_xsh_host(), resources:)]) {
+    assert "no script for package-state" in error.message
+    assert "package resource" in error.message
+  } else {
+    assert false, "an xsh host accepted a package resource"
   }
 }
 
 test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let root = fp"{dir}/tree"
   root.mkdir()
   let file = fp"{root}/motd"
-  file.write("hello\n")
-  file.chmod(0o640)
+  file.write("hello\n", mode: 0o640)
   let link = fp"{root}/current"
-  fs.symlink(p"motd", link)?
+  link.symlink(to: p"motd")
   let blocker = fp"{root}/blocker"
   blocker.write("x")
 
@@ -169,8 +167,8 @@ test the_xsh_path_script_reports_the_same_facts_as_the_posix_script { |ctx|
 
 test the_xsh_xinit_probe_reports_the_same_service_facts_as_the_posix_script { |ctx|
   let dir = test.temp_dir(ctx)?
-  xinit_fixture(dir)?
-  let search = env.get("PATH")?
+  xinit_fixture(dir)
+  let search = e"PATH"?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let posix = connect(testing.local_host())?
     let xsh = connect(testing.local_xsh_host())?
@@ -179,14 +177,14 @@ test the_xsh_xinit_probe_reports_the_same_service_facts_as_the_posix_script { |c
       let expected = transport.exec(posix, .XinitServiceState, [name])?
       let actual = transport.exec(xsh, .XinitServiceState, [name])?
       assert expected.code == 0 and actual.code == 0
-      let actual_text = actual.stdout.utf8()?
-      assert service_description(probe.xinit_service_fact(actual_text)) == service_description(probe.xinit_service_fact(expected.stdout.utf8()?)), f"{name}: {actual_text}"
+      let actual_text = actual.stdout as Str
+      assert service_description(probe.xinit_service_fact(actual_text)) == service_description(probe.xinit_service_fact(expected.stdout as Str)), f"{name}: {actual_text}"
     }
   }
 }
 
 test an_xsh_file_validation_failure_discards_the_stage { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let target = fp"{dir}/validated"
   let resources = [declare.file(id: "validated", at: f"{target}", text: "bad\n", validate: ["/bin/false", "{}"])?]
@@ -194,19 +192,19 @@ test an_xsh_file_validation_failure_discards_the_stage { |ctx|
   let applied = engine.apply(prepared, settings(dir))
   assert statuses(applied, "local-xsh", ["validated"]) == ["failed"]
   assert ! target.exists()?
-  let leftovers = fs.children(dir)? |> where { |child| child.name.starts_with(".xinfra.") } |> count()
+  let leftovers = fs.children(dir)? |> where .name.starts_with(".xinfra.") |> count()
   assert leftovers == 0
 }
 
 test a_relative_lock_path_resolves_against_the_remote_cwd { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let connection = connect(testing.local_xsh_host())?
   cd (dir) {
     let held = lock.acquire(connection, "xinfra.lock")?
     assert held.token.byte_len() == 32
     assert lock.inspect(connection, "xinfra.lock")? != null
-    lock.release(connection, held)?
+    lock.release(connection, held)
     assert lock.inspect(connection, "xinfra.lock")? == null
   }
 }
@@ -215,13 +213,13 @@ test the_xsh_capability_probe_reports_the_running_identity {
   let connection = connect(testing.local_xsh_host())?
   let execution = transport.exec(connection, .Capabilities)?
   assert execution.code == 0
-  let found = probe.capabilities(execution.stdout.utf8()?)?
+  let found = probe.capabilities(execution.stdout as Str)?
   assert found.uid == user.current()?.uid
   assert "xinit" in found.present or "xinit" in found.absent
 }
 
 proc settings(dir: Path) -> engine.Settings {
-  engine.Settings(jobs: 1, policy: .Host, lock_path: f"{dir}/.lock-{{host}}")
+  engine.Settings(1, .Host, f"{dir}/.lock-{{host}}")
 }
 
 pure statuses(result: report.Report, host: Str, ids: List[Str]) -> List[Str] {
@@ -237,14 +235,14 @@ proc actions(dir: Path) [fs] -> List[Str] {
 }
 
 test a_local_xsh_host_converges_file_directory_link_command_and_service_and_reruns_unchanged { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
-  xinit_fixture(dir)?
-  let search = env.get("PATH")?
+  xinit_fixture(dir)
+  let search = e"PATH"?
   env ({PATH: f"{dir}/bin:{search}", XINIT_SERVICE_DIR: f"{dir}/services", XINIT_FAKE_DIR: f"{dir}"}) {
     let site = fp"{dir}/site"
     let stamp = fp"{dir}/stamp"
-    let account = env.get("USER")?
+    let account = e"USER"?
     let account_id = f"{user.current()?.uid}"
     let resources = [
       declare.directory(id: "root", at: f"{site}", mode: 0o750, owner: account)?,
@@ -277,7 +275,7 @@ test a_local_xsh_host_converges_file_directory_link_command_and_service_and_reru
       declare.symlink(id: "current", at: f"{site}/current", target: "elsewhere", replace: true, needs: ["motd"])?,
       declare.xinit_service(id: "logger", name: "logger", running: true, restart_on: ["motd"])?,
     ]
-    let updated = engine.apply(workload.prepare([workload.Workload(host: testing.local_xsh_host(), resources: retarget)])?, settings(dir))
+    let updated = engine.apply(workload.prepare([workload.Workload(testing.local_xsh_host(), retarget)])?, settings(dir))
     assert generated_statuses(updated, ["root", "motd", "current", "logger"]) == ["unchanged", "unchanged", "changed", "unchanged"]
     assert fp"{site}/current".readlink()? == p"elsewhere"
 
@@ -286,7 +284,7 @@ test a_local_xsh_host_converges_file_directory_link_command_and_service_and_reru
       declare.file(id: "motd", at: f"{site}/motd", presence: .Absent)?,
       declare.directory(id: "root", at: f"{site}", presence: .Absent)?,
     ]
-    let cleaned = engine.apply(workload.prepare([workload.Workload(host: testing.local_xsh_host(), resources: absent)])?, settings(dir))
+    let cleaned = engine.apply(workload.prepare([workload.Workload(testing.local_xsh_host(), absent)])?, settings(dir))
     assert generated_statuses(cleaned, ["current", "motd", "root"]) == ["changed", "changed", "changed"]
     assert report.exit_status(cleaned) == 0
     assert ! site.exists()?

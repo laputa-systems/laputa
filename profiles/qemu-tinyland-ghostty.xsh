@@ -64,8 +64,8 @@ export let profile: types.SystemProfile = types.SystemProfile(
     ready_marker: "LAPUTA_TINYLAND_GHOSTTY_PROOF_READY",
     success_marker: "LAPUTA_TINYLAND_GHOSTTY_PROOF_OK",
     failure_marker: "LAPUTA_TINYLAND_GHOSTTY_PROOF_FAILED",
-    input_mode: types.ProofModifiers,
+    input_mode: .ProofModifiers,
   },
-  qemu_gpu: types.Virgl,
+  qemu_gpu: .Virgl,
   development: true,
 )

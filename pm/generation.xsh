@@ -1,7 +1,7 @@
 ##! Deterministic runtime-only system generations assembled from verified BuildPlan artifacts.
-use pm.digest as pm_digest
 use confined
 use plan as build_plan
+use pm.digest as pm_digest
 use root as pm_root
 use store as artifact_store
 use types
@@ -104,10 +104,10 @@ proc generation_require_overlay_path(value: Str, label: Str) {
 
 proc generation_validate_symlink_target(path_value: Str, target: Str) [error] {
   let result = util.pm_symlink_target_check(path_value, target, reject_empty: true)
-  if result == util.PmSymlinkInvalid {
+  if result == .PmSymlinkInvalid {
     return Err(types.PmError.PackageContract(f"overlay symlink {path_value} has an invalid target {target}"))
   }
-  if result == util.PmSymlinkEscape {
+  if result == .PmSymlinkEscape {
     return Err(types.PmError.PackageContract(f"overlay symlink {path_value} escapes the generation: {target}"))
   }
 }
@@ -235,7 +235,7 @@ proc generation_runtime_artifacts(
     artifacts += [{package_name: node.name, package_id: node.package_id, artifact_key: node.artifact_key}]
 
     for dependency in node.dependencies {
-      let runtime = dependency.kind == types.Runtime or dependency.kind == types.RuntimeOnly
+      let runtime = dependency.kind == .Runtime or dependency.kind == .RuntimeOnly
 
       if runtime and ! (selected.get(dependency.name) ?? false) {
         pending += [dependency.name]
@@ -435,7 +435,7 @@ proc generation_overlay_entries(overlay_root: Path) -> Result[List[GenerationOve
 
 pure generation_same_directory_metadata(entry: GenerationOverlayEntry, package_entry: types.RootEntry) -> Bool {
   entry.kind == "dir"
-    and package_entry.kind == types.Tree
+    and package_entry.kind == .Tree
     and entry.mode == package_entry.mode
     and entry.sha256 == package_entry.sha256
     and entry.target == package_entry.target
@@ -446,9 +446,9 @@ pure generation_replacement_preserves_file_metadata(
   package_entry: types.RootEntry,
 ) -> Bool {
   let same_kind = if entry.kind == "file" {
-    package_entry.kind == types.File or package_entry.kind == types.Binary
+    package_entry.kind == .File or package_entry.kind == .Binary
   } else {
-    entry.kind == "symlink" and package_entry.kind == types.Symlink
+    entry.kind == "symlink" and package_entry.kind == .Symlink
   }
 
   same_kind and entry.mode == package_entry.mode
@@ -470,7 +470,7 @@ proc generation_preflight_overlay(
       if entry.path == package_entry.path {
         continue when generation_same_directory_metadata(entry, package_entry)
 
-        if package_entry.kind == types.Tree or entry.kind == "dir" {
+        if package_entry.kind == .Tree or entry.kind == "dir" {
           return Err(
             types.PmError.PackageConflict(
               f"generation overlay {entry.path} has incompatible directory type or mode metadata with package {package_entry.package_name}",
@@ -493,7 +493,7 @@ proc generation_preflight_overlay(
         }
 
         used_replacements = used_replacements.add(entry.path)
-      } else if entry.path.starts_with(f"{package_entry.path}/") and package_entry.kind != types.Tree {
+      } else if entry.path.starts_with(f"{package_entry.path}/") and package_entry.kind != .Tree {
         return Err(
           types.PmError.PackageConflict(f"generation overlay {entry.path} conflicts below package file {package_entry.path}"),
         )

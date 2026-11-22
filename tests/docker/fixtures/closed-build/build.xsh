@@ -4,7 +4,7 @@ use pm.plan
 use pm.policy
 use pm.types
 
-proc assert_no_substrate_leftovers() [fs, error] {
+proc assert_no_substrate_leftovers() {
   let leftovers = fs.walk(p"/scratch", hidden: true)
     |> where .name == "build-root"
     |> map .path
@@ -15,7 +15,7 @@ proc assert_no_substrate_leftovers() [fs, error] {
 ## Resolves and builds the closed cohort, running every package build child
 ## through the cohort confinement profile. `mode` selects the honest cohort, or
 ## one hostile package that must fail under confinement.
-proc main(repository: Path, mode: Str = "cohort") [fs, net, process, env, time, error] {
+proc main(repository: Path, mode = "cohort") [fs, net, process, env, time, error] {
   let hostiles: Map[Path] = {
     "cohort-hostile-read": p"cohort-hostile-read",
     "cohort-hostile-write": p"cohort-hostile-write",
@@ -25,8 +25,8 @@ proc main(repository: Path, mode: Str = "cohort") [fs, net, process, env, time, 
 
   if mode in hostiles {
     let source = hostiles.get(mode)?
-    let hostile_repository = fp"/cohort/{source.display()}"
-    let snapshot: types.RemoteSnapshot = {target: types.X86_64LinuxMusl, index_sha256: "closed-hostile", packages: []}
+    let hostile_repository = fp"/cohort/{source}"
+    let snapshot: types.RemoteSnapshot = types.RemoteSnapshot(types.X86_64LinuxMusl, "closed-hostile", [])
     let value = plan.resolve(catalog.load(hostile_repository)?, snapshot, policy.x86_64_docker(), [mode], false)?
     let _ = execute.build_plan(
       value,
@@ -40,7 +40,7 @@ proc main(repository: Path, mode: Str = "cohort") [fs, net, process, env, time, 
     return
   }
 
-  let snapshot: types.RemoteSnapshot = {target: types.X86_64LinuxMusl, index_sha256: "closed-cohort", packages: []}
+  let snapshot: types.RemoteSnapshot = types.RemoteSnapshot(types.X86_64LinuxMusl, "closed-cohort", [])
   let value = plan.resolve(catalog.load(repository)?, snapshot, policy.x86_64_docker(), honest, false)?
   let result = execute.build_plan(
     value,
@@ -50,9 +50,8 @@ proc main(repository: Path, mode: Str = "cohort") [fs, net, process, env, time, 
     1,
     confinement: policy.closed_build_confinement(p"/scratch"),
   )?
-  assert_no_substrate_leftovers()?
+  assert_no_substrate_leftovers()
   assert result.artifacts.len() == 3
   print "closed cohort published"
 }
 
-main(@args)?

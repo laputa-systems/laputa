@@ -1,7 +1,7 @@
 #!/bin/xsh
 proc main() [fs, process, env, time, error] {
   let status = json.read(p"/run/xinit/seatd.json")?
-  guard json.get(status, ["ready"], false).require(Bool)? else { fail "seatd did not signal readiness" }
+  guard json.get(status, ["ready"], false).require(Bool) else { fail "seatd did not signal readiness" }
   let account = user.lookup("laputa")?
   let runtime = fp"/run/user/{account.uid}"
   let cmdline = p"/proc/cmdline".read_text()?
@@ -15,6 +15,6 @@ proc main() [fs, process, env, time, error] {
     }
   }
   let session = if proof { "/usr/lib/laputa/tinyland-session.xsh" } else { "/usr/lib/laputa/tinyland-interactive.xsh" }
-  unix.exec(process.command_argv(p"/usr/bin/su", ["su", "-p", "laputa", "-s", "/usr/bin/xsh", session], env: {PATH: "/usr/local/bin:/usr/bin:/bin", XDG_RUNTIME_DIR: runtime.display(), LIBSEAT_BACKEND: "seatd", SEATD_SOCK: "/run/seatd.sock"}))?
+  unix.exec(process.command_argv(p"/usr/bin/su", ["su", "-p", "laputa", "-s", "/usr/bin/xsh", session], env: {PATH: "/usr/local/bin:/usr/bin:/bin", XDG_RUNTIME_DIR: runtime, LIBSEAT_BACKEND: "seatd", SEATD_SOCK: "/run/seatd.sock"}))
 }
 main()

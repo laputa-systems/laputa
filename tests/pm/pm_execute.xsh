@@ -55,17 +55,17 @@ proc receipt_named(value: types.BuildResult, name: Str) [error] -> Result[types.
   Err(types.PmError.PackageContract(f"missing execute result artifact {name}"))
 }
 
-proc configured_executor_binary(name: Str) [fs, process, env, error] -> Result[Path] {
+proc configured_executor_binary(name: Str) -> Result[Path] {
   let configured = (e"XSH_HOST" ?? "").trim()
   let runner = if configured != "" {
     let selected = fp"{configured}"
 
-    if ! selected.exists()? {
+    if ! selected.exists() {
       return Err(types.PmError.PackageContract(f"configured XSH runner {selected} is missing"))
     }
 
     selected
-  } else if p"/bin/xsh".exists()? {
+  } else if p"/bin/xsh".exists() {
     p"/bin/xsh"
   } else {
     process.which("xsh")?
@@ -252,7 +252,7 @@ proc exact_remote_snapshot(
         rel: node.rel,
         retrieval: {
           arch: "aarch64",
-          payload: types.RemoteArchive(
+          payload: .RemoteArchive(
             types.RemoteArchiveCoordinates(
               tarball: tarball.relative_to(remote_root).display(),
               sha256: hash.sha256(tarball)?.hex(),
@@ -273,7 +273,7 @@ proc exact_remote_snapshot(
   {target: value.target, index_sha256: "execute-remote-snapshot", packages}
 }
 
-proc executor_fixture_provenance(name: Str) [fs, error] -> Result[types.ExecutorProvenance] {
+proc executor_fixture_provenance(name: Str) -> Result[types.ExecutorProvenance] {
   let root = path.absolute(fixture(f"executor-validity/{name}"))?
   {
     format: "laputa-executor-provenance-1",
@@ -289,7 +289,7 @@ proc remote_snapshot_with_executor(
   value: types.RemoteSnapshot,
   remote_root: Path,
   executor: types.ExecutorProvenance,
-) [fs, error] -> Result[types.RemoteSnapshot] {
+) -> Result[types.RemoteSnapshot] {
   let executor_sha256 = fingerprint.executor_provenance_sha256(executor)?
   var packages: List[types.RemotePlanArtifact] = []
 
@@ -298,11 +298,7 @@ proc remote_snapshot_with_executor(
     let extended = json.read(metadata)?.require(local.PackageMetadataDto)?
     json.write(metadata, {...extended, executor, executor_sha256})
     packages += [
-      {
-        ...artifact,
-        executor_sha256,
-        retrieval: {...artifact.retrieval, metadata_sha256: hash.sha256(metadata)?.hex()},
-      },
+      {...artifact, executor_sha256: executor_sha256, retrieval.metadata_sha256: hash.sha256(metadata)?.hex()},
     ]
   }
 
@@ -474,7 +470,7 @@ test test_execute_counts_build_hooks_and_reused_artifacts [fs, net, process, env
   for name in names {
     let recipe = fp"{repo_root}/packages/{name}/PKGBUILD.xsh"
     let source = recipe.read_text()?
-    recipe.write(source.replace("  let target =", with: f"  print \"build-hook:{name}\"\n  let target ="))?
+    recipe.write(source.replace("  let target =", with: f"  print \"build-hook:{name}\"\n  let target ="))
   }
 
   let initial = resolve_execute_plan(repo_root)?
@@ -494,7 +490,7 @@ test test_execute_counts_build_hooks_and_reused_artifacts [fs, net, process, env
   }
 
   let app_recipe = fp"{repo_root}/packages/execute-app/PKGBUILD.xsh"
-  app_recipe.write(app_recipe.read_text()?.replace("application v1\\n", with: "application v2\\n"))?
+  app_recipe.write(app_recipe.read_text()?.replace("application v1\\n", with: "application v2\\n"))
   let app_plan = resolve_execute_plan(repo_root)?
   let app_logs = test.temp_dir(ctx, name: "execute-count-app")?
   let app_rebuilt = execute.build_plan(app_plan, repo_root, object_store, "", 2, app_logs)?
@@ -510,7 +506,7 @@ test test_execute_counts_build_hooks_and_reused_artifacts [fs, net, process, env
   assert old_app.payload_sha256 != new_app.payload_sha256
 
   let recipe = fp"{repo_root}/packages/execute-dep/PKGBUILD.xsh"
-  recipe.write(recipe.read_text()?.replace("dependency\\n", with: "dependency revision two\\n"))?
+  recipe.write(recipe.read_text()?.replace("dependency\\n", with: "dependency revision two\\n"))
   let changed = resolve_execute_plan(repo_root)?
   let changed_logs = test.temp_dir(ctx, name: "execute-count-changed")?
   let rebuilt = execute.build_plan(changed, repo_root, object_store, "", 2, changed_logs)?
@@ -550,7 +546,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
   let result = execute.build_plan(value, repo_root, object_store, "", 2)?
 
   for receipt in result.artifacts {
-    assert receipt.target == types.X86_64LinuxMusl
+    assert receipt.target == .X86_64LinuxMusl
     let metadata = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     assert metadata.arch == "x86_64"
   }
@@ -672,8 +668,8 @@ test test_execute_recomposes_generation_through_failed_publication_and_gc [fs, n
   let old_remote_tar_sha256 = hash.sha256(old_remote_tar)?.hex()
 
   let interrupted_source = test.temp_path(ctx, name: "execute-generation-lifecycle-interrupted-source")
-  interrupted_source.write("")?
-  interrupted_source.truncate(8192)?
+  interrupted_source.write("")
+  interrupted_source.truncate(8192)
   let marker_before_limit = bytes.from_text("before-file-limit")
   let marker_after_limit = bytes.from_text("after-file-limit")
   assert bytes.write_at(interrupted_source, 4070, marker_before_limit)? == marker_before_limit.len()
@@ -710,7 +706,7 @@ main(@args)?
   let interrupted_upload = test.run_script(
     ctx,
     interruption_worker,
-    [remote_url, interruption_rel.display(), interrupted_source.display(), interruption_work.display(), "limited"],
+    [remote_url, interruption_rel, interrupted_source, interruption_work, "limited"],
   )?
   assert interrupted_upload.status == 153, f"expected SIGXFSZ status 153, got {interrupted_upload.status}: {interrupted_upload.stderr}"
   assert interrupted_upload.success == false
@@ -726,12 +722,12 @@ main(@args)?
   generation.verify_generation(first_root, first_generation)
   assert fp"{first_root}/usr/bin/execute-app".read_text()? == "application revision one\n"
 
-  let retried_upload = test.run_script(
+  let retried_upload = test.expect(
     ctx,
     interruption_worker,
-    [remote_url, interruption_rel.display(), interrupted_source.display(), interruption_work.display(), "retry"],
+    status: 0,
+    args: [remote_url, interruption_rel, interrupted_source, interruption_work, "retry"],
   )?
-  assert retried_upload.success, retried_upload.stderr
   assert retried_upload.stdout == "true\n"
   assert hash.sha256(interruption_destination)?.hex() == interrupted_source_digest
   assert interruption_destination.metadata()?.size == interrupted_source.metadata()?.size
@@ -832,7 +828,7 @@ main(@args)?
   let runner = configured_executor_binary("xsh")?
   let first_retry = spawn run $runner $retry_script ${retry_plan_path} ${object_store} $remote_url ${retry_work_a} ${retry_release} ${retry_ready_a} ?
   let second_retry = spawn run $runner $retry_script ${retry_plan_path} ${object_store} $remote_url ${retry_work_b} ${retry_release} ${retry_ready_b} ?
-  wait until retry_ready_a.exists()? and retry_ready_b.exists()? within 10s every 10ms
+  wait until retry_ready_a.exists() and retry_ready_b.exists() within 10s every 10ms
   retry_release.write("start")
   let retry_statuses = wait [first_retry, second_retry]?
   assert retry_statuses[0].ok
@@ -1289,7 +1285,7 @@ main(@args)?
 test test_execute_refuses_a_confined_plan_with_more_than_one_job [fs, net, process, env, time, error] { |ctx|
   let repo_root = copied_execute_repository(ctx, "execute-confinement-jobs")?
   let value = resolve_execute_plan(repo_root)?
-  let confinement: types.BuildConfinement = {read: [p"/bin"], write: [], tcp: false}
+  let confinement: types.BuildConfinement = types.BuildConfinement(read: [p"/bin"], write: [], tcp: false)
   let object_store = execute_store(ctx, "execute-confinement-jobs-store")?
 
   match execute.build_plan(value, repo_root, object_store, "", 2, confinement:) {

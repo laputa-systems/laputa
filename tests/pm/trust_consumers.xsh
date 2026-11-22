@@ -2,17 +2,15 @@ proc fixture(name: Str) -> Path {
   fp"tests/pm/fixtures/trust-update/{name}"
 }
 
-proc wait_for_port(port_file: Path, attempts: Int) [fs, time, error] -> Result[Int, Error] {
+proc wait_for_port(port_file: Path, attempts: Int) -> Result[Int, Error] {
   var tries = 0
   while tries < attempts {
-    if port_file.exists()? {
+    if port_file.exists() {
       let text = port_file.read_text()?.trim()
-      if text != "" {
-        return text.parse_int_decimal()
-      }
+      return text.parse_int_decimal() when text != ""
     }
 
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
 
@@ -26,7 +24,7 @@ proc serve_chain(ctx: TestContext, name: Str, python: Str, chain: Str, key: Str)
   let dir = test.temp_dir(ctx, name:)?
   let routes = fp"{dir}/routes"
   routes.mkdir()
-  fp"{routes}/hello".write(bytes.from_text("hello\n"))?
+  fp"{routes}/hello".write(bytes.from_text("hello\n"))
   let port_file = fp"{dir}/port"
   let script = fixture("tls_server.py")
   let child = spawn run $python $script $chain $key $port_file $routes ?
@@ -35,50 +33,45 @@ proc serve_chain(ctx: TestContext, name: Str, python: Str, chain: Str, key: Str)
 
 proc stop_server(server: ConsumerServer) [process, error] {
   match process.kill(server.pid, signal: "KILL") {
-    Ok(_) => {},
-    Err(_) => {}
+    Ok(_) | Err(_) => {}
   }
 
   match process.wait_any([server.handle]) {
-    Ok(_) => {},
-    Err(_) => {}
+    Ok(_) | Err(_) => {}
   }
 }
 
-proc python_or_skip() [process, error] -> Result[Str, Error] {
-  match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      ""
-    }
+proc python_or_skip() -> Result[Str, Error] {
+  if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    ""
   }
 }
 
-proc root_bundle(ctx: TestContext) [fs, error] -> Result[Path, Error] {
+proc root_bundle(ctx: TestContext) -> Result[Path, Error] {
   let bundle = test.temp_path(ctx, name: "consumer-bundle.pem")
   bundle.write(fixture("tls/cross-r1.crt").read_bytes()?)
   bundle
 }
 
-proc uv_reaches_http(ctx: TestContext, uv: Path, bundle: Path, port: Int, label: Str) [fs, process, error] -> Result[Bool, Error] {
+proc uv_reaches_http(ctx: TestContext, uv: Path, bundle: Path, port: Int, label: Str) -> Result[Bool, Error] {
   let dir = test.temp_dir(ctx, name: f"uv-{label}")?
   let requirements = fp"{dir}/requirements.in"
-  requirements.write(bytes.from_text("trust-consumer-fixture-package\n"))?
+  requirements.write(bytes.from_text("trust-consumer-fixture-package\n"))
   let stderr = fp"{dir}/stderr"
   let command = process.command_argv(
     uv,
-    [uv.display(), "pip", "compile", requirements.display(), "--no-cache", "--index-url", f"https://127.0.0.1:{port}/simple/"],
+    [uv, "pip", "compile", requirements, "--no-cache", "--index-url", f"https://127.0.0.1:{port}/simple/"],
     dir,
-    {SSL_CERT_FILE: bundle.display(), UV_NO_CONFIG: "1", HOME: dir.display(), PATH: "/usr/bin:/bin"},
+    {SSL_CERT_FILE: bundle, UV_NO_CONFIG: "1", HOME: dir, PATH: "/usr/bin:/bin"},
     stderr:,
     timeout: 60s,
   )
   let _ = process.run(command)?
   let text = stderr.read_text()?
-  if "invalid peer certificate" in text {
-    return false
-  }
+  return false when "invalid peer certificate" in text
 
   assert "unsatisfiable" in text, text
   true
@@ -88,16 +81,15 @@ proc packaged_root() [env, error] -> Result[Str, Error] {
   (e"LAPUTA_TRUST_CONSUMER_ROOT" ?? "").trim()
 }
 
-proc uv_or_skip() [env, process, error] -> Result[Path, Error] {
+proc uv_or_skip() -> Result[Path, Error] {
   let root = packaged_root()?
   return fp"{root}/usr/bin/uv" when root != ""
 
-  match process.which("uv") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("uv is unavailable")
-      p"/nonexistent"
-    }
+  if let Ok(found) = process.which("uv") {
+    found
+  } else {
+    test.skip("uv is unavailable")
+    p"/nonexistent"
   }
 }
 
@@ -105,46 +97,49 @@ test uv_accepts_control_and_blocked_intermediate_but_rejects_omitted_root [fs, p
   let python = python_or_skip()?
   let uv = uv_or_skip()?
   let bundle = root_bundle(ctx)?
-  var outcomes: List[Bool] = []
-
-  for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
-    let server = serve_chain(ctx, f"uv-server-{entry[0]}", python, fixture(f"tls/chain-{entry[0]}.pem").display(), fixture(f"tls/{entry[1]}.key").display())?
-    defer stop_server(server)
-    outcomes += [uv_reaches_http(ctx, uv, bundle, server.port, entry[0])?]
+  let outcomes = collect {
+    for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
+      let server = serve_chain(
+        ctx,
+        f"uv-server-{entry[0]}",
+        python,
+        fixture(f"tls/chain-{entry[0]}.pem").display(),
+        fixture(f"tls/{entry[1]}.key").display(),
+      )?
+      defer stop_server(server)
+      yield uv_reaches_http(ctx, uv, bundle, server.port, entry[0])?
+    }
   }
 
   assert outcomes == [true, true, false]
 }
 
-proc cargo_or_skip() [env, process, error] -> Result[Path, Error] {
+proc cargo_or_skip() -> Result[Path, Error] {
   let root = packaged_root()?
   return fp"{root}/usr/bin/cargo" when root != ""
 
-  match process.which("cargo") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("cargo is unavailable")
-      p"/nonexistent"
-    }
+  if let Ok(found) = process.which("cargo") {
+    found
+  } else {
+    test.skip("cargo is unavailable")
+    p"/nonexistent"
   }
 }
 
-proc cargo_reaches_registry(ctx: TestContext, cargo: Path, bundle: Path, port: Int, label: Str) [fs, process, env, error] -> Result[Bool, Error] {
+proc cargo_reaches_registry(ctx: TestContext, cargo: Path, bundle: Path, port: Int, label: Str) -> Result[Bool, Error] {
   let dir = test.temp_dir(ctx, name: f"cargo-{label}")?
   let stderr = fp"{dir}/stderr"
   let command = process.command_argv(
     cargo,
-    [cargo.display(), "search", "--index", f"sparse+https://127.0.0.1:{port}/", "zzz"],
+    [cargo, "search", "--index", f"sparse+https://127.0.0.1:{port}/", "zzz"],
     dir,
-    {CARGO_HOME: dir.display(), CARGO_HTTP_CAINFO: bundle.display(), HOME: e"HOME" ?? dir.display(), PATH: "/usr/bin:/bin"},
+    {CARGO_HOME: dir, CARGO_HTTP_CAINFO: bundle, HOME: e"HOME" ?? dir.display(), PATH: "/usr/bin:/bin"},
     stderr:,
     timeout: 60s,
   )
   let _ = process.run(command)?
   let text = stderr.read_text()?
-  if "SSL certificate" in text {
-    return false
-  }
+  return false when "SSL certificate" in text
 
   assert "config.json not found" in text, text
   true
@@ -154,12 +149,18 @@ test cargo_accepts_control_and_blocked_intermediate_but_rejects_omitted_root [fs
   let python = python_or_skip()?
   let cargo = cargo_or_skip()?
   let bundle = root_bundle(ctx)?
-  var outcomes: List[Bool] = []
-
-  for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
-    let server = serve_chain(ctx, f"cargo-server-{entry[0]}", python, fixture(f"tls/chain-{entry[0]}.pem").display(), fixture(f"tls/{entry[1]}.key").display())?
-    defer stop_server(server)
-    outcomes += [cargo_reaches_registry(ctx, cargo, bundle, server.port, entry[0])?]
+  let outcomes = collect {
+    for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
+      let server = serve_chain(
+        ctx,
+        f"cargo-server-{entry[0]}",
+        python,
+        fixture(f"tls/chain-{entry[0]}.pem").display(),
+        fixture(f"tls/{entry[1]}.key").display(),
+      )?
+      defer stop_server(server)
+      yield cargo_reaches_registry(ctx, cargo, bundle, server.port, entry[0])?
+    }
   }
 
   assert outcomes == [true, true, false]

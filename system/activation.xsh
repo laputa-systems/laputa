@@ -147,11 +147,11 @@ export proc activation_publish_image(state_dir: Path, receipt: GenerationReceipt
   disk.copy(to: fp"{bundle}/disk")
   let admission = ImageAdmission(
     generation: receipt,
-    state_format: state_format,
+    state_format:,
     kernel_sha256: hash.sha256(fp"{bundle}/kernel")?.hex(),
     disk_sha256: hash.sha256(fp"{bundle}/disk")?.hex(),
   )
-  let metadata = ImageReceipt(format: "laputa-activation-image-2", admission: admission)
+  let metadata = ImageReceipt(format: "laputa-activation-image-2", admission:)
   fp"{bundle}/receipt.json".write(json.encode(metadata)? + "\n")
   for item in [p"kernel", p"disk", p"receipt.json"] { fs.fsync(fp"{bundle}/{item}") }
   fs.fsync(bundle)
@@ -341,8 +341,7 @@ export proc activation_select_image(state_dir: Path) [fs, time, error] -> Result
   return {image, boot_serial: record.boot_serial, failed: null} when record.pending == null
   let selection = activation_begin_boot_record(state_dir, record)?
   let serial = match selection {
-    PendingBoot(boot) => boot.serial
-    FellBack(boot) => boot.serial
+    PendingBoot(boot) | FellBack(boot) => boot.serial
   }
   let failed = match selection {
     PendingBoot(_) => null
@@ -475,13 +474,14 @@ export proc activation_collect_images(state_dir: Path) [fs, error] -> Result[Lis
   let record = activation_status(state_dir)?
   var retained = [record.current.id, record.fallback.id]
   if record.pending != null { retained += [record.pending.id] }
-  var removed: List[Str] = []
   let images = fp"{state_dir}/images"
-  for candidate in fs.children(images)? {
-    let id = candidate.name
-    if generation_id_ok(id) and ! (id in retained) {
-      candidate.path.remove()
-      removed += [id]
+  let removed: List[Str] = collect {
+    for candidate in fs.children(images)? {
+      let id = candidate.name
+      if generation_id_ok(id) and ! (id in retained) {
+        candidate.path.remove()
+        yield id
+      }
     }
   }
   if ! removed.is_empty() { fs.fsync(images) }

@@ -87,12 +87,12 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
   assert "virtio-blk-pci,drive=root" in argv
   assert !("-netdev" in argv)
   assert !("-qmp" in argv)
-  let controlled = qemu.qemu_asterinas_reference_argv(config, {...input, control: qemu.QmpSocket(p"/run/vmm.sock")})?
+  let controlled = qemu.qemu_asterinas_reference_argv(config, {...input, control: .QmpSocket(p"/run/vmm.sock")})?
   assert "unix:/run/vmm.sock,server=on,wait=off" in controlled
-  let networked = qemu.qemu_asterinas_reference_argv(config, {...input, network: qemu.Tap("tap0")})?
+  let networked = qemu.qemu_asterinas_reference_argv(config, {...input, network: .Tap("tap0")})?
   assert "tap,id=net0,ifname=tap0,script=no,downscript=no" in networked
   assert "virtio-net-pci,netdev=net0,mac=AA:FC:00:00:00:01" in networked
-  match qemu.qemu_asterinas_reference_argv(config, {...input, network: qemu.Tap("tap0,script=x")}) {
+  match qemu.qemu_asterinas_reference_argv(config, {...input, network: .Tap("tap0,script=x")}) {
     Ok(_) => fail "accepted a TAP name that injects QEMU options"
     Err(_) => {}
   }
@@ -105,7 +105,7 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
 
 pure position(items: List[Str], wanted: Str) -> Int {
   for index in range(items.len()) {
-    if items[index] == wanted { return index }
+    return index when items[index] == wanted
   }
   -1
 }
@@ -117,8 +117,8 @@ test test_qemu_qualification_attaches_a_second_disk_after_the_root_disk [error] 
     initramfs: p"/tmp/initramfs",
     disk: p"/tmp/root",
     memory_mib: 1024,
-    data_disk: qemu.DataDisk(p"/tmp/data"),
-    network: qemu.Tap("tap0"),
+    data_disk: .DataDisk(p"/tmp/data"),
+    network: .Tap("tap0"),
     control: qemu.NoControl,
   )
   let argv = qemu.qemu_asterinas_reference_argv(config, input)?
@@ -133,9 +133,8 @@ test test_qemu_qualification_attaches_a_second_disk_after_the_root_disk [error] 
 test test_qemu_qualification_rejects_a_guest_without_completion [fs, process, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-qualification")?
   let fake = fp"{root}/qemu"
-  fake.write("#!/bin/sh\nprintf 'incomplete guest output\\n'\n")
-  fake.chmod(0o755)
-  let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+  fake.write("#!/bin/sh\nprintf 'incomplete guest output\\n'\n", mode: 0o755)
+  let config = qemu.QemuConfig(fake, qemu.qemu_target("Linux", "x86_64")?)
   let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
   match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
     Ok(_) => fail "accepted a guest without its completion marker"
@@ -147,9 +146,8 @@ test test_qemu_qualification_stops_a_guest_after_failure [fs, process, time, err
   let root = test.temp_dir(ctx, name: "qemu-qualification-failure")?
   let fake = fp"{root}/qemu"
   let pid_file = fp"{root}/pid"
-  fake.write(f"#!/bin/sh\nprintf '%s' $$ > '{pid_file}'\nprintf 'LAPUTA_ASTERINAS_TEST_FAILED\\n'\nexec sleep 30\n")
-  fake.chmod(0o755)
-  let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+  fake.write(f"#!/bin/sh\nprintf '%s' $$ > '{pid_file}'\nprintf 'LAPUTA_ASTERINAS_TEST_FAILED\\n'\nexec sleep 30\n", mode: 0o755)
+  let config = qemu.QemuConfig(fake, qemu.qemu_target("Linux", "x86_64")?)
   let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
   match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
     Ok(_) => fail "accepted a failed guest"
@@ -163,9 +161,8 @@ test test_qemu_qualification_stops_a_guest_after_failure [fs, process, time, err
 
 proc fake_qualification_qemu(root: Path, script: Str) [fs, process, error] -> Result[qemu.QemuConfig] {
   let fake = fp"{root}/qemu"
-  fake.write(script)
-  fake.chmod(0o755)
-  qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+  fake.write(script, mode: 0o755)
+  qemu.QemuConfig(fake, qemu.qemu_target("Linux", "x86_64")?)
 }
 
 pure qualification_input(root: Path) -> qemu.QemuAsterinasReference {
@@ -175,7 +172,7 @@ pure qualification_input(root: Path) -> qemu.QemuAsterinasReference {
 test test_qemu_qualification_accepts_a_guest_that_powers_off_after_completion [fs, process, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-qualification-poweroff")?
   let config = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'LAPUTA_ASTERINAS_TEST_OK\\n'\nexit 0\n")?
-  qemu.qemu_run_asterinas_reference(config, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2)?
+  qemu.qemu_run_asterinas_reference(config, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2)
 }
 
 test test_qemu_qualification_rejects_a_guest_that_stays_up_after_completion [fs, process, time, error] { |ctx|
@@ -204,7 +201,7 @@ test test_qemu_qualification_rejects_a_guest_that_exits_with_failure_after_compl
 test test_qemu_qualification_keeps_native_and_laputa_completion_separate [fs, process, time, error] { |ctx|
   let root = test.temp_dir(ctx, name: "qemu-native-proof")?
   let native = fake_qualification_qemu(root, "#!/bin/sh\nprintf 'XSH_NATIVE_RESULT pass\\n'\nexit 0\n")?
-  qemu.qemu_run_asterinas_reference(native, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2, proof: qemu.NativeXsh)?
+  qemu.qemu_run_asterinas_reference(native, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2, proof: qemu.NativeXsh)
   match qemu.qemu_run_asterinas_reference(native, qualification_input(root), fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
     Ok(_) => fail "accepted native test completion as the maintained Laputa proof"
     Err(problem) => assert "before its completion marker" in problem.message
@@ -383,7 +380,7 @@ proc qmp_retry_input(socket: Path) -> Result[Unit] {
   assert "QmpRetryOperation" in result.stderr, result.stderr
 }
 
-proc fake_qemu_runs() [process] -> Bool {
+proc fake_qemu_runs() -> Bool {
   match process.which("python3") {
     Ok(_) => true,
     Err(_) => false,
@@ -399,8 +396,7 @@ proc supervisor_fixture(ctx: TestContext) -> Result[SupervisorFixture] {
   outputs.kernel.write("kernel")
   outputs.disk.write("disk")
   let fake_qemu = fp"{root}/fake-qemu"
-  fake_qemu.write(p"tests/system/fixtures/qmp-supervisor-peer.py".read_text()?)
-  fake_qemu.chmod(0o755)
+  fake_qemu.write(p"tests/system/fixtures/qmp-supervisor-peer.py".read_text()?, mode: 0o755)
   {
     config: {qemu: fake_qemu, target: qemu.qemu_target("Linux", "x86_64")?},
     outputs,
@@ -430,7 +426,7 @@ test test_qemu_supervisor_retries_safe_qmp_operations_and_injects_once [fs, proc
   let fixture = supervisor_fixture(ctx)?
   fp"{fixture.outputs.root}/reject-ready".write("")
   fp"{fixture.outputs.root}/reject-screenshot".write("")
-  qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)?
+  qemu.run_test(fixture.config, fixture_profile(), fixture.outputs)
   assert fp"{fixture.outputs.root}/connections".read_lines()?.len() == 5
   let events = fp"{fixture.outputs.root}/native-events".read_lines()?
   assert events.len() == 18
@@ -451,7 +447,7 @@ test test_qemu_supervisor_does_not_replay_input_and_reaps_qemu_after_disconnect 
     Err(problem) => assert "OutcomeIndeterminate" in problem.message, problem.message,
   }
   assert fp"{fixture.outputs.root}/native-events".read_lines()?.len() == 1
-  let pid = fixture.qemu_pid.read_text()?.trim().parse_int()?
+  let pid = fixture.qemu_pid.read_text()?.trim() as Int
   for entry in process.list()? {
     assert entry.pid != pid, f"QEMU process {pid} remained after input failure"
   }

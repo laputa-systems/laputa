@@ -10,33 +10,29 @@ use pm.repo_snapshot
 const KEY_FILE = p"/etc/laputa/repo-snapshot-keys"
 const STATE_DIR = "/var/lib/laputa/repo-state"
 
-proc say(message: Str) -> Result[Unit] {
+proc say(message: Str) {
   p"/dev/console".write(f"LAPUTA_REPO_INSTALLED_STEP {message}\n")
 }
 
 proc cmdline_value(name: Str) -> Result[Str] {
   for token in p"/proc/cmdline".read_text()?.words() {
-    if token.starts_with(f"{name}=") {
-      return token.split("=", 1)[1]
-    }
+    return token.split("=", 1)[1] when token.starts_with(f"{name}=")
   }
   fail f"{name} is missing from the kernel command line"
 }
 
 proc accepted_generation(url: Str) -> Result[Str] {
-  let accepted = repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(Path(STATE_DIR), url))?
+  let accepted = repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(fp"{STATE_DIR}", url))?
   if accepted == null { "none" } else { accepted.generation }
 }
 
 proc wait_for_lease() {
   let lease = p"/run/dhcpc/eth0.status"
-  wait until lease.exists()? within 90s every 200ms
+  wait until lease.exists() within 90s every 200ms
   var waited = 0
   while waited < 90 {
-    if json.get(json.read(lease)?, ["state"], "").require(Str)? == "bound" {
-      return
-    }
-    time.sleep(1s)?
+    return when json.get(json.read(lease)?, ["state"], "").require(Str)? == "bound"
+    time.sleep(1s)
     waited += 1
   }
   fail "dhcp lease never bound"
@@ -45,14 +41,14 @@ proc wait_for_lease() {
 proc run_drill() {
   return unless "LAPUTA_REPO_DRILL=" in p"/proc/cmdline".read_text()?
 
-  say("start")?
+  say("start")
   let expect = cmdline_value("LAPUTA_REPO_DRILL")?
   let url = cmdline_value("LAPUTA_REPO_URL")?
   guard KEY_FILE.metadata()?.mode % 4096 == 0o444 else { fail "provisioned key file is not mode 0444" }
   let keys = repo_snapshot.snapshot_load_keys(KEY_FILE)?
-  say("keys loaded")?
+  say("keys loaded")
   wait_for_lease()
-  say("lease bound")?
+  say("lease bound")
   let before = accepted_generation(url)?
   let now = time.now() / 1000
   let outcome = remote.load_verified_remote_index(url, p"/run/repo-out", keys, now, STATE_DIR)
@@ -77,7 +73,7 @@ proc run_drill() {
     guard after == before else { fail f"{expect}: accepted generation moved from {before} to {after}" }
   }
   p"/dev/console".write(f"LAPUTA_REPO_INSTALLED_OK {expect} generation={after}\n")
-  process.kill(1, signal: "TERM")?
+  process.kill(1, signal: "TERM")
 }
 
 proc main() -> Result[Unit, Error] {
@@ -90,4 +86,4 @@ proc main() -> Result[Unit, Error] {
   }
 }
 
-main()?
+main()

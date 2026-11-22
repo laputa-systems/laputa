@@ -6,7 +6,7 @@ test an_installed_tree_runs_from_its_own_prefix_and_ships_no_test_material { |ct
   assert help.status.exit_code()? == 0
   assert "plan" in help.stdout and "apply" in help.stdout
 
-  let shipped = fs.walk(fp"{prefix}/share/xinfra")? |> map { |item| item.path.display().replace(f"{prefix}", with: "") } |> collect()
+  let shipped = fs.walk(fp"{prefix}/share/xinfra")? |> map .path.display().replace(f"{prefix}", with: "") |> collect()
   for forbidden in ["tests", "fixtures", "examples", ".work", ".git", "id_ed25519", "client", ".pub", "AGENTS.md"] {
     let hits = shipped |> where { |name| forbidden in name } |> count()
     assert hits == 0, f"{forbidden} was installed"

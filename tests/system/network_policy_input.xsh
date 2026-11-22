@@ -10,13 +10,13 @@ pure entries() -> List[NetworkInputEntry] {
   ]
 }
 
-proc invoke(ctx: TestContext, entry: NetworkInputEntry, input: Path) [fs, process, error] -> Result[NetworkInputCommand, Error] {
+proc invoke(ctx: TestContext, entry: NetworkInputEntry, input: Path) -> Result[NetworkInputCommand, Error] {
   let root = test.temp_dir(ctx, name: entry.script.name)?
   let stdout = fp"{root}/stdout"
   let stderr = fp"{root}/stderr"
   let script = entry.script.resolve()?
-  let argv = [ctx.xsh_bin.display(), script.display()] + entry.arguments + [input.display()]
-  let status = process.run(process.command_argv(ctx.xsh_bin, argv, stdout: stdout, stderr: stderr, timeout: 5s))?
+  let argv = [ctx.xsh_bin.display(), script.display(), @entry.arguments, input.display()]
+  let status = process.run(process.command_argv(ctx.xsh_bin, argv, stdout:, stderr:, timeout: 5s))?
   Ok({code: status.shell_code()?, stdout: stdout.read_text()?, stderr: stderr.read_text()?})
 }
 

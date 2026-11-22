@@ -7,6 +7,11 @@ use system.qmp
 use system.text_pixels
 use system.types
 
+## Seconds a qualification guest has to power off after it prints its completion marker.
+export const guest_poweroff_timeout_seconds = 60
+const capture_request_prefix = "LAPUTA_PROOF_SCREENSHOT "
+const capture_name = rx"^[a-z]+(-[a-z]+)*$"
+
 ## The host half of a QEMU invocation, which the profile does not choose: the
 ## guest machine with its hardware accelerator and board options, the CPU
 ## model, the serial console arguments, the root disk transport, and the
@@ -272,9 +277,6 @@ proc qemu_process_live(pid: Int) -> Result[Bool] {
   false
 }
 
-## Seconds a qualification guest has to power off after it prints its completion marker.
-export const guest_poweroff_timeout_seconds = 60
-
 ## Run the disposable qualification guest until it powers off after its completion marker, or the deadline.
 export proc qemu_run_asterinas_reference(
   value: QemuConfig,
@@ -298,7 +300,7 @@ export proc qemu_run_asterinas_reference(
   defer qemu_stop(launched)
   var deadline = time.monotonic()? + timeout_seconds * 1000000000
   var completed = false
-  while qemu_process_live(launched.pid)? {
+  while qemu_process_live(launched.pid) {
     let output = qemu_log_text(console_log, qemu_log)?
     if markers.failure in output or "LAPUTA_ASTERINAS_TEST_FAILED" in output or "Kernel panic" in output or "Uncaught panic" in output {
       fail "qualification guest reported failure"
@@ -311,7 +313,7 @@ export proc qemu_run_asterinas_reference(
       if completed { fail "qualification guest did not power off after its completion marker" }
       fail "qualification guest timed out"
     }
-    time.sleep(200ms)?
+    time.sleep(200ms)
   }
   let status = wait launched?
   let output = qemu_log_text(console_log, qemu_log)?
@@ -347,35 +349,51 @@ proc qmp_key_step(keys: List[Str], down: Bool) -> Result[qmp.QmpStep, Error] {
     {type: "key", data: {key: {type: "qcode", data: key}, down}}
     for key in keys
   ]
-  qmp.QmpExecute("input-send-event", json.encode({events})?, qmp.QmpMutation)
+  Ok(.QmpExecute("input-send-event", json.encode({events})?, qmp.QmpMutation))
 }
 
 proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
   match operation {
     QmpReady => Ok([]),
-    QmpScreenshot(output) => Ok([qmp.QmpExecute("screendump", json.encode({filename: output.display()})?, qmp.QmpReadOnly)]),
+    QmpScreenshot(output) => Ok([.QmpExecute("screendump", json.encode({filename: output.display()})?, qmp.QmpReadOnly)]),
     QmpInput => {
-      var steps: List[qmp.QmpStep] = []
-      for key in ["l", "a", "p", "u", "t", "a", "ret"] {
-        steps += [qmp_key_step([key], true)?, qmp.QmpDelay(40), qmp_key_step([key], false)?, qmp.QmpDelay(40)]
-      }
-      for pair in [{key: "ctrl", down: true}, {key: "d", down: true}, {key: "d", down: false}, {key: "ctrl", down: false}] {
-        steps += [qmp_key_step([pair.key], pair.down)?]
+      let steps: List[qmp.QmpStep] = collect {
+        for key in ["l", "a", "p", "u", "t", "a", "ret"] {
+          yield @[qmp_key_step([key], true)?, .QmpDelay(40), qmp_key_step([key], false)?, .QmpDelay(40)]
+        }
+
+        for pair in [
+          {key: "ctrl", down: true},
+          {key: "d", down: true},
+          {key: "d", down: false},
+          {key: "ctrl", down: false},
+        ] {
+          yield qmp_key_step([pair.key], pair.down)?
+        }
       }
       Ok(steps)
     },
     QmpInputModified => {
-      var steps: List[qmp.QmpStep] = []
-      for key in ["caps_lock", "l", "a", "p", "u", "t", "a", "caps_lock"] {
-        steps += [qmp_key_step([key], true)?, qmp.QmpDelay(40), qmp_key_step([key], false)?, qmp.QmpDelay(40)]
+      let steps: List[qmp.QmpStep] = collect {
+        for key in ["caps_lock", "l", "a", "p", "u", "t", "a", "caps_lock"] {
+          yield @[qmp_key_step([key], true)?, .QmpDelay(40), qmp_key_step([key], false)?, .QmpDelay(40)]
+        }
+
+        for pair in [
+          {key: "shift", down: true},
+          {key: "1", down: true},
+          {key: "1", down: false},
+          {key: "shift", down: false},
+        ] {
+          yield @[qmp_key_step([pair.key], pair.down)?, .QmpDelay(40)]
+        }
+
+        for pair in [{key: "shift", down: true}, {key: "shift", down: false}] {
+          yield @[qmp_key_step([pair.key], pair.down)?, .QmpDelay(40)]
+        }
+
+        yield @[qmp_key_step(["ret"], true)?, .QmpDelay(40), qmp_key_step(["ret"], false)?]
       }
-      for pair in [{key: "shift", down: true}, {key: "1", down: true}, {key: "1", down: false}, {key: "shift", down: false}] {
-        steps += [qmp_key_step([pair.key], pair.down)?, qmp.QmpDelay(40)]
-      }
-      for pair in [{key: "shift", down: true}, {key: "shift", down: false}] {
-        steps += [qmp_key_step([pair.key], pair.down)?, qmp.QmpDelay(40)]
-      }
-      steps += [qmp_key_step(["ret"], true)?, qmp.QmpDelay(40), qmp_key_step(["ret"], false)?]
       Ok(steps)
     },
   }
@@ -383,7 +401,7 @@ proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
 
 proc qemu_qmp(operation: QmpOperation, socket: Path, deadline: Int) {
   let now = time.monotonic()?
-  if now >= deadline { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
+  return Err(types.LaputaError.Docker("QMP proof deadline expired")) when now >= deadline
   let limit = if deadline < now + 60000000000 { deadline } else { now + 60000000000 }
   match qmp.qmp_run_until(socket, qmp_steps(operation)?, limit) {
     Ok(_) => Ok(),
@@ -398,7 +416,7 @@ export enum QemuControl { QemuStop, QemuContinue }
 ## Send one pause or resume command over the native Unix stream.
 export proc qemu_control(socket: Path, control: QemuControl) -> Result[Unit, Error] {
   let command = match control { QemuStop => "stop", QemuContinue => "cont" }
-  qmp.qmp_run(socket, [qmp.QmpExecute(command, "{}", qmp.QmpMutation)], 5000)
+  qmp.qmp_run(socket, [.QmpExecute(command, "{}", qmp.QmpMutation)], 5000)
 }
 
 proc qemu_qmp_retry(operation: QmpRetryOperation, socket: Path, deadline: Int) {
@@ -412,7 +430,7 @@ proc qemu_qmp_retry(operation: QmpRetryOperation, socket: Path, deadline: Int) {
         let remaining_ms = (deadline - time.monotonic()?) / 1000000
         if remaining_ms <= 0 { return Err(types.LaputaError.Docker("QMP proof deadline expired")) }
         let pause_ms = if remaining_ms < 250 { remaining_ms } else { 250 }
-        time.sleep(time.millis(pause_ms))?
+        time.sleep(time.millis(pause_ms))
         attempt += 1
       }
     }
@@ -486,9 +504,6 @@ pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {
   f"console={outputs.console_log}; qemu-log={outputs.qemu_log}; screenshot={outputs.screenshot}"
 }
 
-const capture_request_prefix = "LAPUTA_PROOF_SCREENSHOT "
-const capture_name = rx"^[a-z]+(-[a-z]+)*$"
-
 pure requested_captures(console: Str) -> List[Str] {
   [
     line[capture_request_prefix.byte_len()..].trim()
@@ -497,8 +512,8 @@ pure requested_captures(console: Str) -> List[Str] {
   ]
 }
 
-proc verify_capture(name: Str, screenshot: Path, outputs: build.ProfileOutputs) [fs, error] {
-  if ! screenshot_is_valid(screenshot)? {
+proc verify_capture(name: Str, screenshot: Path, outputs: build.ProfileOutputs) {
+  guard screenshot_is_valid(screenshot) else {
     return Err(types.LaputaError.Profile(f"QMP did not create a nonempty {name} screenshot; inspect {qemu_output_locations(outputs)}"))
   }
   match name {
@@ -565,8 +580,8 @@ export proc run_test(
     for name in requested_captures(log_text) {
       if ! (name in captured) {
         qemu_qmp_retry(QmpRetryScreenshot(capture_path(outputs, name)), outputs.qmp_socket, deadline)
-        captured = captured + [name]
-        verify_capture(name, capture_path(outputs, name), outputs)?
+        captured = [@captured, name]
+        verify_capture(name, capture_path(outputs, name), outputs)
       }
     }
 
@@ -608,7 +623,7 @@ export proc run_test(
     }
 
     let pause_ms = if remaining_ms < 1000 { remaining_ms } else { 1000 }
-    time.sleep(time.millis(pause_ms))?
+    time.sleep(time.millis(pause_ms))
   }
 
   let _ = wait launched?

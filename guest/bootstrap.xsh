@@ -11,29 +11,26 @@ const GUEST_STORE_MNT = "/store"
 
 ## guest bootstrap say.
 export proc guest_bootstrap_say(ctx: GuestBootstrap, message: Str) [fs, error] {
-  p"/dev/console".write(bytes.from_text(f"{ctx.marker} {message}\n"))?
+  p"/dev/console".write(bytes.from_text(f"{ctx.marker} {message}\n"))
 }
 
 ## guest bootstrap fail phase.
 export proc guest_bootstrap_fail_phase(ctx: GuestBootstrap, phase: Str, message: Str) [fs, error] {
-  guest_bootstrap_say(ctx, f"FAIL {phase} {message}")?
+  guest_bootstrap_say(ctx, f"FAIL {phase} {message}")
   return Err(GuestTrustError.Failed(phase:, message:))
 }
 
-proc guest_bootstrap_insmod_one(ctx: GuestBootstrap, name: Str, phase: Str) [fs, process, error] {
+proc guest_bootstrap_insmod_one(ctx: GuestBootstrap, name: Str, phase: Str) {
   match linux.insmod(fp"/lib/modules/{name}.ko") {
     Ok(_) => {},
     Err(problem) => {
       var seen = ""
-      match fs.children(fp"/lib/modules") {
-        Ok(entries) => {
-          for entry in entries {
-            seen = f"{seen} {entry.name}"
-          }
-        },
-        Err(_) => {
-          seen = "<unlistable>"
-        },
+      if let Ok(entries) = fs.children(fp"/lib/modules") {
+        for entry in entries {
+          seen = f"{seen} {entry.name}"
+        }
+      } else {
+        seen = "<unlistable>"
       }
 
       return guest_bootstrap_fail_phase(ctx, phase, f"insmod {name}: {problem.message}; exists={fp"/lib/modules/{name}.ko".exists()?}; entries={seen}")
@@ -58,48 +55,42 @@ export proc guest_bootstrap_load_drivers(ctx: GuestBootstrap, phase: Str) [fs, p
     "jbd2",
     "ext4",
   ] {
-    guest_bootstrap_insmod_one(ctx, name, phase)?
+    guest_bootstrap_insmod_one(ctx, name, phase)
   }
 }
 
 ## guest bootstrap mount store.
 export proc guest_bootstrap_mount_store(ctx: GuestBootstrap, phase: Str) [fs, process, time, error] {
-  guest_bootstrap_wait_for_dev_vda(ctx, phase)?
-  fp"{GUEST_STORE_MNT}".mkdir(parents: true)
+  guest_bootstrap_wait_for_dev_vda(ctx, phase)
+  fp"{GUEST_STORE_MNT}".mkdir()
   match linux.mount(bytes.from_text(GUEST_STORE_DEV), fp"{GUEST_STORE_MNT}", fstype: "ext4") {
     Ok(_) => {},
     Err(problem) => return guest_bootstrap_fail_phase(ctx, phase, f"mount store: {problem.message}"),
   }
 }
 
-proc guest_bootstrap_wait_for_dev_vda(ctx: GuestBootstrap, phase: Str) [fs, time, error] {
+proc guest_bootstrap_wait_for_dev_vda(ctx: GuestBootstrap, phase: Str) {
   var elapsed = 0
-  while ! p"/dev/vda".exists()? {
+  while ! p"/dev/vda".exists() {
     guard elapsed < 30 else {
       var seen = ""
-      match fs.children(fp"/dev") {
-        Ok(entries) => {
-          for entry in entries {
-            seen = f"{seen} {entry.name}"
-          }
-        },
-        Err(_) => {
-          seen = "<unlistable>"
-        },
+      if let Ok(entries) = fs.children(fp"/dev") {
+        for entry in entries {
+          seen = f"{seen} {entry.name}"
+        }
+      } else {
+        seen = "<unlistable>"
       }
 
       var mounts = "<unreadable>"
-      match p"/proc/mounts".read_text() {
-        Ok(text) => {
-          mounts = text
-        },
-        Err(_) => {},
+      if let Ok(text) = p"/proc/mounts".read_text() {
+        mounts = text
       }
 
       return guest_bootstrap_fail_phase(ctx, phase, f"missing /dev/vda after 30s; dev=[{seen}] mounts=[{mounts}]")
     }
 
-    time.sleep(1s)?
+    time.sleep(1s)
     elapsed += 1
   }
 }
@@ -136,7 +127,7 @@ export proc guest_bootstrap_bring_up_net(ctx: GuestBootstrap, phase: Str) [fs, p
 
 ## guest bootstrap read phase.
 export proc guest_bootstrap_read_phase(ctx: GuestBootstrap) [fs, error] -> Result[Str, Error] {
-  guard fp"{ctx.phase_file}".exists()? else {
+  guard fp"{ctx.phase_file}".exists() else {
     return "0"
   }
 
@@ -145,13 +136,13 @@ export proc guest_bootstrap_read_phase(ctx: GuestBootstrap) [fs, error] -> Resul
 
 ## guest bootstrap write phase.
 export proc guest_bootstrap_write_phase(ctx: GuestBootstrap, value: Str) [fs, error] {
-  fp"{ctx.phase_file}".write(bytes.from_text(f"{value}\n"))?
-  fs.fsync(fp"{ctx.phase_file}")?
-  fs.fsync(fp"{GUEST_STORE_MNT}")?
+  fp"{ctx.phase_file}".write(bytes.from_text(f"{value}\n"))
+  fs.fsync(fp"{ctx.phase_file}")
+  fs.fsync(fp"{GUEST_STORE_MNT}")
 }
 
 ## guest bootstrap cmdline value.
-export proc guest_bootstrap_cmdline_value(ctx: GuestBootstrap, key: Str) [fs, error] -> Result[Str, Error] {
+export proc guest_bootstrap_cmdline_value(_: GuestBootstrap, key: Str) [fs, error] -> Result[Str, Error] {
   for field in p"/proc/cmdline".read_text()?.split(" ") {
     guard field.starts_with(f"{key}=") else {
       continue

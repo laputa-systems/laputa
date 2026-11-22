@@ -15,20 +15,20 @@ proc main() [fs, process, env, error] {
   )
   let status = process.run(command)?
   guard status.ok else {
-    p"/dev/console".write(bytes.from_text("LAPUTA_TRUST_GUEST FAIL trampoline child failed\n"))?
-    if p"/child.out".exists()? {
-      p"/dev/console".write(bytes.from_text("--- child stdout ---\n"))?
-      p"/dev/console".write(p"/child.out".read_bytes()?)?
+    p"/dev/console".write(bytes.from_text("LAPUTA_TRUST_GUEST FAIL trampoline child failed\n"))
+    if p"/child.out".exists() {
+      p"/dev/console".write(bytes.from_text("--- child stdout ---\n"))
+      p"/dev/console".write(p"/child.out".read_bytes()?)
     }
 
-    if p"/child.err".exists()? {
-      p"/dev/console".write(bytes.from_text("--- child stderr ---\n"))?
-      p"/dev/console".write(p"/child.err".read_bytes()?)?
+    if p"/child.err".exists() {
+      p"/dev/console".write(bytes.from_text("--- child stderr ---\n"))
+      p"/dev/console".write(p"/child.err".read_bytes()?)
     }
 
-    linux.poweroff()?
+    linux.poweroff()
     return
   }
 }
 
-main()?
+main()

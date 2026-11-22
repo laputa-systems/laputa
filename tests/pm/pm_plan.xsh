@@ -1,8 +1,8 @@
 ##! Behavior coverage for package fingerprints, artifact keys, and build-plan resolution.
 use pm.catalog
 use pm.fingerprint
-use pm.plan
 use pm.payload_archive
+use pm.plan
 use pm.plan_json
 use pm.policy
 use pm.recipe
@@ -35,7 +35,7 @@ test test_payload_encoding_changes_payload_keys_but_not_metapackage_keys [fs, en
     let selected = {...pkg, kind}
     let actual = fingerprint.package_build_input(p".", selected, types.X86_64LinuxMusl)?
     let actual_encoding = payload_archive.encoding_fingerprint()?
-    test.eq(actual, fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, actual_encoding)?)
+    assert actual == fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, actual_encoding)?
     let first = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-a")?
     let repeat = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-a")?
     let changed = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-b")?
@@ -43,7 +43,7 @@ test test_payload_encoding_changes_payload_keys_but_not_metapackage_keys [fs, en
     let repeat_key = plan.artifact_key_for(types.X86_64LinuxMusl, 2, "example-1-1", repeat, [])?
     let changed_key = plan.artifact_key_for(types.X86_64LinuxMusl, 2, "example-1-1", changed, [])?
     assert first_key == repeat_key
-    if kind == types.Meta {
+    if kind == .Meta {
       assert first_key == changed_key
     } else {
       assert first_key != changed_key
@@ -172,26 +172,26 @@ test test_repository_input_ignores_cargo_target_output [fs, env, error] { |ctx|
   let _ = fs.copy_tree(fixture("fingerprint-repository"), dir, parents: true, overwrite: true)?
   let pkg = recipe.load_package(dir)?
   let tool = fp"{root}/tool"
-  fp"{tool}/src".mkdir(parents: true)?
-  fp"{tool}/Cargo.toml".write("[package]\nname = \"tool\"\n")?
-  fp"{tool}/src/main.rs".write("fn main() {}\n")?
+  fp"{tool}/src".mkdir()
+  fp"{tool}/Cargo.toml".write("[package]\nname = \"tool\"\n")
+  fp"{tool}/src/main.rs".write("fn main() {}\n")
   let before = fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?
-  fp"{tool}/target/debug".mkdir(parents: true)?
-  fp"{tool}/target/debug/tool".write("binary-bytes\n")?
-  fp"{tool}/target/debug/build/tool".mkdir(parents: true)?
-  fp"{tool}/target/debug/build/tool/output".write("more-bytes\n")?
-  test.eq(fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?, before)
-  fp"{tool}/.work/tmp".mkdir(parents: true)?
-  fp"{tool}/.work/tmp/probe.log".write("harness scratch\n")?
-  test.eq(fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?, before)
-  fp"{tool}/src/main.rs".write("fn main() { println!(\"changed\"); }\n")?
+  fp"{tool}/target/debug".mkdir()
+  fp"{tool}/target/debug/tool".write("binary-bytes\n")
+  fp"{tool}/target/debug/build/tool".mkdir()
+  fp"{tool}/target/debug/build/tool/output".write("more-bytes\n")
+  assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? == before
+  fp"{tool}/.work/tmp".mkdir()
+  fp"{tool}/.work/tmp/probe.log".write("harness scratch\n")
+  assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? == before
+  fp"{tool}/src/main.rs".write("fn main() { println!(\"changed\"); }\n")
   assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? != before
 }
 
 test test_shared_workspace_archive_pin_changes_both_package_inputs [fs, env, error] {
   let root = fs.cwd()?
   let packages = [recipe.load_package(fp"{root}/packages/{name}")? for name in ["tinyland", "seatd-rs"]]
-  test.eq(packages[0].upstream_sources[0], packages[1].upstream_sources[0])
+  assert packages[0].upstream_sources[0] == packages[1].upstream_sources[0]
   for pkg in packages {
     let before = fingerprint.package_build_input(root, pkg, types.X86_64LinuxMusl)?
     let changed = {
@@ -254,7 +254,7 @@ proc resolve_plan(
 pure retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
   {
     arch: "aarch64",
-    payload: types.RemoteArchive(
+    payload: .RemoteArchive(
       types.RemoteArchiveCoordinates(
         tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
         sha256: f"payload-{name}-{ver}-{rel}",
@@ -273,11 +273,11 @@ proc executor_fixture_payload(ctx: TestContext, name: Str) [fs, env, error] -> R
   let root = fixture(f"executor-validity/{name}")
   let executor = module.load(fp"{root}/pm/build.xsh")?.require(hooks.BuildFilesystem)?
   let dest = test.temp_dir(ctx, name: f"executor-payload-{name}")?
-  executor.build(dest)?
+  executor.build(dest)
   fp"{dest}/payload.bin".read_bytes()?
 }
 
-proc executor_fixture_provenance(name: Str) [fs, error] -> Result[types.ExecutorProvenance] {
+proc executor_fixture_provenance(name: Str) -> Result[types.ExecutorProvenance] {
   let root = path.absolute(fixture(f"executor-validity/{name}"))?
   {
     format: "laputa-executor-provenance-1",
@@ -292,7 +292,7 @@ proc executor_fixture_provenance(name: Str) [fs, error] -> Result[types.Executor
 pure legacy_retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
   {
     arch: "aarch64",
-    payload: types.RemoteArchive(
+    payload: .RemoteArchive(
       types.RemoteArchiveCoordinates(
         tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
         sha256: plan_test_sha256(f"legacy payload {name}-{ver}-{rel}"),
@@ -822,7 +822,7 @@ test test_proof_dependencies_order_execution_and_change_only_proof_identity [fs,
   assert app.artifact_key == initial_app.artifact_key
   assert app.proof_key != initial_app.proof_key
   assert tool.level < app.level
-  assert [dependency.name for dependency in app.dependencies if dependency.kind == types.Proof] == ["proof-tool"]
+  assert [dependency.name for dependency in app.dependencies if dependency.kind == .Proof] == ["proof-tool"]
   let tool_recipe = fp"{root}/packages/proof-tool/PKGBUILD.xsh"
   tool_recipe.write(tool_recipe.read_text()?.replace("ver = \"1\"", with: "ver = \"2\""))
   let changed = resolve_plan(catalog.load(root)?, ["app"], empty_remote_snapshot())?

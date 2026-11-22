@@ -98,7 +98,7 @@ test make_scheduler_contract_ready_task_runs_before_disconnected_cycle [fs, proc
   let script = fp"{root}/write.xsh"
   let output = fp"{root}/output"
   script.write(r"""fp"{args[0]}".write("completed")?
-""")?
+""")
   let ready = task("ready", root, [task_runner()?, script, "--", output], [output])
   let a = task("a", root, ["unused"], [], deps: ["b"])
   let b = task("b", root, ["unused"], [], deps: ["a"])
@@ -159,8 +159,8 @@ test make_tasks_rebuild_for_subsecond_input_changes [fs, process, env, error] { 
   let copy = task("copy", root, ["/bin/cp", input, output], [output], [input])
   make.run_tasks([copy], 1)
   input.write("new")
-  fs.set_times(output, mtime_sec: 1700000000, mtime_nsec: 100)?
-  fs.set_times(input, mtime_sec: 1700000000, mtime_nsec: 200)?
+  fs.set_times(output, mtime_sec: 1700000000, mtime_nsec: 100)
+  fs.set_times(input, mtime_sec: 1700000000, mtime_nsec: 200)
   make.run_tasks([copy], 1)
   assert output.read_text()? == "new"
 }

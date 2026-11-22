@@ -1034,26 +1034,27 @@ export pure operations(spec: model.Spec) -> List[Operation] {
     model.GroupAccount(_) => [.AccountsState, .AddGroup, .DeleteGroup]
     model.UserAccount(_) => [.AccountsState, .AddUser, .ModifyUser, .JoinGroup, .DeleteUser]
     model.Exec(command) => {
-      var found: List[Operation] = []
-      match command.invocation {
-        model.Argv(_) => { found += [.RunArgv] }
-        model.Shell(_) => { found += [.RunShell] }
-      }
-      match command.guard {
-        model.Creates(_) => { found += [.PathState] }
-        model.SkipIf(invocation) => {
-          match invocation {
-            model.Argv(_) => { found += [.RunArgv] }
-            model.Shell(_) => { found += [.RunShell] }
-          }
+      let found: List[Operation] = collect {
+        match command.invocation {
+          model.Argv(_) => { yield .RunArgv }
+          model.Shell(_) => { yield .RunShell }
         }
-        model.OnlyIf(invocation) => {
-          match invocation {
-            model.Argv(_) => { found += [.RunArgv] }
-            model.Shell(_) => { found += [.RunShell] }
+        match command.guard {
+          model.Creates(_) => { yield .PathState }
+          model.SkipIf(invocation) => {
+            match invocation {
+              model.Argv(_) => { yield .RunArgv }
+              model.Shell(_) => { yield .RunShell }
+            }
           }
+          model.OnlyIf(invocation) => {
+            match invocation {
+              model.Argv(_) => { yield .RunArgv }
+              model.Shell(_) => { yield .RunShell }
+            }
+          }
+          else => {}
         }
-        else => {}
       }
       found
     }

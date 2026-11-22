@@ -207,7 +207,7 @@ export proc build_prepared_package(pkg_dir: Path, src: Path, dest: Path, tarball
   let packages = local.load_package_dirs([pkg_dir])?
   let pkg = packages[0]
 
-  if pkg.kind == types.Meta {
+  if pkg.kind == .Meta {
     dest.remove()
     dest.mkdir()
     tarball.parent.mkdir()
@@ -290,5 +290,5 @@ main(@args)?
   local.write_package_db(dest, pkg, manifest, etcsums)
   let archive_paths = local.collect_archive_paths(dest, pkg.filetree)?
   tarball.parent.mkdir()
-  payload_archive.create(tarball, dest, archive_paths)?
+  payload_archive.create(tarball, dest, archive_paths)
 }

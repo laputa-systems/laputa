@@ -186,7 +186,7 @@ test test_checkout_directory_input_stages_with_checkout_modes [fs, net, process,
 
 test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |_|
   let pkg = recipe.load_package(p"packages/baselayout")?
-  let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == types.Tree]
+  let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == .Tree]
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     assert required in trees
@@ -385,7 +385,7 @@ test test_linux_discovery_pool_executes_worker_from_staged_recipe [fs, process, 
       assert p"sub/two.o" in plan.objects
       assert config.read_text()? == "# CONFIG_TEST is not set\n"
     }
-  }?
+  }
   env ({XSH_PM_RECIPE_DIR: recipe_root.display(), XSH_LINUX_KBUILD_DISCOVER_JOBS: "1", TMPDIR: ""}) {
     cd (source) {
       match linux_shared.discover_package_plan("arm64") {

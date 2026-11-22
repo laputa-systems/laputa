@@ -15,7 +15,7 @@ test the_remote_login_shell_preserves_hostile_arguments {
   let result = transport.exec(connection, .EchoArguments, hostile)?
   assert result.code == 0
   let expected = hostile |> map { |word| word + "\0" } |> collect()
-  assert result.stdout.utf8()? == expected.join("")
+  assert result.stdout as Str == expected.join("")
 }
 
 test doas_runs_a_script_as_root_and_a_plain_user_is_refused {
@@ -37,7 +37,7 @@ test doas_runs_a_script_as_root_and_a_plain_user_is_refused {
   let denied = transport.connect(denied_host)?
   let refused = transport.exec_script(denied, "id -u", privileged: true)?
   assert refused.code != 0
-  assert "doas" in refused.stderr.utf8()?
+  assert "doas" in refused.stderr as Str
 }
 
 test a_wrong_host_key_pin_fails_before_any_command {
@@ -46,10 +46,11 @@ test a_wrong_host_key_pin_fails_before_any_command {
     return
   }
 
-  let wrong: model.Host = {...host, host_key: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
-  match transport.connect(wrong) {
-    Err(transport.TransportError.Unreachable {message}) => assert "mismatch" in message
-    else => assert false, "a wrong pin did not fail the connection"
+  let wrong = {...host, host_key: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+  if let Err(transport.TransportError.Unreachable {message}) = transport.connect(wrong) {
+    assert "mismatch" in message
+  } else {
+    assert false, "a wrong pin did not fail the connection"
   }
 }
 
@@ -112,14 +113,15 @@ test connect_all_opens_reachable_hosts_in_parallel_and_fails_only_the_unreachabl
     return
   }
 
-  let unreachable: model.Host = {...first, name: "nowhere", address: "127.0.0.1", port: 1, timeout_ms: 2000}
+  let unreachable = {...first, name: "nowhere", address: "127.0.0.1", port: 1, timeout_ms: 2000}
   let opened = transport.connect_all([first, unreachable, second], 3)
   assert opened.len() == 3
   assert opened[0] is Ok(_)
   assert opened[1] is Err(transport.TransportError.Unreachable {..})
   assert opened[2] is Ok(_)
-  match opened[2] {
-    Ok(connection) => assert transport.exec_script(connection, "true")?.code == 0
-    Err(_) => assert false, "the second host did not open"
+  if let Ok(connection) = opened[2] {
+    assert transport.exec_script(connection, "true")?.code == 0
+  } else {
+    assert false, "the second host did not open"
   }
 }

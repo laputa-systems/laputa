@@ -12,7 +12,7 @@ test test_elfdeps_rejects_a_needed_build_time_path [error] { |_|
 
   assert failures.len() == 1
   assert failures[0].soname == "../../build-root/usr/lib/libdl.so"
-  assert failures[0].gap == elfdeps.BuildTimePath
+  assert failures[0].gap == .BuildTimePath
 }
 
 test test_elfdeps_accepts_names_its_dependencies_provide [error] { |_|
@@ -38,7 +38,7 @@ test test_elfdeps_rejects_a_name_no_installed_package_provides [error] { |_|
 
   assert failures.len() == 1
   assert failures[0].soname == "libvulkan.so.1"
-  assert failures[0].gap == elfdeps.Unprovided
+  assert failures[0].gap == .Unprovided
 }
 
 test test_elfdeps_rejects_a_provider_outside_the_dependency_closure [error] { |_|
@@ -65,7 +65,7 @@ test test_elfdeps_resolves_musl_loader_names_to_musl [error] { |_|
 
   let lookalike = elfdeps.missing_elf_runtime_dependencies("play", ["musl"], ["libcap.so.2"], "", {})
   assert lookalike.len() == 1
-  assert lookalike[0].gap == elfdeps.Unprovided
+  assert lookalike[0].gap == .Unprovided
 }
 
 test test_elfdeps_library_symlinks_provide_their_names [fs, error] { |ctx|

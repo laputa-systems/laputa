@@ -53,7 +53,7 @@ proc assert_pending(record: activation.ActivationRecord, id: Str) {
 }
 
 proc health_services(names: List[Str], state: Str) -> List[activation.ServiceHealth] {
-  [activation.ServiceHealth(name: name, state: state) for name in names]
+  [activation.ServiceHealth(name:, state:) for name in names]
 }
 
 test test_guest_health_requires_current_boot_identity_and_critical_services [fs, time, error] { |ctx|
@@ -62,7 +62,7 @@ test test_guest_health_requires_current_boot_identity_and_critical_services [fs,
   stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
   let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["oxish", "firewall"], "running"))
-  let policy = activation.HealthPolicy(profile: "qemu-maintained", critical_services: ["firewall", "oxish"])
+  let policy = activation.HealthPolicy("qemu-maintained", ["firewall", "oxish"])
   let before = record_text(state)?
   let invalid: List[activation.GuestHealthReport] = [
     {...report, root_digest: sha256_text("tampered")},
@@ -250,7 +250,7 @@ test test_fallback_record_names_the_failed_generation_until_the_next_stage [fs, 
   assert fallen.current.id == "a"
   assert fallen.pending == null
   assert fallen.last_operation == "fell-back"
-  assert fallen.failure == activation.ActivationFailure(generation: generation("b"), attempts: 2)
+  assert fallen.failure == activation.ActivationFailure(generation("b"), 2)
   assert "\"failure\"" in record_text(state)?
   assert activation.activation_status(state)?.failure == fallen.failure
   stage(state, generation("c"))
@@ -523,7 +523,7 @@ test test_policy_pins_bytes_and_rejects_incompatible_state [fs, time, error] { |
   assert record_text(state)? == before
 }
 
-test test_host_and_guest_use_the_same_state_contract [fs, error] { |ctx|
+test test_host_and_guest_use_the_same_state_contract [fs, error] {
   let hook = p"profiles/qemu-maintained/usr/lib/init/rc.early.d/00-maintained-state.boot".read_text()?
   assert f"\"{activation.ACTIVATION_STATE_FORMAT}\\n\"" in hook
 }

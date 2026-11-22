@@ -1,7 +1,7 @@
 #!/bin/xsh --
 error SelfHostingLinkerError = ExecutionFailed(message: Str, status: Status)
 
-proc main(...linker_args: List[Str]) [process, env, error] -> Result[Unit, Error] {
+proc main(...linker_args: List[Str]) [process, env, error] {
   let command = process.command_argv(
     p"/usr/bin/clang",
     [
@@ -18,4 +18,3 @@ proc main(...linker_args: List[Str]) [process, env, error] -> Result[Unit, Error
   exit status.shell_code()?
 }
 
-main(@args)?

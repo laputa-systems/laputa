@@ -1,8 +1,8 @@
 ##! Deterministic typed package build-plan resolution and canonical fingerprints.
-use pm.digest as pm_digest
 use catalog
 use fingerprint as pm_fingerprint
 use graph
+use pm.digest as pm_digest
 use policy as build_policy
 use types
 use util
@@ -64,7 +64,7 @@ proc proof_key_for(package_id: Str, artifact_key: Str, proof_sha256: Str, depend
   let proof_dependencies = [
     f"dependency\t{pm_digest.digest_canonical_field(dependency.name)}\t{pm_digest.digest_canonical_field(dependency.artifact_key)}"
     for dependency in dependencies |> sort-by(dependency_key)
-    if dependency.kind == types.Proof
+    if dependency.kind == .Proof
   ]
   pm_digest.digest_sorted_lines(
     [
@@ -252,7 +252,7 @@ proc with_runtime_only_dependencies(
     var dependencies = node.dependencies
 
     for edge in edges {
-      continue unless edge.from == node.name and edge.kind == types.RuntimeOnly and (selected.get(edge.to) ?? false)
+      continue unless edge.from == node.name and edge.kind == .RuntimeOnly and (selected.get(edge.to) ?? false)
       dependencies += [{name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?}]
     }
 

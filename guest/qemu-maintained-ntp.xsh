@@ -21,9 +21,7 @@ proc console(text: Str) {
 
 proc phase() -> Result[Str] {
   for token in p"/proc/cmdline".read_text()?.words() {
-    if token.starts_with("LAPUTA_NTP_DRILL=") {
-      return token.split("=")[1]
-    }
+    return token.split("=")[1] when token.starts_with("LAPUTA_NTP_DRILL=")
   }
   ""
 }
@@ -32,7 +30,7 @@ proc service_pid(previous: Int) -> Result[Int] {
   let status = p"/run/xinit/ntpd-rs.json"
   var waited = 0
   while waited < 60 {
-    if status.exists()? {
+    if status.exists() {
       let value = json.read(status)?
       let pid = json.get(value, ["pid"], 0).require(Int)?
       let ready = json.get(value, ["ready"], false).require(Bool)?
@@ -44,12 +42,12 @@ proc service_pid(previous: Int) -> Result[Int] {
     waited += 1
   }
   for directory in [p"/run/xinit", p"/var/log", p"/var/log/ntpd-rs"] {
-    if directory.exists()? {
+    if directory.exists() {
       for entry in fs.children(directory)? { console(f"LAPUTA_NTP_DRILL_ENTRY {entry.path}") }
     }
   }
   for evidence in [p"/run/xinit/ntpd-rs.json", p"/var/log/ntpd-rs/current"] {
-    if evidence.exists()? { console(evidence.read_text()?) }
+    if evidence.exists() { console(evidence.read_text()?) }
   }
   fail "ntpd-rs did not become ready"
 }
@@ -71,10 +69,8 @@ proc stratum(text: Str) -> Result[Int] {
 proc wait_synchronized() -> Result[Int] {
   var waited = 0
   while waited < sync_seconds {
-    let level = stratum(status_text()?)?
-    if level < 16 {
-      return level
-    }
+    let level = status_text()? |> stratum(_)?
+    return level when level < 16
     time.sleep(1s)
     waited += 1
   }
@@ -112,7 +108,7 @@ proc wall_minus_monotonic() -> Result[Int] {
 
 proc sync_phase() {
   let first = service_pid(0)?
-  let early = stratum(status_text()?)?
+  let early = status_text()? |> stratum(_)?
   guard early == 16 else { fail f"readiness already reported stratum {early}" }
   console("LAPUTA_NTP_DRILL_READY_UNSYNCHRONIZED stratum=16")
   let level = wait_synchronized()?
@@ -120,14 +116,14 @@ proc sync_phase() {
   console(sources)
   require_operators(sources)
   console(f"LAPUTA_NTP_DRILL_SYNCHRONIZED stratum={level} operators={operators.join(",")}")
-  process.kill(first, signal: "KILL")?
-  let second = service_pid(first)?
+  process.kill(first, signal: "KILL")
+  let _ = service_pid(first)?
   let again = wait_synchronized()?
   console(f"LAPUTA_NTP_DRILL_RESTARTED stratum={again}")
-  p"/var/lib/laputa/ntp-drill".write("synchronized\n")?
-  fs.fsync(p"/var/lib/laputa/ntp-drill")?
+  p"/var/lib/laputa/ntp-drill".write("synchronized\n")
+  fs.fsync(p"/var/lib/laputa/ntp-drill")
   console("LAPUTA_NTP_DRILL_OK sync")
-  process.kill(1, signal: "TERM")?
+  process.kill(1, signal: "TERM")
 }
 
 proc offline_phase() {
@@ -157,7 +153,7 @@ proc offline_phase() {
   let final_pid = service_pid(0)?
   guard final_pid == pid else { fail "the daemon restarted when its sources disappeared" }
   let log = p"/var/log/ntpd-rs/current"
-  if log.exists()? {
+  if log.exists() {
     guard ! ("jumping" in log.read_text()?) else { fail "the daemon stepped the clock" }
   }
   let text = status_text()?
@@ -167,7 +163,7 @@ proc offline_phase() {
 proc run_drill() {
   let selected = phase()?
   return when selected == ""
-  guard config.exists()? else { fail "the packaged ntpd-rs configuration is missing" }
+  guard config.exists() else { fail "the packaged ntpd-rs configuration is missing" }
   if selected == "sync" {
     sync_phase()?
   } else if selected == "offline" {
@@ -187,4 +183,4 @@ proc main() -> Result[Unit, Error] {
   }
 }
 
-main()?
+main()

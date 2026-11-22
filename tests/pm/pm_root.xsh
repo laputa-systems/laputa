@@ -148,7 +148,7 @@ proc rewrite_legacy_database_payload(
   let etcsums = [
     {path: entry.path, sha256: digest(entry.content)}
     for entry in entries
-    if (entry.kind == types.File or entry.kind == types.Binary) and entry.path.starts_with(
+    if (entry.kind == .File or entry.kind == .Binary) and entry.path.starts_with(
       "etc/",
     )
   ]

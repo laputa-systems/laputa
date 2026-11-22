@@ -36,7 +36,7 @@ test quote_round_trips_hostile_values_through_a_real_shell {
     let command = shell.command(script, [value, "second"])?
     let out = run.capture --bytes sh -c $command
     assert out.status.ok, f"exit for {value}"
-    assert out.stdout.utf8()? == value + "\0second\0"
+    assert out.stdout as Str == value + "\0second\0"
   }
 }
 
@@ -50,10 +50,11 @@ type Made = {word: Str, state: Int}
 
 pure random_word(seed: Int, length: Int) -> Made {
   var state = seed
-  var pieces: List[Str] = []
-  for _ in range(length) {
-    state = next_state(state)
-    pieces += [alphabet[state / 65536 % alphabet.len()]]
+  let pieces = collect {
+    for _ in range(length) {
+      state = next_state(state)
+      yield alphabet[state / 65536 % alphabet.len()]
+    }
   }
 
   Made(word: pieces.join(""), state:)
@@ -61,11 +62,12 @@ pure random_word(seed: Int, length: Int) -> Made {
 
 test random_hostile_words_round_trip_through_a_real_shell_as_single_arguments {
   var state = 20261103
-  var words: List[Str] = []
-  for index in range(150) {
-    let made = random_word(state, index % 24)
-    state = made.state
-    words += [made.word]
+  let words = collect {
+    for index in range(150) {
+      let made = random_word(state, index % 24)
+      state = made.state
+      yield made.word
+    }
   }
 
   let script = r"""printf '%s\0' "$@" """
@@ -73,5 +75,5 @@ test random_hostile_words_round_trip_through_a_real_shell_as_single_arguments {
   let out = run.capture --bytes sh -c $command
   assert out.status.ok
   let expected = words |> map { |word| word + "\0" } |> collect()
-  assert out.stdout.utf8()? == expected.join("")
+  assert out.stdout as Str == expected.join("")
 }

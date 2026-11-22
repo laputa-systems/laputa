@@ -55,30 +55,28 @@ export pure redact(text: Str, secrets: List[Str]) -> Str {
 }
 
 pure entries_of(report: Report) -> List[Entry] {
-  report.hosts |> flat-map { |host| host.entries } |> collect()
+  report.hosts |> flat-map .entries |> collect()
 }
 
 pure has_status(entries: List[Entry], status: Str) -> Bool {
-  entries |> any { |entry| entry.status == status }
+  entries |> any .status == status
 }
 
 pure needing_attention(entries: List[Entry]) -> Bool {
-  entries |> any { |entry| attention(entry) }
+  entries |> any(attention)
 }
 
 pure with_status(entries: List[Entry], status: Str) -> Int {
-  entries |> where { |entry| entry.status == status } |> count()
+  entries |> where .status == status |> count()
 }
 
 pure failed_hosts(report: Report) -> List[HostReport] {
-  report.hosts |> where { |host| ! host.ok } |> collect()
+  report.hosts |> where ! .ok |> collect()
 }
 
 pure attention(entry: Entry) -> Bool {
   let status = entry.status
-  if status == "uncertain" {
-    return ! entry.conditional
-  }
+  return ! entry.conditional when status == "uncertain"
 
   status == "failed" or status == "partial" or status == "unknown" or status == "conflict"
 }
@@ -109,9 +107,7 @@ pure label(entry: Entry) -> Str {
 
 pure entry_lines(entry: Entry, verbose: Bool) -> List[Str] {
   let quiet = entry.status == "satisfied" or entry.status == "unchanged"
-  if quiet and ! verbose {
-    return []
-  }
+  return [] when quiet and ! verbose
 
   var lines = [f"  {entry.id} [{entry.kind}] {label(entry)}"]
   let phase = entry.phase ?? ""
@@ -143,7 +139,7 @@ pure host_lines(host: HostReport, verbose: Bool) -> List[Str] {
 
 ## Render a report for a terminal. Quiet entries are omitted unless `verbose`.
 export pure text(report: Report, verbose: Bool) -> Str {
-  var lines: List[Str] = []
+  var lines = []
   for host in report.hosts {
     lines += host_lines(host, verbose)
   }
@@ -151,7 +147,7 @@ export pure text(report: Report, verbose: Bool) -> Str {
   let entries = entries_of(report)
   let drift = with_status(entries, "drift")
   let changed = with_status(entries, "changed")
-  let bad = entries |> where { |entry| attention(entry) } |> count()
+  let bad = entries |> where(attention) |> count()
   lines += [f"{report.mode}: {report.hosts.len()} host(s), {entries.len()} resource(s), {drift} drift, {changed} changed, {bad} need attention, {failed_hosts(report).len()} host(s) failed"]
   sanitize(lines.join("\n"))
 }
@@ -164,17 +160,20 @@ export pure json_document(report: Report) -> Result[Str, Error] {
 ## Render a report as JSON Lines: one object per host failure or entry, then a
 ## final summary object.
 export pure json_lines(report: Report) -> Result[Str, Error] {
-  var lines: List[Str] = []
-  for host in report.hosts {
-    if ! host.ok {
-      lines += [json.encode({type: "host", mode: report.mode, host: host.host, ok: false, phase: host.phase, detail: host.detail})?]
+  let lines = collect {
+    for host in report.hosts {
+      if ! host.ok {
+        yield json.encode(
+          {type: "host", mode: report.mode, host: host.host, ok: false, phase: host.phase, detail: host.detail},
+        )?
+      }
+
+      for entry in host.entries {
+        yield json.encode({...entry, type: "entry", mode: report.mode})?
+      }
     }
 
-    for entry in host.entries {
-      lines += [json.encode({...entry, type: "entry", mode: report.mode})?]
-    }
+    yield json.encode({type: "summary", mode: report.mode, hosts: report.hosts.len(), exit: exit_status(report)})?
   }
-
-  lines += [json.encode({type: "summary", mode: report.mode, hosts: report.hosts.len(), exit: exit_status(report)})?]
   Ok(lines.join("\n"))
 }

@@ -50,14 +50,14 @@ pure mismatch(what: Str) -> Verdict {
 ## Render a mode as four octal digits.
 export pure octal(mode: Int) -> Str {
   var rest = mode
-  var digits: List[Str] = []
+  var digits = []
   while rest > 0 {
-    digits = [f"{rest % 8}"] + digits
+    digits = [f"{rest % 8}", @digits]
     rest = rest / 8
   }
 
   while digits.len() < 4 {
-    digits = ["0"] + digits
+    digits = ["0", @digits]
   }
 
   digits.join("")
@@ -72,34 +72,30 @@ pure principal_matches(wanted: Str, name: Str, id: Int) -> Bool {
 }
 
 pure attribute_changes(owner: Str?, group_name: Str?, mode: Int?, info: fact.PathInfo) -> List[Change] {
-  var changes: List[Change] = []
-  if mode != null and info.mode != mode {
-    changes += [change("mode", octal(info.mode), octal(mode))]
-  }
+  let changes: List[Change] = collect {
+    if mode != null and info.mode != mode {
+      yield change("mode", octal(info.mode), octal(mode))
+    }
 
-  if owner != null and ! principal_matches(owner, info.owner, info.uid) {
-    changes += [change("owner", info.owner, owner)]
-  }
+    if owner != null and ! principal_matches(owner, info.owner, info.uid) {
+      yield change("owner", info.owner, owner)
+    }
 
-  if group_name != null and ! principal_matches(group_name, info.group, info.gid) {
-    changes += [change("group", info.group, group_name)]
+    if group_name != null and ! principal_matches(group_name, info.group, info.gid) {
+      yield change("group", info.group, group_name)
+    }
   }
 
   changes
 }
 
 pure wanted_attributes(owner: Str?, group_name: Str?, mode: Int?) -> List[Change] {
-  var changes: List[Change] = []
-  if mode != null {
-    changes += [change("mode", "(none)", octal(mode))]
-  }
+  let changes: List[Change] = collect {
+    yield change("mode", "(none)", octal(mode)) when mode != null
 
-  if owner != null {
-    changes += [change("owner", "(none)", owner)]
-  }
+    yield change("owner", "(none)", owner) when owner != null
 
-  if group_name != null {
-    changes += [change("group", "(none)", group_name)]
+    yield change("group", "(none)", group_name) when group_name != null
   }
 
   changes
@@ -117,7 +113,7 @@ pure kind_name(kind: fact.PathKind) -> Str {
 pure compare_directory(spec: model.DirectorySpec, state: fact.PathState) -> Verdict {
   match state {
     fact.Unseen(unreadable) => Uncertain(unreadable)
-    fact.Blocked(unreadable) => {
+    fact.Blocked(_) => {
       if spec.presence == .Absent { Satisfied } else { Conflicting(f"a parent of {spec.path} is not a directory") }
     }
     fact.Missing => {
@@ -147,7 +143,7 @@ pure short(digest: Str) -> Str {
 pure compare_file(spec: model.FileSpec, material: Material?, state: fact.PathState) -> Verdict {
   match state {
     fact.Unseen(unreadable) => Uncertain(unreadable)
-    fact.Blocked(unreadable) => {
+    fact.Blocked(_) => {
       if spec.presence == .Absent { Satisfied } else { Conflicting(f"a parent of {spec.path} is not a directory") }
     }
     fact.Missing => {
@@ -166,12 +162,13 @@ pure compare_file(spec: model.FileSpec, material: Material?, state: fact.PathSta
       } else if info.digest == null {
         Uncertain(reading(.Denied, f"cannot read the content of {spec.path} to compare it"))
       } else {
-        var changes: List[Change] = []
         let wanted = material?.digest ?? ""
-        if info.digest != wanted {
-          let from = if spec.sensitive { redacted } else { short(info.digest ?? "") }
-          let to = if spec.sensitive { redacted } else { short(wanted) }
-          changes += [change("content", from, to)]
+        let changes: List[Change] = collect {
+          if info.digest != wanted {
+            let from = if spec.sensitive { redacted } else { short(info.digest) }
+            let to = if spec.sensitive { redacted } else { short(wanted) }
+            yield change("content", from, to)
+          }
         }
 
         let all = changes + attribute_changes(spec.owner, spec.group, spec.mode, info)
@@ -184,7 +181,7 @@ pure compare_file(spec: model.FileSpec, material: Material?, state: fact.PathSta
 pure compare_symlink(spec: model.SymlinkSpec, state: fact.PathState) -> Verdict {
   match state {
     fact.Unseen(unreadable) => Uncertain(unreadable)
-    fact.Blocked(unreadable) => {
+    fact.Blocked(_) => {
       if spec.presence == .Absent { Satisfied } else { Conflicting(f"a parent of {spec.path} is not a directory") }
     }
     fact.Missing => {
@@ -276,23 +273,24 @@ pure compare_user(spec: model.UserSpec, state: fact.UserState) -> Verdict {
       } else if spec.uid != null and info.uid != spec.uid {
         Conflicting(f"user {spec.name} has uid {info.uid}, not {spec.uid}; uids are never changed")
       } else {
-        var changes: List[Change] = []
-        if spec.group != null and info.group != spec.group {
-          changes += [change("group", info.group ?? f"{info.gid}", spec.group)]
-        }
-
-        for member in spec.groups {
-          if member not in info.memberships and member != info.group {
-            changes += [change("membership", "not a member", member)]
+        let changes: List[Change] = collect {
+          if spec.group != null and info.group != spec.group {
+            yield change("group", info.group ?? f"{info.gid}", spec.group)
           }
-        }
 
-        if spec.home != null and info.home != spec.home {
-          changes += [change("home", info.home, spec.home)]
-        }
+          for member in spec.groups {
+            if member not in info.memberships and member != info.group {
+              yield change("membership", "not a member", member)
+            }
+          }
 
-        if spec.shell != null and info.shell != spec.shell {
-          changes += [change("shell", info.shell, spec.shell)]
+          if spec.home != null and info.home != spec.home {
+            yield change("home", info.home, spec.home)
+          }
+
+          if spec.shell != null and info.shell != spec.shell {
+            yield change("shell", info.shell, spec.shell)
+          }
         }
 
         if changes.is_empty() { Satisfied } else { drift(.Update, changes) }
@@ -361,38 +359,38 @@ pure compare_command(spec: model.CommandSpec, state: fact.Fact, changed: List[St
     }
     model.Creates(target) => {
       match state {
-        fact.OnPath(fact.Found(_)) => Satisfied
-        fact.OnPath(fact.Missing) => drift(.Run, [change("creates", "(absent)", target)])
-        fact.OnPath(fact.Blocked(_)) => drift(.Run, [change("creates", "(absent)", target)])
-        fact.OnPath(fact.Unseen(unreadable)) => Uncertain(unreadable)
+        fact.OnPath(.Found(_)) => Satisfied
+        fact.OnPath(.Missing) => drift(.Run, [change("creates", "(absent)", target)])
+        fact.OnPath(.Blocked(_)) => drift(.Run, [change("creates", "(absent)", target)])
+        fact.OnPath(.Unseen(unreadable)) => Uncertain(unreadable)
         else => mismatch("command")
       }
     }
     model.SkipIf(_) => {
       match state {
-        fact.OnGuard(fact.Exited(0)) => Satisfied
-        fact.OnGuard(fact.Exited(code)) => {
+        fact.OnGuard(.Exited(0)) => Satisfied
+        fact.OnGuard(.Exited(code)) => {
           if guard_unreadable(code) {
             Uncertain(reading(.Unavailable, f"the guard could not run (exit {code})"))
           } else {
             drift(.Run, [change("guard", f"exit {code}", "exit 0")])
           }
         }
-        fact.OnGuard(fact.GuardUnseen(unreadable)) => Uncertain(unreadable)
+        fact.OnGuard(.GuardUnseen(unreadable)) => Uncertain(unreadable)
         else => mismatch("command")
       }
     }
     model.OnlyIf(_) => {
       match state {
-        fact.OnGuard(fact.Exited(0)) => drift(.Run, [change("guard", "exit 0", "run")])
-        fact.OnGuard(fact.Exited(code)) => {
+        fact.OnGuard(.Exited(0)) => drift(.Run, [change("guard", "exit 0", "run")])
+        fact.OnGuard(.Exited(code)) => {
           if guard_unreadable(code) {
             Uncertain(reading(.Unavailable, f"the guard could not run (exit {code})"))
           } else {
             Satisfied
           }
         }
-        fact.OnGuard(fact.GuardUnseen(unreadable)) => Uncertain(unreadable)
+        fact.OnGuard(.GuardUnseen(unreadable)) => Uncertain(unreadable)
         else => mismatch("command")
       }
     }
@@ -405,47 +403,54 @@ pure compare_command(spec: model.CommandSpec, state: fact.Fact, changed: List[St
 export pure verdict(spec: model.Spec, state: fact.Fact, material: Material?, changed: List[Str]) -> Verdict {
   match spec {
     model.Directory(directory) => {
-      match state {
-        fact.OnPath(path_state) => compare_directory(directory, path_state)
-        else => mismatch("directory")
+      if let .OnPath(path_state) = state {
+        compare_directory(directory, path_state)
+      } else {
+        mismatch("directory")
       }
     }
     model.File(file) => {
-      match state {
-        fact.OnPath(path_state) => compare_file(file, material, path_state)
-        else => mismatch("file")
+      if let .OnPath(path_state) = state {
+        compare_file(file, material, path_state)
+      } else {
+        mismatch("file")
       }
     }
     model.Link(link) => {
-      match state {
-        fact.OnPath(path_state) => compare_symlink(link, path_state)
-        else => mismatch("symlink")
+      if let .OnPath(path_state) = state {
+        compare_symlink(link, path_state)
+      } else {
+        mismatch("symlink")
       }
     }
     model.Package(package) => {
-      match state {
-        fact.OnPackage(package_state) => compare_package(package, package_state)
-        else => mismatch("package")
+      if let .OnPackage(package_state) = state {
+        compare_package(package, package_state)
+      } else {
+        mismatch("package")
       }
     }
     model.PackageIndex(_) => Unevaluated("the package index is refreshed only at apply")
     model.GroupAccount(account_group) => {
-      match state {
-        fact.OnGroup(group_state) => compare_group(account_group, group_state)
-        else => mismatch("group")
+      if let .OnGroup(group_state) = state {
+        compare_group(account_group, group_state)
+      } else {
+        mismatch("group")
       }
     }
     model.UserAccount(account) => {
-      match state {
-        fact.OnUser(user_state) => compare_user(account, user_state)
-        else => mismatch("user")
+      if let .OnUser(user_state) = state {
+        compare_user(account, user_state)
+      } else {
+        mismatch("user")
       }
     }
     model.Exec(command) => compare_command(command, state, changed)
     model.Service(service) => {
-      match state {
-        fact.OnService(service_state) => compare_service(service, service_state, changed)
-        else => mismatch("service")
+      if let .OnService(service_state) = state {
+        compare_service(service, service_state, changed)
+      } else {
+        mismatch("service")
       }
     }
   }

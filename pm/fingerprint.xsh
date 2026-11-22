@@ -1,6 +1,6 @@
 ##! Exact semantic fingerprints for package inputs and executor provenance.
-use pm.digest as pm_digest
 use payload_archive
+use pm.digest as pm_digest
 use types
 use util
 
@@ -86,11 +86,11 @@ proc package_source_lines(pkg: types.Package, target: types.Target) -> Result[Li
       continue when ignored_tree_path(rel)
 
       if entry.kind == "symlink" {
-        let target = entry.path.readlink()?.display()
+        let link_target = entry.path.readlink()?.display()
 
-        if util.pm_symlink_target_check(rel.display(), target, reject_empty: false) != util.PmSymlinkValid {
+        if util.pm_symlink_target_check(rel.display(), link_target, reject_empty: false) != .PmSymlinkValid {
           return Err(
-            types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {target} leaves the recipe directory"),
+            types.PmError.PackageContract(f"{pkg.name}: recipe symlink {rel} -> {link_target} leaves the recipe directory"),
           )
         }
       }
@@ -142,7 +142,7 @@ export proc package_build_input(
   pkg: types.Package,
   target: types.Target,
 ) [fs, error] -> Result[Str, Error] {
-  let encoding = if pkg.kind == types.Meta { "" } else { payload_archive.encoding_fingerprint()? }
+  let encoding = if pkg.kind == .Meta { "" } else { payload_archive.encoding_fingerprint()? }
   package_build_input_with_encoding(repo_root, pkg, target, encoding)?
 }
 
@@ -165,7 +165,7 @@ export proc package_build_input_with_encoding(
     f"nostrip\t{pkg.nostrip}",
   ]
 
-  if pkg.kind != types.Meta {
+  if pkg.kind != .Meta {
     lines += [f"payload-encoding\t{encoding}"]
   }
 

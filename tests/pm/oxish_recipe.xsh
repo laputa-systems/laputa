@@ -7,19 +7,19 @@ use pm.util
 const executables = ["oxish", "oxish-keygen", "oxish-scp", "oxish-server", "oxish-session", "oxish-sftp"]
 const documents = ["LICENSE-APACHE", "LICENSE-MIT", "THIRD-PARTY.md", "provenance.json"]
 
-proc stage_release(root: Path, omit: Str) [fs, error] -> Result[Path] {
+proc stage_release(root: Path, omit: Str) -> Result[Path] {
   let release = fp"{root}/release"
 
   for tool in executables {
     if f"bin/{tool}" != omit {
-      fp"{release}/bin/{tool}".parent.mkdir(parents: true)
+      fp"{release}/bin/{tool}".parent.mkdir()
       fp"{release}/bin/{tool}".write(bytes.from_text(f"#!{tool}\n"))
     }
   }
 
   for document in documents {
     if document != omit {
-      fp"{release}/{document}".parent.mkdir(parents: true)
+      fp"{release}/{document}".parent.mkdir()
       fp"{release}/{document}".write(bytes.from_text(f"{document}\n"))
     }
   }
@@ -46,7 +46,7 @@ test oxish_recipe_pins_one_release_archive_per_architecture [fs, env, error] {
     }
 
     for source in pkg.upstream_sources[1..] {
-      assert source.checksums |> all { |checksum| checksum.sha256 == "SKIP" }
+      assert source.checksums |> all .sha256 == "SKIP"
     }
   }
 }
@@ -55,7 +55,7 @@ test oxish_recipe_installs_the_release_executables_and_service_modules [fs, erro
   let root = test.temp_dir(ctx, name: "oxish install")?
   let release = stage_release(root, "")?
   let dest = fp"{root}/dest"
-  oxish_recipe.install_release(release, p"packages/oxish", dest)?
+  oxish_recipe.install_release(release, p"packages/oxish", dest)
 
   for tool in executables {
     let installed = fp"{dest}/usr/bin/{tool}"

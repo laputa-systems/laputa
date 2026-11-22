@@ -32,9 +32,9 @@ type ReleaseMetadata = {
   trust_policy_sha256: Str,
 }
 
-let MAX_METADATA_BYTES = 4096
-let MAX_ROOT_BUNDLE_BYTES = 4194304
-let MAX_RELEASE_VALIDITY_SECONDS = 7776000
+const MAX_METADATA_BYTES = 4096
+const MAX_ROOT_BUNDLE_BYTES = 4194304
+const MAX_RELEASE_VALIDITY_SECONDS = 7776000
 
 pure release_fail(message: Str) -> Error {
   ReleaseError.InvalidData(message)
@@ -49,7 +49,7 @@ proc release_require(condition: Bool, message: Str) [error] {
 ## Parses one exact signed-release metadata document.
 export proc release_parse_metadata(message: Bytes) [error] -> Result[ReleaseMetadata, Error] {
   release_require(! message.is_empty() and message.len() <= MAX_METADATA_BYTES, "signed metadata size is invalid")
-  let text = message.utf8()?
+  let text = message as Str
   release_require(text.ends_with("\n") and "\r" not in text, "signed metadata must use LF-terminated UTF-8 lines")
   let lines = text.byte_slice(0, text.byte_len() - 1).split("\n")
   release_require(lines.len() == 6 and lines[0] == "laputa-trust-release-v2", "signed metadata header or field count is invalid")
@@ -99,7 +99,7 @@ export proc release_verify(input: SignedReleaseInput) [error] -> Result[Verified
   release_require(input.provisioned_public_key.len() == 32, "a provisioned 32-byte Laputa trust public key is required")
   release_require(input.signature.len() == 64, "trust release signature must contain 64 raw Ed25519 bytes")
   release_require(! input.metadata.is_empty() and input.metadata.len() <= MAX_METADATA_BYTES, "signed metadata size is invalid")
-  release_require(input.root_bundle.len() > 0 and input.root_bundle.len() <= MAX_ROOT_BUNDLE_BYTES, "root bundle size is invalid")
+  release_require(! input.root_bundle.is_empty() and input.root_bundle.len() <= MAX_ROOT_BUNDLE_BYTES, "root bundle size is invalid")
 
   let signature_valid = crypto.ed25519_verify(input.metadata, input.provisioned_public_key, input.signature)?
   release_require(signature_valid, "trust release metadata signature is invalid")
@@ -124,7 +124,7 @@ export proc release_verify(input: SignedReleaseInput) [error] -> Result[Verified
     input.next_policy.sha256().hex() == release.trust_policy_sha256,
     "trust policy digest does not match signed metadata",
   )
-  net.validate_root_bundle(input.root_bundle)?
+  net.validate_root_bundle(input.root_bundle)
 
   {
     root_bundle: input.root_bundle,

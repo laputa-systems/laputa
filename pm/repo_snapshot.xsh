@@ -59,7 +59,7 @@ export pure snapshot_u64_is_greater(left: Str, right: Str) -> Bool {
 
 ## Signed indexes must bind every referenced artifact to a digest and a repository-relative path.
 export proc snapshot_validate_index(items: List[types.RemotePackage]) [error] {
-  var identities: List[Str] = []
+  var identities = []
   for item in items {
     let identity = f"{item.arch}/{item.name}"
     snapshot_require(identity not in identities, f"signed repository index repeats {identity}")

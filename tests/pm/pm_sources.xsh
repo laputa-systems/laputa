@@ -75,24 +75,23 @@ proc expect_stage_error(pkg: types.Package, src: Path, expected: List[Str]) {
 test test_repository_staging_excludes_build_and_harness_outputs [fs, net, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "repository-staging-scratch")?
   let source = fp"{root}/tool"
-  fp"{source}/src".mkdir(parents: true)?
-  fp"{source}/src/main.rs".write("fn main() {}\n")?
-  fp"{source}/.work/tmp".mkdir(parents: true)?
-  fp"{source}/target/debug".mkdir(parents: true)?
-  fp"{source}/target/debug/tool".write("stale executable\n")?
-  let python = match process.which("python3") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("python3 is unavailable to bind the fixture socket")
-      return
-    },
+  fp"{source}/src".mkdir()
+  fp"{source}/src/main.rs".write("fn main() {}\n")
+  fp"{source}/.work/tmp".mkdir()
+  fp"{source}/target/debug".mkdir()
+  fp"{source}/target/debug/tool".write("stale executable\n")
+  let python = if let Ok(found) = process.which("python3") {
+    found
+  } else {
+    test.skip("python3 is unavailable to bind the fixture socket")
+    return
   }
   run $python "-c" "import os,socket,sys; os.chdir(sys.argv[1]); s=socket.socket(socket.AF_UNIX); s.bind('test.sock')" fp"{source}/.work/tmp"
   let dest = fp"{root}/staged"
   env ({XSH_PM_REPOSITORY_ROOT: root.display()}) {
     sources.stage_package_sources(url_package("repository/tool", "SKIP"), dest)
   }
-  test.eq(fp"{dest}/src/main.rs".read_text()?, "fn main() {}\n")
+  assert fp"{dest}/src/main.rs".read_text()? == "fn main() {}\n"
   assert ! fp"{dest}/.work".exists()?
   assert ! fp"{dest}/target".exists()?
 }
@@ -469,7 +468,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 test test_cargo_vendor_source_stages_cached_crates_as_a_directory_source [fs, net, process, env, error] { |ctx|
   let crate_file = demo_crate(ctx, "demo_crate", "0.1.0")?
   let owned_demo = demo_crate(ctx, "owned_crate", "1.0.0")?
-  let owned_crate = {...owned_demo, item: {...owned_demo.item, source: "sparse+https://crates.17166969.xyz/current/registry/"}}
+  let owned_crate = {...owned_demo, item.source: "sparse+https://crates.17166969.xyz/current/registry/"}
   let cache = test.temp_dir(ctx, name: "crate-set-cache")?
   let lockfile = test.temp_path(ctx, name: "Cargo.lock")
   lockfile.write(crate_set_lock([crate_file.item, owned_crate.item]))
@@ -520,12 +519,11 @@ version = "1.0.0"
 source = "{owned_crate.item.source}"
 checksum = "{owned_crate.item.checksum}"
 """)
-  let cargo = match process.which("cargo") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("cargo is unavailable to read the vendored lockfile")
-      return
-    },
+  let cargo = if let Ok(found) = process.which("cargo") {
+    found
+  } else {
+    test.skip("cargo is unavailable to read the vendored lockfile")
+    return
   }
   let cargo_home = test.temp_dir(ctx, name: "registry-empty-cargo-home")?
   let vendor_config = f"source.vendored-sources.directory=\"{src}/vendor\""
@@ -599,7 +597,7 @@ test test_git_workspace_source_preserves_the_locked_git_identity_offline [fs, ne
   let git_source = f"git+https://github.com/example/fork?rev={revision}#{revision}"
   let tree = test.temp_dir(ctx, name: "git-workspace-tree")?
   let checkout = fp"{tree}/fork-{revision}"
-  fp"{checkout}/forked/src".mkdir(parents: true)?
+  fp"{checkout}/forked/src".mkdir()
   fp"{checkout}/Cargo.toml".write("[workspace]\nmembers = [\"forked\"]\n")
   fp"{checkout}/forked/Cargo.toml".write("[package]\nname = \"forked\"\nversion = \"0.1.0\"\nedition = \"2021\"\n")
   fp"{checkout}/forked/src/lib.rs".write("pub fn answer() -> u32 { 42 }\n")
@@ -622,12 +620,12 @@ source = "{git_source}"
 """)
   let lock_sha256 = cache_file(cache, lockfile)?
   let base = crate_set_package("https://upstream.invalid/Cargo.lock", lock_sha256)
-  let git_archive: types.UpstreamSource = {
+  let git_archive: types.UpstreamSource = types.UpstreamSource(
     source: fp"https://github.com/example/fork/archive/{revision}.tar.gz => git-fork",
     kind: types.CargoGitWorkspace,
     architectures: ["all"],
     checksums: [{arch: "all", sha256: archive_sha256}],
-  }
+  )
   let src = test.temp_dir(ctx, name: "git-workspace-src")?
 
   env ({LAPUTA_SOURCE_CACHE: cache.display(), LAPUTA_MIRROR: "", XSH_PM_TARGET_ARCH: "aarch64"}) {
@@ -649,13 +647,12 @@ forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
 """)
   fp"{src}/src".mkdir()
   fp"{src}/src/lib.rs".write("pub fn answer() -> u32 { forked::answer() }\n")
-  lockfile.copy(to: fp"{src}/Cargo.lock")?
-  let cargo = match process.which("cargo") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("cargo is unavailable to read the staged git workspace")
-      return
-    },
+  lockfile.copy(to: fp"{src}/Cargo.lock")
+  let cargo = if let Ok(found) = process.which("cargo") {
+    found
+  } else {
+    test.skip("cargo is unavailable to read the staged git workspace")
+    return
   }
   let cargo_home = test.temp_dir(ctx, name: "git-workspace-empty-cargo-home")?
   let config = fp"{src}/git-fork/.cargo-source.toml"
@@ -676,12 +673,11 @@ forked = {{ git = "https://github.com/example/fork", rev = "{revision}" }}
 }
 
 test test_source_downloads_name_their_client_to_hosts_that_require_one [fs, net, process, time, error] { |ctx|
-  let python = match process.which("python3") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture HTTP server")
-      return
-    },
+  let python = if let Ok(found) = process.which("python3") {
+    found
+  } else {
+    test.skip("python3 is unavailable for the fixture HTTP server")
+    return
   }
   let root = test.temp_dir(ctx, name: "agent-download")?
   let port_file = fp"{root}/port"
@@ -691,13 +687,13 @@ test test_source_downloads_name_their_client_to_hosts_that_require_one [fs, net,
     let _ = process.wait_any([server])
   }
   var tries = 0
-  while ! port_file.exists()? or port_file.read_text()?.trim() == "" {
+  while ! port_file.exists() or port_file.read_text()?.trim() == "" {
     assert tries < 100, "fixture HTTP server did not start"
-    time.sleep(100ms)?
+    time.sleep(100ms)
     tries += 1
   }
   let port = port_file.read_text()?.trim()
   let dest = fp"{root}/source"
-  test.eq(util.download_file(f"http://127.0.0.1:{port}/source", dest)?, "")
+  assert util.download_file(f"http://127.0.0.1:{port}/source", dest)? == ""
   test.eq(dest.read_text()?, "payload\n")
 }

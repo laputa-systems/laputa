@@ -5,11 +5,11 @@ use system.build
 use system.docker
 use system.profile
 
-proc main(repository: Path, artifacts: Path, output: Path, image: Str, architecture: Str = "x86_64") [fs, process, env, error] -> Result[Unit, Error] {
+proc main(repository: Path, artifacts: Path, output: Path, image: Str, architecture = "x86_64") [fs, process, env, error] {
   let arch = xsh_seed.xsh_seed_arch(architecture)?
   let identity = unix.id()?
-  world.world_kbuild_cache(repository).mkdir()?
-  let config: docker.DockerConfig = {
+  world.world_kbuild_cache(repository).mkdir()
+  let config: docker.DockerConfig = docker.DockerConfig(
     docker: images.docker_program()?,
     arch: arch.arch,
     platform: arch.docker_platform,
@@ -17,13 +17,12 @@ proc main(repository: Path, artifacts: Path, output: Path, image: Str, architect
     seed: xsh_seed.xsh_seed_require(repository, arch.arch)?,
     output_root: output,
     artifact_root: artifacts,
-    image,
+    image:,
     repo_url: "",
     owner: {uid: identity.uid, gid: identity.gid},
-  }
+  )
   let intent = profile.load_system_profile("qemu-self-hosting", fp"{repository}/profiles")?
   let result = build.build_profile(config, intent, 2)?
   print "self-hosting system bundle" $result.current
 }
 
-main(@args)?

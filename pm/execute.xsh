@@ -128,7 +128,7 @@ proc execute_run_confined_build(
   source: Path,
   dest: Path,
   payload: Path,
-) -> Result[Unit] {
+) {
   let confinement = context.confinement
 
   if confinement == null {
@@ -136,7 +136,7 @@ proc execute_run_confined_build(
   }
 
   let runner = fp"{work}/confined-build.xsh"
-  runner.write(confined_build_runner())?
+  runner.write(confined_build_runner())
   let xsh = execute_xsh_runner()?
   let command = process.command_argv(
     xsh,
@@ -145,8 +145,8 @@ proc execute_run_confined_build(
   )
   let status = linux.run_confined(
     command,
-    read: confinement.read + [work, build_root, xsh.parent],
-    write: confinement.write + [work],
+    read: [@confinement.read, work, build_root, xsh.parent],
+    write: [@confinement.write, work],
     tcp: confinement.tcp,
   )?
   return when status.ok
@@ -205,7 +205,7 @@ proc execute_stage_local(
       if context.confinement == null {
         pm_build.build_prepared_package(recipe_dir, source, dest, payload)
       } else {
-        execute_run_confined_build(context, node, work, build_root, recipe_dir, source, dest, payload)?
+        execute_run_confined_build(context, node, work, build_root, recipe_dir, source, dest, payload)
       }
     }
   }
@@ -248,7 +248,7 @@ proc execute_run_proof(
   payload_sha256: Str,
   proof: Path,
 ) {
-  if pkg.kind == types.Meta {
+  if pkg.kind == .Meta {
     pm_proof.write_artifact_receipt(proof, node, payload_sha256)
     return
   }
@@ -256,7 +256,7 @@ proc execute_run_proof(
   let proof_keys = [
     dependency.artifact_key
     for dependency in node.dependencies
-    if dependency.kind == types.Runtime or dependency.kind == types.Proof
+    if dependency.kind == .Runtime or dependency.kind == .Proof
   ]
   let proof_artifacts = execute_receipt_closure(context, proof_keys)?
   let root_handle = fs.tempdir()?
@@ -284,7 +284,7 @@ proc execute_build_local(context: ExecuteContext, node: types.PlanNode) -> Resul
     fp"{work}/build-root"
   }
 
-  if pkg.kind == types.Meta {
+  if pkg.kind == .Meta {
     build_root.mkdir()
   } else {
     let dependencies = execute_receipt_closure(context, store.receipt_dependency_keys(node))?
@@ -349,7 +349,7 @@ proc execute_node(context: ExecuteContext, node: types.PlanNode) -> Result[types
 }
 
 pure execute_wait_keys(node: types.PlanNode) -> List[Str] {
-  [dependency.artifact_key for dependency in node.dependencies if dependency.kind != types.RuntimeOnly]
+  [dependency.artifact_key for dependency in node.dependencies if dependency.kind != .RuntimeOnly]
 }
 
 type RunningNode = {handle: ProcessHandle, node: types.PlanNode, log: Path, started_ns: Int}

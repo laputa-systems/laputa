@@ -51,7 +51,7 @@ export pure local_xsh_host(name: Str = "local-xsh") -> model.Host {
 ## The disposable hosts a fixture run published, or none when no fixture
 ## environment is present.
 export proc fixture_hosts() [env, fs, error] -> Result[List[model.Host], Error] {
-  match env.get("XINFRA_TEST_INVENTORY") {
+  match e"XINFRA_TEST_INVENTORY" {
     Err(_) => Ok([])
     Ok(file) => Ok(inventory.load(fp"{file}")?.hosts)
   }
@@ -61,16 +61,16 @@ export proc fixture_hosts() [env, fs, error] -> Result[List[model.Host], Error] 
 ## present.
 export proc fixture_host(name: Str) [env, fs, error] -> Result[model.Host?, Error] {
   let hosts = fixture_hosts()?
-  let matching = hosts |> where { |host| host.name == name } |> collect()
+  let matching = hosts |> where .name == name |> collect()
   if matching.is_empty() { null } else { matching[0] }
 }
 
 ## Look up one entry of a report by host and resource id.
 export pure entry_of(result: report.Report, host: Str, id: Str) -> report.Entry? {
   let found = result.hosts
-    |> where { |item| item.host == host }
-    |> flat-map { |item| item.entries }
-    |> where { |entry| entry.id == id }
+    |> where .host == host
+    |> flat-map .entries
+    |> where .id == id
     |> collect()
   if found.is_empty() { null } else { found[0] }
 }
@@ -95,7 +95,7 @@ export proc remote_text(host: model.Host, script: Str, args: List[Str] = [], pri
     fail f"exit {execution.code}: {execution.stderr.utf8() ?? ""}"
   }
 
-  Ok(execution.stdout.utf8()?)
+  Ok(execution.stdout as Str)
 }
 
 ## Skip controller-target tests whose scripts require Linux facilities.

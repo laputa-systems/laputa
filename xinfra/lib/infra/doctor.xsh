@@ -21,12 +21,11 @@ const resource_tools = [
 ]
 
 const openrc_tools = ["rc-service", "rc-update"]
+const hostile = ["plain", "", "-x", "it's", "a b", "line\nbreak", "$HOME", "$(echo injected)", "`id`", "; id", "\\", "caf\u{e9}"]
 
 pure all_present(absent: List[Str], tools: List[Str]) -> Bool {
   tools |> all { |tool| tool not in absent }
 }
-
-const hostile = ["plain", "", "-x", "it's", "a b", "line\nbreak", "$HOME", "$(echo injected)", "`id`", "; id", "\\", "caf\u{e9}"]
 
 pure check(host: Str, id: Str, ok: Bool, detail: Str) -> report.Entry {
   report.Entry(
@@ -68,7 +67,7 @@ export pure unsupported(dialect: model.Dialect, absent: List[Str]) -> List[Str] 
     return kinds
   }
 
-  var kinds: List[Str] = []
+  var kinds = []
   for pair in resource_tools {
     if pair[1] in absent and pair[0] not in kinds {
       kinds += [pair[0]]
@@ -85,9 +84,7 @@ export pure unsupported(dialect: model.Dialect, absent: List[Str]) -> List[Str] 
 ## The baseline utilities missing from a capability report. An xsh target runs
 ## the catalogue's XSH sources, so it has no POSIX utility baseline.
 export pure missing_required(dialect: model.Dialect, absent: List[Str]) -> List[Str] {
-  if dialect == .Xsh {
-    return []
-  }
+  return [] when dialect == .Xsh
 
   required |> where { |tool| tool in absent } |> collect()
 }
@@ -126,11 +123,8 @@ proc authority(connection: transport.Connection, host: model.Host, capabilities:
 }
 
 proc inspect_host(host: model.Host, lock_path: Str) [fs, env, process, error] -> report.HostReport {
-  let connection = match transport.connect(host) {
-    Ok(opened) => opened
-    Err(error) => {
-      return report.HostReport(host: host.name, ok: false, phase: "connect", detail: report.sanitize(error.message), entries: [])
-    }
+  let connection = transport.connect(host) ?? {
+    return report.HostReport(host: host.name, ok: false, phase: "connect", detail: report.sanitize(.message), entries: [])
   }
 
   var entries = [check(host.name, "connect", true, f"{host.user}@{host.address}:{host.port}")]
@@ -161,7 +155,7 @@ proc inspect_host(host: model.Host, lock_path: Str) [fs, env, process, error] ->
   }
 
   let _ = transport.disconnect(connection)
-  let ok = entries |> all { |entry| entry.status != "failed" }
+  let ok = entries |> all .status != "failed"
   report.HostReport(host: host.name, ok:, phase: null, detail: null, entries:)
 }
 

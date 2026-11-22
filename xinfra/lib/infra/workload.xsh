@@ -28,7 +28,7 @@ export pure material_key(host: Str, id: Str) -> Str {
   f"{host}/{id}"
 }
 
-proc measure_file(host: Str, resource: model.Resource, spec: model.FileSpec) [fs, env, error] -> Result[compare.Material?, Error] {
+proc measure_file(host: Str, resource: model.Resource, spec: model.FileSpec) -> Result[compare.Material?, Error] {
   guard spec.presence == .Present else {
     return Ok(null)
   }
@@ -45,7 +45,7 @@ pure dialect_refusal(host: model.Host, resource: model.Resource, operation: scri
   f"{host.name}: {resource.id}: the {host.dialect} dialect has no script for {operation}; a {model.kind(resource.spec)} resource cannot run on this host"
 }
 
-proc check_dialect(host: model.Host, resources: List[model.Resource]) -> Result[Unit, Error] {
+proc check_dialect(host: model.Host, resources: List[model.Resource]) {
   for resource in resources {
     for operation in scripts.operations(resource.spec) {
       guard scripts.supports(host.dialect, operation) else {
@@ -55,33 +55,30 @@ proc check_dialect(host: model.Host, resources: List[model.Resource]) -> Result[
   }
 }
 
-proc secret_values(host: Str, resource: model.Resource) [env, error] -> Result[List[Str], Error] {
-  var names: List[Str] = []
-  match resource.spec {
-    model.File(spec) => {
-      if let source = spec.content {
-        match source {
-          model.SecretEnv(name) => names += [name]
-          else => {}
+proc secret_values(host: Str, resource: model.Resource) -> Result[List[Str], Error] {
+  let names = collect {
+    match resource.spec {
+      model.File(spec) => {
+        if let source = spec.content {
+          if let .SecretEnv(name) = source {
+            yield name
+          }
         }
       }
+      model.Exec(spec) => yield spec.stdin_env when spec.stdin_env != null
+      else => {}
     }
-    model.Exec(spec) => {
-      if spec.stdin_env != null {
-        names += [spec.stdin_env]
-      }
-    }
-    else => {}
   }
 
-  var values: List[Str] = []
-  for name in names {
-    let value = ctx f"{host}: {resource.id}" { env.get(name)? }
-    guard value.byte_len() >= minimum_secret_bytes else {
-      fail f"{host}: {resource.id}: secret {name} is shorter than {minimum_secret_bytes} bytes and cannot be redacted reliably"
-    }
+  let values = collect {
+    for name in names {
+      let value = ctx f"{host}: {resource.id}" { env.get(name)? }
+      guard value.byte_len() >= minimum_secret_bytes else {
+        fail f"{host}: {resource.id}: secret {name} is shorter than {minimum_secret_bytes} bytes and cannot be redacted reliably"
+      }
 
-    values += [value]
+      yield value
+    }
   }
 
   Ok(values)
@@ -94,19 +91,16 @@ proc secret_values(host: Str, resource: model.Resource) [env, error] -> Result[L
 export proc prepare(declared: List[Workload]) [fs, env, error] -> Result[Prepared, Error] {
   var ordered: List[Workload] = []
   var materials: Map[Str, compare.Material] = {}
-  var secrets: List[Str] = []
+  var secrets = []
   for entry in declared {
     let resources = ctx f"host {entry.host.name}" { graph.order(entry.resources)? }
-    ctx f"host {entry.host.name}" { check_dialect(entry.host, resources)? }
+    ctx f"host {entry.host.name}" { check_dialect(entry.host, resources) }
     ordered += [Workload(host: entry.host, resources:)]
     for resource in resources {
-      match resource.spec {
-        model.File(spec) => {
-          if let found = measure_file(entry.host.name, resource, spec)? {
-            materials[material_key(entry.host.name, resource.id)] = found
-          }
+      if let .File(spec) = resource.spec {
+        if let found = measure_file(entry.host.name, resource, spec)? {
+          materials[material_key(entry.host.name, resource.id)] = found
         }
-        else => {}
       }
 
       for value in secret_values(entry.host.name, resource)? {
@@ -117,7 +111,7 @@ export proc prepare(declared: List[Workload]) [fs, env, error] -> Result[Prepare
     }
   }
 
-  let lists = ordered |> map { |entry| entry.resources |> map { |resource| resource.id } |> collect() } |> collect()
+  let lists = ordered |> map { .resources |> map .id |> collect() } |> collect()
   let operations = graph.merge_order(lists)?
   Ok(Prepared(workloads: ordered, operations:, materials:, secrets:))
 }

@@ -3,11 +3,11 @@ use infra.graph
 use infra.model
 
 pure dir(id: Str, needs: List[Str] = []) -> model.Resource {
-  declare.directory(id:, at: f"/srv/{id}", needs:) ?? model.Resource(id:, needs:, spec: model.PackageIndex(model.PackageIndexSpec(note: "")))
+  declare.directory(id:, at: f"/srv/{id}", needs:) ?? model.Resource(id:, needs:, spec: .PackageIndex(model.PackageIndexSpec("")))
 }
 
 pure ids(resources: List[model.Resource]) -> List[Str] {
-  resources |> map { |resource| resource.id }
+  resources |> map .id
 }
 
 pure refused(result: Result[List[model.Resource], Error], needle: Str) -> Bool {
@@ -84,9 +84,7 @@ test hosts_that_order_shared_operations_differently_are_refused {
 
 pure position(list: List[Str], id: Str) -> Int {
   for index in range(list.len()) {
-    if list[index] == id {
-      return index
-    }
+    return index when list[index] == id
   }
 
   -1
@@ -96,13 +94,12 @@ test the_merged_sequence_respects_every_hosts_order_for_many_generated_inputs {
   let universe = ["a", "b", "c", "d", "e", "f", "g"]
   var state = 7
   for round in range(60) {
-    var lists: List[List[Str]] = []
-    for host in range(3) {
-      var picked: List[Str] = []
-      for id in universe {
-        state = (state * 1103515245 + 12345) % 2147483648
-        if state / 65536 % 3 != 0 {
-          picked += [id]
+    var lists = []
+    for _ in range(3) {
+      let picked = collect {
+        for id in universe {
+          state = (state * 1103515245 + 12345) % 2147483648
+          yield id when state / 65536 % 3 != 0
         }
       }
 

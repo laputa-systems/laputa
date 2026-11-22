@@ -47,13 +47,14 @@ proc defined_symbols(binary: Path, sized: Bool) [fs, process, env, error] -> Res
   }
   proof.ensure(result.status.success, "native-census/symbols", f"nm failed on {binary}")
   let listing = result.stdout
-  var symbols: List[Symbol] = []
-  for line in listing.lines() {
-    let fields = line.fields()
-    if sized and fields.len() == 4 {
-      symbols += [{name: normalize_symbol(fields[3]), size: fields[1].parse_uint()?}]
-    } else if sized == false and fields.len() == 3 {
-      symbols += [{name: normalize_symbol(fields[2]), size: 0}]
+  let symbols: List[Symbol] = collect {
+    for line in listing.lines() {
+      let fields = line.fields()
+      if sized and fields.len() == 4 {
+        yield {name: normalize_symbol(fields[3]), size: fields[1] as UInt}
+      } else if sized == false and fields.len() == 3 {
+        yield {name: normalize_symbol(fields[2]), size: 0}
+      }
     }
   }
   symbols
@@ -127,7 +128,7 @@ cli main census(root: Path, spec: Path = p"qualification/native-census/component
   var installed: Map[Int] = {}
   var elf_packages: Map[Int] = {}
   var elf_count = 0
-  var linked_edges: Map[Bool] = {}
+  var linked_edges: Set[Str] = set.empty()
   for package in packages {
     let metadata = json.read(fp"{package.path}/metadata.json")?.require(Record)?
     dependencies[package.name] = metadata.get("deps")?.require(List[Str])?
@@ -142,7 +143,7 @@ cli main census(root: Path, spec: Path = p"qualification/native-census/component
       elf_count += 1
       for soname in info.needed {
         let owner = providers.get(soname) ?? ""
-        linked_edges[f"{package.name} {owner}"] = true
+        linked_edges = linked_edges.add(f"{package.name} {owner}")
       }
       elf_packages[package.name] = (elf_packages.get(package.name) ?? 0) + 1
     }
@@ -172,10 +173,11 @@ cli main census(root: Path, spec: Path = p"qualification/native-census/component
   }
   if plan != p"" {
     let nodes = json.read(plan)?.require(Record)?.get("nodes")?.require(List[Record])?
-    var not_installed: List[Str] = []
-    for node in nodes {
-      let name = node.get("name")?.require(Str)?
-      not_installed += [name] unless name in dependencies
+    let not_installed = collect {
+      for node in nodes {
+        let name = node.get("name")?.require(Str)?
+        yield name unless name in dependencies
+      }
     }
     let joined = not_installed.join(" ")
     print f"planned but not installed: {not_installed.len()}: {joined}"

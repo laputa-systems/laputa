@@ -59,11 +59,11 @@ type Invocation = {status: Status, stdout: Str, stderr: Str}
 
 proc xinfra(...args: List[Str]) [process, error] -> Result[Invocation, Error] {
   let out = run.capture --text xsh bin/xinfra.xsh @args
-  Ok(Invocation(status: out.status, stdout: out.stdout, stderr: out.stderr))
+  Ok(Invocation(...out))
 }
 
 test a_plan_changes_nothing_and_check_exits_one_on_drift { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let inventory = inventory_for(dir)?
   let deploy = deploy_in(dir, deploy_source)?
@@ -82,7 +82,7 @@ test a_plan_changes_nothing_and_check_exits_one_on_drift { |ctx|
 }
 
 test reports_come_as_a_json_document_or_json_lines { |ctx|
-  testing.require_linux_target()?
+  testing.require_linux_target()
   let dir = test.temp_dir(ctx)?
   let inventory = inventory_for(dir)?
   let deploy = deploy_in(dir, deploy_source)?

@@ -178,7 +178,7 @@ proc scanner_marker_path() -> Result[Path] {
 }
 
 proc live_session_groups(session: Int) -> Result[List[Int]] {
-  var groups: List[Int] = []
+  var groups = []
   for entry in process.list()? {
     let pgrp = entry.pgrp ?? 0
     if (entry.session ?? 0) == session and entry.status != "Z" and pgrp > 0 and ! (pgrp in groups) {
@@ -1227,7 +1227,7 @@ proc rotate_log(name: Str, keep: Int) {
     Ok(_) => {}
     Err(failure) => {
       if ! had_first {
-        first.remove(missing_ok: true)
+        first.remove()
       }
 
       return Err(failure)
@@ -1340,7 +1340,7 @@ proc cleanup_failed_start(service: Service, pid: Int, failure: Error) {
   if pid > 0 {
     match unix.shutdown_process_groups([pid], time.millis(service.stop_timeout_ms), 100ms) {
       Ok(cleanup) => {
-        if ! cleanup.remaining.is_empty() {
+        guard cleanup.remaining.is_empty() else {
           return Err(XinitError.Failed(kind: "xinit-cleanup", message: f"{service.name}: {failure.message}; retained process group {pid}"))
         }
       }
@@ -1355,8 +1355,8 @@ proc spawned_readiness(service: Service, pid: Int) -> Result[Bool] {
   match wait_ready(service) {
     Ok(ready) => ready
     Err(failure) => {
-      cleanup_failed_start(service, pid, failure)?
-      return Err(failure)
+      cleanup_failed_start(service, pid, failure)
+      Err(failure)
     }
   }
 }
@@ -1480,8 +1480,8 @@ proc start_one_service(name: Str) -> Result[SavedStatus] {
   match recorded {
     Ok(status) => status
     Err(failure) => {
-      cleanup_failed_start(service, base.pid, failure)?
-      return Err(failure)
+      cleanup_failed_start(service, base.pid, failure)
+      Err(failure)
     }
   }
 }
@@ -1504,7 +1504,7 @@ proc scanner_active() -> Result[Bool] {
   observed > 0 and (start_time_ms <= 0 or observed == start_time_ms)
 }
 
-proc request_desired(name: Str, desired: Str, qualifier: Str = "") {
+proc request_desired(name: Str, desired: Str, qualifier = "") {
   let dir = inbox_dir()?
   let group_gid = control_group_gid()?
   let target = fp"{dir}/{name}"
@@ -1512,7 +1512,7 @@ proc request_desired(name: Str, desired: Str, qualifier: Str = "") {
   let text = if qualifier == "" { desired } else { f"{desired} {qualifier}" }
 
   scratch.write(text, mode: 0o770)
-  defer scratch.remove(missing_ok: true)
+  defer scratch.remove()
   fs.set_owner(scratch, gid: group_gid)
 
   if qualifier == "" {
@@ -1531,7 +1531,7 @@ proc request_desired(name: Str, desired: Str, qualifier: Str = "") {
     }
   }
 
-  wake_scanner()?
+  wake_scanner()
   print f"{name} {desired} queued"
 }
 
@@ -1566,8 +1566,8 @@ proc require_scanner_for_owner(qualifier: Str) {
   }
 }
 
-proc start_service(name: Str, qualifier: Str = "") {
-  require_scanner_for_owner(qualifier)?
+proc start_service(name: Str, qualifier = "") {
+  require_scanner_for_owner(qualifier)
 
   if scanner_active() {
     request_desired(name, "up", qualifier)
@@ -1605,8 +1605,8 @@ proc running_dependents(name: Str) -> Result[List[Str]] {
   out
 }
 
-proc stop_service(name: Str, qualifier: Str = "") {
-  require_scanner_for_owner(qualifier)?
+proc stop_service(name: Str, qualifier = "") {
+  require_scanner_for_owner(qualifier)
 
   if scanner_active() {
     request_desired(name, "down", qualifier)
@@ -2051,11 +2051,12 @@ proc mark_unit_stopped(unit: ServiceUnit) -> Result[ServiceUnit] {
 }
 
 proc shutdown_all(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
-  var reversed: List[ServiceUnit] = []
   var children: List[ChildExit] = []
-  for unit in reverse_units(units) {
-    children += kill_unit(unit)?
-    reversed += [mark_unit_stopped(unit)?]
+  let reversed: List[ServiceUnit] = collect {
+    for unit in reverse_units(units) {
+      children += kill_unit(unit)?
+      yield mark_unit_stopped(unit)?
+    }
   }
   reconcile_child_exits(reverse_units(reversed), children, elapsed_now_ms()?)?
 }
@@ -2137,10 +2138,11 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
 }
 
 proc apply_request(units: List[ServiceUnit], name: Str, desired: Str) -> Result[List[ServiceUnit]] {
-  var children: List[ChildExit] = []
-  for unit in units {
-    if unit.service.name == name and desired in ["down", "restart"] {
-      children += kill_unit(unit)?
+  let children: List[ChildExit] = collect {
+    for unit in units {
+      if unit.service.name == name and desired in ["down", "restart"] {
+        yield @kill_unit(unit)?
+      }
     }
   }
   let updated = [apply_one(unit, name, desired)? for unit in units]
@@ -2223,41 +2225,36 @@ proc control_skipped(request: ControlRequest, name: Str) -> Result[Bool] {
 proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: Path, name: Str) -> Result[List[ServiceUnit]] {
   var out = out_units
   let leaf: RelPath = fp"{name}".require()?
-  let observed = match processing.read_regular(leaf, max_bytes: control_request_limit) {
-    Ok(opened) => opened
-    Err(failure) => {
-      let info = fs.stat(path_value, follow_symlinks: false)
-      let uid = match info { Ok(value) => value.uid, Err(_) => -1 }
-      let kind = match info { Ok(value) => value.kind, Err(_) => "" }
-      let oversized = match info { Ok(value) => value.size > control_request_limit, Err(_) => false }
-      let reason = if kind != "" and kind != "file" {
-        "not-a-single-regular-file"
-      } else if oversized {
-        "oversized"
-      } else {
-        failure.message
-      }
-      eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={reason}"
-      match info {
-        Ok(value) => {
-          if value.kind == "dir" {
-            let target = fp"{inbox_dir()?}/{name}"
-            match fs.rename_noreplace(path_value, target) {
-              Ok(_) => {}
-              Err(_) => {
-                let key = bytes.from_text(name).sha256().hex()
-                let refused = fp"{path_value.parent()}/.refused-{key}-{process.current_pid()?}-{time.monotonic()?}"
-                fs.rename_noreplace(path_value, refused)?
-              }
-            }
-          } else {
-            processing.remove(leaf)?
+  let observed = processing.read_regular(leaf, max_bytes: control_request_limit) ?? {
+    let info = fs.stat(path_value, follow_symlinks: false)
+    let uid = if let Ok(value) = info { value.uid } else { -1 }
+    let kind = if let Ok(value) = info { value.kind } else { "" }
+    let oversized = if let Ok(value) = info { value.size > control_request_limit } else { false }
+    let reason = if kind != "" and kind != "file" {
+      "not-a-single-regular-file"
+    } else if oversized {
+      "oversized"
+    } else {
+      .message
+    }
+    eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={reason}"
+    if let Ok(value) = info {
+      if value.kind == "dir" {
+        let target = fp"{inbox_dir()?}/{name}"
+        match fs.rename_noreplace(path_value, target) {
+          Ok(_) => {}
+          Err(_) => {
+            let key = bytes.from_text(name).sha256().hex()
+            let refused = fp"{path_value.parent()}/.refused-{key}-{process.current_pid()?}-{time.monotonic()?}"
+            fs.rename_noreplace(path_value, refused)
           }
         }
-        Err(_) => {}
+      } else {
+        processing.remove(leaf)
       }
-      return out
     }
+
+    return out
   }
 
   let uid = observed.uid
@@ -2281,12 +2278,12 @@ proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: P
 
   match parse_control_request(observed.data) {
     Ok(request) => {
-      if control_skipped(request, name)? {
+      if control_skipped(request, name) {
         eprint --flush f"xinit-control-skipped: service={name} uid={uid} verb={request.verb} reason=owner-mismatch"
       } else {
         print --flush f"xinit-control accepted service={name} uid={uid} verb={request.verb}"
         if request.verb != "reload" and unit_state_of(out, name) != "" {
-          set_control_owner(name, request.owner)?
+          set_control_owner(name, request.owner)
         }
         out = apply_request(out, name, request.verb)?
       }
@@ -2331,8 +2328,8 @@ proc drain_inbox(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
       match fs.rename_noreplace(entry.path, claimed) {
         Ok(_) => { out = drain_claim(out, processing, claimed, entry.name)? }
         Err(failure) => {
-          if fs.stat(claimed, follow_symlinks: false) is Ok(_) { continue }
-          if fs.stat(entry.path, follow_symlinks: false) is Err(_) { continue }
+          continue when fs.stat(claimed, follow_symlinks: false) is Ok(_)
+          continue when fs.stat(entry.path, follow_symlinks: false) is Err(_)
           return Err(failure)
         }
       }
@@ -2395,7 +2392,7 @@ proc scan_units(names: List[Str]) {
   prepare_control_inbox()
 
   for unit in units {
-    set_control_owner(unit.service.name, "")?
+    set_control_owner(unit.service.name, "")
   }
 
   let wake_path = scanner_wake_path()?
@@ -2417,7 +2414,7 @@ proc scan_units(names: List[Str]) {
 
     return when remaining == 0
 
-    let event = unix.wait_pid1_event(timeout: time.millis(next_wait_ms(units, elapsed_now_ms()?)), wake_fd: wake_fd)?
+    let event = unix.wait_pid1_event(timeout: time.millis(next_wait_ms(units, elapsed_now_ms()?)), wake_fd:)?
 
     if remaining > 0 {
       remaining -= 1
@@ -2528,7 +2525,7 @@ proc control_qualifier(parsed: Record) -> Result[Str] {
   ""
 }
 
-proc control(verb: Str, name: Str, qualifier: Str = "") {
+proc control(verb: Str, name: Str, qualifier = "") {
   if qualifier != "" and verb != "start" and verb != "up" and verb != "stop" and verb != "down" {
     return Err(XinitError.Failed(kind: "xinit-control", message: f"{verb} takes no owner qualifier"))
   }
