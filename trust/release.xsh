@@ -99,7 +99,7 @@ export proc release_verify(input: SignedReleaseInput) [error] -> Result[Verified
   release_require(input.provisioned_public_key.len() == 32, "a provisioned 32-byte Laputa trust public key is required")
   release_require(input.signature.len() == 64, "trust release signature must contain 64 raw Ed25519 bytes")
   release_require(! input.metadata.is_empty() and input.metadata.len() <= MAX_METADATA_BYTES, "signed metadata size is invalid")
-  release_require(input.root_bundle.len() > 0 and input.root_bundle.len() <= MAX_ROOT_BUNDLE_BYTES, "root bundle size is invalid")
+  release_require(! input.root_bundle.is_empty() and input.root_bundle.len() <= MAX_ROOT_BUNDLE_BYTES, "root bundle size is invalid")
 
   let signature_valid = crypto.ed25519_verify(input.metadata, input.provisioned_public_key, input.signature)?
   release_require(signature_valid, "trust release metadata signature is invalid")

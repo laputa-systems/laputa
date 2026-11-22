@@ -91,7 +91,7 @@ export pure cells(raster: Raster, left: Int, cell_width: Int, count: Int, top: I
   while index < count {
     let from = left + index * cell_width
     let inside = runs(raster, from, from + cell_width, top, bottom, backgrounds)
-    if inside.len() > 0 {
+    if ! inside.is_empty() {
       var ink = 0
       var chroma = 0
       for part in inside {

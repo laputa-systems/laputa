@@ -57,7 +57,7 @@ cli main(source: Path, llvm_bin: Path, output: Path, host_cc: Path) [fs, process
     }
 
     print f"{arch}: {changes.len()} changed symbols"
-    changed = changed or changes.len() != 0
+    changed = changed or ! changes.is_empty()
   }
 
   if changed {

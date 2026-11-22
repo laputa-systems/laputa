@@ -31,7 +31,7 @@ proc qmp_frame(fd: Int, pending: Bytes, deadline: Int) -> Result[QmpFrame, Error
     return Err(QmpError.Protocol("QMP frame exceeds 1 MiB")) when buffer.len() > 1048576
     qmp_wait(fd, "readable", deadline)
     let part = unix.read_fd(fd, 4096)?
-    return Err(QmpError.Protocol("QMP socket closed")) when part.len() == 0
+    return Err(QmpError.Protocol("QMP socket closed")) when part.is_empty()
     buffer = bytes.concat([buffer, part])
   }
 }

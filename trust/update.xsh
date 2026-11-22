@@ -615,7 +615,7 @@ proc trust_activate_release(
       } else {
         bytes.from_text("")
       }
-      guard committed_metadata == metadata and committed_metadata.len() > 0 else {
+      guard committed_metadata == metadata and ! committed_metadata.is_empty() else {
         return Err(
           update_fail(f"immutable trust generation already exists and does not match the verified release: {generation}"),
         )

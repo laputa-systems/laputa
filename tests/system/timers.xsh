@@ -515,10 +515,10 @@ test test_supervisor_releases_quiescence_once_the_job_has_no_live_attempt [fs, p
   let released = timers.timer_quiesce_reconcile(rig.store, rig.command, no_attempts(), {}, now)?
   assert release_calls(rig)? == ["backup"]
   assert timers.timer_quiesce_names(rig.store)? == []
-  assert released.len() == 0
+  assert released.is_empty()
   let again = timers.timer_quiesce_reconcile(rig.store, rig.command, no_attempts(), released, at(2000, BASE))?
   assert release_calls(rig)? == ["backup"]
-  assert again.len() == 0
+  assert again.is_empty()
 }
 
 test test_a_failed_release_is_retried_after_its_delay_and_then_given_up [fs, process, time, io, env, error] { |ctx|
@@ -546,7 +546,7 @@ test test_a_failed_release_is_retried_after_its_delay_and_then_given_up [fs, pro
   let healed = timers.timer_quiesce_reconcile(rig.store, rig.command, no_attempts(), restarted, at(100000, BASE))?
   assert release_calls(rig)?.len() == 5
   assert timers.timer_quiesce_names(rig.store)? == []
-  assert healed.len() == 0
+  assert healed.is_empty()
 }
 
 test test_a_running_attempts_quiescence_is_left_alone [fs, process, time, io, env, error] { |ctx|
