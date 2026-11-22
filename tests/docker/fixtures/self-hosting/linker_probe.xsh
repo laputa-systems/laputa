@@ -1,4 +1,4 @@
-let arguments = [
+const arguments = [
   "/bin/xsh",
   "/inputs/laputa/guest/self-hosting-linker.xsh",
   "--",
@@ -13,7 +13,7 @@ let arguments = [
 let positive = process.command_argv(p"/bin/xsh", arguments.extend(["-o", "/scratch/linker-probe.so"]), env: {TMPDIR: "/scratch"})
 let success = linux.run_in_namespaces(positive, root: p"/declared", cwd: p"/declared", uid: 65534, gid: 65534, drop_groups: true)?
 assert success.exited_with(0)
-let comment = p"/declared/scratch/linker-comment"
+const comment = p"/declared/scratch/linker-comment"
 let inspect = process.command_argv(
   p"/usr/bin/readelf",
   ["readelf", "-p", ".comment", "/scratch/linker-probe.so"],

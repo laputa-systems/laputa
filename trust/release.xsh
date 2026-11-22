@@ -32,9 +32,9 @@ type ReleaseMetadata = {
   trust_policy_sha256: Str,
 }
 
-let MAX_METADATA_BYTES = 4096
-let MAX_ROOT_BUNDLE_BYTES = 4194304
-let MAX_RELEASE_VALIDITY_SECONDS = 7776000
+const MAX_METADATA_BYTES = 4096
+const MAX_ROOT_BUNDLE_BYTES = 4194304
+const MAX_RELEASE_VALIDITY_SECONDS = 7776000
 
 pure release_fail(message: Str) -> Error {
   ReleaseError.InvalidData(message)

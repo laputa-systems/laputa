@@ -5,7 +5,7 @@ use trust.store as trust_store
 
 error ProofError = Failed(kind: Str, message: Str)
 
-let REQUIRED_BLOCKED_SPKIS = [
+const REQUIRED_BLOCKED_SPKIS = [
   "43bffa19d6ef651451f6841e019931e96f6f2eaeff28ab4b6f1ce4576de2717b",
   "49dd353dc2b919a3770645117d0e60c16115e7d1bc259eefe734b00ea434fe5f",
   "5c0660a2b164910d8ff589c18e14552e9e0ec237dcefe2cb736d41a4811f81a0",
