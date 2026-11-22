@@ -6487,14 +6487,14 @@ proc resolve_item_compile_flags(
   defs: List[Str],
 ) -> Result[List[PreparedArchiveItem]] {
   let verdicts = probe_compiler_options(items, cc, triple, cflags, defs)?
-  var resolved: List[PreparedArchiveItem] = []
-
-  for item in items {
-    var member_flags = [
-      resolve_compile_flags(item.object, member, verdicts)?
-      for member in item.member_flags
-    ]
-    resolved += [{...item, flags: resolve_compile_flags(item.object, item.flags, verdicts)?, member_flags: member_flags}]
+  let resolved: List[PreparedArchiveItem] = collect {
+    for item in items {
+      var member_flags = [
+        resolve_compile_flags(item.object, member, verdicts)?
+        for member in item.member_flags
+      ]
+      yield {...item, flags: resolve_compile_flags(item.object, item.flags, verdicts)?, member_flags: member_flags}
+    }
   }
 
   resolved
