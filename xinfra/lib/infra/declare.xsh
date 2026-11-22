@@ -195,7 +195,7 @@ export pure symlink(
 }
 
 pure constraint_of(version: Str) -> Result[model.Constraint, Error] {
-  let table: List[Str] = [">=", "<=", "=", ">", "<"]
+  let table = [">=", "<=", "=", ">", "<"]
   for text in table {
     if version.starts_with(text) {
       let rest = version.byte_slice(text.byte_len())

@@ -139,7 +139,7 @@ pure host_lines(host: HostReport, verbose: Bool) -> List[Str] {
 
 ## Render a report for a terminal. Quiet entries are omitted unless `verbose`.
 export pure text(report: Report, verbose: Bool) -> Str {
-  var lines: List[Str] = []
+  var lines = []
   for host in report.hosts {
     lines += host_lines(host, verbose)
   }
@@ -160,7 +160,7 @@ export pure json_document(report: Report) -> Result[Str, Error] {
 ## Render a report as JSON Lines: one object per host failure or entry, then a
 ## final summary object.
 export pure json_lines(report: Report) -> Result[Str, Error] {
-  var lines: List[Str] = []
+  var lines = []
   for host in report.hosts {
     if ! host.ok {
       lines += [json.encode({type: "host", mode: report.mode, host: host.host, ok: false, phase: host.phase, detail: host.detail})?]

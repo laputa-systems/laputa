@@ -2,7 +2,7 @@ use pm.proof
 use pm.util as pm_util
 
 proc defined_exports(readelf: Path, library: Path) [fs, process, env, error] -> Result[List[Str], Error] {
-  var names: List[Str] = []
+  var names = []
 
   for line in (run.text $readelf "--dyn-syms" "-W" $library).lines() {
     let fields = line.fields()
@@ -16,7 +16,7 @@ proc defined_exports(readelf: Path, library: Path) [fs, process, env, error] -> 
 }
 
 proc declared_functions(header: Path) -> Result[List[Str], Error] {
-  var names: List[Str] = []
+  var names = []
 
   for line in header.read_text()?.lines() {
     if let [_, name] = rx"""\b(fc_[a-z0-9_]+)\(""".captures(line) {

@@ -50,7 +50,7 @@ pure mismatch(what: Str) -> Verdict {
 ## Render a mode as four octal digits.
 export pure octal(mode: Int) -> Str {
   var rest = mode
-  var digits: List[Str] = []
+  var digits = []
   while rest > 0 {
     digits = [f"{rest % 8}"] + digits
     rest = rest / 8

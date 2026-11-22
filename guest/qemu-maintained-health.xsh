@@ -41,7 +41,7 @@ proc cap_marker_lines(lines: List[Str], keep: Int) -> List[Str] {
 
 proc append_boot_marker(path_value: Path, line: Str) {
   path_value.parent.mkdir()
-  var lines: List[Str] = []
+  var lines = []
   if path_value.exists() {
     lines = path_value.read_text()?.lines() |> where .trim() != "" |> collect
   }
@@ -79,11 +79,11 @@ proc main() {
   p"/dev/console".write(f"LAPUTA_ACTIVATION_HEALTH {encoded}\n")
   let failed = boot_failed_id(cmdline)?
   let marker = boot_marker_line(id, serial, failed, report.root_digest, report.profile, services)?
-  var pre_lines: List[Str] = []
+  var pre_lines = []
   if p"/var/log/boot-markers.log".exists() {
     pre_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect
   }
-  var laputa_files: List[Str] = []
+  var laputa_files = []
   if p"/var/lib/laputa".exists() {
     for entry in fs.children(p"/var/lib/laputa")? {
       laputa_files += [entry.name]

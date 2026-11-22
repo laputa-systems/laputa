@@ -68,13 +68,13 @@ proc expect_rejected(input: Result[Record, Error], fragment: Str, root: Path, ge
 
 ## Captures the observable store state for zero-mutation assertions.
 proc snapshot_store_state(paths: trust_store.TrustStorePaths) -> Result[Record, Error] {
-  var generations: List[Str] = []
+  var generations = []
   for entry in fs.children(paths.generations)? {
     generations += [entry.name]
   }
   generations = generations |> sort
 
-  var staging: List[Str] = []
+  var staging = []
   if paths.staging.exists() {
     for entry in fs.children(paths.staging)? {
       staging += [entry.name]
@@ -714,7 +714,7 @@ test trust_update_rotates_keys_package_only [fs, process, env, time, error] { |c
   let _ = trust_update.trust_update_from_dir(root, release_c)?
   assert trust_store.trust_store_read_active(trust_store.trust_store_paths(root))? == "3"
 
-  var names: List[Str] = []
+  var names = []
   for entry in fs.children(fixture("release-d"))? {
     names += [entry.name]
   }

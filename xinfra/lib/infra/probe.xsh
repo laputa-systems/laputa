@@ -26,7 +26,7 @@ export pure decode_hex(text: Str) -> Result[Str, Error] {
     fail "odd number of hex digits"
   }
 
-  var values: List[Int] = []
+  var values = []
   var offset = 0
   while offset < text.byte_len() {
     let high = hex_value(text.byte_slice(offset, 1))?
@@ -180,7 +180,7 @@ pure passwd_line(line: Str, groups: List[fact.GroupInfo]) -> Result[fact.UserInf
 
 pure section_lines(stdout: Str, marker: Str, next: Str?) -> List[Str] {
   var inside = false
-  var lines: List[Str] = []
+  var lines = []
   for line in stdout.lines() {
     if line == marker {
       inside = true
@@ -301,9 +301,9 @@ export type Capabilities = {present: List[Str], absent: List[Str], uid: Int}
 
 ## Parse the `capabilities` script output.
 export pure capabilities(stdout: Str) -> Result[Capabilities, Error] {
-  var present: List[Str] = []
-  var absent: List[Str] = []
-  var uid: Int? = null
+  var present = []
+  var absent = []
+  var uid = null
   var shell_ok = false
   for line in stdout.lines() {
     if line == "shell ok" {

@@ -102,7 +102,7 @@ proc password(name: Str) -> Result[Path] {
 
 proc snapshot_ids(text: Str) -> Result[List[Str]] {
   let groups = json.decode(text)?.require(List[Record])?
-  var ids: List[Str] = []
+  var ids = []
   for grp in groups {
     for snap in grp.get("snapshots")?.require(List[Record])? {
       ids += [snap.get("id")?.require(Str)?]
@@ -113,7 +113,7 @@ proc snapshot_ids(text: Str) -> Result[List[Str]] {
 
 proc snapshot_paths(text: Str) -> Result[List[Str]] {
   let groups = json.decode(text)?.require(List[Record])?
-  var paths: List[Str] = []
+  var paths = []
   for grp in groups {
     for snap in grp.get("snapshots")?.require(List[Record])? {
       for snap_path in snap.get("paths")?.require(List[Str])? {
@@ -213,7 +213,7 @@ proc phase_restore() {
   let _ = rustic(["restore", "latest", blank_mount.display()], pw2)?
   let before = fp"{backup_mount}/hashes-before.txt".read_text()?.lines() |> where .trim() != "" |> collect
   guard before.len() > 0 else { fail "hash manifest is empty" }
-  var bare: List[Str] = []
+  var bare = []
   for entry in before {
     let fields = entry.split("  ")
     guard fields.len() == 2 else { fail f"unparseable manifest line: {entry}" }
@@ -253,7 +253,7 @@ pure expected_additions() -> List[Str] {
 }
 
 proc diff_paths(text: Str) -> Result[List[Str]] {
-  var changed: List[Str] = []
+  var changed = []
   for line in text.lines() {
     let trimmed = line.trim()
     if trimmed == "" or trimmed.starts_with("Files") or trimmed.starts_with("Dirs") {

@@ -114,7 +114,7 @@ proc pyramid_kernel_graph(
   fp"{source}/.config".write("CONFIG_TEST=y\n")
   let groups = [f"directory{index}" for index in range(group_count)]
   fp"{source}/Kbuild".write("obj-y += " + [f"{directory}/" for directory in groups].join(" ") + "\n")
-  var objects: List[Path] = []
+  var objects = []
   for directory in groups {
     fp"{source}/{directory}".mkdir()
     let names = [f"unit{index}" for index in range(objects_per_group)]

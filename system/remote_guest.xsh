@@ -150,7 +150,7 @@ proc validated_name(header: Record) [error] -> Result[Str, Error] {
 
 proc incoming_names(root: Path) [fs, error] -> Result[List[Str], Error] {
   return [] unless root.exists()
-  var names: List[Str] = []
+  var names = []
   for entry in fs.children(root)? {
     if entry.name.starts_with(".incoming-") {
       names += [entry.name]

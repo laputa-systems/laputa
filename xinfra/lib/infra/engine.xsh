@@ -80,7 +80,7 @@ proc survey_host(mode: Mode, entry: workload.Workload, prepared: workload.Prepar
   }
 
   var entries: List[report.Entry] = []
-  var planned: List[Str] = []
+  var planned = []
   for resource in entry.resources {
     let state = match observe.observe(connection, resource.spec) {
       Ok(found) => found
@@ -514,7 +514,7 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     }
   }
 
-  var aborted: Str? = null
+  var aborted = null
   for id in prepared.operations {
     var steps: List[Step] = []
     for state in states.values() {

@@ -14,7 +14,7 @@ export pure quote(value: Str) -> Result[Str, Error] {
 }
 
 pure quote_all(values: List[Str]) -> Result[List[Str], Error] {
-  var quoted: List[Str] = []
+  var quoted = []
   for value in values {
     quoted += [quote(value)?]
   }
@@ -82,7 +82,7 @@ export pure xsh_quote(value: Str) -> Result[Str, Error] {
 ## emitted as escaped XSH string literals, so an operand cannot change the
 ## program.
 export pure xsh_command(script: Str, args: List[Str]) -> Result[Str, Error] {
-  var quoted: List[Str] = []
+  var quoted = []
   for value in args {
     quoted += [xsh_quote(value)?]
   }

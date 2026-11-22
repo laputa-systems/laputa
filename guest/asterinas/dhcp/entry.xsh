@@ -102,7 +102,7 @@ proc await_state(label: Str, wanted: Str, timeout_ms: Int) {
 }
 
 proc watch_states(label: Str, duration_ms: Int) {
-  var sequence: List[Str] = []
+  var sequence = []
   let deadline = elapsed_ms()? + duration_ms
   while elapsed_ms()? < deadline {
     let state = significant(client_state())
@@ -337,7 +337,7 @@ proc reject_routes() {
 }
 
 pure syslog_record(line: Str) -> Str {
-  var fields: List[Str] = []
+  var fields = []
   for field in rx" header_time=\x22[^\x22]*\x22".replace(line, with: "").split(" ") {
     let name = field.split("=")[0]
     guard !(name in ["seq", "boot", "boottime_ns", "kseq", "ktime_us", "tag_pid"]) else { continue }
@@ -434,7 +434,7 @@ proc syslog_consumer() [fs, process, env, time, net, error] {
 
 proc state_lines() [fs, process, env, time, net, error] -> Result[List[Str]] {
   let dump = linux.network_dump()?
-  var lines: List[Str] = []
+  var lines = []
   var eth0 = 0
   var names: Map[Int, Str] = {}
   for link in dump.links {

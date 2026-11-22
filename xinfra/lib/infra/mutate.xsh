@@ -378,7 +378,7 @@ proc apply_service(connection: transport.Connection, spec: model.ServiceSpec, dr
 }
 
 proc apply_command(connection: transport.Connection, spec: model.CommandSpec) [env, fs, process, error] -> Result[Unit, outcome.StepError] {
-  var input: Bytes? = null
+  var input = null
   if spec.stdin_env != null {
     match env.get(spec.stdin_env) {
       Ok(value) => input = bytes.from_text(value)

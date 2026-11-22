@@ -4,7 +4,7 @@ use infra.model
 
 pure duplicates(resources: List[model.Resource]) -> List[Str] {
   var seen: Set[Str] = set.empty()
-  var repeated: List[Str] = []
+  var repeated = []
   for resource in resources {
     if resource.id in seen {
       if resource.id not in repeated {
@@ -20,7 +20,7 @@ pure duplicates(resources: List[model.Resource]) -> List[Str] {
 
 pure unknown_dependencies(resources: List[model.Resource]) -> List[Str] {
   let known = resources |> map { |resource| resource.id } |> collect()
-  var problems: List[Str] = []
+  var problems = []
   for resource in resources {
     for dependency in model.dependencies(resource) {
       if dependency == resource.id {
@@ -38,7 +38,7 @@ pure unknown_dependencies(resources: List[model.Resource]) -> List[Str] {
 ## where every resource follows what it needs. Among resources that are ready
 ## together, declaration order wins.
 export pure order(resources: List[model.Resource]) -> Result[List[model.Resource], Error] {
-  var problems: List[Str] = []
+  var problems = []
   for id in duplicates(resources) {
     problems += [f"duplicate resource id {id}"]
   }
@@ -71,7 +71,7 @@ export pure order(resources: List[model.Resource]) -> Result[List[model.Resource
 ## follows everything declared before it on any host. Hosts that order two
 ## shared identifiers differently have no consistent sequence and are refused.
 export pure merge_order(lists: List[List[Str]]) -> Result[List[Str], Error] {
-  var seen: List[Str] = []
+  var seen = []
   for list in lists {
     for id in list {
       if id not in seen {
@@ -82,7 +82,7 @@ export pure merge_order(lists: List[List[Str]]) -> Result[List[Str], Error] {
 
   var placed: Set[Str] = set.empty()
   var remaining = seen
-  var merged: List[Str] = []
+  var merged = []
   while ! remaining.is_empty() {
     let ready = remaining |> where { |id| ready_everywhere(id, lists, placed) } |> collect()
     guard ! ready.is_empty() else {

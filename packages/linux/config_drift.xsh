@@ -29,7 +29,7 @@ export pure linux_config_changes(before: Str, after: Str) -> List[Str] {
     }
   }
 
-  var changes: List[Str] = []
+  var changes = []
 
   for name in names |> sort-by . {
     let old_value = original.get(name) ?? "<absent>"

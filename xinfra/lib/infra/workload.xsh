@@ -56,7 +56,7 @@ proc check_dialect(host: model.Host, resources: List[model.Resource]) -> Result[
 }
 
 proc secret_values(host: Str, resource: model.Resource) -> Result[List[Str], Error] {
-  var names: List[Str] = []
+  var names = []
   match resource.spec {
     model.File(spec) => {
       if let source = spec.content {
@@ -73,7 +73,7 @@ proc secret_values(host: Str, resource: model.Resource) -> Result[List[Str], Err
     else => {}
   }
 
-  var values: List[Str] = []
+  var values = []
   for name in names {
     let value = ctx f"{host}: {resource.id}" { env.get(name)? }
     guard value.byte_len() >= minimum_secret_bytes else {
@@ -93,7 +93,7 @@ proc secret_values(host: Str, resource: model.Resource) -> Result[List[Str], Err
 export proc prepare(declared: List[Workload]) [fs, env, error] -> Result[Prepared, Error] {
   var ordered: List[Workload] = []
   var materials: Map[Str, compare.Material] = {}
-  var secrets: List[Str] = []
+  var secrets = []
   for entry in declared {
     let resources = ctx f"host {entry.host.name}" { graph.order(entry.resources)? }
     ctx f"host {entry.host.name}" { check_dialect(entry.host, resources) }

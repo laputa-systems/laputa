@@ -58,7 +58,7 @@ cli main up(count: UInt = 3, dir = p".work/fixtures") [fs, process, time, error]
     "timeout_ms = 10000",
     "",
   ]
-  var ids: List[Str] = []
+  var ids = []
   for index in range(1, count + 1) {
     let host_key = fp"{dir}/host-{run_id}-{index}"
     keygen(host_key)

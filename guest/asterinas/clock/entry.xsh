@@ -130,7 +130,7 @@ poll-interval-limits = {{ min = 1, max = 1 }}
 [synchronization]
 minimum-agreeing-sources = 1
 """)
-  var groups: List[Int] = []
+  var groups = []
   var completed = false
   defer {
     let daemon_log = p"/run/ntp-proof-logs/ntpd-rs/current"
@@ -238,7 +238,7 @@ minimum-agreeing-sources = 1
   let raw_origin = (run.text $oracle "--raw").trim().parse_int_decimal()?
   let original = time.now()
   let origin = now_ms()?
-  var groups: List[Int] = []
+  var groups = []
   var completed = false
   defer {
     let daemon_log = p"/run/ntp-proof-logs/ntpd-rs/current"

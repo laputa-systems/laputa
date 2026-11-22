@@ -172,7 +172,7 @@ cli main census(root: Path, spec: Path = p"qualification/native-census/component
   }
   if plan != p"" {
     let nodes = json.read(plan)?.require(Record)?.get("nodes")?.require(List[Record])?
-    var not_installed: List[Str] = []
+    var not_installed = []
     for node in nodes {
       let name = node.get("name")?.require(Str)?
       not_installed += [name] unless name in dependencies

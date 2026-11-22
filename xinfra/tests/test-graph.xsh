@@ -94,9 +94,9 @@ test the_merged_sequence_respects_every_hosts_order_for_many_generated_inputs {
   let universe = ["a", "b", "c", "d", "e", "f", "g"]
   var state = 7
   for round in range(60) {
-    var lists: List[List[Str]] = []
+    var lists = []
     for host in range(3) {
-      var picked: List[Str] = []
+      var picked = []
       for id in universe {
         state = (state * 1103515245 + 12345) % 2147483648
         if state / 65536 % 3 != 0 {

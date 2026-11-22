@@ -285,7 +285,7 @@ test trust_update_killed_mid_transaction_recovers_cleanly [fs, process, env, tim
 }
 
 proc store_snapshot(root: Path) -> Result[Str, Error] {
-  var entries: List[Str] = []
+  var entries = []
   for entry in fs.walk(fp"{root}/var/lib/laputa/trust", hidden: true)? {
     let rel = entry.path.strip_prefix(root)?
     entries += [f"{rel.display()} {entry.kind} {entry.size}"]
@@ -337,8 +337,8 @@ test trust_cli_status_is_read_only_under_concurrency [fs, process, env, time, er
   let modules = module_root()?
   let iodir = test.temp_dir(ctx, name: "trust-status-race-io")?
   let script = fp"{modules}/trust.xsh"
-  var outputs: List[Path] = []
-  var handles: List[ProcessHandle] = []
+  var outputs = []
+  var handles = []
   for index in range(8) {
     let err = fp"{iodir}/status-{index}.err"
     let out = fp"{iodir}/status-{index}.out"

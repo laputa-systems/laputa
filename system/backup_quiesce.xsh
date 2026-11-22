@@ -390,8 +390,8 @@ export proc quiesce_release_record(qe: QuiesceEnv, job: Str, timeout_ms: Int) [f
     return Ok(false)
   }
   let bound = if timeout_ms > 0 { timeout_ms } else { record.release_timeout_ms }
-  var failures: List[Str] = []
-  var restored: List[Str] = []
+  var failures = []
+  var restored = []
   for service in record.services {
     continue unless service.acquired
     match quiesce_release_service(qe, record, service.name, bound) {

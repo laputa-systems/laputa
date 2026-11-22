@@ -68,7 +68,7 @@ export pure unsupported(dialect: model.Dialect, absent: List[Str]) -> List[Str] 
     return kinds
   }
 
-  var kinds: List[Str] = []
+  var kinds = []
   for pair in resource_tools {
     if pair[1] in absent and pair[0] not in kinds {
       kinds += [pair[0]]

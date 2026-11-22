@@ -13,7 +13,7 @@ proc service_state(name: Str) -> Result[Str] {
 }
 
 proc unit_summary() -> Result[Str] {
-  var parts: List[Str] = []
+  var parts = []
   for item in g"/run/xinit/*.json" {
     let value = json.read(item)?
     let name = json.get(value, ["name"], "").require(Str)?
@@ -27,7 +27,7 @@ proc unit_summary() -> Result[Str] {
 }
 
 proc path_summary() -> Result[Str] {
-  var marks: List[Str] = []
+  var marks = []
   for item in [p"/var/lib/dhcpc", p"/run/dhcpc", p"/run/dhcpc/eth0.status", p"/etc/resolv.conf", p"/usr/bin/dhcpc", p"/usr/bin/syslogd"] {
     let present = item.exists()?
     marks += [f"{item.display()}={present}"]

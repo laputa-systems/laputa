@@ -178,7 +178,7 @@ proc scanner_marker_path() -> Result[Path] {
 }
 
 proc live_session_groups(session: Int) -> Result[List[Int]] {
-  var groups: List[Int] = []
+  var groups = []
   for entry in process.list()? {
     let pgrp = entry.pgrp ?? 0
     if (entry.session ?? 0) == session and entry.status != "Z" and pgrp > 0 and ! (pgrp in groups) {

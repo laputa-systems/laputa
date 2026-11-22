@@ -67,7 +67,7 @@ export proc network_read_input(input: Path) [fs, error] -> Result[Str, Error] {
   if snapshot.truncated {
     return Err(NetworkPolicyError.NetworkInvalid(f"network input exceeds {network_input_limit} bytes"))
   }
-  let data: Bytes = snapshot.data
+  let data = snapshot.data
   data.utf8()
 }
 
@@ -98,7 +98,7 @@ export pure network_is_ipv6(value: Str) -> Bool {
 
 pure hex_pieces(text: Str) -> List[Int]? {
   return [] when text.is_empty()
-  var values: List[Int] = []
+  var values = []
   for piece in text.split(":") {
     return null when piece.is_empty() or piece.byte_len() > 4
     var value = 0

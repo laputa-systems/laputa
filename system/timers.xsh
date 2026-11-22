@@ -1186,7 +1186,7 @@ type TimerWriterScan = {verdict: Str, groups: List[Int]}
 
 proc timer_writer_observe(record: TimerWriter, boot_id: Str) -> Result[TimerWriterScan, Error] {
   var leader = 0
-  var groups: List[Int] = []
+  var groups = []
   for entry in process.list()? {
     if entry.pid == record.pid {
       leader = entry.start_time_ms
@@ -1798,7 +1798,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
     running = keep
 
     if ! running.is_empty() {
-      var handles: List[ProcessHandle] = []
+      var handles = []
       for entry in running {
         handles += [entry.handle]
       }
@@ -1807,7 +1807,7 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] -> 
         let entry = running[done.index]
         let job = timer_find_job(loaded.jobs, entry.name) ?? timer_job_stub(entry.name)
         let signaled = ! done.status.exited()
-        var code: Int? = null
+        var code = null
         if ! signaled {
           if let Ok(value) = done.status.exit_code() { code = value }
         }

@@ -64,8 +64,8 @@ test test_pyramid_pm_selected_fresh_build_and_reuse [fs, net, process, env, time
   let prepared = execute.build_plan(dependencies, repository, object_store, "", 1)?
   assert [receipt.package_name for receipt in prepared.artifacts] == ["execute-dep", "execute-tool"]
   let value = pyramid_plan(repository, ["execute-app"])?
-  var reused: List[Str] = []
-  var fresh: List[Str] = []
+  var reused = []
+  var fresh = []
   for node in value.nodes {
     if store.artifact_path(object_store, node.artifact_key).exists() {
       reused += [node.name]

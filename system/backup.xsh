@@ -144,7 +144,7 @@ export pure backup_config_from_json(value: Any) -> Result[BackupConfig, Error] {
   guard ! sources_value.is_empty() and sources_value.len() <= BACKUP_MAX_SOURCES else {
     return Err(error.failure(f"sources must hold 1..{BACKUP_MAX_SOURCES} paths"))
   }
-  var sources: List[Str] = []
+  var sources = []
   for source_value in sources_value {
     let source = backup_absolute_path(source_value, "sources[]")?
     guard ! (source in sources) else {
@@ -207,7 +207,7 @@ export pure backup_config_from_json(value: Any) -> Result[BackupConfig, Error] {
 ## Extract snapshot ids from rustic snapshot JSON.
 export pure backup_snapshot_ids(value: Any) -> Result[List[Str], Error] {
   let entries = value.require(List[Any])?
-  var ids: List[Str] = []
+  var ids = []
   for entry in entries {
     let grouped = json.get(entry, ["snapshots"], null)
     if grouped != null {
@@ -237,7 +237,7 @@ export pure backup_snapshot_ids(value: Any) -> Result[List[Str], Error] {
 
 ## The newest policy-count snapshots.
 export pure backup_retention_keep_newest(ids: List[Str], keep_last: Int) -> List[Str] {
-  var kept: List[Str] = []
+  var kept = []
   var index = 0
   while index < ids.len() and index < keep_last {
     kept += [ids[index]]
@@ -248,7 +248,7 @@ export pure backup_retention_keep_newest(ids: List[Str], keep_last: Int) -> List
 
 ## The snapshots outside the newest policy count.
 export pure backup_retention_forget(ids: List[Str], keep_last: Int) -> List[Str] {
-  var dropped: List[Str] = []
+  var dropped = []
   var index = keep_last
   while index < ids.len() {
     dropped += [ids[index]]

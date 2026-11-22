@@ -3,7 +3,7 @@ use pm.proof
 
 pure le(value: Int, width: Int) -> List[Int] {
   var rest = value
-  var octets: List[Int] = []
+  var octets = []
   for _ in range(width) {
     octets += [rest % 256]
     rest = rest / 256
@@ -14,7 +14,7 @@ pure le(value: Int, width: Int) -> List[Int] {
 proc square_wave_wav(wav: Path) {
   let rate = 8000
   let frames = rate / 2
-  var samples: List[Int] = []
+  var samples = []
   for frame in range(frames) {
     let level = if frame / 20 % 2 == 0 { 8000 } else { 65536 - 8000 }
     samples += le(level, 2)

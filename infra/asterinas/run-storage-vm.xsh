@@ -41,7 +41,7 @@ cli main(
   console.remove()
   backend_log.remove()
 
-  var argv: List[Str] = []
+  var argv = []
   if kind == "firecracker" {
     argv = [firecracker, "--no-api", "--config-file", config]
   } else {

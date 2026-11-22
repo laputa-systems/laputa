@@ -577,7 +577,7 @@ proc stage_vendored_outputs() {
 
 proc add_libgallium_link_map() -> Result[Str, Error] {
   let ninja = p"build/build.ninja"
-  var output: List[Str] = []
+  var output = []
   var in_edge = false
   var library = ""
 
