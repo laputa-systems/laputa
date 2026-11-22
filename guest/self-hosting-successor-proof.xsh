@@ -33,7 +33,7 @@ proc verify_successor(root: Path, expected_tools = p"/run/self-hosting-output/ta
 
 proc main(root: Path, expected_tools = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, error] {
   guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
-  let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
+  let release_input = if release_inputs.is_empty() { null } else { fp"{release_inputs[0]}" }
   verify_successor(root, expected_tools, release_input)
 }
 

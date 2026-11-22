@@ -5,11 +5,11 @@ proc main(...argv: List[Str]) [fs, process, error] {
   guard argv.len() == 5 else {
     fail "usage: maintained_state_image.xsh STATE_ROOT OUTPUT SIZE FORMATTER XSH"
   }
-  let root = Path(argv[0])
-  let output = Path(argv[1])
+  let root = fp"{argv[0]}"
+  let output = fp"{argv[1]}"
   let size = argv[2] as Int
-  let formatter = Path(argv[3])
-  let xsh = Path(argv[4])
+  let formatter = fp"{argv[3]}"
+  let xsh = fp"{argv[4]}"
   let owners = first_boot.state_ownership(root)?
   with scratch = fs.tempdir_in(output.parent())? {
     let owner_file = fp"{scratch.host_path()?}/owners.json"

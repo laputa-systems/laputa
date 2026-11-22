@@ -1,8 +1,8 @@
 use pm.generation
 
 if args[0] == "compose" {
-  let value = generation.read_generation_plan(Path(args[1]))?
-  match generation.compose(value, Path(args[2]), Path(args[3]), Path(args[4])) {
+  let value = generation.read_generation_plan(fp"{args[1]}")?
+  match generation.compose(value, fp"{args[2]}", fp"{args[3]}", fp"{args[4]}") {
     Ok(_) => print "published"
     Err(_) => print "refused"
   }
@@ -10,16 +10,16 @@ if args[0] == "compose" {
 }
 
 unix.pid1_setup([], subreaper: true, allow_non_pid1: true)
-let runner = Path(args[0])
-let script = Path(args[1])
-let saved_plan = Path(args[2])
-let store = Path(args[3])
-let parent = Path(args[4])
-let overlay = Path(args[5])
-let outside = Path(args[6])
-let evil = Path(args[7])
+let runner = fp"{args[0]}"
+let script = fp"{args[1]}"
+let saved_plan = fp"{args[2]}"
+let store = fp"{args[3]}"
+let parent = fp"{args[4]}"
+let overlay = fp"{args[5]}"
+let outside = fp"{args[6]}"
+let evil = fp"{args[7]}"
 let kind = args[8]
-let log = Path(args[9])
+let log = fp"{args[9]}"
 let published = fp"{parent}/failed"
 let child = unix.spawn_process_group_log(process.command_argv(runner, ["xsh", script, "compose", saved_plan, store, published, overlay], env: {LAPUTA_MANUAL_INDEX_SENTINEL: fp"{outside}/sentinel"}), log)?
 var groups = [child.pid]

@@ -115,7 +115,7 @@ proc run_argv(header: Record, scoped: Bool) [env, fs, process, error] -> Result[
       guard requested.starts_with("/") and "\u{0}" not in requested else {
         return Err(refuse("cwd", "cwd must be an absolute directory"))
       }
-      dir = Path(requested)
+      dir = fp"{requested}"
       guard dir.exists() and dir.is_dir() else {
         return Err(refuse("cwd", "cwd must be an existing directory"))
       }

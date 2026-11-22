@@ -13,7 +13,7 @@ proc verify_previous(root: Path, expected_os_release: Path? = null) [fs, process
 
 proc main(root: Path, ...release_inputs: List[Str]) [fs, process, env, error] {
   guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
-  let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
+  let release_input = if release_inputs.is_empty() { null } else { fp"{release_inputs[0]}" }
   verify_previous(root, release_input)
 }
 

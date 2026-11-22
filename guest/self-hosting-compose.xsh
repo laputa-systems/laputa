@@ -76,7 +76,7 @@ proc compose(root: Path, toolchain = p"/run/self-hosting-output/target/x86_64-un
 
 proc main(root: Path, toolchain = p"/run/self-hosting-output/target/x86_64-unknown-linux-musl/verification", ...release_inputs: List[Str]) [fs, process, env, time, error] {
   guard release_inputs.len() <= 1 else { fail "expected at most one declared os-release input" }
-  let release_input = if release_inputs.is_empty() { null } else { Path(release_inputs[0]) }
+  let release_input = if release_inputs.is_empty() { null } else { fp"{release_inputs[0]}" }
   compose(root, toolchain, release_input)
 }
 

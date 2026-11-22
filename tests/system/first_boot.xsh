@@ -483,7 +483,7 @@ test test_state_image_publication_preserves_old_output_on_invalid_state [fs, pro
   let image = fp"{root}/state.ext4"
   first_boot.apply(source, base("new"))
   fp"{source}/format".write("laputa-maintained-state-1\n")
-  let xsh = Path(e"XSH_HOST" ?? "xsh")
+  let xsh = fp"{e"XSH_HOST" ?? "xsh"}"
   let argv = [xsh.display(), "system/maintained_state_image.xsh", "--", source.display(), image.display(), "8388608", "packages/laputa-fs/files/mkfs.ext4.xsh", xsh.display()]
   assert process.run(process.command_argv(xsh, argv))?.ok
   assert image.metadata()?.mode.bit_and(0o777) == 0o600

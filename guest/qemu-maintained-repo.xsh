@@ -22,7 +22,7 @@ proc cmdline_value(name: Str) -> Result[Str] {
 }
 
 proc accepted_generation(url: Str) -> Result[Str] {
-  let accepted = repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(Path(STATE_DIR), url))?
+  let accepted = repo_snapshot.snapshot_read_accepted(repo_snapshot.snapshot_state_paths(fp"{STATE_DIR}", url))?
   if accepted == null { "none" } else { accepted.generation }
 }
 
