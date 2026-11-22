@@ -112,7 +112,7 @@ export proc linux_kbuild_discover_prepared(
     return Err(kbuild.ScriptError.Failed(kind: "linux-kbuild-case-input", message: "discovery scratch must not contain symlink components"))
   }
   let source = source_root.resolve()?
-  if ! source.display().starts_with(scratch.display() + "/") or source.metadata()?.kind != "dir" {
+  if ! source.display().starts_with(scratch.display() + "/") or ! source.is_dir()? {
     return Err(kbuild.ScriptError.Failed(kind: "linux-kbuild-case-input", message: "discovery source must be an owned directory under .work/tmp"))
   }
   for relative_output in [
