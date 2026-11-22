@@ -27,7 +27,7 @@ export proc self_hosting_verify_bundle(bundle: Path, expected_generation: Str, s
   let start = bytes.unpack_le(partition, 8, offset: 32)? * sector_bytes
   var offset = 0
   while offset < size {
-    let count = if size - offset < 1024 * 1024 { size - offset } else { 1024 * 1024 }
+    let count = if size - offset < 1MiB { size - offset } else { 1024 * 1024 }
     fail "successor disk root payload differs from its root filesystem" unless bytes.read_at(disk, start + offset, count)? == bytes.read_at(rootfs, offset, count)?
     offset += count
   }

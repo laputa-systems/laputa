@@ -28,7 +28,7 @@ proc main(mode = "verification") [fs, process, env, error] {
   if mode == "debug" {
     process.set_rlimit("stack", soft: 8 * 1024 * 1024, hard: 8 * 1024 * 1024)
     let limit = process.rlimit("stack")?
-    assert limit.soft == 8 * 1024 * 1024 and limit.hard == 8 * 1024 * 1024
+    assert limit.soft == 8MiB and limit.hard == 8MiB
     let text = json.encode(limit)?
     print "LAP19_STACK_LIMIT" $text
     build_environment.CARGO_TARGET_DIR = "/output/target-debug"
