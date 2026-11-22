@@ -8,7 +8,7 @@ proc expected_status() -> Result[Int] {
 }
 
 proc mounted_read_only(mount_point: Str) -> Result[Bool] {
-  for line in p"/proc/mounts".read_text()?.lines() {
+  for line in p"/proc/mounts".read_lines()? {
     let fields = line.words()
     return "ro" in fields[3].split(",") when fields.len() > 3 and fields[1] == mount_point
   }

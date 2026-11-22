@@ -26,7 +26,7 @@ proc main(arch: Str, package_tools_image: Str, profile_overlay_path: Str) [fs, p
   }
   let build_plan = pm_plan_json.read(plan_path)?
   let profile = pm_generation.overlay_profile(overlay)?
-  let extra_roots = [name for name in p"/output/extra-packages".read_text()?.lines() if name.trim() != ""]
+  let extra_roots = [name for name in p"/output/extra-packages".read_lines()? if name.trim() != ""]
   let runtime_roots = base_runtime_roots + extra_roots
   let generation_plan = pm_generation.plan_profile(build_plan, runtime_roots, profile)?
   let generation_root = fp"/output/generations/{generation_plan.generation_sha256}"

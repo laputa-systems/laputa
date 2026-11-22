@@ -501,7 +501,7 @@ proc release_rig(ctx: TestContext, name: Str, jobs: List[Str]) [fs, process, env
 proc release_calls(rig: ReleaseRig) -> Result[List[Str], Error] {
   let calls = fp"{rig.root}/calls.log"
   return Ok([]) unless calls.exists()
-  Ok(calls.read_text()?.lines() |> where .trim() != "" |> collect)
+  Ok(calls.read_lines()? |> where .trim() != "" |> collect)
 }
 
 pure no_attempts() -> List[timers.TimerRunning] {

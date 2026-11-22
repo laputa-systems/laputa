@@ -43,7 +43,7 @@ proc append_boot_marker(path_value: Path, line: Str) {
   path_value.parent.mkdir()
   var lines = []
   if path_value.exists() {
-    lines = path_value.read_text()?.lines() |> where .trim() != "" |> collect
+    lines = path_value.read_lines()? |> where .trim() != "" |> collect
   }
   lines = cap_marker_lines([@lines, line], 20)
   path_value.write_atomic(lines.join("\n") + "\n")
@@ -81,7 +81,7 @@ proc main() {
   let marker = boot_failed_id(cmdline)? |> boot_marker_line(id, serial, _, report.root_digest, report.profile, services)?
   var pre_lines = []
   if p"/var/log/boot-markers.log".exists() {
-    pre_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect
+    pre_lines = p"/var/log/boot-markers.log".read_lines()? |> where .trim() != "" |> collect
   }
   let laputa_files = collect {
     if p"/var/lib/laputa".exists() {
@@ -96,7 +96,7 @@ proc main() {
     append_boot_marker(p"/var/log/boot-markers.log", marker)
   }
   if p"/var/log/boot-markers.log".exists() {
-    let marker_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect
+    let marker_lines = p"/var/log/boot-markers.log".read_lines()? |> where .trim() != "" |> collect
     p"/dev/console".write(f"LAPUTA_BOOT_MARKER_COUNT {marker_lines.len()}\n")
   }
 }

@@ -18,7 +18,7 @@ proc defined_exports(readelf: Path, library: Path) [fs, process, env, error] -> 
 proc declared_functions(header: Path) -> Result[List[Str], Error] {
   var names = []
 
-  for line in header.read_text()?.lines() {
+  for line in header.read_lines()? {
     if let [_, name] = rx"""\b(fc_[a-z0-9_]+)\(""".captures(line) {
       if name not in names {
         names += [name]

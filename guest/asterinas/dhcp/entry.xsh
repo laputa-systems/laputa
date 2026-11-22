@@ -87,7 +87,7 @@ proc elapsed_ms() -> Result[Int] {
 proc show_client_log() {
   let log = fp"{WORK}/client.log"
   if log.exists() {
-    for line in log.read_text()?.lines() { eprint --flush f"NET_DHCP_CLIENT_LOG {line}" }
+    for line in log.read_lines()? { eprint --flush f"NET_DHCP_CLIENT_LOG {line}" }
   }
 }
 
@@ -256,7 +256,7 @@ proc link_lines(label: Str) [fs, process, env, net, error] {
   let listing = fp"{WORK}/ifconfig.out"
   let status = process.run(process.command_argv(p"/usr/bin/xsh", [p"/usr/bin/xsh", p"/usr/lib/xsh/core/ifconfig", "eth0"], WORK, {XSH_MODULE_PATH: "/usr/lib/xsh/core", LC_ALL: "C"}, b"", listing, listing))?
   guard status.ok else { fail f"ifconfig eth0 failed: {listing.read_text()?}" }
-  for line in listing.read_text()?.lines() {
+  for line in listing.read_lines()? {
     if line.trim().starts_with("TX errors") { eprint --flush f"NET_DHCP_{label}_IFCONFIG {line.trim()}" }
   }
 }
@@ -420,7 +420,7 @@ proc syslog_consumer() [fs, process, env, time, net, error] {
   p"/dev/kmsg".write("<14>laputa-syslog: a kernel ring record\n")
   time.sleep(1s)
   let _ = unix.shutdown_process_groups([receiver.pid], 3s, 100ms)?
-  for line in log.read_text()?.lines() {
+  for line in log.read_lines()? {
     guard !("source=kmsg" in line) or "laputa-syslog" in line else { continue }
     guard !line.starts_with("event=stop") else {
       eprint --flush f"NET_DHCP_syslog_STOP {[field for field in line.split(" ") if field.starts_with("dropped_") or field.starts_with("senders=")].join(" ")}"
@@ -429,7 +429,7 @@ proc syslog_consumer() [fs, process, env, time, net, error] {
     eprint --flush f"NET_DHCP_syslog_LINE {syslog_record(line)}"
   }
   if errors.exists() {
-    for line in errors.read_text()?.lines() { eprint --flush f"NET_DHCP_syslog_ERR {line}" }
+    for line in errors.read_lines()? { eprint --flush f"NET_DHCP_syslog_ERR {line}" }
   }
 }
 
@@ -453,7 +453,7 @@ proc state_lines() [fs, process, env, time, net, error] -> Result[List[Str]] {
   }
   let resolv = fp"{WORK}/etc/resolv.conf"
   if resolv.exists() {
-    for line in resolv.read_text()?.lines() {
+    for line in resolv.read_lines()? {
       guard line.starts_with("nameserver") else { continue }
       lines += [f"RESOLV {line}"]
     }
@@ -600,7 +600,7 @@ proc main() [fs, process, env, time, net, io, error] {
       let _ = snapshot("rebound")?
       fp"{WORK}/resume".write("x\n")
       if !await_file(fp"{WORK}/tcp-done", 150000) { eprint --flush "NET_DHCP_tcp_TIMEOUT waiting for the transfer" }
-      for line in fp"{WORK}/tcp-result".read_text()?.lines() {
+      for line in fp"{WORK}/tcp-result".read_lines()? {
         if line.starts_with("DHCP_DETAIL") { eprint --flush $line } else { eprint --flush f"NET_DHCP_tcp_disrupted {line}" }
       }
       let after = run.text /usr/lib/asterinas/case/tcp-client "transfer"

@@ -120,7 +120,7 @@ proc options(services: List[Str]) -> Result[quiesce.QuiesceOptions, Error] {
 proc transitions(rig: Rig) -> Result[List[Str], Error] {
   let log = fp"{rig.env.state_dir}/stub.log"
   return Ok([]) unless log.exists()
-  Ok(log.read_text()?.lines() |> where .trim() != "" |> collect)
+  Ok(log.read_lines()? |> where .trim() != "" |> collect)
 }
 
 proc plan(rig: Rig, services: List[Str]) -> Result[quiesce.QuiesceRecord, Error] {
@@ -186,7 +186,7 @@ test test_every_stop_and_release_request_carries_the_attempts_token [fs, process
   quiesce.quiesce_write_record(r.env, record)
   quiesce.quiesce_stop_service(r.env, record, "logger")
   assert quiesce.quiesce_release_record(r.env, "backup", 0)?
-  let requests = fp"{r.env.state_dir}/requests.log".read_text()?.lines() |> where .trim() != "" |> collect
+  let requests = fp"{r.env.state_dir}/requests.log".read_lines()? |> where .trim() != "" |> collect
   assert requests.len() == 2
   assert requests[0].ends_with(f"stop --owner {record.token} logger"), requests[0]
   assert requests[1].ends_with(f"start --if-owner {record.token} logger"), requests[1]

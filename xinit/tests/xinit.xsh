@@ -2332,7 +2332,7 @@ export let service = {
   let saved = fp"{run_dir}/crasher.json".read_text()?
   let restarts = rx"\x22restarts\x22:([0-9]+)".captures(saved)[1] as Int
   assert restarts >= 1, saved
-  assert fp"{log_root}/crasher/current".read_text()?.lines().len() >= 2
+  assert fp"{log_root}/crasher/current".read_lines()?.len() >= 2
 }
 
 test test_control_requests_parse_owner_qualifiers [fs, process, error] { |ctx|

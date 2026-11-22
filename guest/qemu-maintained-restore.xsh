@@ -210,7 +210,7 @@ proc phase_restore() {
   let snap1 = fp"{backup_mount}/snap1.id".read_text()?.trim()
   guard snap1 != "" else { fail "snap1.id is missing" }
   let _ = rustic(["restore", "latest", blank_mount.display()], pw2)?
-  let before = fp"{backup_mount}/hashes-before.txt".read_text()?.lines() |> where .trim() != "" |> collect
+  let before = fp"{backup_mount}/hashes-before.txt".read_lines()? |> where .trim() != "" |> collect
   guard before.len() > 0 else { fail "hash manifest is empty" }
   let bare = collect {
     for entry in before {

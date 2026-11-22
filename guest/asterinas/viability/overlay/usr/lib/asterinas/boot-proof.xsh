@@ -243,7 +243,7 @@ proc main() [fs, process, env, time, net, error] {
     let git_marker = fp"{source_root}/.git"
     git_marker.mkdir()
     let failed_selections = collect {
-      for test_selection in test_selection_path.read_text()?.lines() {
+      for test_selection in test_selection_path.read_lines()? {
         continue when test_selection.trim() == ""
         eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
         let test_run = try { stream_xsh_tests(source_root, test_selection)? }
