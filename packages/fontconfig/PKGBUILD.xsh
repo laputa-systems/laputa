@@ -65,7 +65,7 @@ proc split_edge(split: NinjaSplit, block: List[Str]) -> Result[NinjaSplit] {
 
 proc stage_generated() {
   let ninja = p"build/build.ninja"
-  var split: NinjaSplit = {kept: [], removed: []}
+  var split: NinjaSplit = NinjaSplit(kept: [], removed: [])
   var block = []
   for line in ninja.read_text()?.split("\n") {
     if ! block.is_empty() and line.starts_with(" ") {
@@ -91,7 +91,7 @@ proc stage_generated() {
     fs.install(entry.path, fp"build/{output}", 0o644, parents: true, overwrite: true)
   }
   for output in split.removed {
-    if output.ends_with(".h") and ! fp"build/{output}".exists()? {
+    if output.ends_with(".h") and ! fp"build/{output}".exists() {
       return Err(types.PmError.PackageContract(f"fontconfig: missing generated {output}"))
     }
   }
@@ -129,7 +129,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     env ({DESTDIR: dest}) {
       run $meson "install" "-C" "build" "--no-rebuild"
     }
-  }?
+  }
   fp"{dest}/etc/fonts".remove(missing_ok: false)
   fp"{dest}/var/cache/fontconfig".mkdir(true)
 }

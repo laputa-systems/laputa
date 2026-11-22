@@ -1,6 +1,6 @@
 ##! XSH module `PKGBUILD` package and build operations.
-use pm.types
 use pm.target as pm_target
+use pm.types
 
 ## Exported declaration `name`.
 export const name = "gnu-stubs"

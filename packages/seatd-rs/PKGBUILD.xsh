@@ -1,7 +1,7 @@
 ##! XSH module `seatd-rs` package and build operations.
-use packages.upstream_pins as upstream_pins
-use pm.target as pm_target
+use packages.upstream_pins
 use pm.rust as pm_rust
+use pm.target as pm_target
 use pm.types
 use pm.util as pm_util
 
@@ -85,7 +85,7 @@ export proc build(dest: Path) [fs, process, env, error] {
     types.TargetReserved => { return Err(types.PmError.PackageContract("unsupported seatd-rs target")) }
   }
 
-  let x86_64_rustflags = if build_target == types.X86_64LinuxMusl and target != build_target {
+  let x86_64_rustflags = if build_target == .X86_64LinuxMusl and target != build_target {
     host_rustflags
   } else {
     target_rustflags

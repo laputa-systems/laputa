@@ -1,5 +1,5 @@
 ##! XSH module `proof` package and build operations.
-use packages.upstream_pins as upstream_pins
+use packages.upstream_pins
 use pm.target as pm_target
 use pm.types
 
@@ -63,11 +63,8 @@ proc ensure_x86_bzimage(image_path: Path) {
   }
 }
 
-proc main(rootfs = p"/rootfs") [fs, env, error] -> Result[Unit, Error] {
-  let target = match pm_target.recipe_target() {
-    Ok(value) => value
-    Err(problem) => { return Err(ProofError.Failed(kind: "proof-linux", message: f"unsupported proof arch: {problem.message}")) }
-  }
+proc main(rootfs = p"/rootfs") [fs, env, error] {
+  let target = pm_target.recipe_target() ?? { return Err(ProofError.Failed(kind: "proof-linux", message: f"unsupported proof arch: {.message}")) }
   ensure_file(fp"{rootfs}/boot/vmlinuz", "kernel image")
   ensure_file(fp"{rootfs}/boot/vmlinuz-{kernel_release}", "versioned kernel image")
   ensure_file(fp"{rootfs}/usr/share/linux/config-{kernel_release}", "kernel config")

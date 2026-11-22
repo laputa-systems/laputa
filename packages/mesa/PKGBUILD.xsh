@@ -577,28 +577,29 @@ proc stage_vendored_outputs() {
 
 proc add_libgallium_link_map() -> Result[Str, Error] {
   let ninja = p"build/build.ninja"
-  var output: List[Str] = []
   var in_edge = false
   var library = ""
 
-  for line in ninja.read_text()?.split("\n") {
-    if line.starts_with("build ") {
-      let head = line.split(": ")[0]
-      in_edge = head.ends_with(f"/libgallium-{ver}.so")
+  let output = collect {
+    for line in ninja.read_text()?.split("\n") {
+      if line.starts_with("build ") {
+        let head = line.split(": ")[0]
+        in_edge = head.ends_with(f"/libgallium-{ver}.so")
 
-      if in_edge {
-        library = head.byte_slice(6)
+        if in_edge {
+          library = head.byte_slice(6)
+        }
       }
-    }
 
-    if in_edge and line.starts_with("  LINK_ARGS = ") {
-      let args = line.byte_slice(14)
-      output += [f"  LINK_ARGS = -Wl,-Map={libgallium_link_map} {args}"]
-      in_edge = false
-      continue
-    }
+      if in_edge and line.starts_with("  LINK_ARGS = ") {
+        let args = line.byte_slice(14)
+        yield f"  LINK_ARGS = -Wl,-Map={libgallium_link_map} {args}"
+        in_edge = false
+        continue
+      }
 
-    output += [line]
+      yield line
+    }
   }
 
   if library == "" {
@@ -649,7 +650,7 @@ proc report_libgallium_link_map(link_map_path: Path, library: Path) -> Result[St
 
   let file_size = fs.stat(library)?.size
   let map_size = fs.stat(link_map_path)?.size
-  f"mesa link map: {link_map_path.display()} {map_size} bytes sha256 {hash.sha256(link_map_path)?.hex()}; libgallium {library.display()} {file_size} bytes; LLVM {llvm_bytes} bytes in {llvm_sections} live input sections; llvm-toolchain libc++/unwind {cxx_bytes} bytes in {cxx_sections} live input sections; all live input sections {included_bytes} bytes"
+  f"mesa link map: {link_map_path} {map_size} bytes sha256 {hash.sha256(link_map_path)?.hex()}; libgallium {library} {file_size} bytes; LLVM {llvm_bytes} bytes in {llvm_sections} live input sections; llvm-toolchain libc++/unwind {cxx_bytes} bytes in {cxx_sections} live input sections; all live input sections {included_bytes} bytes"
 }
 
 ## Package recipe export.

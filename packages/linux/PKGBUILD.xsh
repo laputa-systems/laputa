@@ -1,5 +1,5 @@
 ##! Linux package metadata and the dynamic recipe boundary.
-use packages.upstream_pins as upstream_pins
+use packages.upstream_pins
 
 ## Exported declaration `name`.
 export const name = "linux"

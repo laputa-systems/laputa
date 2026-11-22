@@ -1,5 +1,5 @@
-use packages.linux.kbuild
 use packages.linux.PKGBUILD-shared as linux_shared
+use packages.linux.kbuild
 use pm.make
 
 type ArchiveTaskReport = {argv: List[Str], outputs: List[Str]}
@@ -141,7 +141,7 @@ proc test_builtin_archive_plan(
   cflags: List[Str],
   defs: List[Str],
   includes: List[Str],
-) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+) -> Result[kbuild.BuiltinArchivePlan] {
   env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
     XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
@@ -159,7 +159,7 @@ proc test_builtin_archive_plan_with_workers(
   analysis_jobs: Int,
   xsh_bin: Path,
   worker: Path,
-) [fs, process, env, time, error] -> Result[kbuild.BuiltinArchivePlan] {
+) -> Result[kbuild.BuiltinArchivePlan] {
   env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),
     XSH_LINUX_KBUILD_TRUST_COMPILE_FLAGS_CACHE: "0"}) {
     return kbuild.plan_builtin_archives_with_analysis_workers(
@@ -360,7 +360,7 @@ test test_kbuild_rebuilds_legacy_discovered_plan_cache [fs, process, env, time, 
       let repaired = linux_shared.cached_package_plan("arm64")?
       assert contains_path(repaired.objects, "init/main.o")
       assert ! contains_path(repaired.objects, "init/stale.o")
-    }?
+    }
   }
 }
 
@@ -385,7 +385,7 @@ endif
       let x86 = linux_shared.cached_package_plan("x86")?
       assert contains_path(x86.objects, "x86.o")
       assert ! contains_path(x86.objects, "arm.o")
-    }?
+    }
   }
 }
 
@@ -411,7 +411,7 @@ test test_kbuild_plan_cache_invalidates_nested_and_included_makefiles [fs, proce
       nested.write(nested.read_text()? + "obj-y += nested-added.o\n")
       let third = linux_shared.cached_package_plan("arm64")?
       assert contains_path(third.objects, "init/nested-added.o")
-    }?
+    }
   }
 }
 
@@ -774,15 +774,15 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, time, err
   assert calls.read_text()? == "first\nsecond\n"
   kbuild.run_archive_plan_output(plan, second, 1)
   assert calls.read_text()? == "first\nsecond\n"
-  fs.set_times(second, mtime_sec: 4039372800)?
+  fs.set_times(second, mtime_sec: 4039372800)
   source.write("changed")
-  fs.set_times(source, mtime_sec: 4070908800)?
+  fs.set_times(source, mtime_sec: 4070908800)
   kbuild.run_archive_plan_output(plan, second, 1)
   assert first.read_text()? == "changed"
   assert second.read_text()? == "changedsecond"
   assert calls.read_text()? == "first\nsecond\nfirst\nsecond\n"
   assert ! unused.exists()?
-  let archive_plan: kbuild.BuiltinArchivePlan = {
+  let archive_plan: kbuild.BuiltinArchivePlan = kbuild.BuiltinArchivePlan(
     tasks: [
       {name: "first", outputs: [first], inputs: [source], deps: [], argv: ["/bin/true"], cwd: root,
         env: {}, depfile: p"", stamp: p""},
@@ -798,7 +798,7 @@ test test_kbuild_runs_archive_plan_output_from_json [fs, process, env, time, err
     missing_sources: [],
     generated_objects: [],
     duplicate_outputs: [],
-  }
+  )
   cd (root) {
     env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_LINUX_KBUILD_JOBS: "1"}) {
       match linux_shared.run_targeted_kbuild_outputs(archive_plan, second.display()) {
@@ -894,7 +894,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
   fake.mkdir()
   fp"{fake}/xsh".write("#!/bin/sh\nprintf x >> \"$(dirname \"$0\")/calls\"\nexec /bin/cp \"$3\" \"$4\"\n", mode: 0o755)
   helper.write(p"packages/linux/efi-stubcopy.xsh".read_text()?)
-  fs.set_times(helper, mtime_sec: 1000000000)?
+  fs.set_times(helper, mtime_sec: 1000000000)
   fp"{recipe}/kbuild-archive-analysis-worker.xsh".write(p"packages/linux/kbuild-archive-analysis-worker.xsh".read_text()?)
   fp"{root}/drivers/firmware/efi/libstub".mkdir()
   fp"{root}/.config".write("CONFIG_X86=y\n")
@@ -916,7 +916,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
       assert first.missing_sources.is_empty()
       let base = p".xsh-kbuild/obj/drivers/firmware/efi/libstub/gop.o"
       let output = p".xsh-kbuild/obj/drivers/firmware/efi/libstub/gop.stub.o"
-      base.parent.mkdir(parents: true)
+      base.parent.mkdir()
       base.write("compiled object\n")
       let copies = [task for task in first.tasks if task.name == output.display()]
       assert copies.len() == 1
@@ -926,7 +926,7 @@ test test_kbuild_archive_plan_cache_binds_efi_stub_helper [fs, process, env, tim
       let fingerprint = p".xsh-kbuild-archive-plan.fingerprint"
       let before = fingerprint.read_text()?
       helper.write(helper.read_text()? + "\n")
-      fs.set_times(helper, mtime_sec: 1000000000)?
+      fs.set_times(helper, mtime_sec: 1000000000)
       let second = linux_shared.cached_archive_plan(plan, p"/usr/bin/cc", "x86", "x86_64-linux-gnu", [], [])?
       assert second.missing_sources.is_empty()
       assert fingerprint.read_text()? != before
@@ -1136,7 +1136,7 @@ test test_kbuild_parallel_archive_analysis_matches_serial [fs, process, env, tim
       assert "-DCHANGED" not in tasks[0].argv
       assert p"first.o" not in captured.missing_sources
       assert [task for task in captured.tasks if task.name == ".xsh-kbuild/obj/kernel/jump_label.o"].len() == 1
-    }?
+    }
   }
 }
 
@@ -1294,12 +1294,11 @@ CFLAGS_bar.o := $(call cc-disable-warning,xsh-no-such-warning) -DBAR
   let plan: kbuild.KbuildPlan = kbuild.KbuildPlan(
     dirs: [p"."], objects: [p"foo.o", p"bar.o"], lib_objects: [], archive_owners: [], composites: [], unsupported: [],
   )
-  let clang = match process.which("clang") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("clang is unavailable to evaluate the compiler option calls")
-      return
-    },
+  let clang = if let Ok(found) = process.which("clang") {
+    found
+  } else {
+    test.skip("clang is unavailable to evaluate the compiler option calls")
+    return
   }
   cd (root) {
     let archive_plan = test_builtin_archive_plan(cache, plan, clang, "x86_64-linux-gnu", [], [], [])?
@@ -1394,7 +1393,7 @@ test test_kbuild_compile_flags_cache_binds_parsed_include [fs, process, env, tim
   let included = fp"{root}/flags.include"
   let replacement = fp"{root}/replacement"
   replacement.write("CFLAGS_foo.o := -DNEW\n")
-  fs.mkfifo(included, 0o600)?
+  fs.mkfifo(included, 0o600)
   let command = process.command_argv(
     p"/bin/sh",
     ["/bin/sh", "-c", "exec 3>\"$1\"; printf 'CFLAGS_foo.o := -DOLD\\n' >&3; mv \"$2\" \"$1\"; exec 3>&-", "fixture", included, replacement],
@@ -1414,7 +1413,7 @@ test test_kbuild_compile_flags_cache_binds_parsed_include [fs, process, env, tim
     assert "-DOLD" in tasks[0].argv
     assert "-DNEW" not in tasks[0].argv
     included.remove(missing_ok: false)
-    fs.mkfifo(included, 0o600)?
+    fs.mkfifo(included, 0o600)
     replacement.write("CFLAGS_foo.o := -DNEW\n")
     let second_writer = spawn command?
     defer second_writer.cancel(kill_after: 0ms)
@@ -1438,7 +1437,7 @@ test test_kbuild_archive_plan_cache_binds_parsed_compile_flags [fs, process, env
   let included = fp"{root}/flags.include"
   let replacement = fp"{root}/replacement"
   replacement.write("CFLAGS_foo.o := -DNEW\n")
-  fs.mkfifo(included, 0o600)?
+  fs.mkfifo(included, 0o600)
   let command = process.command_argv(
     p"/bin/sh",
     ["/bin/sh", "-c", "exec 3>\"$1\"; printf 'CFLAGS_foo.o := -DOLD\\n' >&3; mv \"$2\" \"$1\"; exec 3>&-", "fixture", included, replacement],
@@ -1525,7 +1524,7 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
       original_report.write(report_text)
       changed_report.write(report_text.replace("/usr/bin/false", with: "/usr/bin/cc"))
       report.remove(missing_ok: false)
-      fs.mkfifo(report, 0o600)?
+      fs.mkfifo(report, 0o600)
       let replace_report = process.command_argv(
         p"/bin/sh",
         ["/bin/sh", "-c", "exec 3>\"$1\"; cat \"$2\" >&3; mv \"$3\" \"$1\"; exec 3>&-", "fixture", report, original_report, changed_report],
@@ -1542,7 +1541,7 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
       env ({XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let reused = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert reused.task_count == repaired.task_count
-      }?
+      }
       for report in [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"] {
         let summary = kbuild.archive_plan_summary_path(report)
         let stored = json.read(summary)?.require(ArchiveSummaryReport)?
@@ -1551,20 +1550,20 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan"}) {
         let repaired_summary = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert repaired_summary.task_count == repaired.task_count
-      }?
+      }
       let reports = [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"]
-      for report in reports { report.chmod(0o000)? }
+      for report in reports { report.chmod(0o000) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count
-      }?
-      for report in reports { report.chmod(0o644)? }
+      }
+      for report in reports { report.chmod(0o644) }
       let report_texts = [report.read_text()? for report in reports]
       for report in reports { report.remove(missing_ok: false) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count
-      }?
+      }
       for index in range(reports.len()) { reports[index].write(report_texts[index]) }
       p"foo.S".write(".text\n")
       p"foo.c".remove(missing_ok: false)

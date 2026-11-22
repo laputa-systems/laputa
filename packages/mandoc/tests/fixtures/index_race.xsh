@@ -1,8 +1,8 @@
 use pm.generation
 
 if args[0] == "compose" {
-  let value = generation.read_generation_plan(Path(args[1]))?
-  match generation.compose(value, Path(args[2]), Path(args[3]), Path(args[4])) {
+  let value = generation.read_generation_plan(fp"{args[1]}")?
+  match generation.compose(value, fp"{args[2]}", fp"{args[3]}", fp"{args[4]}") {
     Ok(_) => print "published"
     Err(_) => print "refused"
   }
@@ -10,16 +10,16 @@ if args[0] == "compose" {
 }
 
 unix.pid1_setup([], subreaper: true, allow_non_pid1: true)
-let runner = Path(args[0])
-let script = Path(args[1])
-let saved_plan = Path(args[2])
-let store = Path(args[3])
-let parent = Path(args[4])
-let overlay = Path(args[5])
-let outside = Path(args[6])
-let evil = Path(args[7])
+let runner = fp"{args[0]}"
+let script = fp"{args[1]}"
+let saved_plan = fp"{args[2]}"
+let store = fp"{args[3]}"
+let parent = fp"{args[4]}"
+let overlay = fp"{args[5]}"
+let outside = fp"{args[6]}"
+let evil = fp"{args[7]}"
 let kind = args[8]
-let log = Path(args[9])
+let log = fp"{args[9]}"
 let published = fp"{parent}/failed"
 let child = unix.spawn_process_group_log(process.command_argv(runner, ["xsh", script, "compose", saved_plan, store, published, overlay], env: {LAPUTA_MANUAL_INDEX_SENTINEL: fp"{outside}/sentinel"}), log)?
 var groups = [child.pid]
@@ -31,7 +31,7 @@ var staging: List[Path] = []
 var attempts = 0
 while staging.is_empty() and attempts < 500 {
   for entry in fs.children(parent)? {
-    if fp"{entry.path}/usr/share/man/.race-ready".exists()? { staging = [entry.path] }
+    if fp"{entry.path}/usr/share/man/.race-ready".exists() { staging = [entry.path] }
   }
   if staging.is_empty() { time.sleep(10ms) }
   attempts += 1
@@ -52,11 +52,11 @@ if kind == "program" {
   root.symlink(target: fp"{outside}/manuals", path: p"usr/share/man")
 } else {
   let replacement = fp"{outside}/{stage.name}"
-  fp"{replacement}/usr/bin".mkdir(parents: true)
+  fp"{replacement}/usr/bin".mkdir()
   evil.copy(to: fp"{replacement}/usr/bin/makewhatis")
-  fp"{replacement}/usr/lib".mkdir(parents: true)
+  fp"{replacement}/usr/lib".mkdir()
   fp"{outside}/library".copy(to: fp"{replacement}/usr/lib/libz.so.1")
-  fp"{replacement}/usr/share/man/man1".mkdir(parents: true)
+  fp"{replacement}/usr/share/man/man1".mkdir()
   fp"{outside}/manuals/man1/outside.1".copy(to: fp"{replacement}/usr/share/man/man1/outside.1")
   parent.rename(to: fp"{parent}.retained")
   parent.symlink(to: outside)

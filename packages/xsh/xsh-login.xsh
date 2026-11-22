@@ -1,5 +1,5 @@
 #!/bin/xsh
-error LoginShellError = Failed(message: Str)
+error LoginShellError = Failed
 
 proc main(...argv: List[Str]) [fs, process, env, error] {
   guard argv.len() == 2 and argv[0] == "-c" else {
@@ -8,8 +8,8 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
 
   let scratch = fs.tempdir()?
   let source = fp"{scratch.host_path()?}/command.xsh"
-  source.write(argv[1])?
-  let status = process.run(process.command_argv(p"/bin/xsh", ["/bin/xsh", source.display()], fs.cwd()?, {}))?
+  source.write(argv[1])
+  let status = process.run(process.command_argv(p"/bin/xsh", ["/bin/xsh", source], fs.cwd()?, {}))?
 
   if ! status.ok {
     if status.exited() {
@@ -20,4 +20,3 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
   }
 }
 
-main(@args)?

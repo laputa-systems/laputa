@@ -1,9 +1,9 @@
 ##! perf, the Linux performance tool, built from the kernel tarball's tools/perf.
+use packages.upstream_pins
 use pm.make
-use pm.util as pm_util
-use pm.types
 use pm.target as pm_target
-use packages.upstream_pins as upstream_pins
+use pm.types
+use pm.util as pm_util
 
 error PerfBuildError = UnsupportedArch | MissingKernelVersion
 

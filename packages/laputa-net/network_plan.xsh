@@ -67,7 +67,7 @@ export proc network_read_input(input: Path) [fs, error] -> Result[Str, Error] {
   if snapshot.truncated {
     return Err(NetworkPolicyError.NetworkInvalid(f"network input exceeds {network_input_limit} bytes"))
   }
-  let data: Bytes = snapshot.data
+  let data = snapshot.data
   data.utf8()
 }
 
@@ -98,16 +98,17 @@ export pure network_is_ipv6(value: Str) -> Bool {
 
 pure hex_pieces(text: Str) -> List[Int]? {
   return [] when text.is_empty()
-  var values: List[Int] = []
-  for piece in text.split(":") {
-    return null when piece.is_empty() or piece.byte_len() > 4
-    var value = 0
-    for digit in piece {
-      let position = hex_digits.find(digit)
-      return null when position == null
-      value = value * 16 + position
+  let values = collect {
+    for piece in text.split(":") {
+      return null when piece.is_empty() or piece.byte_len() > 4
+      var value = 0
+      for digit in piece {
+        let position = hex_digits.find(digit)
+        return null when position == null
+        value = value * 16 + position
+      }
+      yield value
     }
-    values += [value]
   }
   values
 }
@@ -231,7 +232,7 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
   }
   var seen_addresses: List[NetworkAddress] = []
   for address in observed.addresses {
-    if network_is_ipv6(address.local) != ipv6 {
+    guard network_is_ipv6(address.local) == ipv6 else {
       return Err(NetworkPolicyError.NetworkInvalid(f"observed cohort holds an address outside the intent's {family} family"))
     }
     if !valid_address(address) or address in seen_addresses {
@@ -241,7 +242,7 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
   }
   var seen_routes: List[NetworkDefaultRoute] = []
   for route in observed.routes {
-    if network_is_ipv6(route.gateway) != ipv6 {
+    guard network_is_ipv6(route.gateway) == ipv6 else {
       return Err(NetworkPolicyError.NetworkInvalid(f"observed cohort holds a default route outside the intent's {family} family"))
     }
     if !valid_route(route, ipv6) or route in seen_routes {
@@ -251,7 +252,7 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
   }
   seen_addresses = []
   for address in owned.addresses {
-    if network_is_ipv6(address.local) != ipv6 {
+    guard network_is_ipv6(address.local) == ipv6 else {
       return Err(NetworkPolicyError.NetworkInvalid(f"ownership holds an address outside the intent's {family} family"))
     }
     if !valid_address(address) or address in seen_addresses {
@@ -261,7 +262,7 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
   }
   seen_routes = []
   for route in owned.routes {
-    if network_is_ipv6(route.gateway) != ipv6 {
+    guard network_is_ipv6(route.gateway) == ipv6 else {
       return Err(NetworkPolicyError.NetworkInvalid(f"ownership holds a default route outside the intent's {family} family"))
     }
     if !valid_route(route, ipv6) or route in seen_routes {
@@ -288,15 +289,16 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
       return Err(NetworkPolicyError.NetworkInvalid("default route metric is occupied; explicit reconciliation required"))
     }
   }
-  var operations: List[NetworkOperation] = []
-  if !observed.up { operations += [NetworkBringLinkUp] }
-  if intent.address not in observed.addresses { operations += [NetworkAddAddress(intent.address)] }
-  if desired_route not in observed.routes { operations += [NetworkAddDefaultRoute(desired_route)] }
-  for route in owned.routes {
-    if route != desired_route and route in observed.routes { operations += [NetworkRemoveDefaultRoute(route)] }
-  }
-  for address in owned.addresses {
-    if address != intent.address and address in observed.addresses { operations += [NetworkRemoveAddress(address)] }
+  let operations: List[NetworkOperation] = collect {
+    yield NetworkBringLinkUp unless observed.up
+    yield NetworkAddAddress(intent.address) when intent.address not in observed.addresses
+    yield NetworkAddDefaultRoute(desired_route) when desired_route not in observed.routes
+    for route in owned.routes {
+      if route != desired_route and route in observed.routes { yield NetworkRemoveDefaultRoute(route) }
+    }
+    for address in owned.addresses {
+      if address != intent.address and address in observed.addresses { yield NetworkRemoveAddress(address) }
+    }
   }
   Ok({intent, owned, before: observed, operations})
 }
@@ -305,29 +307,27 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
 export pure network_replay(plan: NetworkPlan, events: List[NetworkReplayEvent]) -> NetworkReplayResult {
   match network_plan(plan.intent, plan.owned, plan.before) {
     Err(_) => return NetworkInvalid("invalid plan precondition")
-    Ok(expected_plan) => {
-      if expected_plan != plan { return NetworkInvalid("plan operations do not match policy") }
-    }
+    Ok(expected_plan) => return NetworkInvalid("plan operations do not match policy") when expected_plan != plan
   }
   if events.len() > network_replay_limit { return NetworkInvalid(f"replay exceeds {network_replay_limit} events") }
-  if events.is_empty() { return NetworkInvalid("missing precondition observation") }
+  return NetworkInvalid("missing precondition observation") when events.is_empty()
   match events[0] {
     NetworkLostEvents => return NetworkReobserve("lost events require full observation")
     NetworkTruncated => return NetworkInvalid("truncated observation")
-    NetworkPrecondition(observed) => {
-      if observed != plan.before { return NetworkReobserve("stale precondition") }
-    }
+    NetworkPrecondition(observed) => return NetworkReobserve("stale precondition") when observed != plan.before
     NetworkApplied(_) | NetworkDenied(_) | NetworkFailed(_) | NetworkObserved(_) => return NetworkInvalid("expected precondition observation")
   }
   var next_operation = 0
   var converged = false
-  let expected: NetworkOwnership = {
-    ifindex: plan.intent.ifindex, name: plan.intent.name,
-    addresses: [plan.intent.address], routes: [network_desired_route(plan.intent)],
-  }
+  let expected: NetworkOwnership = NetworkOwnership(
+    ifindex: plan.intent.ifindex,
+    name: plan.intent.name,
+    addresses: [plan.intent.address],
+    routes: [network_desired_route(plan.intent)],
+  )
   for event_index, event in events {
     continue when event_index == 0
-    if converged { return NetworkInvalid("events after final observation") }
+    return NetworkInvalid("events after final observation") when converged
     match event {
       NetworkLostEvents => return NetworkReobserve("lost events require full observation")
       NetworkTruncated => return NetworkInvalid("truncated observation")
@@ -345,12 +345,12 @@ export pure network_replay(plan: NetworkPlan, events: List[NetworkReplayEvent]) 
         return NetworkReobserve(f"operation {index} failed; partial state requires observation")
       }
       NetworkObserved(observed) => {
-        if next_operation != plan.operations.len() { return NetworkInvalid("missing operation results") }
+        guard next_operation == plan.operations.len() else { return NetworkInvalid("missing operation results") }
         if observed.sequence <= plan.before.sequence { return NetworkReobserve("final observation is not newer") }
         match network_plan(plan.intent, expected, observed) {
           Err(_) => return NetworkReobserve("final observation conflicts with intent")
           Ok(remaining) => {
-            if !remaining.operations.is_empty() { return NetworkReobserve("operations acknowledged but state has not converged") }
+            guard remaining.operations.is_empty() else { return NetworkReobserve("operations acknowledged but state has not converged") }
           }
         }
         for address in plan.before.addresses {
@@ -369,7 +369,7 @@ export pure network_replay(plan: NetworkPlan, events: List[NetworkReplayEvent]) 
       }
     }
   }
-  if !converged { return NetworkInvalid("missing final observation") }
+  return NetworkInvalid("missing final observation") unless converged
   NetworkConverged(expected)
 }
 

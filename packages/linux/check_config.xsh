@@ -1,6 +1,6 @@
 use packages.linux.config_drift as drift
 use packages.llvm-toolchain.PKGBUILD as llvm_recipe
-use packages.upstream_pins as upstream_pins
+use packages.upstream_pins
 
 cli main(source: Path, llvm_bin: Path, output: Path, host_cc: Path) [fs, process, env, error] {
   let source_root = path.absolute(source)?
@@ -43,7 +43,7 @@ cli main(source: Path, llvm_bin: Path, output: Path, host_cc: Path) [fs, process
       return Err(error.failure(f"configuration output must be fresh: {build}"))?
     }
 
-    build.mkdir(parents: true)
+    build.mkdir()
     let original = fragment.read_text()?
     fp"{build}/.config".write(original)
     let unavailable = fp"{build}/unavailable-tool"
@@ -57,7 +57,7 @@ cli main(source: Path, llvm_bin: Path, output: Path, host_cc: Path) [fs, process
     }
 
     print f"{arch}: {changes.len()} changed symbols"
-    changed = changed or changes.len() != 0
+    changed = changed or ! changes.is_empty()
   }
 
   if changed {

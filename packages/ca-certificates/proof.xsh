@@ -5,7 +5,7 @@ use trust.store as trust_store
 
 error ProofError = Failed(kind: Str, message: Str)
 
-let REQUIRED_BLOCKED_SPKIS = [
+const REQUIRED_BLOCKED_SPKIS = [
   "43bffa19d6ef651451f6841e019931e96f6f2eaeff28ab4b6f1ce4576de2717b",
   "49dd353dc2b919a3770645117d0e60c16115e7d1bc259eefe734b00ea434fe5f",
   "5c0660a2b164910d8ff589c18e14552e9e0ec237dcefe2cb736d41a4811f81a0",
@@ -20,7 +20,7 @@ proc ensure(condition: Bool, kind: Str, message: Str) [error] {
   }
 }
 
-proc verify_package_metadata(rootfs: Path) [fs, error] {
+proc verify_package_metadata(rootfs: Path) {
   let metadata_path = fp"{rootfs}/var/lib/xsh-pm/packages/ca-certificates/metadata.json"
   ensure(metadata_path.exists()?, "ca-certificates-metadata", "missing package metadata")
   let metadata = json.read(metadata_path)?.require(Record)?
@@ -28,7 +28,7 @@ proc verify_package_metadata(rootfs: Path) [fs, error] {
   ensure(deps.is_empty(), "ca-certificates-deps", f"expected no runtime deps, got {deps.join(" ")}")
 }
 
-proc verify_managed_symlinks(rootfs: Path) [fs, error] {
+proc verify_managed_symlinks(rootfs: Path) {
   let bundle_link = fp"{rootfs}/etc/ssl/certs/ca-certificates.crt"
   ensure(bundle_link.is_symlink()?, "ca-certificates-layout", "canonical bundle is not a managed symlink")
   ensure(
@@ -50,14 +50,14 @@ proc verify_managed_symlinks(rootfs: Path) [fs, error] {
   ensure(cert_link.readlink()? == p"certs/ca-certificates.crt", "ca-certificates-layout", "cert.pem target changed")
 }
 
-proc verify_provisioned_key(rootfs: Path) [fs, error] {
+proc verify_provisioned_key(rootfs: Path) {
   let key_path = fp"{rootfs}/etc/laputa/trust-update-key"
   ensure(key_path.exists()?, "ca-certificates-key", "missing provisioned trust-update key")
   let key = key_path.read_bytes()?
   ensure(key.len() == 32, "ca-certificates-key", "provisioned trust-update key must contain exactly 32 raw Ed25519 bytes")
 }
 
-proc verify_distrust_policy(rootfs: Path) [fs, error] {
+proc verify_distrust_policy(rootfs: Path) {
   let policy_path = fp"{rootfs}/etc/laputa/trust-policy"
   ensure(policy_path.exists()?, "ca-certificates-policy", "missing /etc/laputa/trust-policy")
   let policy = trust_policy.parse(policy_path.read_bytes()?)?
@@ -67,13 +67,13 @@ proc verify_distrust_policy(rootfs: Path) [fs, error] {
 }
 
 proc main(rootfs = p"/rootfs") [fs, error] {
-  verify_managed_symlinks(rootfs)?
-  verify_provisioned_key(rootfs)?
-  verify_package_metadata(rootfs)?
+  verify_managed_symlinks(rootfs)
+  verify_provisioned_key(rootfs)
+  verify_package_metadata(rootfs)
 
   let paths = trust_store.trust_store_paths(rootfs)
   let seed_bundle = trust_store.seed_bundle_path(paths.root).read_bytes()?
-  let seed_body = seed_bundle.utf8()?
+  let seed_body = seed_bundle as Str
   let cert_count = seed_body.split("-----BEGIN CERTIFICATE-----").len() - 1
   ensure(cert_count == 118, "ca-certificates-bundle", f"expected 118 certificates, found {cert_count}")
   ensure(
@@ -86,7 +86,7 @@ proc main(rootfs = p"/rootfs") [fs, error] {
   ensure(active == "1", "ca-certificates-store", f"seeded trust generation is not 1: {active}")
 
   let bundle = trust_store.canonical_bundle_path(paths.root).read_bytes()?
-  net.validate_root_bundle(bundle)?
+  net.validate_root_bundle(bundle)
 
   ensure(bundle == seed_bundle, "ca-certificates-store", "active bundle differs from the pinned seed")
 

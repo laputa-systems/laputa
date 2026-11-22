@@ -508,7 +508,7 @@ main(@args)?
     )
 }
 
-proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang: Bool = false, cxx: Bool = false) {
+proc write_wrapper(dest: Path, wrapper_name: Str, real: Path, clang = false, cxx = false) {
   let path_value = fp"{dest}/usr/bin/{wrapper_name}"
   path_value.parent().mkdir()
   path_value.remove()
