@@ -333,8 +333,10 @@ that rewrites them.
 ## Replacement gates
 
 Promotion needs all four gate classes for a candidate. These gates apply
-before any default changes. None of them has been run for a replacement, and
-this document replaces nothing.
+before any default changes. Only the zlib candidate's interface and
+differential gates have been run, recorded in [zlib gate
+evidence](#zlib-gate-evidence-zlib-rs); no gate is closed and this document
+replaces nothing.
 
 **Common to every candidate.**
 
@@ -403,3 +405,93 @@ this document replaces nothing.
    and rendered frames for the shader stack). Play's libplacebo depends on
    shaderc for its generated GLSL, so a front-end swap needs the whole shader
    pipeline rendered identically before it is considered.
+
+## zlib gate evidence (zlib-rs)
+
+The `zlib-rs` package (`packages/zlib-rs`) builds `libz.so.1` from
+laputa-systems/zlib-rs at `496c33cd8c5f3fa2ef688498533981d22a07593f`
+(zlib-rs 0.6.8, the `libz-rs-sys` C API with the `gz` feature, stable Rust 1.99.0). Cargo
+builds a static archive and the C toolchain links it under the fork's
+`zlib.map` version script, because Rust cannot version symbols itself. The
+package installs under `usr/lib/zlib-rs/`, shares no path with `packages/zlib`,
+and no profile installs it. The only registry crate it adds to the fork's own
+lockfile is `libc 0.2.172`, which the `gz` feature needs.
+
+Run from the checkout root with host XSH tools:
+
+```bash
+xsh qualification/zlib-rs/run.xsh -- x86_64
+```
+
+It builds `zlib`, `zlib-rs` and `llvm-toolchain`, composes a root of the three,
+and runs `qualification/zlib-rs/check.xsh` in the offline package-tools
+container. At Laputa `0314dc09` the `package_key_x86_64` in `seed/images.lock`
+no longer matches `packages/llvm-toolchain`, so `make build` stops with `stale
+image lock`; the run below used a scratch copy of that commit with only that
+key set to the current one, and the local package-tools image digest unchanged.
+
+**What ran (x86_64, 2026-11-22; exit 0).**
+
+- Interface. SONAME is `libz.so.1` in both. `DT_NEEDED` is `libc.so` alone in
+  both, with no `RUNPATH`. The C library exports 95 versioned dynamic symbols
+  and the candidate 93, with identical `ZLIB_*` versions on the shared 93 and no
+  extra export. The two missing are `gzprintf` and `gzvprintf`: both are variadic
+  and zlib-rs defines variadic functions only behind its nightly-only
+  `gzprintf` feature, which the pinned stable toolchain cannot build. The
+  static LLVM unwinder that Rust's `std` pulls in is linked with its symbols
+  hidden.
+- ABI. `z_stream` and `gz_header` offsets and sizes, the integer type sizes,
+  and 61 constants are identical between the two `zlib.h` files.
+- Differential, C zlib 1.3.2 as oracle: 15 groups, 56,501 checks, 0 failures.
+  Every level (-1 to 9) and strategy on nine inputs, each stream decoded by
+  both libraries; window bits, memLevel, raw, zlib and gzip wrappers;
+  `compress`, `compress2`, `uncompress`, `uncompress2`, `compressBound`;
+  streaming with input and output buffers from 1 to 4,096 bytes; every flush
+  mode; `deflateParams`, dictionaries, priming, copy, reset and tuning;
+  `gz_header` round trip; `inflateBack`; `gzopen` write and read at every mode,
+  seek, rewind, `gzdirect`, append, `gzdopen`, `gzsetparams`; `crc32`,
+  `adler32` and their combines with split, unaligned and overflow inputs;
+  truncation at every prefix length, single-byte corruption at every position
+  of small zlib, raw and gzip streams, and random junk, each requiring the same
+  return code from both; invalid arguments and version checks; `inflateSync`;
+  allocator hooks with the allocation failing at every index (no leak, same
+  `Z_MEM_ERROR` class); a 256 MiB zeros bomb inflated in full and capped at
+  16 MiB. Controls: the oracle against itself gives 0 failures and 0
+  divergences; swapping the roles fails.
+- Consumer imports. From the 2026-11-20 census root, FreeType imports
+  `inflateInit2_`, `inflate`, `inflateEnd`, `inflateReset`; libpng imports
+  those plus `crc32`, `deflate`, `deflateInit2_`, `deflateEnd`,
+  `deflateReset` and `inflateReset2@ZLIB_1.2.3.4`; Play imports `compress2`.
+  All are exported with the same versions.
+
+**Known divergences (the candidate follows zlib 1.3.0 behavior; the oracle is
+1.3.2).** `check.xsh` reports each and exits 0; they are open until accepted or
+fixed in the fork.
+
+- `uncompress` and `uncompress2` into a zero-length output buffer return
+  `Z_DATA_ERROR` in the candidate and `Z_BUF_ERROR` in 1.3.2, and `uncompress2`
+  reports one more input byte consumed. This is an oversized-input error-class
+  difference in the core API.
+- The gz file layer was reworked in 1.3.2 and the candidate does not follow it:
+  `gzgets` read to end of file leaves `Z_BUF_ERROR` in the oracle and none in
+  the candidate; a file truncated inside the stream returns the same bytes but
+  the oracle reports no error and the candidate `Z_BUF_ERROR`; a file shorter
+  than four bytes is a transparent read in the oracle and `Z_BUF_ERROR` with no
+  data in the candidate; a damaged gzip header or first block is read
+  transparently or silently ended by the oracle and rejected by the candidate.
+  Whenever the oracle reports an error the candidate reports the same one.
+
+Other observations. `compressBound` differs from the oracle but never falls
+below the size of a real compression; the candidate's `zlibVersion()` is
+`1.3.0-zlib-rs-0.6.8` while its header says `1.3.2.zlib-rs-0.6.8`. Over the
+test corpus at level 6 the candidate's streams total 621,141 bytes against
+572,036 for the oracle; byte equality is not a gate. Installed size is 471,544
+bytes against 104,552 for `libz.so.1.3.2`.
+
+**Not run.** Consumer qualification through the real consumers: Play
+screenshots through `compress2` and the font stack's libpng and FreeType,
+including the PCF gzip path. The aarch64 build and run. The fuzz corpus run.
+The interleaved performance gate. The closure gate with an installed root, so
+`census.xsh` is unchanged and unique installed bytes before and after are not
+measured. Acceptance of the divergences above. No gate is closed and no default
+changes.
