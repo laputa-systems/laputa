@@ -114,14 +114,12 @@ proc snapshot_ids(text: Str) -> Result[List[Str]] {
 
 proc snapshot_paths(text: Str) -> Result[List[Str]] {
   let groups = json.decode(text)?.require(List[Record])?
-  var paths = []
-  for grp in groups {
-    for snap in grp.get("snapshots")?.require(List[Record])? {
-      for snap_path in snap.get("paths")?.require(List[Str])? {
-        paths += [snap_path]
-      }
-    }
-  }
+  var paths = [
+    snap_path
+    for grp in groups
+    for snap in grp.get("snapshots")?.require(List[Record])?
+    for snap_path in snap.get("paths")?.require(List[Str])?
+  ]
   paths
 }
 

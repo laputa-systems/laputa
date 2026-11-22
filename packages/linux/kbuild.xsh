@@ -6490,12 +6490,10 @@ proc resolve_item_compile_flags(
   var resolved: List[PreparedArchiveItem] = []
 
   for item in items {
-    var member_flags: List[List[Str]] = []
-
-    for member in item.member_flags {
-      member_flags += [resolve_compile_flags(item.object, member, verdicts)?]
-    }
-
+    var member_flags: List[List[Str]] = [
+      resolve_compile_flags(item.object, member, verdicts)?
+      for member in item.member_flags
+    ]
     resolved += [{...item, flags: resolve_compile_flags(item.object, item.flags, verdicts)?, member_flags: member_flags}]
   }
 

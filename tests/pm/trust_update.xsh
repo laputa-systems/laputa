@@ -68,10 +68,7 @@ proc expect_rejected(input: Result[Record, Error], fragment: Str, root: Path, ge
 
 ## Captures the observable store state for zero-mutation assertions.
 proc snapshot_store_state(paths: trust_store.TrustStorePaths) -> Result[Record, Error] {
-  var generations = []
-  for entry in fs.children(paths.generations)? {
-    generations += [entry.name]
-  }
+  var generations = [entry.name for entry in fs.children(paths.generations)?]
   generations = generations |> sort
 
   var staging = []
