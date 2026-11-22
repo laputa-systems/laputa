@@ -148,6 +148,41 @@ variable axes, scaling, metrics, and cache ownership through final pixels.
 Require representative correctness and performance before replacing FreeType.
 Keep one distribution implementation rather than private application stacks.
 
+### Track F: move GPU execution out of the guest
+
+Rustifying Mesa is out of scope; Mesa's own Rust subsystems (the NAK and
+Kraid shader compilers, Rusticl) do not replace the guest's VM graphics
+drivers. Instead, evaluate virtual-GPU paths that let the guest drop its
+software and translation drivers. The guest builds `softpipe`, `virgl` and
+the `swrast` (lavapipe) Vulkan driver; the native census attributes about
+69.5 MB to `libgallium` and 72.8 MB to `libvulkan_lvp`, mostly static LLVM.
+Mesa upstream reported in May 2026 that the VirGL OpenGL path is unmaintained
+and may be removed, which makes the current Ghostty backend a liability on
+its own terms.
+
+Two host paths exist. Venus forwards Vulkan through the host's virglrenderer
+and needs only Mesa's `virtio` Vulkan driver in the guest, with Zink for
+OpenGL; the development host's QEMU 11.1.2 offers `virtio-gpu-gl` with
+`venus`, `blob` and `drm_native_context` over an amdgpu GPU. Rutabaga with
+gfxstream moves the virtual-GPU transport to Rust (Mesa accepted the
+`magma-gpu` subproject in June 2026) but still runs native gfxstream on the
+host, and the development host's QEMU is built without it. Neither path
+removes native code: it relocates GPU execution to the host and shrinks the
+guest.
+
+Start with Venus because it runs on the current host. Keep the existing
+virgl/lavapipe profile unchanged as the control, add an experimental x86-64
+profile whose guest Mesa builds only the `virtio` Vulkan driver (and Zink
+once an OpenGL consumer is in scope), and qualify Play's Vulkan presentation
+first; Ghostty's OpenGL context waits until Ghostty returns to scope. Keep
+Tinyland's 2D scanout device and its screenshot proof. Acceptance needs real
+displayed pixels, keyboard and compositor recovery, proof that no software
+fallback was selected, and measured guest installed bytes, startup, RSS, CPU,
+frame latency and host cost against the control on the same host. Evaluate
+Rutabaga/gfxstream after Venus, with a pinned QEMU build that includes it.
+Updating Mesa from 26.2.4 to the current bug-fix release is ordinary package
+maintenance, separate from this track.
+
 ### Track E: preserve runtime and kernel independence
 
 Retain musl and Linux. Crabc remains heavy work in progress and is explicitly
@@ -243,13 +278,17 @@ ships), KBVM inside Tinyland, mdevd-rs, and shared rust-fontconfig discovery
 for Ghostty and Play.
 
 Not yet executed: every replacement gate in the table above. The first pilots
-are zlib-rs as a candidate `libz.so.1` (Track C) and a HarfRust/Skrifa
-differential against Play's overlay text (Track D); neither changes a
-production default.
+are zlib-rs as a candidate `libz.so.1` (Track C), a HarfRust/Skrifa
+differential against Play's overlay text (Track D), and a Venus profile for
+Play's Vulkan presentation (Track F); none changes a production default.
 
 Parked while Ghostty is out of scope: libxkbcommon, whose only production
-consumer is Ghostty, and a shared HarfRust provider, which needs Ghostty and
-Play to migrate together.
+consumer is Ghostty, and Ghostty's OpenGL qualification on Track F.
+
+Play's text follows the one-distribution-library rule: once the differential
+qualifies HarfRust and Skrifa/Swash on Play's workload, they ship as one
+shared distribution provider that Play consumes first and Ghostty joins when
+it returns to scope, rather than a private copy linked into Play.
 
 Retained substrate: `libwayland-client.so.0` stays while Mesa's Wayland
 platform does. Mesa's EGL and Vulkan WSI import it (`packages/mesa` depends on
