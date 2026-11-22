@@ -2225,7 +2225,7 @@ proc control_skipped(request: ControlRequest, name: Str) -> Result[Bool] {
 proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: Path, name: Str) -> Result[List[ServiceUnit]] {
   var out = out_units
   let leaf: RelPath = fp"{name}".require()?
-  let observed = processing.read_regular(leaf, max_bytes: control_request_limit) ?? { |failure|
+  let observed = processing.read_regular(leaf, max_bytes: control_request_limit) ?? {
     let info = fs.stat(path_value, follow_symlinks: false)
     let uid = if let Ok(value) = info { value.uid } else { -1 }
     let kind = if let Ok(value) = info { value.kind } else { "" }
@@ -2235,7 +2235,7 @@ proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: P
     } else if oversized {
       "oversized"
     } else {
-      failure.message
+      .message
     }
     eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={reason}"
     if let Ok(value) = info {

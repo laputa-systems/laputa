@@ -1256,8 +1256,8 @@ export proc timer_writer_settle(store: TimerWriterStore, name: Str) [fs, process
   let file = timer_writer_file(store, name)
   return Ok("none") unless file.exists()
   let record = timer_writer_from_json(json.read(file)?)?
-  let outcome = timer_writer_stop(record, store.boot_id) ?? { |problem|
-    timer_log(f"event=writer-error name={name} pid={record.pid} message={problem.message}")
+  let outcome = timer_writer_stop(record, store.boot_id) ?? {
+    timer_log(f"event=writer-error name={name} pid={record.pid} message={.message}")
     "alive"
   }
   if outcome == "alive" {
@@ -1330,9 +1330,9 @@ export proc timer_quiesce_reconcile(
   for name in names {
     continue when timer_is_running(running, name)
     let tracker = out.get(name) ?? TimerRelease(due_mono_ms: 0, attempts: 0, reported: false)
-    let policy = timer_release_policy(store, name) ?? { |problem|
+    let policy = timer_release_policy(store, name) ?? {
       if ! tracker.reported {
-        timer_log(f"event=quiesce-record-invalid name={name} message={problem.message}")
+        timer_log(f"event=quiesce-record-invalid name={name} message={.message}")
         out[name] = TimerRelease(due_mono_ms: tracker.due_mono_ms, attempts: tracker.attempts, reported: true)
       }
       continue

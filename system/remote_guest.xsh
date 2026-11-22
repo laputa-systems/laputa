@@ -230,8 +230,8 @@ proc reply_error(kind: Str, message: Str) [io, error] {
 }
 
 proc main() [env, fs, io, process, error] {
-  let header = read_header() ?? { |error|
-    reply_error("request", error.message)
+  let header = read_header() ?? {
+    reply_error("request", .message)
     return
   }
   let op = json.get(header, ["op"], "").require(Str)?

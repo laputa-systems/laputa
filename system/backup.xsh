@@ -473,8 +473,8 @@ proc backup_run_hook(hook: BackupHook?, label: Str) {
     stdout: out,
     stderr: errors,
     timeout: time.millis(value.timeout_ms),
-  )) ?? { |problem|
-    return Err(error.failure(f"{label} hook did not run: {problem.message}"))
+  )) ?? {
+    return Err(error.failure(f"{label} hook did not run: {.message}"))
   }
   let errors_text = if errors.exists() { errors.read_text()? } else { "" }
   out.remove()

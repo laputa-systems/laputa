@@ -58,8 +58,8 @@ export proc release(connection: transport.Connection, held: Held) [fs, process, 
 
 ## Describe the holder of a host's lock, or null when it is free.
 export proc inspect(connection: transport.Connection, lock_path: Str) [fs, process, error] -> Result[Str?, LockError] {
-  let execution = transport.exec(connection, .InspectLock, [lock_path], privileged: true) ?? { |error|
-    return Err(LockError.Failed(error.message), cause: error)
+  let execution = transport.exec(connection, .InspectLock, [lock_path], privileged: true) ?? {
+    return Err(LockError.Failed(.message), cause: .)
   }
 
   if execution.code != 0 {
