@@ -176,7 +176,7 @@ minimum-agreeing-sources = 1
     return
   }
 
-  let observed = run.text $probe "pause" $peer_host f"{pause_hold_ms}"
+  let observed = run.text $probe "pause" $peer_host $pause_hold_ms
   print "NTP_PAUSE_OBSERVED" observed.trim()
   let held = probe_field(observed, "peer_mono_ms")?
   let mono_gap = probe_field(observed, "guest_mono_ms")?

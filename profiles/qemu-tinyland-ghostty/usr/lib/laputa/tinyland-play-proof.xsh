@@ -25,7 +25,7 @@ proc main() [fs, process, env, time, error] {
   let fixture = fp"{runtime}/laputa-play-fixture.mkv"
   fixture.remove()
   let ffmpeg = p"/usr/bin/ffmpeg"
-  run $ffmpeg "-hide_banner" "-loglevel" "error" "-filter_complex" "testsrc2=size=320x240:rate=10,format=rgb24" "-frames:v" f"{fixture_frames}" "-c:v" "png" $fixture
+  run $ffmpeg "-hide_banner" "-loglevel" "error" "-filter_complex" "testsrc2=size=320x240:rate=10,format=rgb24" "-frames:v" $fixture_frames "-c:v" "png" $fixture
 
   let player = p"/usr/bin/player"
   let played = env ({
@@ -56,7 +56,7 @@ proc play_international_text(runtime: Path) [fs, process, env, time, error] {
   let frame = fp"{runtime}/laputa-play-text.png"
   video.remove()
   frame.write(black_frame_png.base64_decode()?)
-  run $ffmpeg "-hide_banner" "-loglevel" "error" "-loop" "1" "-framerate" "1" "-i" $frame "-frames:v" f"{text_seconds}" "-c:v" "png" $video
+  run $ffmpeg "-hide_banner" "-loglevel" "error" "-loop" "1" "-framerate" "1" "-i" $frame "-frames:v" $text_seconds "-c:v" "png" $video
   frame.remove()
   subtitles.write(
     """1
