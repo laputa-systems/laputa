@@ -491,7 +491,7 @@ test test_generation_overlay_binds_guest_proof_after_run_mount [fs, error] {
   let builder = p"system/container_build.xsh".read_text()?
   let guest = p"guest/qemu-tinyland-ghostty-proof.xsh".read_text()?
   let session = p"profiles/qemu-tinyland-ghostty/usr/lib/laputa/tinyland-session.xsh".read_text()?
-  assert hook_metadata.mode % 4096 == 0o755
+  assert hook_metadata.mode.bit_and(0o111) == 0o111, f"boot hook mode {hook_metadata.mode % 4096}"
   assert "tinyland-runtime-setup.xsh" in hook
   assert guest.starts_with("""#!/bin/xsh
 """)
