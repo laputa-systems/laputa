@@ -722,12 +722,12 @@ main(@args)?
   generation.verify_generation(first_root, first_generation)
   assert fp"{first_root}/usr/bin/execute-app".read_text()? == "application revision one\n"
 
-  let retried_upload = test.run_script(
+  let retried_upload = test.expect(
     ctx,
     interruption_worker,
-    [remote_url, interruption_rel, interrupted_source, interruption_work, "retry"],
+    status: 0,
+    args: [remote_url, interruption_rel, interrupted_source, interruption_work, "retry"],
   )?
-  assert retried_upload.success, retried_upload.stderr
   assert retried_upload.stdout == "true\n"
   assert hash.sha256(interruption_destination)?.hex() == interrupted_source_digest
   assert interruption_destination.metadata()?.size == interrupted_source.metadata()?.size
