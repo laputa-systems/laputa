@@ -91,7 +91,7 @@ test test_repository_staging_excludes_build_and_harness_outputs [fs, net, proces
   env ({XSH_PM_REPOSITORY_ROOT: root.display()}) {
     sources.stage_package_sources(url_package("repository/tool", "SKIP"), dest)
   }
-  test.eq(fp"{dest}/src/main.rs".read_text()?, "fn main() {}\n")
+  assert fp"{dest}/src/main.rs".read_text()? == "fn main() {}\n"
   assert ! fp"{dest}/.work".exists()?
   assert ! fp"{dest}/target".exists()?
 }
@@ -694,6 +694,6 @@ test test_source_downloads_name_their_client_to_hosts_that_require_one [fs, net,
   }
   let port = port_file.read_text()?.trim()
   let dest = fp"{root}/source"
-  test.eq(util.download_file(f"http://127.0.0.1:{port}/source", dest)?, "")
+  assert util.download_file(f"http://127.0.0.1:{port}/source", dest)? == ""
   test.eq(dest.read_text()?, "payload\n")
 }

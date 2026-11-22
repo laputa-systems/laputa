@@ -35,7 +35,7 @@ test test_payload_encoding_changes_payload_keys_but_not_metapackage_keys [fs, en
     let selected = {...pkg, kind}
     let actual = fingerprint.package_build_input(p".", selected, types.X86_64LinuxMusl)?
     let actual_encoding = payload_archive.encoding_fingerprint()?
-    test.eq(actual, fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, actual_encoding)?)
+    assert actual == fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, actual_encoding)?
     let first = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-a")?
     let repeat = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-a")?
     let changed = fingerprint.package_build_input_with_encoding(p".", selected, types.X86_64LinuxMusl, "encoding-b")?
@@ -180,10 +180,10 @@ test test_repository_input_ignores_cargo_target_output [fs, env, error] { |ctx|
   fp"{tool}/target/debug/tool".write("binary-bytes\n")
   fp"{tool}/target/debug/build/tool".mkdir()
   fp"{tool}/target/debug/build/tool/output".write("more-bytes\n")
-  test.eq(fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?, before)
+  assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? == before
   fp"{tool}/.work/tmp".mkdir()
   fp"{tool}/.work/tmp/probe.log".write("harness scratch\n")
-  test.eq(fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)?, before)
+  assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? == before
   fp"{tool}/src/main.rs".write("fn main() { println!(\"changed\"); }\n")
   assert fingerprint.package_build_input(root, pkg, types.Aarch64LinuxMusl)? != before
 }
@@ -191,7 +191,7 @@ test test_repository_input_ignores_cargo_target_output [fs, env, error] { |ctx|
 test test_shared_workspace_archive_pin_changes_both_package_inputs [fs, env, error] {
   let root = fs.cwd()?
   let packages = [recipe.load_package(fp"{root}/packages/{name}")? for name in ["tinyland", "seatd-rs"]]
-  test.eq(packages[0].upstream_sources[0], packages[1].upstream_sources[0])
+  assert packages[0].upstream_sources[0] == packages[1].upstream_sources[0]
   for pkg in packages {
     let before = fingerprint.package_build_input(root, pkg, types.X86_64LinuxMusl)?
     let changed = {
