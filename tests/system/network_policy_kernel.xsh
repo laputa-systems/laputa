@@ -53,7 +53,7 @@ test test_default_route_requests_include_exact_metric_gateway_and_interface [fs,
 
 test test_forged_foreign_removal_is_rejected_before_encoding [fs, error] {
   var plan = fixture_plan()?
-  plan.operations = [policy.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
+  plan.operations = [.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
   match kernel.network_change(plan, 0) {
     Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
     Ok(_) => assert false
@@ -208,7 +208,7 @@ test test_outcomes_and_lost_notices_map_to_replay_events [fs, error] {
   assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Refused(errno: 101, message: "Network is unreachable"))) == policy.NetworkDenied(2)
   assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Transport("deadline"))) == policy.NetworkFailed(2)
   assert kernel.network_outcome(2, Err(net_state.ChangeFailure.Unencodable("multipath"))) == policy.NetworkFailed(2)
-  assert kernel.network_lost_events(net_state.Lost("overrun")) == policy.NetworkLostEvents
+  assert kernel.network_lost_events(.Lost("overrun")) == policy.NetworkLostEvents
   assert kernel.network_lost_events(net_state.Changed) == null
   assert kernel.network_lost_events(net_state.Quiet) == null
 }
@@ -231,7 +231,7 @@ test test_retired_owned_default_route_with_a_nonzero_metric_is_removable [fs, er
   let plan = retired_route_plan()?
   assert plan.operations == [policy.NetworkRemoveDefaultRoute({gateway: "192.0.2.1", metric: 300})]
   match kernel.network_change(plan, 0) {
-    Ok(net_state.RemoveRoute(route)) => {
+    Ok(.RemoveRoute(route)) => {
       assert route.priority == 300
       assert route.protocol == 3
       assert route.route_type == 1
@@ -315,11 +315,11 @@ test test_unmodeled_route_attributes_never_become_a_removal [fs, error] {
   let selected = net_state.project(dump)?
   let route = selected.routes[0]
   assert route.other_attributes == [8]
-  match net_state.request(net_state.RemoveRoute(route)) {
+  match net_state.request(.RemoveRoute(route)) {
     Ok(encoded) => assert encoded.message_type == 25
     Err(_) => assert false, "an unexpected removal encode failure"
   }
-  match net_state.request(net_state.AddRoute(route)) {
+  match net_state.request(.AddRoute(route)) {
     Err(net_state.ChangeFailure.Unencodable {message}) => assert "cannot be encoded" in message
     Ok(_) => assert false, "an addition silently dropped an unmodeled attribute"
   }
@@ -361,15 +361,15 @@ test test_reconcile_result_reports_conflicts_instead_of_rolling_back [fs, error]
     plan,
     attempts: 0,
     observed: stale,
-    events: [policy.NetworkPrecondition(plan.before)],
-    result: policy.NetworkReobserve("observation changed before operation 0"),
+    events: [.NetworkPrecondition(plan.before)],
+    result: .NetworkReobserve("observation changed before operation 0"),
   }
   assert conflict.attempts == 0
   match conflict.result {
     policy.NetworkReobserve(reason) => assert reason == "observation changed before operation 0"
     else => assert false
   }
-  let diverged: kernel.NetworkReconcile = {...conflict, attempts: 1, result: policy.NetworkReobserve("operation 0 was acknowledged but the observation diverged")}
+  let diverged: kernel.NetworkReconcile = {...conflict, attempts: 1, result: .NetworkReobserve("operation 0 was acknowledged but the observation diverged")}
   match diverged.result {
     policy.NetworkReobserve(reason) => assert reason == "operation 0 was acknowledged but the observation diverged"
     else => assert false
@@ -632,13 +632,13 @@ test test_ipv6_zero_metric_is_never_sent_and_a_zero_metric_removal_is_refused [e
 test test_forged_ipv6_operations_are_rejected_before_encoding [error] {
   let plan = policy.network_plan(intent6(), empty_ownership(), empty6())?
   var forged = plan
-  forged.operations = [policy.NetworkRemoveAddress({local: "2001:db8:ff::2", prefix: 64})]
+  forged.operations = [.NetworkRemoveAddress({local: "2001:db8:ff::2", prefix: 64})]
   match kernel.network_changes(forged) {
     Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
     Ok(_) => assert false
   }
   var extended = plan
-  extended.operations = plan.operations + [policy.NetworkRemoveDefaultRoute({gateway: "fe80::bad", metric: 1024})]
+  extended.operations = plan.operations + [.NetworkRemoveDefaultRoute({gateway: "fe80::bad", metric: 1024})]
   match kernel.network_change(extended, 0) {
     Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
     Ok(_) => assert false

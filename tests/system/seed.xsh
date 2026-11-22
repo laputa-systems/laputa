@@ -418,7 +418,7 @@ test test_world_host_plan_scopes_the_mirror_and_keeps_typed_selection [fs, net, 
     world.host_pm_plan("", repo_root: repository, roots: ["app"], target: "aarch64-linux-musl", output:)
     let value = pm_plan_json.read(output)?
     assert value.roots == ["app"]
-    assert value.target == pm_types.Aarch64LinuxMusl
+    assert value.target == .Aarch64LinuxMusl
     assert e"XSH_PM_REPO"? == outer_repo
 
     match world.host_pm_plan("", repo_root: repository, roots: [], target: "aarch64-linux-musl", output:) {

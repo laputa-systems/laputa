@@ -70,7 +70,7 @@ test test_qemu_tinyland_ghostty_profile_has_exact_runtime_intent [fs, error] {
     "libwlroots",
     "libinput",
   ]
-  assert value.qemu_gpu == types.Virgl
+  assert value.qemu_gpu == .Virgl
   assert value.development
 }
 
@@ -108,9 +108,9 @@ test test_profile_validation_rejects_duplicate_or_invalid_roots [error] {
       ready_marker: "VALID_PROOF_READY",
       success_marker: "VALID_PROOF_OK",
       failure_marker: "VALID_PROOF_FAILED",
-    input_mode: types.ProofPlain,
+    input_mode: .ProofPlain,
     },
-    qemu_gpu: types.Virtio2d,
+    qemu_gpu: .Virtio2d,
     development: true,
   )
   profile.validate_system_profile(valid)
@@ -149,8 +149,8 @@ test test_profile_digest_is_deterministic [fs, error] {
   let value = profile.load_system_profile("qemu-tinyland-ghostty", profiles_root())?
   assert profile.digest(value)? == profile.digest(value)?
   assert profile.digest(value)? != profile.digest({...value, qemu_smp: 3})?
-  assert profile.digest(value)? != profile.digest({...value, qemu_gpu: types.Virtio2d})?
-  assert profile.digest(value)? != profile.digest({...value, proof: {...value.proof, input_mode: types.ProofPlain}})?
+  assert profile.digest(value)? != profile.digest({...value, qemu_gpu: .Virtio2d})?
+  assert profile.digest(value)? != profile.digest({...value, proof: {...value.proof, input_mode: .ProofPlain}})?
 }
 
 test test_profile_rejects_forbidden_packages_in_its_runtime_closure [fs, error] {

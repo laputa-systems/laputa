@@ -353,11 +353,11 @@ proc qmp_key_step(keys: List[Str], down: Bool) -> Result[qmp.QmpStep, Error] {
 proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
   match operation {
     QmpReady => Ok([]),
-    QmpScreenshot(output) => Ok([qmp.QmpExecute("screendump", json.encode({filename: output.display()})?, qmp.QmpReadOnly)]),
+    QmpScreenshot(output) => Ok([.QmpExecute("screendump", json.encode({filename: output.display()})?, qmp.QmpReadOnly)]),
     QmpInput => {
       var steps: List[qmp.QmpStep] = []
       for key in ["l", "a", "p", "u", "t", "a", "ret"] {
-        steps += [qmp_key_step([key], true)?, qmp.QmpDelay(40), qmp_key_step([key], false)?, qmp.QmpDelay(40)]
+        steps += [qmp_key_step([key], true)?, .QmpDelay(40), qmp_key_step([key], false)?, .QmpDelay(40)]
       }
       for pair in [{key: "ctrl", down: true}, {key: "d", down: true}, {key: "d", down: false}, {key: "ctrl", down: false}] {
         steps += [qmp_key_step([pair.key], pair.down)?]
@@ -367,15 +367,15 @@ proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
     QmpInputModified => {
       var steps: List[qmp.QmpStep] = []
       for key in ["caps_lock", "l", "a", "p", "u", "t", "a", "caps_lock"] {
-        steps += [qmp_key_step([key], true)?, qmp.QmpDelay(40), qmp_key_step([key], false)?, qmp.QmpDelay(40)]
+        steps += [qmp_key_step([key], true)?, .QmpDelay(40), qmp_key_step([key], false)?, .QmpDelay(40)]
       }
       for pair in [{key: "shift", down: true}, {key: "1", down: true}, {key: "1", down: false}, {key: "shift", down: false}] {
-        steps += [qmp_key_step([pair.key], pair.down)?, qmp.QmpDelay(40)]
+        steps += [qmp_key_step([pair.key], pair.down)?, .QmpDelay(40)]
       }
       for pair in [{key: "shift", down: true}, {key: "shift", down: false}] {
-        steps += [qmp_key_step([pair.key], pair.down)?, qmp.QmpDelay(40)]
+        steps += [qmp_key_step([pair.key], pair.down)?, .QmpDelay(40)]
       }
-      steps += [qmp_key_step(["ret"], true)?, qmp.QmpDelay(40), qmp_key_step(["ret"], false)?]
+      steps += [qmp_key_step(["ret"], true)?, .QmpDelay(40), qmp_key_step(["ret"], false)?]
       Ok(steps)
     },
   }
@@ -398,7 +398,7 @@ export enum QemuControl { QemuStop, QemuContinue }
 ## Send one pause or resume command over the native Unix stream.
 export proc qemu_control(socket: Path, control: QemuControl) -> Result[Unit, Error] {
   let command = match control { QemuStop => "stop", QemuContinue => "cont" }
-  qmp.qmp_run(socket, [qmp.QmpExecute(command, "{}", qmp.QmpMutation)], 5000)
+  qmp.qmp_run(socket, [.QmpExecute(command, "{}", qmp.QmpMutation)], 5000)
 }
 
 proc qemu_qmp_retry(operation: QmpRetryOperation, socket: Path, deadline: Int) {

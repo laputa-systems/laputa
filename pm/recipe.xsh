@@ -129,7 +129,7 @@ proc decode_upstream_source(name: Str, raw: Record) -> Result[types.UpstreamSour
     return Err(types.PmError.PackageContract(f"{name}: upstream source {source} has no target architectures"))
   }
 
-  if (kind == types.CargoVendor or kind == types.CargoGitWorkspace) and util.parse_source_line(source)?.dest.normalize() == "." {
+  if (kind == .CargoVendor or kind == .CargoGitWorkspace) and util.parse_source_line(source)?.dest.normalize() == "." {
     return Err(types.PmError.PackageContract(f"{name}: {raw_kind} source {source} needs a `=> DIR` destination"))
   }
 
@@ -421,7 +421,7 @@ export proc load_package_for_target(dir: Path, target: types.Target) [fs, env, e
   let upstream_sources = decode_upstream_sources(name, metadata.upstream_sources)?
   let filetree = decode_filetree(name, select_filetree(metadata, arch))?
 
-  if kind == types.Payload {
+  if kind == .Payload {
     guard metadata.has_build else {
       return Err(types.PmError.PackageContract(f"{name}: payload package must export build"))
     }
@@ -494,7 +494,7 @@ export proc call_prepare(pkg: types.Package, src: Path) [fs, process, env, error
 
 ## Invokes the required payload `build` procedure through the dynamic recipe boundary.
 export proc call_build(pkg: types.Package, src: Path, dest: Path) [fs, process, env, error] {
-  return when pkg.kind == types.Meta
+  return when pkg.kind == .Meta
 
   let dynamic = load_recipe_procedures(dynamic_recipe_path(pkg)?)?
 

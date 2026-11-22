@@ -54,7 +54,7 @@ test hosts_inherit_defaults_and_override_them {
   assert web.address == "10.0.0.11"
   assert web.port == 2222
   assert web.user == "deploy"
-  assert web.privilege == model.Doas
+  assert web.privilege == .Doas
   assert web.timeout_ms == 5000
   assert web.key == p"/etc/xinfra/keys/id"
   assert web.groups == ["web"]
@@ -62,7 +62,7 @@ test hosts_inherit_defaults_and_override_them {
   let db = loaded.hosts[0]
   assert db.port == 22
   assert db.user == "root"
-  assert db.privilege == model.Root
+  assert db.privilege == .Root
   assert db.key == p"/abs/key"
   assert db.escalate_reads
 }
@@ -100,22 +100,22 @@ test unknown_fields_groups_and_values_are_errors {
 
 test a_local_host_needs_no_connection_details {
   let loaded = inventory.parse("[hosts.here]\ntransport = \"local\"\n", p"/x")?
-  assert loaded.hosts[0].transport == model.Local
+  assert loaded.hosts[0].transport == .Local
   assert loaded.hosts[0].key == null
 }
 
 test the_dialect_defaults_to_posix_and_accepts_xsh_for_one_host_or_defaults {
   let defaulted = inventory.parse(complete, p"/etc/xinfra")?
-  assert defaulted.hosts[0].dialect == model.Posix
-  assert defaulted.hosts[1].dialect == model.Posix
+  assert defaulted.hosts[0].dialect == .Posix
+  assert defaulted.hosts[1].dialect == .Posix
   let pinned = "address = \"1.2.3.4\"\nuser = \"deploy\"\nkey = \"k\"\nhost_key = \"" + pin + "\"\n"
   let host = inventory.parse("[hosts.laputa]\n" + pinned + "dialect = \"xsh\"\n", p"/x")?
-  assert host.hosts[0].dialect == model.Xsh
+  assert host.hosts[0].dialect == .Xsh
   let shared = inventory.parse("[defaults]\ndialect = \"xsh\"\nuser = \"deploy\"\nkey = \"k\"\n[hosts.laputa]\naddress = \"1.2.3.4\"\nhost_key = \"" + pin + "\"\n[hosts.laputa2]\naddress = \"1.2.3.5\"\nhost_key = \"" + pin + "\"\n", p"/x")?
-  assert shared.hosts[0].dialect == model.Xsh
-  assert shared.hosts[1].dialect == model.Xsh
+  assert shared.hosts[0].dialect == .Xsh
+  assert shared.hosts[1].dialect == .Xsh
   let local = inventory.parse("[hosts.here]\ntransport = \"local\"\ndialect = \"xsh\"\n", p"/x")?
-  assert local.hosts[0].dialect == model.Xsh
+  assert local.hosts[0].dialect == .Xsh
 }
 
 test an_unknown_dialect_and_xsh_doas_are_refused {

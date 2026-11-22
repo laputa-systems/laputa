@@ -52,7 +52,7 @@ cli main(
       initramfs: fp"{initramfs}",
       disk: fp"{root}",
       memory_mib: memory_mib,
-      data_disk: qemu.DataDisk(fp"{state}"),
+      data_disk: .DataDisk(fp"{state}"),
       network: qemu.NoNetwork,
       control: qemu.NoControl,
     )

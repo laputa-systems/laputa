@@ -72,10 +72,10 @@ proc root_require_relative_path(value: Str, label: Str) {
 
 proc root_validate_symlink_target(path_value: Str, target: Str) [error] {
   let result = util.pm_symlink_target_check(path_value, target, reject_empty: true)
-  if result == util.PmSymlinkInvalid {
+  if result == .PmSymlinkInvalid {
     return Err(types.PmError.PackageContract(f"symlink {path_value} has an invalid target {target}"))
   }
-  if result == util.PmSymlinkEscape {
+  if result == .PmSymlinkEscape {
     return Err(types.PmError.PackageContract(f"symlink {path_value} escapes the root: {target}"))
   }
 }
@@ -101,17 +101,17 @@ proc root_validate_metadata_entry(value: types.ArtifactEntry) {
     return Err(types.PmError.PackageContract(f"artifact metadata mode for {value.path} is invalid"))
   }
 
-  if value.kind == types.File or value.kind == types.Binary {
+  if value.kind == .File or value.kind == .Binary {
     guard value.target == "" else {
       return Err(types.PmError.PackageContract(f"file {value.path} must not have a symlink target"))
     }
 
     root_require_sha256(value.sha256, f"file {value.path} SHA-256")
-  } else if value.kind == types.Tree {
+  } else if value.kind == .Tree {
     if value.sha256 != "" or value.target != "" {
       return Err(types.PmError.PackageContract(f"directory {value.path} must not have a hash or target"))
     }
-  } else if value.kind == types.Symlink {
+  } else if value.kind == .Symlink {
     guard value.mode == 0o777 else {
       return Err(types.PmError.PackageContract(f"symlink {value.path} must have mode 0777"))
     }
@@ -182,7 +182,7 @@ proc root_legacy_package_db_entries(
   var expected_etcsums: List[types.EtcSum] = [
     {path: entry.path, sha256: entry.sha256}
     for entry in payload_entries
-    if util.is_etc_file(fp"{entry.path}") and (entry.kind == types.File or entry.kind == types.Binary)
+    if util.is_etc_file(fp"{entry.path}") and (entry.kind == .File or entry.kind == .Binary)
   ]
   if stored_etcsums != expected_etcsums {
     return Err(
@@ -255,7 +255,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
     }
   }
 
-  if kind == types.Meta and ! entries.is_empty() {
+  if kind == .Meta and ! entries.is_empty() {
     return Err(types.PmError.PackageContract(f"metapackage {receipt.package_name} must have no payload entries"))
   }
 
@@ -265,7 +265,7 @@ proc root_artifact_metadata(receipt: types.ArtifactReceipt) -> Result[DecodedArt
 proc root_verify_entry_in(root_handle: FsRoot, entry: types.ArtifactEntry) {
   let rel = confined.rel(entry.path)?
 
-  if entry.kind == types.Symlink {
+  if entry.kind == .Symlink {
     let target = root_handle.readlink(rel)?
 
     if target.display() != entry.target {
@@ -281,7 +281,7 @@ proc root_verify_entry_in(root_handle: FsRoot, entry: types.ArtifactEntry) {
 
   let meta = root_handle.metadata(rel)?
 
-  if entry.kind == types.File or entry.kind == types.Binary {
+  if entry.kind == .File or entry.kind == .Binary {
     guard meta.mode % 4096 == entry.mode else {
       return Err(types.PmError.PackageContract(f"root entry {entry.path} mode does not match metadata"))
     }
@@ -289,7 +289,7 @@ proc root_verify_entry_in(root_handle: FsRoot, entry: types.ArtifactEntry) {
     if meta.kind != "file" or root_handle.read_bytes(rel)?.sha256().hex() != entry.sha256 {
       return Err(types.PmError.PackageContract(f"root file {entry.path} does not match metadata"))
     }
-  } else if entry.kind == types.Tree {
+  } else if entry.kind == .Tree {
     if meta.kind != "dir" or meta.mode % 4096 != entry.mode {
       return Err(types.PmError.PackageContract(f"root directory {entry.path} does not match metadata"))
     }
@@ -297,8 +297,8 @@ proc root_verify_entry_in(root_handle: FsRoot, entry: types.ArtifactEntry) {
 }
 
 pure root_same_directory_metadata(left: types.RootEntry, right: types.RootEntry) -> Bool {
-  left.kind == types.Tree
-    and right.kind == types.Tree
+  left.kind == .Tree
+    and right.kind == .Tree
     and left.mode == right.mode
     and left.sha256 == right.sha256
     and left.target == right.target
@@ -521,7 +521,7 @@ proc root_validate_receipt(value: types.RootReceipt) {
     return Err(types.PmError.PackageContract("root receipt repeats generated manual index"))
   }
   for entry in value.generated_entries {
-    if entry.path != "usr/share/man/mandoc.db" or entry.kind != types.File or entry.mode != 0o644 or entry.target != "" {
+    if entry.path != "usr/share/man/mandoc.db" or entry.kind != .File or entry.mode != 0o644 or entry.target != "" {
       return Err(types.PmError.PackageContract("root receipt has invalid generated manual index metadata"))
     }
     root_require_sha256(entry.sha256, "manual index SHA-256")
@@ -560,14 +560,14 @@ proc root_materialize_entry(source: FsRoot, output: FsRoot, entry: types.RootEnt
   let rel = confined.rel(entry.path)?
   root_ensure_parent(output, entry.path)
 
-  if entry.kind == types.Tree {
+  if entry.kind == .Tree {
     confined.ensure_dir(output, entry.path)
     output.chmod(rel, entry.mode)
     root_verify_entry_in(output, entry)
     return
   }
 
-  let created = if entry.kind == types.File or entry.kind == types.Binary {
+  let created = if entry.kind == .File or entry.kind == .Binary {
     fs.root_install_file(source, rel, output, rel, entry.mode)
   } else {
     output.symlink(target: fp"{entry.target}", path: rel)
@@ -625,7 +625,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
     }
 
     let metadata = root_artifact_metadata(receipt)?
-    let payload = metadata.kind != types.Meta
+    let payload = metadata.kind != .Meta
     planned_artifacts += [
       {
         package_name: receipt.package_name,
@@ -651,7 +651,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
         if root_same_directory_metadata(owner, planned) {
           coalesced = true
         } else {
-          if owner.kind == types.Tree and planned.kind == types.Tree {
+          if owner.kind == .Tree and planned.kind == .Tree {
             return Err(
               types.PmError.PackageConflict(
                 f"root directory {planned.path} has incompatible metadata from {owner.package_name} and {receipt.package_name}",
@@ -677,7 +677,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
 
           if prefix in owners {
             let owner = owners.get(prefix)?
-            if owner.kind != types.Tree {
+            if owner.kind != .Tree {
               return Err(
                 types.PmError.PackageConflict(
                   f"root non-directory {owner.path} owned by {owner.package_name} conflicts with {planned.path}",
@@ -689,7 +689,7 @@ proc root_ownership(target: types.Target, verified: List[types.ArtifactReceipt])
           index += 1
         }
 
-        if planned.kind != types.Tree and planned.path in first_descendants {
+        if planned.kind != .Tree and planned.path in first_descendants {
           let owner = first_descendants.get(planned.path)?
           return Err(
             types.PmError.PackageConflict(

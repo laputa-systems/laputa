@@ -32,7 +32,7 @@ proc rebuild_seed(root: Path, arch: Str) [fs, error] {
 }
 
 proc plan_for(value: types.PackageCatalog, target: types.Target, roots: List[Str]) -> Result[types.BuildPlan] {
-  let policy_value = if target == types.Aarch64LinuxMusl { policy.aarch64_docker() } else { policy.x86_64_docker() }
+  let policy_value = if target == .Aarch64LinuxMusl { policy.aarch64_docker() } else { policy.x86_64_docker() }
   plan.resolve(value, {target, index_sha256: "repository-keys-empty-remote", packages: []}, policy_value, roots, false)?
 }
 

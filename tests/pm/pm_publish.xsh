@@ -128,7 +128,7 @@ proc stage_plan_artifacts(
     payload.write(if package_kind == "meta" { "laputa metapackage payload marker\n" } else { f"payload {node.package_id}\n" })
     let payload_sha256 = hash.sha256(payload)?.hex()
     let runtime_dependencies = [
-      dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime
+      dependency.name for dependency in node.dependencies if dependency.kind == .Runtime
     ]
     if include_package_kind {
       json.write(
@@ -141,10 +141,10 @@ proc stage_plan_artifacts(
           rel: node.rel,
           deps: if dependency_order.is_empty() or runtime_dependencies.is_empty() { runtime_dependencies } else { dependency_order },
           runtime_only_deps: [
-            dependency.name for dependency in node.dependencies if dependency.kind == types.RuntimeOnly
+            dependency.name for dependency in node.dependencies if dependency.kind == .RuntimeOnly
           ],
-          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildHost],
-          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildTarget],
+          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == .BuildHost],
+          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == .BuildTarget],
           package_kind,
           filetree: [],
           manifest: [],
@@ -161,12 +161,12 @@ proc stage_plan_artifacts(
           additional_metadata: {source: "recipe"},
           ver: node.ver,
           rel: node.rel,
-          deps: [dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime],
+          deps: [dependency.name for dependency in node.dependencies if dependency.kind == .Runtime],
           runtime_only_deps: [
-            dependency.name for dependency in node.dependencies if dependency.kind == types.RuntimeOnly
+            dependency.name for dependency in node.dependencies if dependency.kind == .RuntimeOnly
           ],
-          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildHost],
-          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == types.BuildTarget],
+          mkdeps_host: [dependency.name for dependency in node.dependencies if dependency.kind == .BuildHost],
+          mkdeps_target: [dependency.name for dependency in node.dependencies if dependency.kind == .BuildTarget],
           filetree: [],
           manifest: [],
           metadata_sha256: "",
@@ -199,7 +199,7 @@ test test_snapshot_defaults_only_omitted_legacy_package_kind_to_payload [fs, env
   let legacy = repo.snapshot(value, legacy_store)?
 
   for publication in legacy.packages {
-    assert publication.kind == types.Payload
+    assert publication.kind == .Payload
   }
 
   let invalid_store = test.temp_dir(ctx, name: "publish-invalid-package-kind-store")?

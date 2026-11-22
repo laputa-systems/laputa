@@ -139,11 +139,11 @@ pure outcome_entry(host: Str, resource: model.Resource, result: outcome.Outcome,
 }
 
 pure failed_at(phase: outcome.Phase, message: Str) -> outcome.Outcome {
-  outcome.Failed(outcome.Failure(phase:, message:))
+  .Failed(outcome.Failure(phase:, message:))
 }
 
 pure unknown_at(phase: outcome.Phase, message: Str) -> outcome.Outcome {
-  outcome.OutcomeUnknown(outcome.Failure(phase:, message:))
+  .OutcomeUnknown(outcome.Failure(phase:, message:))
 }
 
 pure skip_reason(spec: model.Spec) -> Str {
@@ -208,7 +208,7 @@ proc confirm(
   material: compare.Material?,
 ) [fs, env, process, error] -> outcome.Outcome {
   if ! verifiable(resource.spec) {
-    return outcome.Changed(outcome.Applied(changes: drift.changes, verified: false))
+    return .Changed(outcome.Applied(changes: drift.changes, verified: false))
   }
 
   verify(connection, resource, drift, material)
@@ -268,7 +268,7 @@ proc settle(
   match compare.verdict(resource.spec, state, material, changed) {
     compare.Satisfied => {
       match resource.spec {
-        model.Exec(_) => outcome.Skipped(skip_reason(resource.spec))
+        model.Exec(_) => .Skipped(skip_reason(resource.spec))
         else => outcome.Unchanged
       }
     }
@@ -372,7 +372,7 @@ pure absorb(state: HostState, done: Reconciled, policy: FailurePolicy) -> HostSt
 }
 
 pure blocked_state(state: HostState, resource: model.Resource, reason: Str, secrets: List[Str]) -> HostState {
-  let entry = outcome_entry(state.workload.host.name, resource, outcome.Blocked(reason), secrets)
+  let entry = outcome_entry(state.workload.host.name, resource, .Blocked(reason), secrets)
   {...state, unsettled: state.unsettled + [resource.id], entries: state.entries + [entry]}
 }
 

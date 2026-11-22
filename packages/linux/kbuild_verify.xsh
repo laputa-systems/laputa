@@ -89,7 +89,7 @@ export proc linux_kbuild_discover_prepared(
   pkg: types.Package,
   target: types.Target,
 ) [fs, env, error] -> Result[kbuild.KbuildPlan, Error] {
-  if pkg.name != "linux" or target == types.TargetReserved {
+  if pkg.name != "linux" or target == .TargetReserved {
     return Err(kbuild.ScriptError.Failed(kind: "linux-kbuild-case-input", message: "discovery requires the linux package and a supported target"))
   }
   let arch = types.pm_target_arch(target)
@@ -131,7 +131,7 @@ export proc linux_kbuild_discover_prepared(
   }
   let staged_config = fp"{source}/.config"
   config.copy(to: staged_config, overwrite: true)
-  let srcarch = if target == types.X86_64LinuxMusl { "x86" } else { "arm64" }
+  let srcarch = if target == .X86_64LinuxMusl { "x86" } else { "arm64" }
   kbuild.write_config_headers(staged_config, source, pkg.ver, srcarch)
   let loaded = kbuild.load_config(staged_config)?
   let options: kbuild.DiscoverOptions = {

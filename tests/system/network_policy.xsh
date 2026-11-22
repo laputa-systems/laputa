@@ -29,8 +29,8 @@ test test_no_change_is_empty_and_foreign_resources_are_preserved [error] {
 
 test test_replay_rejects_operations_outside_the_policy [error] {
   var plan = policy.network_plan(intent(), owned(), snapshot())?
-  plan.operations = [policy.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
-  assert policy.network_replay(plan, [policy.NetworkPrecondition(snapshot())]) == policy.NetworkInvalid("plan operations do not match policy")
+  plan.operations = [.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
+  assert policy.network_replay(plan, [.NetworkPrecondition(snapshot())]) == policy.NetworkInvalid("plan operations do not match policy")
 }
 
 test test_changed_address_removes_only_owned_resources [error] {
@@ -62,15 +62,15 @@ test test_stale_lost_missing_and_reordered_observations_fail_closed [error] {
   let plan = policy.network_plan(desired, owned(), snapshot())?
   var stale = snapshot()
   stale.up = false
-  assert policy.network_replay(plan, [policy.NetworkPrecondition(stale)]) == policy.NetworkReobserve("stale precondition")
+  assert policy.network_replay(plan, [.NetworkPrecondition(stale)]) == policy.NetworkReobserve("stale precondition")
   assert policy.network_replay(plan, [policy.NetworkLostEvents]) == policy.NetworkReobserve("lost events require full observation")
   assert policy.network_replay(plan, []) == policy.NetworkInvalid("missing precondition observation")
-  assert policy.network_replay(plan, [policy.NetworkApplied(0)]) == policy.NetworkInvalid("expected precondition observation")
-  assert policy.network_replay(plan, [policy.NetworkPrecondition(snapshot()), policy.NetworkApplied(1)]) == policy.NetworkInvalid("operation result out of order")
-  assert policy.network_replay(plan, [policy.NetworkPrecondition(snapshot()), policy.NetworkTruncated]) == policy.NetworkInvalid("truncated observation")
+  assert policy.network_replay(plan, [.NetworkApplied(0)]) == policy.NetworkInvalid("expected precondition observation")
+  assert policy.network_replay(plan, [.NetworkPrecondition(snapshot()), .NetworkApplied(1)]) == policy.NetworkInvalid("operation result out of order")
+  assert policy.network_replay(plan, [.NetworkPrecondition(snapshot()), policy.NetworkTruncated]) == policy.NetworkInvalid("truncated observation")
   var fresh = snapshot()
   fresh.sequence = 2
-  assert policy.network_replay(plan, [policy.NetworkPrecondition(snapshot()), policy.NetworkApplied(0), policy.NetworkObserved(fresh)]) == policy.NetworkInvalid("missing operation results")
+  assert policy.network_replay(plan, [.NetworkPrecondition(snapshot()), .NetworkApplied(0), .NetworkObserved(fresh)]) == policy.NetworkInvalid("missing operation results")
 }
 
 test test_acknowledged_changes_need_new_complete_observation [error] {
@@ -81,16 +81,16 @@ test test_acknowledged_changes_need_new_complete_observation [error] {
   assert policy.network_replay(plan, prefix) == policy.NetworkInvalid("missing final observation")
   var observed = snapshot()
   observed.sequence = 2
-  match policy.network_replay(plan, prefix + [policy.NetworkObserved(observed)]) {
+  match policy.network_replay(plan, prefix + [.NetworkObserved(observed)]) {
     policy.NetworkReobserve(reason) => assert reason == "operations acknowledged but state has not converged"
     policy.NetworkInvalid(reason) => assert reason == "expected re-observation"
     policy.NetworkConverged(_) => assert false
   }
   observed.addresses = [desired.address, {local: "198.51.100.2", prefix: 24}]
   let expected: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [desired.address], routes: owned().routes}
-  assert policy.network_replay(plan, prefix + [policy.NetworkObserved(observed)]) == policy.NetworkConverged(expected)
+  assert policy.network_replay(plan, prefix + [.NetworkObserved(observed)]) == policy.NetworkConverged(expected)
   observed.addresses = [desired.address]
-  assert policy.network_replay(plan, prefix + [policy.NetworkObserved(observed)]) == policy.NetworkReobserve("foreign address disappeared")
+  assert policy.network_replay(plan, prefix + [.NetworkObserved(observed)]) == policy.NetworkReobserve("foreign address disappeared")
 }
 
 test test_owned_resources_are_bound_to_link_and_mixed_families_are_rejected [error] {
@@ -371,14 +371,14 @@ test test_ipv6_replay_converges_with_the_kernel_metric_and_catches_foreign_loss 
   observed.sequence = 2
   observed.addresses = [{local: "2001:db8:1::3", prefix: 64}, {local: "2001:db8:ff::2", prefix: 64}]
   let expected: policy.NetworkOwnership = {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::3", prefix: 64}], routes: [{gateway: "fe80::1", metric: 1024}]}
-  assert policy.network_replay(plan, prefix + [policy.NetworkObserved(observed)]) == policy.NetworkConverged(expected)
+  assert policy.network_replay(plan, prefix + [.NetworkObserved(observed)]) == policy.NetworkConverged(expected)
   var lost_foreign = observed
   lost_foreign.routes = [{gateway: "fe80::1", metric: 1024}]
-  assert policy.network_replay(plan, prefix + [policy.NetworkObserved(lost_foreign)]) == policy.NetworkReobserve("foreign route disappeared")
+  assert policy.network_replay(plan, prefix + [.NetworkObserved(lost_foreign)]) == policy.NetworkReobserve("foreign route disappeared")
   var retained = observed
   retained.addresses = [{local: "2001:db8:1::2", prefix: 64}, {local: "2001:db8:1::3", prefix: 64}, {local: "2001:db8:ff::2", prefix: 64}]
-  assert policy.network_replay(plan, prefix + [policy.NetworkObserved(retained)]) == policy.NetworkReobserve("retired owned address remains")
-  assert policy.network_replay(plan, [policy.NetworkPrecondition(snapshot())]) == policy.NetworkReobserve("stale precondition")
+  assert policy.network_replay(plan, prefix + [.NetworkObserved(retained)]) == policy.NetworkReobserve("retired owned address remains")
+  assert policy.network_replay(plan, [.NetworkPrecondition(snapshot())]) == policy.NetworkReobserve("stale precondition")
 }
 
 test test_ipv6_fixture_decodes_exactly_and_plans_without_touching_foreign_state [fs, error] {

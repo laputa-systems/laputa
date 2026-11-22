@@ -210,7 +210,7 @@ proc add_foreign_routes() [process, net, error] {
   let ifindex = fixture.index_of("eth0")
   let routes = [static_route("203.0.113.0", 24, "192.0.2.1", 50)?, static_route("0.0.0.0", 0, "192.0.2.254", 700)?]
   for route in routes {
-    apply.mutate("eth0", ifindex, network.AddRoute(route))
+    apply.mutate("eth0", ifindex, .AddRoute(route))
   }
 }
 
@@ -307,7 +307,7 @@ proc reject_routes() [fs, process, env, time, net, error] {
   let eth0 = fixture.index_of("eth0")
   let rejecting = [RTN_BLACKHOLE, RTN_UNREACHABLE, RTN_PROHIBIT, RTN_THROW]
   for route_type in rejecting + [RTN_LOCAL, 3, 4, 5] {
-    route_change(f"ADD type={route_type}", state.AddRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))
+    route_change(f"ADD type={route_type}", .AddRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))
   }
   reject_route_lines("added")
   fixture.link_down("eth0")
@@ -319,21 +319,21 @@ proc reject_routes() [fs, process, env, time, net, error] {
   let _ = snapshot("rebound")?
   reject_route_lines("rebound")
   for route_type in rejecting { connect_through("rejected", f"203.0.{route_type + 100}.1") }
-  route_change("THROW_FALLBACK", state.AddRoute(foreign_route("203.0.109.0", TABLE_DEFAULT, 0, RTN_UNICAST, {ifindex: eth0, gateway: "192.0.2.1"})))
+  route_change("THROW_FALLBACK", .AddRoute(foreign_route("203.0.109.0", TABLE_DEFAULT, 0, RTN_UNICAST, {ifindex: eth0, gateway: "192.0.2.1"})))
   connect_through("thrown", "203.0.109.1")
-  route_change("WITH_GATEWAY", state.AddRoute(foreign_route("203.0.120.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, {ifindex: null, gateway: "192.0.2.1"})))
-  route_change("WITH_DEVICE", state.AddRoute(foreign_route("203.0.121.0", network.TABLE_MAIN, 0, RTN_UNREACHABLE, {ifindex: eth0, gateway: null})))
-  route_change("DUPLICATE", state.AddRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))
-  route_change("NOWHERE_SCOPE", state.AddRoute(foreign_route("203.0.122.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_PROHIBIT, none)))
-  route_change("HOST_SCOPE", state.AddRoute(foreign_route("203.0.123.0", network.TABLE_MAIN, SCOPE_HOST, RTN_BLACKHOLE, none)))
-  route_change("UNICAST_NOWHERE_SCOPE", state.AddRoute(foreign_route("203.0.124.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_UNICAST, {ifindex: eth0, gateway: null})))
+  route_change("WITH_GATEWAY", .AddRoute(foreign_route("203.0.120.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, {ifindex: null, gateway: "192.0.2.1"})))
+  route_change("WITH_DEVICE", .AddRoute(foreign_route("203.0.121.0", network.TABLE_MAIN, 0, RTN_UNREACHABLE, {ifindex: eth0, gateway: null})))
+  route_change("DUPLICATE", .AddRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))
+  route_change("NOWHERE_SCOPE", .AddRoute(foreign_route("203.0.122.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_PROHIBIT, none)))
+  route_change("HOST_SCOPE", .AddRoute(foreign_route("203.0.123.0", network.TABLE_MAIN, SCOPE_HOST, RTN_BLACKHOLE, none)))
+  route_change("UNICAST_NOWHERE_SCOPE", .AddRoute(foreign_route("203.0.124.0", network.TABLE_MAIN, SCOPE_NOWHERE, RTN_UNICAST, {ifindex: eth0, gateway: null})))
   for route_type in [0, 10, 12] {
-    route_change(f"INVALID type={route_type}", state.AddRoute(foreign_route("203.0.125.0", network.TABLE_MAIN, 0, route_type, none)))
+    route_change(f"INVALID type={route_type}", .AddRoute(foreign_route("203.0.125.0", network.TABLE_MAIN, 0, route_type, none)))
   }
   for route_type in rejecting {
-    route_change(f"DELETE type={route_type}", state.RemoveRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))
+    route_change(f"DELETE type={route_type}", .RemoveRoute(foreign_route(f"203.0.{route_type + 100}.0", network.TABLE_MAIN, 0, route_type, none)))
   }
-  route_change("DELETE_AGAIN", state.RemoveRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))
+  route_change("DELETE_AGAIN", .RemoveRoute(foreign_route("203.0.106.0", network.TABLE_MAIN, 0, RTN_BLACKHOLE, none)))
   connect_through("released", "203.0.106.1")
   reject_route_lines("deleted")
 }

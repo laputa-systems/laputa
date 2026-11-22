@@ -186,7 +186,7 @@ test test_checkout_directory_input_stages_with_checkout_modes [fs, net, process,
 
 test test_baselayout_declares_boot_mount_directories_as_payload [fs, env, error] { |_|
   let pkg = recipe.load_package(p"packages/baselayout")?
-  let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == types.Tree]
+  let trees = [entry.path.display() for entry in pkg.filetree if entry.kind == .Tree]
 
   for required in ["dev", "dev/pts", "dev/shm", "proc", "run", "sys", "tmp"] {
     assert required in trees

@@ -361,38 +361,38 @@ pure compare_command(spec: model.CommandSpec, state: fact.Fact, changed: List[St
     }
     model.Creates(target) => {
       match state {
-        fact.OnPath(fact.Found(_)) => Satisfied
-        fact.OnPath(fact.Missing) => drift(.Run, [change("creates", "(absent)", target)])
-        fact.OnPath(fact.Blocked(_)) => drift(.Run, [change("creates", "(absent)", target)])
-        fact.OnPath(fact.Unseen(unreadable)) => Uncertain(unreadable)
+        fact.OnPath(.Found(_)) => Satisfied
+        fact.OnPath(.Missing) => drift(.Run, [change("creates", "(absent)", target)])
+        fact.OnPath(.Blocked(_)) => drift(.Run, [change("creates", "(absent)", target)])
+        fact.OnPath(.Unseen(unreadable)) => Uncertain(unreadable)
         else => mismatch("command")
       }
     }
     model.SkipIf(_) => {
       match state {
-        fact.OnGuard(fact.Exited(0)) => Satisfied
-        fact.OnGuard(fact.Exited(code)) => {
+        fact.OnGuard(.Exited(0)) => Satisfied
+        fact.OnGuard(.Exited(code)) => {
           if guard_unreadable(code) {
             Uncertain(reading(.Unavailable, f"the guard could not run (exit {code})"))
           } else {
             drift(.Run, [change("guard", f"exit {code}", "exit 0")])
           }
         }
-        fact.OnGuard(fact.GuardUnseen(unreadable)) => Uncertain(unreadable)
+        fact.OnGuard(.GuardUnseen(unreadable)) => Uncertain(unreadable)
         else => mismatch("command")
       }
     }
     model.OnlyIf(_) => {
       match state {
-        fact.OnGuard(fact.Exited(0)) => drift(.Run, [change("guard", "exit 0", "run")])
-        fact.OnGuard(fact.Exited(code)) => {
+        fact.OnGuard(.Exited(0)) => drift(.Run, [change("guard", "exit 0", "run")])
+        fact.OnGuard(.Exited(code)) => {
           if guard_unreadable(code) {
             Uncertain(reading(.Unavailable, f"the guard could not run (exit {code})"))
           } else {
             Satisfied
           }
         }
-        fact.OnGuard(fact.GuardUnseen(unreadable)) => Uncertain(unreadable)
+        fact.OnGuard(.GuardUnseen(unreadable)) => Uncertain(unreadable)
         else => mismatch("command")
       }
     }

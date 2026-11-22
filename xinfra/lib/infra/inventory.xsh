@@ -125,13 +125,13 @@ pure build_host(
   let privilege = privilege_of(what, pick_text(text_of(what, entries, "privilege")?, text_of("defaults", defaults, "privilege")?))?
   let timeout = pick_int(int_of(what, entries, "timeout_ms")?, int_of("defaults", defaults, "timeout_ms")?) ?? 10000
   let transfer = pick_int(int_of(what, entries, "transfer_timeout_ms")?, int_of("defaults", defaults, "transfer_timeout_ms")?) ?? 600000
-  let reads = bool_of(what, entries, "escalate_reads")? ?? bool_of("defaults", defaults, "escalate_reads")? ?? privilege == model.Doas
+  let reads = bool_of(what, entries, "escalate_reads")? ?? bool_of("defaults", defaults, "escalate_reads")? ?? privilege == .Doas
   let groups = list_of(what, entries, "groups")?
   guard timeout > 0 and transfer > 0 else {
     fail f"{what}.timeout_ms and transfer_timeout_ms must be positive"
   }
 
-  guard dialect == model.Posix or privilege != model.Doas else {
+  guard dialect == .Posix or privilege != .Doas else {
     fail f"{what}: the xsh dialect has no doas escalation; use privilege plain or root"
   }
 
@@ -145,7 +145,7 @@ pure build_host(
   }
 
   vars = merged(vars, vars_of(what, entries)?)
-  if transport == model.Local {
+  if transport == .Local {
     return Ok(model.Host(
       name:,
       transport:,

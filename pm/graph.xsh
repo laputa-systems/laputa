@@ -11,12 +11,12 @@ pure kind_is_selected(kind: types.DependencyKind, kinds: List[types.DependencyKi
 ## dependent's build root holds, so it must be built first and its key enters the
 ## dependent's artifact key.
 export pure edge_orders_builds(kind: types.DependencyKind) -> Bool {
-  edge_orders_execution(kind) and kind != types.Proof
+  edge_orders_execution(kind) and kind != .Proof
 }
 
 ## Returns whether execution needs a dependency artifact before building or proving a node.
 export pure edge_orders_execution(kind: types.DependencyKind) -> Bool {
-  kind != types.Bootstrap and kind != types.RuntimeOnly
+  kind != .Bootstrap and kind != .RuntimeOnly
 }
 
 pure edge_key(from: Str, to: Str) -> Str {

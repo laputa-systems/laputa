@@ -43,7 +43,7 @@ test test_payload_encoding_changes_payload_keys_but_not_metapackage_keys [fs, en
     let repeat_key = plan.artifact_key_for(types.X86_64LinuxMusl, 2, "example-1-1", repeat, [])?
     let changed_key = plan.artifact_key_for(types.X86_64LinuxMusl, 2, "example-1-1", changed, [])?
     assert first_key == repeat_key
-    if kind == types.Meta {
+    if kind == .Meta {
       assert first_key == changed_key
     } else {
       assert first_key != changed_key
@@ -254,7 +254,7 @@ proc resolve_plan(
 pure retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
   {
     arch: "aarch64",
-    payload: types.RemoteArchive(
+    payload: .RemoteArchive(
       types.RemoteArchiveCoordinates(
         tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
         sha256: f"payload-{name}-{ver}-{rel}",
@@ -292,7 +292,7 @@ proc executor_fixture_provenance(name: Str) [fs, error] -> Result[types.Executor
 pure legacy_retrieval_for(name: Str, ver: Str, rel: Str) -> types.RemoteRetrieval {
   {
     arch: "aarch64",
-    payload: types.RemoteArchive(
+    payload: .RemoteArchive(
       types.RemoteArchiveCoordinates(
         tarball: f"packages/aarch64/{name}/{name}-{ver}-{rel}.tar.gz",
         sha256: plan_test_sha256(f"legacy payload {name}-{ver}-{rel}"),
@@ -822,7 +822,7 @@ test test_proof_dependencies_order_execution_and_change_only_proof_identity [fs,
   assert app.artifact_key == initial_app.artifact_key
   assert app.proof_key != initial_app.proof_key
   assert tool.level < app.level
-  assert [dependency.name for dependency in app.dependencies if dependency.kind == types.Proof] == ["proof-tool"]
+  assert [dependency.name for dependency in app.dependencies if dependency.kind == .Proof] == ["proof-tool"]
   let tool_recipe = fp"{root}/packages/proof-tool/PKGBUILD.xsh"
   tool_recipe.write(tool_recipe.read_text()?.replace("ver = \"1\"", with: "ver = \"2\""))
   let changed = resolve_plan(catalog.load(root)?, ["app"], empty_remote_snapshot())?

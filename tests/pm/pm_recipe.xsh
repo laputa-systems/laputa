@@ -426,7 +426,7 @@ test test_recipe_infers_identity_and_neutral_source_defaults [fs, env, error] { 
   let pkg = recipe.load_package_for_target(dir, types.X86_64LinuxMusl)?
   assert pkg.name == dir.name
   assert pkg.rel == "1"
-  assert pkg.kind == types.Payload
+  assert pkg.kind == .Payload
   assert pkg.upstream_sources[0].architectures == ["all"]
   assert pkg.upstream_sources[0].checksums[0].arch == "all"
   assert recipe.redundant_defaults(dir)? == []

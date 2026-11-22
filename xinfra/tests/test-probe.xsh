@@ -46,7 +46,7 @@ test a_symlink_target_with_newlines_survives {
 }
 
 test missing_denied_and_blocked_paths_are_different_facts {
-  assert probe.path_fact("state missing\n") is fact.Missing
+  assert probe.path_fact("state missing\n") is .Missing
   match probe.path_fact("state denied\ndetail 6e6f\n") {
     fact.Unseen(unreadable) => {
       assert unreadable.cause == .Denied
@@ -70,7 +70,7 @@ test garbage_never_reads_as_absence {
 }
 
 test package_reports_map_to_installed_absent_and_unavailable {
-  assert probe.package_fact("state absent\n") is fact.NotInstalled
+  assert probe.package_fact("state absent\n") is .NotInstalled
   match probe.package_fact("state installed\nversion 1.37.0-r20\nordering lt\n") {
     fact.Installed(installed) => {
       assert installed.version == "1.37.0-r20"
@@ -117,7 +117,7 @@ test accounts_resolve_primary_group_and_memberships {
     }
     else => assert false, "deploy missing"
   }
-  assert probe.user_fact(accounts, "ghost") is fact.NoUser
+  assert probe.user_fact(accounts, "ghost") is .NoUser
   match probe.group_fact(accounts, "wheel") {
     fact.GroupFound(info) => {
       assert info.gid == 10
@@ -163,7 +163,7 @@ test service_reports_map_status_codes {
     fact.ServiceFound(info) => assert info.running == .Indeterminate
     else => assert false, "not found"
   }
-  assert probe.service_fact("state missing\n") is fact.NoService
+  assert probe.service_fact("state missing\n") is .NoService
   match probe.service_fact("state unavailable\n") {
     fact.ServiceUnseen(unreadable) => assert unreadable.cause == .Unavailable
     else => assert false, "not unseen"
@@ -196,7 +196,7 @@ test xinit_status_reports_existence_running_and_readiness {
       else => assert false, f"{down} was not found"
     }
   }
-  assert probe.xinit_service_fact("state missing\n") is fact.NoService
+  assert probe.xinit_service_fact("state missing\n") is .NoService
   match probe.xinit_service_fact("state unavailable\n") {
     fact.ServiceUnseen(unreadable) => assert unreadable.cause == .Unavailable
     else => assert false, "not unseen"

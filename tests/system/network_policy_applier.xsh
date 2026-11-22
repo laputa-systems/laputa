@@ -206,13 +206,13 @@ test test_forged_operations_are_rejected_by_the_whole_change_set [error] {
     assert changes[index] == kernel.network_change(plan, index)?
   }
   var forged = plan
-  forged.operations = [policy.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
+  forged.operations = [.NetworkRemoveAddress({local: "198.51.100.2", prefix: 24})]
   match kernel.network_changes(forged) {
     Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
     Ok(_) => assert false, "a forged operation was accepted"
   }
   var extended = plan
-  extended.operations = plan.operations + [policy.NetworkRemoveDefaultRoute({gateway: "198.51.100.1", metric: 200})]
+  extended.operations = plan.operations + [.NetworkRemoveDefaultRoute({gateway: "198.51.100.1", metric: 200})]
   match kernel.network_changes(extended) {
     Err(problem) => assert problem.message == "operation is not part of a valid policy plan"
     Ok(_) => assert false, "an appended operation was accepted"

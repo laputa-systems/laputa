@@ -106,7 +106,7 @@ export pure receipt_dependency_keys(node: types.PlanNode) -> List[Str] {
     [
       dependency.artifact_key
       for dependency in node.dependencies
-      if dependency.kind != types.RuntimeOnly and dependency.kind != types.Proof
+      if dependency.kind != .RuntimeOnly and dependency.kind != .Proof
     ],
   )
 }
@@ -117,7 +117,7 @@ export pure receipt_runtime_dependency_keys(node: types.PlanNode) -> List[Str] {
     [
       dependency.artifact_key
       for dependency in node.dependencies
-      if dependency.kind == types.Runtime
+      if dependency.kind == .Runtime
     ],
   )
 }
@@ -450,16 +450,16 @@ proc remote_executor_sha256(metadata: Path, node: types.PlanNode) -> Result[Str]
 proc verify_remote_metapackage_metadata(metadata: Path, node: types.PlanNode, arch: Str) {
   let dto = json.read(metadata)?.require(RemoteMetapackageMetadataDto)?
   let runtime_dependencies = [
-    dependency.name for dependency in node.dependencies if dependency.kind == types.Runtime
+    dependency.name for dependency in node.dependencies if dependency.kind == .Runtime
   ] |> sort
   let runtime_only_dependencies = [
-    dependency.name for dependency in node.dependencies if dependency.kind == types.RuntimeOnly
+    dependency.name for dependency in node.dependencies if dependency.kind == .RuntimeOnly
   ] |> sort
   let build_host_dependencies = [
-    dependency.name for dependency in node.dependencies if dependency.kind == types.BuildHost
+    dependency.name for dependency in node.dependencies if dependency.kind == .BuildHost
   ] |> sort
   let build_target_dependencies = [
-    dependency.name for dependency in node.dependencies if dependency.kind == types.BuildTarget
+    dependency.name for dependency in node.dependencies if dependency.kind == .BuildTarget
   ] |> sort
   let metadata_runtime_dependencies = dto.deps |> sort
   let metadata_runtime_only_dependencies = dto.runtime_only_deps |> sort
@@ -470,7 +470,7 @@ proc verify_remote_metapackage_metadata(metadata: Path, node: types.PlanNode, ar
     return Err(types.PmError.PackageContract(f"remote metapackage metadata does not match plan node {node.package_id}"))
   }
 
-  if types.parse_package_kind(dto.package_kind)? != types.Meta {
+  if types.parse_package_kind(dto.package_kind)? != .Meta {
     return Err(types.PmError.PackageContract(f"remote metapackage metadata for {node.package_id} declares a payload"))
   }
 
@@ -489,7 +489,7 @@ proc verify_remote_archive_metadata(metadata: Path, node: types.PlanNode) {
 
   let kind = types.parse_package_kind(raw.get("package_kind")?.require()?)?
 
-  if kind == types.Meta {
+  if kind == .Meta {
     return Err(types.PmError.PackageContract(f"remote archive metadata for {node.package_id} declares a metapackage"))
   }
 }

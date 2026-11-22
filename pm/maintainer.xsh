@@ -56,7 +56,7 @@ export proc maintainer_outdated(pkg: types.Package, github_release: Str) {
 
 ## Render a target-specific replacement declaration only from a current plan and verified payload.
 export proc maintainer_filetree_diff(pkg: types.Package, repo_root: Path, value: types.BuildPlan, store_root: Path) -> Result[Str, Error] {
-  guard pkg.kind == types.Payload else {
+  guard pkg.kind == .Payload else {
     return Err(types.PmError.PackageContract(f"{pkg.name}: metapackage has no payload filetree"))
   }
   let selected = [node for node in value.nodes if node.name == pkg.name]

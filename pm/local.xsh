@@ -87,9 +87,9 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
 
       declared[key] = entry.kind
 
-      yield entry.path when entry.kind == types.Binary
+      yield entry.path when entry.kind == .Binary
 
-      if entry.kind == types.Tree {
+      if entry.kind == .Tree {
         guard fp"{dest}/{entry.path}".is_dir() else {
           return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a tree, but it is not a directory"))
         }
@@ -107,7 +107,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
       for entry in pkg.filetree {
         let tree = entry.path.display()
 
-        if entry.kind == types.Tree and key.starts_with(f"{tree}/") {
+        if entry.kind == .Tree and key.starts_with(f"{tree}/") {
           covered_by_tree = true
         }
       }
@@ -133,11 +133,11 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
 
     let declared_kind = declared.get(key)?
 
-    if declared_kind == types.Tree {
+    if declared_kind == .Tree {
       return Err(types.PmError.PackageContract(f"{pkg.name} filetree tree {key} overlaps an output file"))
     }
 
-    if declared_kind == types.Symlink {
+    if declared_kind == .Symlink {
       guard actual_kind == "symlink" else {
         return Err(types.PmError.PackageContract(f"{pkg.name} declares {key} as a symlink, found {actual_kind}"))
       }
@@ -154,14 +154,14 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
     }
 
     match elf.inspect(path_value) {
-      Ok(info) if info.type != "not-elf" and declared_kind == types.File => return Err(
+      Ok(info) if info.type != "not-elf" and declared_kind == .File => return Err(
         types.PmError.PackageContract(f"{pkg.name} ELF output {key} must be declared as binary"),
       )
-      Ok(info) if info.type == "not-elf" and declared_kind == types.Binary => return Err(
+      Ok(info) if info.type == "not-elf" and declared_kind == .Binary => return Err(
         types.PmError.PackageContract(f"{pkg.name} declares non-ELF output {key} as binary"),
       )
       Ok(_) => {}
-      Err(_) if declared_kind == types.Binary => return Err(
+      Err(_) if declared_kind == .Binary => return Err(
         types.PmError.PackageContract(f"{pkg.name} declares non-ELF output {key} as binary"),
       )
       Err(_) => {}
@@ -171,7 +171,7 @@ export proc validate_and_strip_package(pkg: types.Package, dest: Path, manifest:
   for entry in pkg.filetree {
     let key = entry.path.display()
 
-    if entry.kind != types.Tree and ! fp"{dest}/{entry.path}".exists() {
+    if entry.kind != .Tree and ! fp"{dest}/{entry.path}".exists() {
       return Err(types.PmError.PackageContract(f"{pkg.name} declares missing file {key}"))
     }
   }
@@ -255,7 +255,7 @@ export proc collect_archive_paths(
     }
 
     for entry in filetree {
-      if entry.kind == types.Tree {
+      if entry.kind == .Tree {
         let tree = fp"{root}/{entry.path}"
 
         yield entry.path when dir_empty(tree)
@@ -421,7 +421,7 @@ export proc load_built_package_from_dest(
   tarball: Path,
   dest: Path,
 ) [fs, error] -> Result[types.BuiltPackage, Error] {
-  if pkg.kind == types.Meta {
+  if pkg.kind == .Meta {
     let metadata_files: List[types.ArtifactEntry] = []
 
     return {

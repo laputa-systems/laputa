@@ -252,7 +252,7 @@ proc exact_remote_snapshot(
         rel: node.rel,
         retrieval: {
           arch: "aarch64",
-          payload: types.RemoteArchive(
+          payload: .RemoteArchive(
             types.RemoteArchiveCoordinates(
               tarball: tarball.relative_to(remote_root).display(),
               sha256: hash.sha256(tarball)?.hex(),
@@ -550,7 +550,7 @@ test test_execute_x86_64_plan_preserves_target_and_metadata [fs, net, process, e
   let result = execute.build_plan(value, repo_root, object_store, "", 2)?
 
   for receipt in result.artifacts {
-    assert receipt.target == types.X86_64LinuxMusl
+    assert receipt.target == .X86_64LinuxMusl
     let metadata = json.read(fp"{receipt.artifact_dir}/metadata.json")?.require(local.PackageMetadataDto)?
     assert metadata.arch == "x86_64"
   }

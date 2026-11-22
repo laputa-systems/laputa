@@ -87,12 +87,12 @@ test test_qemu_qualification_boots_the_disposable_ext2_payload [error] {
   assert "virtio-blk-pci,drive=root" in argv
   assert !("-netdev" in argv)
   assert !("-qmp" in argv)
-  let controlled = qemu.qemu_asterinas_reference_argv(config, {...input, control: qemu.QmpSocket(p"/run/vmm.sock")})?
+  let controlled = qemu.qemu_asterinas_reference_argv(config, {...input, control: .QmpSocket(p"/run/vmm.sock")})?
   assert "unix:/run/vmm.sock,server=on,wait=off" in controlled
-  let networked = qemu.qemu_asterinas_reference_argv(config, {...input, network: qemu.Tap("tap0")})?
+  let networked = qemu.qemu_asterinas_reference_argv(config, {...input, network: .Tap("tap0")})?
   assert "tap,id=net0,ifname=tap0,script=no,downscript=no" in networked
   assert "virtio-net-pci,netdev=net0,mac=AA:FC:00:00:00:01" in networked
-  match qemu.qemu_asterinas_reference_argv(config, {...input, network: qemu.Tap("tap0,script=x")}) {
+  match qemu.qemu_asterinas_reference_argv(config, {...input, network: .Tap("tap0,script=x")}) {
     Ok(_) => fail "accepted a TAP name that injects QEMU options"
     Err(_) => {}
   }
@@ -117,8 +117,8 @@ test test_qemu_qualification_attaches_a_second_disk_after_the_root_disk [error] 
     initramfs: p"/tmp/initramfs",
     disk: p"/tmp/root",
     memory_mib: 1024,
-    data_disk: qemu.DataDisk(p"/tmp/data"),
-    network: qemu.Tap("tap0"),
+    data_disk: .DataDisk(p"/tmp/data"),
+    network: .Tap("tap0"),
     control: qemu.NoControl,
   )
   let argv = qemu.qemu_asterinas_reference_argv(config, input)?

@@ -338,7 +338,7 @@ proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: f
 
   for member in memberships {
     let known = match state {
-      fact.OnUser(fact.UserFound(info)) => member in info.memberships or member == (info.group ?? "")
+      fact.OnUser(.UserFound(info)) => member in info.memberships or member == (info.group ?? "")
       else => false
     }
     if ! known {

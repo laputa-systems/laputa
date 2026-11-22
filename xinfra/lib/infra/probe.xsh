@@ -105,14 +105,14 @@ export pure path_fact(stdout: Str) -> fact.PathState {
     "missing" => fact.Missing
     "found" => {
       match path_info(table) {
-        Ok(info) => fact.Found(info)
-        Err(error) => fact.Unseen(malformed(f"path report: {error.message}"))
+        Ok(info) => .Found(info)
+        Err(error) => .Unseen(malformed(f"path report: {error.message}"))
       }
     }
-    "blocked" => fact.Blocked(fact.Unreadable(cause: .Conflict, detail: detail_of(table)))
-    "denied" => fact.Unseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
-    "error" => fact.Unseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
-    else => fact.Unseen(malformed(f"path report has no state: {stdout}"))
+    "blocked" => .Blocked(fact.Unreadable(cause: .Conflict, detail: detail_of(table)))
+    "denied" => .Unseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
+    "error" => .Unseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
+    else => .Unseen(malformed(f"path report has no state: {stdout}"))
   }
 }
 
@@ -131,16 +131,16 @@ export pure package_fact(stdout: Str) -> fact.PackageState {
       match table.get("version") {
         Ok(version) => {
           if table.get("ordering") is Ok("unknown") {
-            fact.PackageUnseen(malformed(f"apk could not order version {version}"))
+            .PackageUnseen(malformed(f"apk could not order version {version}"))
           } else {
-            fact.Installed(fact.InstalledPackage(version:, ordering:))
+            .Installed(fact.InstalledPackage(version:, ordering:))
           }
         }
-        Err(_) => fact.PackageUnseen(malformed("package report has no version"))
+        Err(_) => .PackageUnseen(malformed("package report has no version"))
       }
     }
-    "unavailable" => fact.PackageUnseen(fact.Unreadable(cause: .Unavailable, detail: "apk database is not readable"))
-    else => fact.PackageUnseen(malformed(f"package report has no state: {stdout}"))
+    "unavailable" => .PackageUnseen(fact.Unreadable(cause: .Unavailable, detail: "apk database is not readable"))
+    else => .PackageUnseen(malformed(f"package report has no state: {stdout}"))
   }
 }
 
@@ -232,13 +232,13 @@ export pure accounts(stdout: Str) -> AccountsState {
 ## The state of the named group in a parsed account database.
 export pure group_fact(accounts: Accounts, name: Str) -> fact.GroupState {
   let found = accounts.groups |> where { |entry| entry.name == name } |> collect()
-  if found.is_empty() { fact.NoGroup } else { fact.GroupFound(found[0]) }
+  if found.is_empty() { fact.NoGroup } else { .GroupFound(found[0]) }
 }
 
 ## The state of the named user in a parsed account database.
 export pure user_fact(accounts: Accounts, name: Str) -> fact.UserState {
   let found = accounts.users |> where { |entry| entry.name == name } |> collect()
-  if found.is_empty() { fact.NoUser } else { fact.UserFound(found[0]) }
+  if found.is_empty() { fact.NoUser } else { .UserFound(found[0]) }
 }
 
 ## Parse the `service_state` script output into the state of one service.
@@ -246,7 +246,7 @@ export pure service_fact(stdout: Str) -> fact.ServiceState {
   let table = fields(stdout)
   match table.get("state") ?? "" {
     "missing" => fact.NoService
-    "unavailable" => fact.ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "rc-service is not installed"))
+    "unavailable" => .ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "rc-service is not installed"))
     "found" => {
       let running: fact.Running = match table.get("status") ?? "" {
         "0" => .Started
@@ -256,12 +256,12 @@ export pure service_fact(stdout: Str) -> fact.ServiceState {
       }
       let enabled = table.get("enabled") ?? ""
       if enabled == "yes" or enabled == "no" {
-        fact.ServiceFound(fact.ServiceInfo(enabled: enabled == "yes", running:, ready: null))
+        .ServiceFound(fact.ServiceInfo(enabled: enabled == "yes", running:, ready: null))
       } else {
-        fact.ServiceUnseen(malformed("service report has no enablement"))
+        .ServiceUnseen(malformed("service report has no enablement"))
       }
     }
-    else => fact.ServiceUnseen(malformed(f"service report has no state: {stdout}"))
+    else => .ServiceUnseen(malformed(f"service report has no state: {stdout}"))
   }
 }
 
@@ -272,9 +272,9 @@ export pure xinit_service_fact(stdout: Str) -> fact.ServiceState {
   let table = fields(stdout)
   match table.get("state") ?? "" {
     "missing" => fact.NoService
-    "unavailable" => fact.ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "xinit is not installed"))
-    "denied" => fact.ServiceUnseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
-    "error" => fact.ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
+    "unavailable" => .ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: "xinit is not installed"))
+    "denied" => .ServiceUnseen(fact.Unreadable(cause: .Denied, detail: detail_of(table)))
+    "error" => .ServiceUnseen(fact.Unreadable(cause: .Unavailable, detail: detail_of(table)))
     "found" => {
       let running: fact.Running = match table.get("running") ?? "" {
         "running" => .Started
@@ -288,12 +288,12 @@ export pure xinit_service_fact(stdout: Str) -> fact.ServiceState {
       }
       let readiness = table.get("ready") ?? ""
       guard readiness == "true" or readiness == "false" else {
-        return fact.ServiceUnseen(malformed("xinit status report has no readiness"))
+        return .ServiceUnseen(malformed("xinit status report has no readiness"))
       }
 
       fact.ServiceFound(fact.ServiceInfo(enabled: null, running:, ready: readiness == "true"))
     }
-    else => fact.ServiceUnseen(malformed(f"xinit service report has no state: {stdout}"))
+    else => .ServiceUnseen(malformed(f"xinit service report has no state: {stdout}"))
   }
 }
 

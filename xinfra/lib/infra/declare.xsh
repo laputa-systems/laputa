@@ -66,7 +66,7 @@ export pure directory(
   }
 
   let spec = model.DirectorySpec(path: at, presence:, owner:, group: group_name, mode:, parents:)
-  Ok(model.Resource(id:, needs:, spec: model.Directory(spec)))
+  Ok(model.Resource(id:, needs:, spec: .Directory(spec)))
 }
 
 pure content_of(
@@ -81,26 +81,26 @@ pure content_of(
 ) -> Result[model.Content?, Error] {
   var chosen: List[model.Content] = []
   if text != null {
-    chosen += [model.Inline(bytes.from_text(text))]
+    chosen += [.Inline(bytes.from_text(text))]
   }
 
   if data != null {
-    chosen += [model.Inline(data)]
+    chosen += [.Inline(data)]
   }
 
   if source != null {
-    chosen += [model.FromFile(source)]
+    chosen += [.FromFile(source)]
   }
 
   if secret_env != null {
     check.environment_ok(secret_env)
-    chosen += [model.SecretEnv(secret_env)]
+    chosen += [.SecretEnv(secret_env)]
   }
 
   if template_file != null {
     let object_text = template_json ?? "{}"
     let _ = ctx f"file {id}: template_json" { json.decode(object_text)? }
-    chosen += [model.Rendered(model.TemplateSource(file: template_file, json: object_text))]
+    chosen += [.Rendered(model.TemplateSource(file: template_file, json: object_text))]
   }
 
   if presence == .Absent {
@@ -167,7 +167,7 @@ export pure file(
   let content = content_of(id, presence, text, data, source, secret_env, template_file, template_json)?
   let marked = sensitive or secret_env != null
   let spec = model.FileSpec(path: at, presence:, content:, owner:, group: group_name, mode:, validate:, sensitive: marked)
-  Ok(model.Resource(id:, needs:, spec: model.File(spec)))
+  Ok(model.Resource(id:, needs:, spec: .File(spec)))
 }
 
 ## Declare a symbolic link. An existing link to another target is replaced
@@ -193,7 +193,7 @@ export pure symlink(
 
   let replacement: model.Replacement = if replace { .ReplaceLink } else { .Keep }
   let spec = model.SymlinkSpec(path: at, presence:, target:, replacement:)
-  Ok(model.Resource(id:, needs:, spec: model.Link(spec)))
+  Ok(model.Resource(id:, needs:, spec: .Link(spec)))
 }
 
 pure constraint_of(version: Str) -> Result[model.Constraint, Error] {
@@ -236,7 +236,7 @@ export pure package(
 
   let constraint = if version == null { null } else { ctx f"package {id}" { constraint_of(version)? } }
   let spec = model.PackageSpec(name:, presence:, constraint:)
-  Ok(model.Resource(id:, needs:, spec: model.Package(spec)))
+  Ok(model.Resource(id:, needs:, spec: .Package(spec)))
 }
 
 ## Declare an explicit refresh of the apk index. It runs only at apply and is
@@ -244,7 +244,7 @@ export pure package(
 export pure package_index(id: Str, needs: List[Str] = []) -> Result[model.Resource, Error] {
   require_args("package_index", id, needs)
   let spec = model.PackageIndexSpec(note: "apk update")
-  Ok(model.Resource(id:, needs:, spec: model.PackageIndex(spec)))
+  Ok(model.Resource(id:, needs:, spec: .PackageIndex(spec)))
 }
 
 ## Declare a group in the account database. A differing gid is a conflict,
@@ -263,7 +263,7 @@ export pure group_account(
   }
 
   let spec = model.GroupSpec(name:, presence:, gid:)
-  Ok(model.Resource(id:, needs:, spec: model.GroupAccount(spec)))
+  Ok(model.Resource(id:, needs:, spec: .GroupAccount(spec)))
 }
 
 ## Declare a user. `groups` are supplementary memberships that must hold; extra
@@ -295,7 +295,7 @@ export pure user_account(
   }
 
   let spec = model.UserSpec(name:, presence:, uid:, group: primary_group, groups:, home:, shell:, system: system_account)
-  Ok(model.Resource(id:, needs:, spec: model.UserAccount(spec)))
+  Ok(model.Resource(id:, needs:, spec: .UserAccount(spec)))
 }
 
 pure invocation_of(what: Str, argv: List[Str]?, shell: Str?) -> Result[model.Invocation, Error] {
@@ -305,11 +305,11 @@ pure invocation_of(what: Str, argv: List[Str]?, shell: Str?) -> Result[model.Inv
 
   if argv != null {
     check.argv_ok(what, argv)
-    return Ok(model.Argv(argv))
+    return Ok(.Argv(argv))
   }
 
   check.shell_ok(what, shell ?? "")
-  Ok(model.Shell(shell ?? ""))
+  Ok(.Shell(shell ?? ""))
 }
 
 ## Declare a command. Exactly one condition decides whether it runs:
@@ -340,15 +340,15 @@ export pure command(
   var guards: List[model.Guard] = []
   if creates != null {
     ctx f"command {id}" { check.path_ok("creates", creates) }
-    guards += [model.Creates(creates)]
+    guards += [.Creates(creates)]
   }
 
   if skip_if != null or skip_if_shell != null {
-    guards += [model.SkipIf(ctx f"command {id}" { invocation_of("skip_if", skip_if, skip_if_shell)? })]
+    guards += [.SkipIf(ctx f"command {id}" { invocation_of("skip_if", skip_if, skip_if_shell)? })]
   }
 
   if only_if != null or only_if_shell != null {
-    guards += [model.OnlyIf(ctx f"command {id}" { invocation_of("only_if", only_if, only_if_shell)? })]
+    guards += [.OnlyIf(ctx f"command {id}" { invocation_of("only_if", only_if, only_if_shell)? })]
   }
 
   if ! run_on.is_empty() {
@@ -383,7 +383,7 @@ export pure command(
   }
 
   let spec = model.CommandSpec(invocation:, guard: guards[0], triggers: run_on, stdin_env:, accept:, timeout_ms: timeout_seconds * 1000)
-  Ok(model.Resource(id:, needs:, spec: model.Exec(spec)))
+  Ok(model.Resource(id:, needs:, spec: .Exec(spec)))
 }
 
 ## Declare an OpenRC service. `enabled` adds or removes it from `runlevel`;
@@ -413,7 +413,7 @@ export pure service(
   }
 
   let spec = model.ServiceSpec(name:, adapter: .OpenRc, runlevel:, enabled:, running:, reload_on:, restart_on:)
-  Ok(model.Resource(id:, needs:, spec: model.Service(spec)))
+  Ok(model.Resource(id:, needs:, spec: .Service(spec)))
 }
 
 ## Declare a Laputa xinit service. `running` starts or stops it; `reload_on`
@@ -445,5 +445,5 @@ export pure xinit_service(
   }
 
   let spec = model.ServiceSpec(name:, adapter: .Xinit, runlevel: "", enabled: null, running:, reload_on:, restart_on:)
-  Ok(model.Resource(id:, needs:, spec: model.Service(spec)))
+  Ok(model.Resource(id:, needs:, spec: .Service(spec)))
 }
