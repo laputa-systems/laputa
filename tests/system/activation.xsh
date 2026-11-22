@@ -523,7 +523,7 @@ test test_policy_pins_bytes_and_rejects_incompatible_state [fs, time, error] { |
   assert record_text(state)? == before
 }
 
-test test_host_and_guest_use_the_same_state_contract [fs, error] { |ctx|
+test test_host_and_guest_use_the_same_state_contract [fs, error] {
   let hook = p"profiles/qemu-maintained/usr/lib/init/rc.early.d/00-maintained-state.boot".read_text()?
   assert f"\"{activation.ACTIVATION_STATE_FORMAT}\\n\"" in hook
 }

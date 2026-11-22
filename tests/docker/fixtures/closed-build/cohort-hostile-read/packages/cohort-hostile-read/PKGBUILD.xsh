@@ -23,7 +23,7 @@ export const filetree = [{path: p"usr/share/cohort-hostile-read", kind: "file"}]
 error Escape = Failed
 
 ## The cohort checkout is outside every declared read root, so reading it must be denied.
-export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
+export proc build(_: Path) [fs, process, env, error] -> Result[Unit, Error] {
   let undeclared = p"/cohort/build.xsh"
   match undeclared.read_text() {
     Ok(_) => Err(Escape.Failed("undeclared read succeeded; the build ran unconfined"))

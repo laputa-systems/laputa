@@ -127,7 +127,7 @@ test test_captured_docker_observation_reproduces_foreign_ownership_conflict [fs,
   assert record.error == "desired address is foreign; ownership cannot be inferred"
   assert record.input.owned.addresses.is_empty()
   assert record.input.owned.routes.is_empty()
-  for attempt in [1, 2] {
+  for _ in [1, 2] {
     if let Err(problem) = policy.network_plan(record.input.intent, record.input.owned, record.input.observed) {
       assert problem.message == record.error
     } else {
@@ -200,7 +200,7 @@ pure empty_owned() -> policy.NetworkOwnership {
 }
 
 test test_ipv6_plan_brings_the_link_up_and_uses_the_kernel_default_metric [error] {
-  let observed: policy.NetworkSnapshot = {...snapshot6(), up: false, addresses: [], routes: []}
+  let observed = {...snapshot6(), up: false, addresses: [], routes: []}
   let plan = policy.network_plan(intent6(), empty_owned(), observed)?
   assert plan.operations == [
     policy.NetworkBringLinkUp,
@@ -219,7 +219,7 @@ test test_ipv6_plan_brings_the_link_up_and_uses_the_kernel_default_metric [error
 test test_ipv4_zero_metric_is_not_rewritten_to_the_ipv6_default [error] {
   var zero = intent()
   zero.metric = 0
-  let observed: policy.NetworkSnapshot = {...snapshot(), addresses: [], routes: []}
+  let observed = {...snapshot(), addresses: [], routes: []}
   let empty: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [], routes: [])
   let plan = policy.network_plan(zero, empty, observed)?
   assert plan.operations == [policy.NetworkAddAddress(zero.address), policy.NetworkAddDefaultRoute({gateway: "192.0.2.1", metric: 0})]
@@ -258,7 +258,7 @@ test test_ipv6_retargeting_removes_only_owned_resources [error] {
 }
 
 test test_ipv6_intent_must_be_canonical_global_unicast_text [error] {
-  let observed: policy.NetworkSnapshot = {...snapshot6(), addresses: [], routes: []}
+  let observed = {...snapshot6(), addresses: [], routes: []}
   let invalid = [
     "2001:DB8::2", "2001:0db8::2", "2001:db8:0:0:0:0:0:2", "2001:db8::0:2", "2001:db8:0:0:1::1", "2001:db8::1:1:1:1:1",
     "::", "::1", "::2", "fe80::2", "febf::2", "ff02::1", "::ffff:192.0.2.1", "::ffff:c000:201", "2001:db8::2::3",
@@ -282,7 +282,7 @@ test test_ipv6_intent_must_be_canonical_global_unicast_text [error] {
 }
 
 test test_ipv6_prefix_and_gateway_bounds_and_family_agreement [error] {
-  let observed: policy.NetworkSnapshot = {...snapshot6(), addresses: [], routes: []}
+  let observed = {...snapshot6(), addresses: [], routes: []}
   for prefix in [0, 129, -1] {
     var desired = intent6()
     desired.address.prefix = prefix
@@ -327,7 +327,7 @@ test test_a_cohort_never_mixes_address_families [error] {
     assert false
   }
 
-  var only_route: policy.NetworkSnapshot = {...snapshot6(), addresses: [], routes: [{gateway: "192.0.2.1", metric: 100}]}
+  var only_route = {...snapshot6(), addresses: [], routes: [{gateway: "192.0.2.1", metric: 100}]}
   if let Err(problem) = policy.network_plan(intent6(), empty_owned(), only_route) {
     assert problem.message == "observed cohort holds a default route outside the intent's IPv6 family"
   } else {

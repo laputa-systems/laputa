@@ -42,12 +42,11 @@ proc stop_server(server: ConsumerServer) [process, error] {
 }
 
 proc python_or_skip() -> Result[Str, Error] {
-  match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      ""
-    }
+  if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    ""
   }
 }
 
@@ -86,12 +85,11 @@ proc uv_or_skip() -> Result[Path, Error] {
   let root = packaged_root()?
   return fp"{root}/usr/bin/uv" when root != ""
 
-  match process.which("uv") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("uv is unavailable")
-      p"/nonexistent"
-    }
+  if let Ok(found) = process.which("uv") {
+    found
+  } else {
+    test.skip("uv is unavailable")
+    p"/nonexistent"
   }
 }
 
@@ -120,12 +118,11 @@ proc cargo_or_skip() -> Result[Path, Error] {
   let root = packaged_root()?
   return fp"{root}/usr/bin/cargo" when root != ""
 
-  match process.which("cargo") {
-    Ok(found) => found,
-    Err(_) => {
-      test.skip("cargo is unavailable")
-      p"/nonexistent"
-    }
+  if let Ok(found) = process.which("cargo") {
+    found
+  } else {
+    test.skip("cargo is unavailable")
+    p"/nonexistent"
   }
 }
 

@@ -117,18 +117,18 @@ proc options(services: List[Str]) -> Result[quiesce.QuiesceOptions, Error] {
   }
 }
 
-proc transitions(rig: Rig) -> Result[List[Str], Error] {
-  let log = fp"{rig.env.state_dir}/stub.log"
+proc transitions(harness: Rig) -> Result[List[Str], Error] {
+  let log = fp"{harness.env.state_dir}/stub.log"
   return Ok([]) unless log.exists()
   Ok(log.read_lines()? |> where .trim() != "" |> collect)
 }
 
-proc plan(rig: Rig, services: List[Str]) -> Result[quiesce.QuiesceRecord, Error] {
-  quiesce.quiesce_plan(rig.env, "backup", 1, services, "boot-1", 1767225600000, options(services)?)
+proc plan(harness: Rig, services: List[Str]) -> Result[quiesce.QuiesceRecord, Error] {
+  quiesce.quiesce_plan(harness.env, "backup", 1, services, "boot-1", 1767225600000, options(services)?)
 }
 
-proc status_of(rig: Rig, service: Str) -> Result[Str, Error] {
-  let value = json.read(fp"{rig.env.state_dir}/{service}.json")?
+proc status_of(harness: Rig, service: Str) -> Result[Str, Error] {
+  let value = json.read(fp"{harness.env.state_dir}/{service}.json")?
   Ok(json.get(value, ["desired"], "").require()?)
 }
 

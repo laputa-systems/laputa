@@ -192,8 +192,8 @@ test test_zero_metric_route_changes_never_reach_a_request [error] {
     assert false, "a zero-metric removal was encoded"
   }
 
-  let created: policy.NetworkIntent = {...raised, metric: 0}
-  let empty_routes: policy.NetworkSnapshot = {...observed, routes: []}
+  let created = {...raised, metric: 0}
+  let empty_routes = {...observed, routes: []}
   let creation = policy.network_plan(created, {ifindex: 7, name: "veth-test", addresses: [{local: "192.0.2.2", prefix: 24}], routes: []}, empty_routes)?
   assert creation.operations == [policy.NetworkAddDefaultRoute({gateway: "192.0.2.1", metric: 0})]
   if let Err(problem) = kernel.network_change(creation, 0) {

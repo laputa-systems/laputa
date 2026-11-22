@@ -523,7 +523,7 @@ export let filetree = []
   }
 }
 
-test test_remote_decoder_keeps_payload_states_unambiguous [fs, net, env, error] { |ctx|
+test test_remote_decoder_keeps_payload_states_unambiguous [fs, net, env, error] {
   let empty_meta = remote.decode_remote_package(remote_decoder_row(true, "", "", 0))?
   let meta_plan = remote.plan_artifact_from_package(empty_meta)?
   assert types.remote_payload_is_metadata_only(meta_plan.retrieval.payload)

@@ -19,22 +19,20 @@ proc has_control(text: Str) -> Bool {
 }
 
 test test_guest_stderr_is_stripped_of_control_characters_in_a_failure {
-  match remote.remote_decode_reply(run_result(3, "", HOSTILE)) {
-    Err(remote.RemoteError.Failed {message, ..}) => {
-      assert ! has_control(message)
-      assert "line" in message
-    }
-    other => assert false, "expected a failure"
+  if let Err(remote.RemoteError.Failed {message, ..}) = remote.remote_decode_reply(run_result(3, "", HOSTILE)) {
+    assert ! has_control(message)
+    assert "line" in message
+  } else {
+    assert false, "expected a failure"
   }
 }
 
 test test_a_refusal_message_and_kind_are_stripped_of_control_characters {
   let line = json.encode({protocol: remote.REMOTE_PROTOCOL, ok: false, error: {kind: HOSTILE, message: HOSTILE}})?
-  match remote.remote_decode_reply(run_result(0, line + "\n", "")) {
-    Err(remote.RemoteError.Refused {kind, message, ..}) => {
-      assert ! has_control(kind)
-      assert ! has_control(message)
-    }
-    other => assert false, "expected a refusal"
+  if let Err(remote.RemoteError.Refused {kind, message, ..}) = remote.remote_decode_reply(run_result(0, line + "\n", "")) {
+    assert ! has_control(kind)
+    assert ! has_control(message)
+  } else {
+    assert false, "expected a refusal"
   }
 }

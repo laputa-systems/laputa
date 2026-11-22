@@ -33,7 +33,7 @@ match linux.connect(fd, {family: "inet", address: "127.0.0.1", port: 9}) {
 }
 
 ## The helper inherits the build child's Landlock domain, so its TCP connect is confined too.
-export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
+export proc build(_: Path) [fs, process, env, error] -> Result[Unit, Error] {
   let recipe = fp"{env("XSH_PM_RECIPE_DIR")?}"
   let helper = fp"{recipe}/tcp-probe.xsh"
   helper.write(tcp_probe())

@@ -42,12 +42,11 @@ proc stop_server(server: ConsumerServer) [process, error] {
 }
 
 proc python_or_skip() -> Result[Str, Error] {
-  match process.which("python3") {
-    Ok(found) => found.display(),
-    Err(_) => {
-      test.skip("python3 is unavailable for the fixture TLS server")
-      ""
-    }
+  if let Ok(found) = process.which("python3") {
+    found.display()
+  } else {
+    test.skip("python3 is unavailable for the fixture TLS server")
+    ""
   }
 }
 

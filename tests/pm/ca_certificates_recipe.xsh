@@ -56,7 +56,7 @@ test ca_certificate_proof_checks_pinned_roots_and_managed_store [fs, process, en
   prove_ok(ctx, "certificate proof")
 }
 
-test ca_certificate_proof_pins_each_seed_blocked_spki [fs, process, env, error] { |ctx|
+test ca_certificate_proof_pins_each_seed_blocked_spki [fs, process, env, error] {
   let seed = p"packages/ca-certificates/files/trust-policy".read_text()?
   let proof_source = p"packages/ca-certificates/proof.xsh".read_text()?
   var count = 0

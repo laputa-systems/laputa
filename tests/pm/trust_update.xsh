@@ -325,7 +325,7 @@ test trust_update_rejects_oversized_payloads [fs, process, time, error] { |ctx|
 
 test trust_update_rejects_malformed_releases [fs, process, env, time, error] { |ctx|
   let root = stage_system(ctx, "trust-update-malformed", "signing-key")?
-  let base = stage_release(ctx, "trust-update-malformed-base", "release-b")?
+  let _ = stage_release(ctx, "trust-update-malformed-base", "release-b")?
 
   var big = ""
   for _ in range(4097) { big += "x" }
@@ -472,7 +472,7 @@ test trust_update_recovers_interrupted_staging [fs, process, time, error] { |ctx
   let staging = "staging/candidate-3-orphan"
   fp"{paths.store}/{staging}".mkdir()
   fp"{paths.store}/{staging}/owner".write(bytes.from_text("orphan-token"))
-  let key = key_bytes("signing-key")?
+  let _ = key_bytes("signing-key")?
   trust_store.trust_store_write_journal(paths, "staged", "3", staging, "orphan-token")
 
   let source = stage_release(ctx, "trust-update-recover-c", "release-c")?
@@ -489,7 +489,7 @@ test trust_update_rolls_forward_a_committed_candidate [fs, process, time, error]
   let _ = trust_update.trust_update_from_dir(root, release_b)?
 
   let paths = trust_store.trust_store_paths(root)
-  let key = key_bytes("signing-key")?
+  let _ = key_bytes("signing-key")?
   let bundle = fixture("release-c/ca-certificates.crt").read_bytes()?
   let policy = fixture("release-c/trust-policy").read_bytes()?
   let staged = trust_store.trust_store_stage_candidate(
@@ -980,7 +980,7 @@ test trust_update_recovery_persists_signed_time_for_expired_active_release [fs, 
   assert issued < time.now() / 1000
 }
 
-test trust_release_rejects_legacy_v1_metadata [fs, error] { |_ctx|
+test trust_release_rejects_legacy_v1_metadata [fs, error] {
   let legacy = p"tests/fixtures/trust-release/valid.metadata".read_bytes()?
   match trust_release.release_parse_metadata(legacy) {
     Ok(_) => test.fail("legacy trust release metadata was accepted"),

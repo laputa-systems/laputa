@@ -23,7 +23,7 @@ export const filetree = [{path: p"usr/share/cohort-hostile-write", kind: "file"}
 error Escape = Failed
 
 ## The mounted output store is writable but outside every declared write root.
-export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
+export proc build(_: Path) [fs, process, env, error] -> Result[Unit, Error] {
   let undeclared = p"/output/hostile-escape"
   match undeclared.write("escaped\n") {
     Ok(_) => Err(Escape.Failed("undeclared write succeeded; the build ran unconfined"))

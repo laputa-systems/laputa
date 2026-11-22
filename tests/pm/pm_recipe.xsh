@@ -482,7 +482,7 @@ test test_recipe_loads_proof_dependencies_without_running_the_proof [fs, env, er
   }
 }
 
-test test_ca_certificates_installs_managed_symlinks_and_seeds { |ctx|
+test test_ca_certificates_installs_managed_symlinks_and_seeds {
   let pkg = recipe.load_package(p"packages/ca-certificates")?
   let paths = [entry.path.display() for entry in pkg.filetree]
   let joined = paths.join("\n")
@@ -499,7 +499,7 @@ test test_ca_certificates_installs_managed_symlinks_and_seeds { |ctx|
   }
 }
 
-test test_laputa_pm_ships_the_trust_command { |ctx|
+test test_laputa_pm_ships_the_trust_command {
   let pkg = recipe.load_package(p"packages/laputa-pm")?
   let paths = [entry.path.display() for entry in pkg.filetree]
   for expected in ["usr/bin/trust", "usr/lib/pm/trust.xsh", "usr/lib/pm/trust"] {

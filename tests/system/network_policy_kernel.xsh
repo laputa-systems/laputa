@@ -2,6 +2,9 @@ use lib.net_state
 use packages.laputa-net.network_kernel as kernel
 use packages.laputa-net.network_plan as policy
 
+const static6 = 192
+const settled6 = 128
+
 pure request_of(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Request, Error] {
   Ok(net_state.request(kernel.network_change(plan, index)?)?)
 }
@@ -9,9 +12,9 @@ pure request_of(plan: policy.NetworkPlan, index: Int) -> Result[net_state.Reques
 proc fixture_plan() -> Result[policy.NetworkPlan, Error] {
   let raw = p"tests/system/fixtures/network-policy-conflict.json".read_text()?
   let input: policy.NetworkPlanInput = json.decode(raw)?.require()?
-  var intent = input.intent
-  intent.address.local = "192.0.3.3"
-  policy.network_plan(intent, input.owned, input.observed)
+  var changed = input.intent
+  changed.address.local = "192.0.3.3"
+  policy.network_plan(changed, input.owned, input.observed)
 }
 
 pure primary_dump() -> LinuxNetworkDump {
@@ -383,7 +386,7 @@ test test_projected_route_identity_matches_the_removal_request_exactly [fs, erro
 test test_reconcile_result_reports_conflicts_instead_of_rolling_back [fs, error] {
   let plan = healthy_plan()?
   assert plan.operations == [policy.NetworkAddAddress({local: "192.0.2.3", prefix: 24}), policy.NetworkRemoveAddress({local: "192.0.2.2", prefix: 24})]
-  let stale: policy.NetworkSnapshot = {...plan.before, sequence: 2, routes: []}
+  let stale = {...plan.before, sequence: 2, routes: []}
   let conflict: kernel.NetworkReconcile = kernel.NetworkReconcile(
     plan:,
     attempts: 0,
@@ -398,7 +401,13 @@ test test_reconcile_result_reports_conflicts_instead_of_rolling_back [fs, error]
     assert false
   }
 
-  let diverged: kernel.NetworkReconcile = {...conflict, attempts: 1, result: .NetworkReobserve("operation 0 was acknowledged but the observation diverged")}
+  let diverged = kernel.NetworkReconcile(
+    plan: conflict.plan,
+    attempts: 1,
+    observed: conflict.observed,
+    events: conflict.events,
+    result: .NetworkReobserve("operation 0 was acknowledged but the observation diverged"),
+  )
   if let .NetworkReobserve(reason) = diverged.result {
     assert reason == "operation 0 was acknowledged but the observation diverged"
   } else {
@@ -430,9 +439,6 @@ pure default6(gateway: Str, metric: Int) -> LinuxNetworkRoute {
 pure dump6(addresses: List[LinuxNetworkAddress], routes: List[LinuxNetworkRoute]) -> LinuxNetworkDump {
   {...primary_dump(), addresses, routes}
 }
-
-const static6 = 192
-const settled6 = 128
 
 proc rejects6(addresses: List[LinuxNetworkAddress], routes: List[LinuxNetworkRoute], message: Str) {
   if let Err(problem) = kernel.network_project_dump(dump6(addresses, routes), intent6(), 1) {
@@ -640,7 +646,7 @@ test test_ipv6_requests_select_exact_local_prefix_gateway_interface_and_metric [
 }
 
 test test_ipv6_has_no_primary_secondary_rule_so_same_prefix_additions_are_planned [error] {
-  let observed: policy.NetworkSnapshot = {...empty6(), addresses: [{local: "2001:db8:1::2", prefix: 64}]}
+  let observed = {...empty6(), addresses: [{local: "2001:db8:1::2", prefix: 64}]}
   let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [])
   let plan = policy.network_plan({...intent6(), address: {local: "2001:db8:1::3", prefix: 64}}, owned, observed)?
   assert plan.operations[0] == policy.NetworkAddAddress({local: "2001:db8:1::3", prefix: 64})
@@ -657,7 +663,7 @@ test test_ipv6_zero_metric_is_never_sent_and_a_zero_metric_removal_is_refused [e
     assert false, "the default route was not added"
   }
 
-  let observed: policy.NetworkSnapshot = {...empty6(), routes: [{gateway: "fe80::9", metric: 0}]}
+  let observed = {...empty6(), routes: [{gateway: "fe80::9", metric: 0}]}
   let owned: policy.NetworkOwnership = policy.NetworkOwnership(ifindex: 7, name: "veth-test", addresses: [], routes: [{gateway: "fe80::9", metric: 0}])
   let retiring = policy.network_plan(intent6(), owned, observed)?
   assert policy.NetworkRemoveDefaultRoute({gateway: "fe80::9", metric: 0}) in retiring.operations
