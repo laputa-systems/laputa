@@ -1,7 +1,7 @@
 #!/bin/xsh --
 use lib.nettools_fixture as fixture
 
-error NtpCaseError = Failed(message: Str)
+error NtpCaseError = Failed
 
 type NtpCalibration = {correction: Float}
 

@@ -92,7 +92,7 @@ export const filetree = [
   },
 ]
 
-error TailscaleBuildError = SourceChanged(path: Str) | BuildFailed(message: Str)
+error TailscaleBuildError = SourceChanged(path: Str) | BuildFailed
 
 proc patch_go(path_value: Path, original: Str, replacement: Str) {
   let contents = path_value.read_text()?

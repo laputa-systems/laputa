@@ -1,7 +1,7 @@
 ##! Capture and offline replay of a disposable Docker veth ownership conflict.
 use packages.laputa-net.network_plan as policy
 
-error NetworkCaptureError = Failed(message: Str)
+error NetworkCaptureError = Failed
 ## Selected typed observation, empty ownership, and the exact resulting policy error.
 export type NetworkConflictCapture = {input: policy.NetworkPlanInput, error: Str}
 

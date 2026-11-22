@@ -1,5 +1,5 @@
 #!/bin/xsh
-error LoginShellError = Failed(message: Str)
+error LoginShellError = Failed
 
 proc main(...argv: List[Str]) [fs, process, env, error] {
   guard argv.len() == 2 and argv[0] == "-c" else {

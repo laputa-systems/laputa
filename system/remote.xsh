@@ -49,18 +49,18 @@ pure plain(text: Str) -> Str {
 ## Decodes one remote program run into its reply record or a typed refusal.
 export proc remote_decode_reply(result: ExecResult) [error] -> Result[Record, Error] {
   guard ! result.missing else {
-    return Err(RemoteError.Malformed(message: "the remote program ended without a completion status"))
+    return Err(RemoteError.Malformed("the remote program ended without a completion status"))
   }
   guard result.exit_code == 0 else {
     return Err(RemoteError.Failed(exit_code: result.exit_code, message: plain(result.stderr.utf8()?.trim())))
   }
   let text = result.stdout.utf8()?.trim()
   guard ! text.is_empty() and "\n" not in text else {
-    return Err(RemoteError.Malformed(message: "the remote program must answer with exactly one line"))
+    return Err(RemoteError.Malformed("the remote program must answer with exactly one line"))
   }
   let reply = json.decode(text)?.require(Record)?
   guard json.get(reply, ["protocol"], "") == REMOTE_PROTOCOL else {
-    return Err(RemoteError.Malformed(message: "the remote program speaks another protocol"))
+    return Err(RemoteError.Malformed("the remote program speaks another protocol"))
   }
   if json.get(reply, ["ok"], false).require(Bool) {
     return json.get(reply, ["result"], {}).require(Record)?
@@ -201,5 +201,5 @@ export proc remote_diagnose_afresh(target: RemoteTarget, program: Str) [fs, net,
   with session = remote_connect(target)? {
     return remote_diagnose(session, program)?
   }
-  Err(RemoteError.Malformed(message: "unreachable"))
+  Err(RemoteError.Malformed("unreachable"))
 }

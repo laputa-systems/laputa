@@ -20,7 +20,7 @@ export const nostrip = true
 ## Installed payload contract.
 export const filetree = [{path: p"usr/share/cohort-hostile-tcp", kind: "file"}]
 
-error Escape = Failed(message: Str)
+error Escape = Failed
 
 pure tcp_probe() -> Str {
   r"""let c = linux.net_constants()

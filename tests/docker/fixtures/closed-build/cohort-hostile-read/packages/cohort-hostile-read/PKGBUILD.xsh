@@ -20,7 +20,7 @@ export const nostrip = true
 ## Installed payload contract.
 export const filetree = [{path: p"usr/share/cohort-hostile-read", kind: "file"}]
 
-error Escape = Failed(message: Str)
+error Escape = Failed
 
 ## The cohort checkout is outside every declared read root, so reading it must be denied.
 export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {

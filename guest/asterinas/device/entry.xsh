@@ -4,12 +4,12 @@ const disk_group = 9
 const disk_mode = 0o660
 const memory_mode = 0o666
 
-error DeviceCaseError = Failed(message: Str)
+error DeviceCaseError = Failed
 
 proc require(condition: Bool, message: Str) [error] {
   guard condition else {
     eprint --flush f"DEV_FAILED {message}"
-    return Err(DeviceCaseError.Failed(message:))
+    return Err(DeviceCaseError.Failed(message))
   }
 }
 

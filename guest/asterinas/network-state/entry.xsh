@@ -1,5 +1,5 @@
 #!/bin/xsh --
-error NetworkStateError = Failed(message: Str)
+error NetworkStateError = Failed
 
 type Attribute = {data: Bytes, kind: Int}
 

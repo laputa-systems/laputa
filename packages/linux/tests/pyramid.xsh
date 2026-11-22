@@ -5,7 +5,7 @@ use pm.make
 use pm.recipe
 use pm.types
 
-error PyramidStopError = Failed(message: Str)
+error PyramidStopError = Failed
 
 proc pyramid_plan_archives(plan: kbuild.KbuildPlan, cache: Path) -> Result[kbuild.BuiltinArchivePlan] {
   env ({XSH_LINUX_KBUILD_PLAN_CACHE_DIR: cache.display(), XSH_LINUX_KBUILD_COMPILE_FLAGS_CACHE_DIR: cache.display(),

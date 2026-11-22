@@ -1,6 +1,6 @@
 ##! Pixel checks that a QMP screenshot shows international text as shaped glyphs rather than tofu.
 ##! A tofu line repeats one identical box, so a line of words passes only when its words differ.
-error TextPixelsError = Failed(message: Str)
+error TextPixelsError = Failed
 
 const sample_step = 2
 const minimum_cell_ink = 8
@@ -124,7 +124,7 @@ export pure shows_glyphs(found: List[Run]) -> Bool {
 
 proc require(condition: Bool, message: Str) {
   return when condition
-  Err(TextPixelsError.Failed(message:))?
+  Err(TextPixelsError.Failed(message))?
 }
 
 proc check_line(name: Str, found: List[Run], glyphs: Bool) {

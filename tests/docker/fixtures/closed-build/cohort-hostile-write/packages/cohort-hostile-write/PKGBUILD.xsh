@@ -20,7 +20,7 @@ export const nostrip = true
 ## Installed payload contract.
 export const filetree = [{path: p"usr/share/cohort-hostile-write", kind: "file"}]
 
-error Escape = Failed(message: Str)
+error Escape = Failed
 
 ## The mounted output store is writable but outside every declared write root.
 export proc build(dest: Path) [fs, process, env, error] -> Result[Unit, Error] {
