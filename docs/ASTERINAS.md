@@ -24,9 +24,17 @@ The kernel ELF SHA-256 is
 recovery rounds and the clock and `rtnl_ack` witnesses:
 `ASTERINAS_LOCAL=1 LAPUTA_RECOVERY_REPEATS=10 bash infra/asterinas/qualify.sh all --backend asterinas`,
 after `ASTERINAS_EXTRA_PACKAGES=ntpd-rs bash infra/asterinas/viability.sh build`.
-The Linux backend and the native corpus were not rerun at this pin: the
-retained legacy-ACPI Linux reference package is no longer on this host. No
-cohort assertion, deadline or poweroff requirement changed.
+Later the same day both backends passed every cohort, again with all ten
+recovery rounds:
+`LAPUTA_LINUX_KERNEL_PACKAGE=<payload.tar.gz> LAPUTA_RECOVERY_REPEATS=10 bash infra/asterinas/qualify.sh all --backend both`.
+The Linux reference was the store's Laputa `linux` 7.2.9-1 artifact built on
+2026-11-20, whose configuration keeps the legacy ACPI power path
+(`CONFIG_ACPI_REDUCED_HARDWARE_ONLY` unset) with built-in virtio and ext2 through
+ext4; its `payload.tar.gz` serves as the package. That run rebuilt the kernel in
+the primary checkout, with ELF SHA-256
+`8684f8f7332adbaca21f944572692543b39216383133b07a8f1048bbe242ed80`, so the
+two builds of this pin are not bit-identical. The native corpus was not rerun
+at this pin. No cohort assertion, deadline or poweroff requirement changed.
 
 The previous pin `d27b665aa`, with XSH `748dc69e5`, added four lanes to
 `c505c5dc6`:
