@@ -82,7 +82,7 @@ proc trust_read_source_dir(dir: Path) -> Result[TrustReleaseBytes, Error] {
     return Err(update_fail(f"release directory does not exist: {dir}"))
   }
 
-  guard dir.is_dir()? else {
+  guard dir.is_dir() else {
     return Err(update_fail(f"release source is not a directory: {dir}"))
   }
 
