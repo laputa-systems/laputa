@@ -2491,7 +2491,7 @@ assert ! fp"{inbox_dir()?}/app".exists()?
 
 test test_inbox_retains_claimed_directory_when_new_request_arrives [fs, process, error] { |ctx|
   let root = test.temp_dir(ctx, name: "control-directory")?
-  let hook = "  let observed = match processing.read_regular(leaf, max_bytes: control_request_limit) {"
+  let hook = "  let observed = processing.read_regular(leaf, max_bytes: control_request_limit) ?? { |failure|"
   let original = xinit_policy_source()?
   assert original.split(hook).len() == 2
   let source = original.replace(hook, with: """
