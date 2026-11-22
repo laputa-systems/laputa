@@ -3,4 +3,3 @@ proc main(root: Path) [fs, process, error] {
   assert output.trim() == "declared C payload"
 }
 
-main(@args)

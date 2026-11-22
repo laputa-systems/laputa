@@ -20,4 +20,3 @@ proc main(...argv: List[Str]) [fs, process, env, error] {
   }
 }
 
-main(@args)

@@ -11,4 +11,3 @@ proc main(source_root: Path) [fs, env, error, io] {
   print "xsh-kbuild-plan" plan.dirs.len() "dirs" plan.objects.len() "objects" plan.unsupported.len() "unsupported"
 }
 
-main(@args)

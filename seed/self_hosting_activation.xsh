@@ -30,4 +30,3 @@ proc main(operation: Str, output: Path, bundle: Path, selected_kernel: Path, too
   print json.encode(activation.activation_status(state)?)?
 }
 
-main(@args)

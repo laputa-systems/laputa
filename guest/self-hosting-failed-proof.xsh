@@ -6,4 +6,3 @@ proc main(root: Path) [fs, error] {
   fail "deliberate self-hosting candidate health failure"
 }
 
-main(@args)

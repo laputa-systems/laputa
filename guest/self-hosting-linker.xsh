@@ -18,4 +18,3 @@ proc main(...linker_args: List[Str]) [process, env, error] {
   exit status.shell_code()?
 }
 
-main(@args)

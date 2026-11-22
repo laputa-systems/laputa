@@ -80,4 +80,3 @@ proc main(repository: Path, output_root: Path, completion_marker: Str) [fs, proc
   }
 }
 
-main(@args)

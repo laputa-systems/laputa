@@ -76,4 +76,3 @@ proc main(root: Path) [fs, process, env, time, error] {
   print "LAPUTA_SELF_HOSTING_QUALIFIED"
 }
 
-main(@args)

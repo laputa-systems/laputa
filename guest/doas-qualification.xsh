@@ -187,4 +187,3 @@ proc main(...argv: List[Str]) [fs, process, time, net, error] {
   }
 }
 
-main(@args)

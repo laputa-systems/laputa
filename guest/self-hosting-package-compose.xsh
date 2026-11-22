@@ -11,4 +11,3 @@ proc main(root: Path) [fs, process, env, error] {
   fail "selected package successor failed" unless status.ok
 }
 
-main(@args)

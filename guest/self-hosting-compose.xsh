@@ -80,4 +80,3 @@ proc main(root: Path, toolchain = p"/run/self-hosting-output/target/x86_64-unkno
   compose(root, toolchain, release_input)
 }
 
-main(@args)

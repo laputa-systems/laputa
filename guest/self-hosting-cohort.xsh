@@ -30,4 +30,3 @@ proc main(repository: Path) [fs, process, env, error] {
   assert artifacts == 3
 }
 
-main(@args)

@@ -17,4 +17,3 @@ proc main(root: Path, ...release_inputs: List[Str]) [fs, process, env, error] {
   verify_previous(root, release_input)
 }
 
-main(@args)

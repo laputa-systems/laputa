@@ -37,4 +37,3 @@ proc main(root: Path, expected_tools = p"/run/self-hosting-output/target/x86_64-
   verify_successor(root, expected_tools, release_input)
 }
 
-main(@args)

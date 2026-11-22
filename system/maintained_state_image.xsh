@@ -23,4 +23,3 @@ proc main(...argv: List[Str]) [fs, process, error] {
     }
   }
 }
-main(@args)

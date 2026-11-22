@@ -55,4 +55,3 @@ proc main(repository: Path, mode = "cohort") [fs, net, process, env, time, error
   print "closed cohort published"
 }
 
-main(@args)

@@ -49,4 +49,3 @@ proc main(mode = "verification") [fs, process, env, error] {
   print "LAPUTA_SELF_HOSTING_COMPILED"
 }
 
-main(@args)

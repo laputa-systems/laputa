@@ -19,4 +19,3 @@ proc main(root: Path) [fs, process, env, error] {
   print "LAPUTA_SELF_HOSTING_REPLAYED"
 }
 
-main(@args)

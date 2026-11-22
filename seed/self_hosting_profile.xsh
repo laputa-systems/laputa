@@ -26,4 +26,3 @@ proc main(repository: Path, artifacts: Path, output: Path, image: Str, architect
   print "self-hosting system bundle" $result.current
 }
 
-main(@args)

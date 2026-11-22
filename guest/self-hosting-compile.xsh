@@ -28,4 +28,3 @@ proc main(root: Path) [fs, process, env, error] {
   print "LAPUTA_SELF_HOSTING_SOURCE_BUILD_DONE"
 }
 
-main(@args)
