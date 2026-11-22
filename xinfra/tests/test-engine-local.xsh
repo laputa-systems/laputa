@@ -157,8 +157,8 @@ test one_failed_host_does_not_stop_the_healthy_ones { |ctx|
   let good = [declare.file(id: "motd", at: f"{dir}/good", text: "x")?]
   let bad = [declare.file(id: "motd", at: f"{dir}/missing/bad", text: "x")?]
   let hosts = [
-    workload.Workload(host: testing.local_host("good-1"), resources: good),
-    workload.Workload(host: testing.local_host("bad-1"), resources: bad),
+    workload.Workload(testing.local_host("good-1"), good),
+    workload.Workload(testing.local_host("bad-1"), bad),
   ]
   let result = engine.apply(prepare(hosts)?, settings(dir))
   assert testing.status_of(result, "good-1", "motd") == "changed"

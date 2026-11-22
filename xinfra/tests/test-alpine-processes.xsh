@@ -126,7 +126,7 @@ test a_transfer_that_outlives_its_timeout_leaves_the_destination_and_reports_an_
   run truncate -s 600M $blob
   let small = fp"{dir}/small.bin"
   small.write("original\n")
-  let settings = engine.Settings(jobs: 1, policy: .Host, lock_path: f"{base}.lock")
+  let settings = engine.Settings(1, .Host, f"{base}.lock")
   let first = engine.apply(workload.prepare([workload.Workload(host:, resources: [
     declare.directory(id: "base", at: base, parents: true)?,
     declare.file(id: "bin", at: f"{base}/app.bin", source: small, needs: ["base"])?,
@@ -144,7 +144,7 @@ test a_transfer_that_outlives_its_timeout_leaves_the_destination_and_reports_an_
   let after = testing.remote_text(reader, "cat \"$1\"/app.bin", [base], privileged: true)?
   assert after == "original\n"
 
-  let healed = engine.apply(workload.prepare([workload.Workload(host: reader, resources: [
+  let healed = engine.apply(workload.prepare([workload.Workload(reader, [
     declare.directory(id: "base", at: base, parents: true)?,
     declare.file(id: "bin", at: f"{base}/app.bin", source: small, needs: ["base"])?,
   ])])?, settings)

@@ -221,7 +221,7 @@ test the_xsh_capability_probe_reports_the_running_identity {
 }
 
 proc settings(dir: Path) -> engine.Settings {
-  engine.Settings(jobs: 1, policy: .Host, lock_path: f"{dir}/.lock-{{host}}")
+  engine.Settings(1, .Host, f"{dir}/.lock-{{host}}")
 }
 
 pure statuses(result: report.Report, host: Str, ids: List[Str]) -> List[Str] {
@@ -277,7 +277,7 @@ test a_local_xsh_host_converges_file_directory_link_command_and_service_and_reru
       declare.symlink(id: "current", at: f"{site}/current", target: "elsewhere", replace: true, needs: ["motd"])?,
       declare.xinit_service(id: "logger", name: "logger", running: true, restart_on: ["motd"])?,
     ]
-    let updated = engine.apply(workload.prepare([workload.Workload(host: testing.local_xsh_host(), resources: retarget)])?, settings(dir))
+    let updated = engine.apply(workload.prepare([workload.Workload(testing.local_xsh_host(), retarget)])?, settings(dir))
     assert generated_statuses(updated, ["root", "motd", "current", "logger"]) == ["unchanged", "unchanged", "changed", "unchanged"]
     assert fp"{site}/current".readlink()? == p"elsewhere"
 
@@ -286,7 +286,7 @@ test a_local_xsh_host_converges_file_directory_link_command_and_service_and_reru
       declare.file(id: "motd", at: f"{site}/motd", presence: .Absent)?,
       declare.directory(id: "root", at: f"{site}", presence: .Absent)?,
     ]
-    let cleaned = engine.apply(workload.prepare([workload.Workload(host: testing.local_xsh_host(), resources: absent)])?, settings(dir))
+    let cleaned = engine.apply(workload.prepare([workload.Workload(testing.local_xsh_host(), absent)])?, settings(dir))
     assert generated_statuses(cleaned, ["current", "motd", "root"]) == ["changed", "changed", "changed"]
     assert report.exit_status(cleaned) == 0
     assert ! site.exists()?

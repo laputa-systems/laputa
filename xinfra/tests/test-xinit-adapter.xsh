@@ -44,7 +44,7 @@ proc fixture(dir: Path) [fs, error] {
 }
 
 proc settings(dir: Path) -> engine.Settings {
-  engine.Settings(jobs: 1, policy: .Host, lock_path: f"{dir}/.lock-{{host}}")
+  engine.Settings(1, .Host, f"{dir}/.lock-{{host}}")
 }
 
 proc prepared(resources: List[model.Resource]) [fs, env, error] -> Result[workload.Prepared, Error] {

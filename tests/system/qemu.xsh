@@ -135,7 +135,7 @@ test test_qemu_qualification_rejects_a_guest_without_completion [fs, process, ti
   let fake = fp"{root}/qemu"
   fake.write("#!/bin/sh\nprintf 'incomplete guest output\\n'\n")
   fake.chmod(0o755)
-  let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+  let config = qemu.QemuConfig(fake, qemu.qemu_target("Linux", "x86_64")?)
   let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
   match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
     Ok(_) => fail "accepted a guest without its completion marker"
@@ -149,7 +149,7 @@ test test_qemu_qualification_stops_a_guest_after_failure [fs, process, time, err
   let pid_file = fp"{root}/pid"
   fake.write(f"#!/bin/sh\nprintf '%s' $$ > '{pid_file}'\nprintf 'LAPUTA_ASTERINAS_TEST_FAILED\\n'\nexec sleep 30\n")
   fake.chmod(0o755)
-  let config = qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+  let config = qemu.QemuConfig(fake, qemu.qemu_target("Linux", "x86_64")?)
   let input = qemu.QemuAsterinasReference(kernel: fp"{root}/kernel", initramfs: fp"{root}/init", disk: fp"{root}/disk", memory_mib: 1024, data_disk: qemu.NoDataDisk, network: qemu.NoNetwork, control: qemu.NoControl)
   match qemu.qemu_run_asterinas_reference(config, input, fp"{root}/console", fp"{root}/qemu-log", 5, 2) {
     Ok(_) => fail "accepted a failed guest"
@@ -165,7 +165,7 @@ proc fake_qualification_qemu(root: Path, script: Str) [fs, process, error] -> Re
   let fake = fp"{root}/qemu"
   fake.write(script)
   fake.chmod(0o755)
-  qemu.QemuConfig(qemu: fake, target: qemu.qemu_target("Linux", "x86_64")?)
+  qemu.QemuConfig(fake, qemu.qemu_target("Linux", "x86_64")?)
 }
 
 pure qualification_input(root: Path) -> qemu.QemuAsterinasReference {

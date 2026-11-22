@@ -23,7 +23,7 @@ pure gone() -> fact.Fact {
 }
 
 pure denied() -> fact.Fact {
-  .OnPath(.Unseen(fact.Unreadable(cause: .Denied, detail: "no")))
+  .OnPath(.Unseen(fact.Unreadable(.Denied, "no")))
 }
 
 const none: List[Str] = []
@@ -90,7 +90,7 @@ test an_unreadable_path_is_uncertain_never_unchanged_or_absent {
 }
 
 test a_blocked_parent_makes_an_absent_resource_satisfied_and_a_present_one_a_conflict {
-  let blocked = fact.OnPath(.Blocked(fact.Unreadable(cause: .Conflict, detail: "not a directory")))
+  let blocked = fact.OnPath(.Blocked(fact.Unreadable(.Conflict, "not a directory")))
   let present = declare.directory(id: "d", at: "/srv/x")?
   let absent = declare.directory(id: "d", at: "/srv/x", presence: .Absent)?
   assert compare.verdict(present.spec, blocked, null, none) is .Conflicting(_)
@@ -99,7 +99,7 @@ test a_blocked_parent_makes_an_absent_resource_satisfied_and_a_present_one_a_con
 
 test file_content_is_compared_by_digest_and_attributes {
   let resource = declare.file(id: "f", at: "/etc/f", text: "x", mode: 0o600)?
-  let material = compare.Material(digest: sha("a"), size: 1)
+  let material = compare.Material(sha("a"), 1)
   let same = found(info(.Regular, mode: 0o600, digest: sha("a")))
   assert compare.verdict(resource.spec, same, material, none) is .Satisfied
   let other = found(info(.Regular, mode: 0o600, digest: sha("b")))
@@ -111,14 +111,14 @@ test file_content_is_compared_by_digest_and_attributes {
 
 test an_unreadable_file_digest_is_uncertain {
   let resource = declare.file(id: "f", at: "/etc/f", text: "x")?
-  let material = compare.Material(digest: sha("a"), size: 1)
+  let material = compare.Material(sha("a"), 1)
   let verdict = compare.verdict(resource.spec, found(info(.Regular, digest: null)), material, none)
   assert verdict is .Uncertain(_)
 }
 
 test a_sensitive_file_never_shows_its_digests {
   let resource = declare.file(id: "f", at: "/etc/f", secret_env: "TOKEN")?
-  let material = compare.Material(digest: sha("a"), size: 1)
+  let material = compare.Material(sha("a"), 1)
   let verdict = compare.verdict(resource.spec, found(info(.Regular, digest: sha("b"))), material, none)
   if let compare.Drifted(drift) = verdict {
     for change in drift.changes {
@@ -181,7 +181,7 @@ test packages_are_installed_or_removed {
   assert act(compare.verdict(present.spec, .OnPackage(fact.NotInstalled), null, none)) == .Create
   assert compare.verdict(absent.spec, .OnPackage(fact.NotInstalled), null, none) is .Satisfied
   assert act(compare.verdict(absent.spec, installed("1", null), null, none)) == .Remove
-  let broken = fact.OnPackage(.PackageUnseen(fact.Unreadable(cause: .Unavailable, detail: "no apk")))
+  let broken = fact.OnPackage(.PackageUnseen(fact.Unreadable(.Unavailable, "no apk")))
   assert compare.verdict(present.spec, broken, null, none) is .Uncertain(_)
   assert compare.verdict(absent.spec, broken, null, none) is .Uncertain(_)
 }
@@ -218,7 +218,7 @@ test users_and_groups_are_removed_without_touching_ids {
   let team = declare.group_account(id: "g", name: "app", presence: .Absent)?
   assert act(compare.verdict(account.spec, account_fact(), null, none)) == .Remove
   assert compare.verdict(account.spec, .OnUser(fact.NoUser), null, none) is .Satisfied
-  let present = fact.OnGroup(.GroupFound(fact.GroupInfo(name: "app", gid: 1000, members: [])))
+  let present = fact.OnGroup(.GroupFound(fact.GroupInfo("app", 1000, [])))
   assert act(compare.verdict(team.spec, present, null, none)) == .Remove
   let wanted = declare.group_account(id: "g", name: "app", gid: 1001)?
   assert compare.verdict(wanted.spec, present, null, none) is .Conflicting(_)
@@ -303,7 +303,7 @@ test an_xinit_service_plans_from_its_status_not_from_enablement {
   assert compare.verdict(resource.spec, .OnService(fact.NoService), null, none) is .Uncertain(_)
   if let compare.Uncertain(unreadable) = compare.verdict(
     resource.spec,
-    .OnService(.ServiceUnseen(fact.Unreadable(cause: .Denied, detail: "no"))),
+    .OnService(.ServiceUnseen(fact.Unreadable(.Denied, "no"))),
     null,
     none,
   ) {

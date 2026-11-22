@@ -62,7 +62,7 @@ test test_guest_health_requires_current_boot_identity_and_critical_services [fs,
   stage(state, generation("b"))
   let _ = activation.activation_begin_boot(state)?
   let report = activation.GuestHealthReport(format: "laputa-guest-health-1", generation_id: "b", boot_serial: 1, root_digest: sha256_text("b"), profile: "qemu-maintained", services: health_services(["oxish", "firewall"], "running"))
-  let policy = activation.HealthPolicy(profile: "qemu-maintained", critical_services: ["firewall", "oxish"])
+  let policy = activation.HealthPolicy("qemu-maintained", ["firewall", "oxish"])
   let before = record_text(state)?
   let invalid: List[activation.GuestHealthReport] = [
     {...report, root_digest: sha256_text("tampered")},
@@ -250,7 +250,7 @@ test test_fallback_record_names_the_failed_generation_until_the_next_stage [fs, 
   assert fallen.current.id == "a"
   assert fallen.pending == null
   assert fallen.last_operation == "fell-back"
-  assert fallen.failure == activation.ActivationFailure(generation: generation("b"), attempts: 2)
+  assert fallen.failure == activation.ActivationFailure(generation("b"), 2)
   assert "\"failure\"" in record_text(state)?
   assert activation.activation_status(state)?.failure == fallen.failure
   stage(state, generation("c"))

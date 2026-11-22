@@ -26,7 +26,7 @@ proc main(repository: Path, mode = "cohort") [fs, net, process, env, time, error
   if mode in hostiles {
     let source = hostiles.get(mode)?
     let hostile_repository = fp"/cohort/{source}"
-    let snapshot: types.RemoteSnapshot = types.RemoteSnapshot(target: types.X86_64LinuxMusl, index_sha256: "closed-hostile", packages: [])
+    let snapshot: types.RemoteSnapshot = types.RemoteSnapshot(types.X86_64LinuxMusl, "closed-hostile", [])
     let value = plan.resolve(catalog.load(hostile_repository)?, snapshot, policy.x86_64_docker(), [mode], false)?
     let _ = execute.build_plan(
       value,
@@ -40,7 +40,7 @@ proc main(repository: Path, mode = "cohort") [fs, net, process, env, time, error
     return
   }
 
-  let snapshot: types.RemoteSnapshot = types.RemoteSnapshot(target: types.X86_64LinuxMusl, index_sha256: "closed-cohort", packages: [])
+  let snapshot: types.RemoteSnapshot = types.RemoteSnapshot(types.X86_64LinuxMusl, "closed-cohort", [])
   let value = plan.resolve(catalog.load(repository)?, snapshot, policy.x86_64_docker(), honest, false)?
   let result = execute.build_plan(
     value,

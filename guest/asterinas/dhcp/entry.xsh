@@ -66,7 +66,7 @@ proc start_client() [fs, process, error] -> Result[Client] {
     timeout: 1800s,
   )
   let client = unix.spawn_process_group_log(command, log)?
-  Ok(Client(pid: client.pid))
+  Ok(Client(client.pid))
 }
 
 proc stop_client(client: Client) [process, time, error] {
@@ -186,7 +186,7 @@ proc start_tcp_client() [fs, process, error] -> Result[Client] {
   let program = p"/usr/lib/asterinas/case/tcp-client"
   let command = process.command_argv(program, [program, "disrupted"], WORK, {LC_ALL: "C"}, b"", result, result, timeout: 300s)
   let client = unix.spawn_process_group_log(command, result)?
-  Ok(Client(pid: client.pid))
+  Ok(Client(client.pid))
 }
 
 proc await_file(file: Path, timeout_ms: Int) -> Result[Bool] {

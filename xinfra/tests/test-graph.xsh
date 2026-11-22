@@ -3,7 +3,7 @@ use infra.graph
 use infra.model
 
 pure dir(id: Str, needs: List[Str] = []) -> model.Resource {
-  declare.directory(id:, at: f"/srv/{id}", needs:) ?? model.Resource(id:, needs:, spec: .PackageIndex(model.PackageIndexSpec(note: "")))
+  declare.directory(id:, at: f"/srv/{id}", needs:) ?? model.Resource(id:, needs:, spec: .PackageIndex(model.PackageIndexSpec("")))
 }
 
 pure ids(resources: List[model.Resource]) -> List[Str] {
