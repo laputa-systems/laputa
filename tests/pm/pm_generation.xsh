@@ -65,7 +65,7 @@ proc stage_generation_artifacts(ctx: TestContext, value: types.BuildPlan, store_
     let proof = fp"{stage}/proof.json"
     let path_value = fp"{contents}/usr/share/{node.name}"
     path_value.parent.mkdir()
-    path_value.write(f"payload {node.name}\n")
+    path_value.write(f"payload {node.name}\n", mode: 0o644)
     archive.create(payload, contents, [p"."], .Tar, compression: .Gzip)
     json.write(
       metadata,
@@ -281,7 +281,7 @@ test test_generation_profile_overlay_metadata_and_explicit_replacement [fs, proc
 
   let conflict_overlay = empty_overlay(ctx, "generation-conflict-overlay")?
   fp"{conflict_overlay}/usr/share".mkdir()
-  fp"{conflict_overlay}/usr/share/app".write("replaced app\n")
+  fp"{conflict_overlay}/usr/share/app".write("replaced app\n", mode: 0o644)
   let conflict = generation.plan(build_value, ["app"], generation.overlay_digest(conflict_overlay)?)?
   let conflict_output = fp"{test.temp_dir(ctx, name: "generation-conflict-output")?}/root"
   expect_generation_error(
