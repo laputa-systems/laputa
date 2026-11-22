@@ -29,7 +29,7 @@ pure denied() -> fact.Fact {
 const none: List[Str] = []
 
 pure fields(verdict: compare.Verdict) -> List[Str] {
-  if let compare.Drifted(drift) = verdict {
+  if let .Drifted(drift) = verdict {
     drift.changes |> map .field |> collect()
   } else {
     []
@@ -37,7 +37,7 @@ pure fields(verdict: compare.Verdict) -> List[Str] {
 }
 
 pure act(verdict: compare.Verdict) -> compare.Act? {
-  if let compare.Drifted(drift) = verdict {
+  if let .Drifted(drift) = verdict {
     drift.act
   } else {
     null
@@ -120,7 +120,7 @@ test a_sensitive_file_never_shows_its_digests {
   let resource = declare.file(id: "f", at: "/etc/f", secret_env: "TOKEN")?
   let material = compare.Material(sha("a"), 1)
   let verdict = compare.verdict(resource.spec, found(info(.Regular, digest: sha("b"))), material, none)
-  if let compare.Drifted(drift) = verdict {
+  if let .Drifted(drift) = verdict {
     for change in drift.changes {
       assert change.from == "(redacted)" and change.to == "(redacted)"
     }
@@ -129,7 +129,7 @@ test a_sensitive_file_never_shows_its_digests {
   }
 
   let created = compare.verdict(resource.spec, gone(), material, none)
-  if let compare.Drifted(drift) = created {
+  if let .Drifted(drift) = created {
     assert drift.changes[0].to == "(redacted)"
   } else {
     assert false, "no drift"
@@ -281,7 +281,7 @@ test restart_supersedes_reload_and_each_is_one_notification {
   let reloaded = compare.verdict(resource.spec, up, null, ["a", "b"])
   assert fields(reloaded) == ["notify"]
   let both = compare.verdict(resource.spec, up, null, ["a", "b", "c"])
-  if let compare.Drifted(drift) = both {
+  if let .Drifted(drift) = both {
     assert drift.changes.len() == 1
     assert drift.changes[0].to == "restart"
   } else {
@@ -301,7 +301,7 @@ test an_xinit_service_plans_from_its_status_not_from_enablement {
   assert fields(compare.verdict(resource.spec, xinit_fact(.Stopped, false), null, none)) == ["running"]
   assert fields(compare.verdict(resource.spec, xinit_fact(.Crashed, false), null, none)) == ["running"]
   assert compare.verdict(resource.spec, .OnService(fact.NoService), null, none) is .Uncertain(_)
-  if let compare.Uncertain(unreadable) = compare.verdict(
+  if let .Uncertain(unreadable) = compare.verdict(
     resource.spec,
     .OnService(.ServiceUnseen(fact.Unreadable(.Denied, "no"))),
     null,
@@ -322,7 +322,7 @@ test an_xinit_trigger_restarts_or_reloads_once_per_apply {
   assert compare.verdict(resource.spec, xinit_fact(.Started, true), null, none) is .Satisfied
   assert fields(compare.verdict(resource.spec, xinit_fact(.Started, true), null, ["a"])) == ["notify"]
   let both = compare.verdict(resource.spec, xinit_fact(.Started, true), null, ["a", "b"])
-  if let compare.Drifted(drift) = both {
+  if let .Drifted(drift) = both {
     assert drift.changes.len() == 1
     assert drift.changes[0].to == "restart"
   } else {

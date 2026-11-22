@@ -142,7 +142,7 @@ pure unknown_at(phase: outcome.Phase, message: Str) -> outcome.Outcome {
 }
 
 pure skip_reason(spec: model.Spec) -> Str {
-  if let model.Exec(command) = spec {
+  if let .Exec(command) = spec {
     match command.guard {
       model.Creates(target) => f"{target} already exists"
       model.SkipIf(_) => "the skip guard succeeded"
@@ -223,7 +223,7 @@ proc run_drift(
 }
 
 pure declared_content(resource: model.Resource) -> model.Content? {
-  if let model.File(spec) = resource.spec {
+  if let .File(spec) = resource.spec {
     spec.content
   } else {
     null
@@ -231,7 +231,7 @@ pure declared_content(resource: model.Resource) -> model.Content? {
 }
 
 pure file_spec(resource: model.Resource) -> model.FileSpec? {
-  if let model.File(spec) = resource.spec {
+  if let .File(spec) = resource.spec {
     spec
   } else {
     null

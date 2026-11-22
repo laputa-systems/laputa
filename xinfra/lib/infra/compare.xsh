@@ -409,28 +409,28 @@ pure compare_command(spec: model.CommandSpec, state: fact.Fact, changed: List[St
 export pure verdict(spec: model.Spec, state: fact.Fact, material: Material?, changed: List[Str]) -> Verdict {
   match spec {
     model.Directory(directory) => {
-      if let fact.OnPath(path_state) = state {
+      if let .OnPath(path_state) = state {
         compare_directory(directory, path_state)
       } else {
         mismatch("directory")
       }
     }
     model.File(file) => {
-      if let fact.OnPath(path_state) = state {
+      if let .OnPath(path_state) = state {
         compare_file(file, material, path_state)
       } else {
         mismatch("file")
       }
     }
     model.Link(link) => {
-      if let fact.OnPath(path_state) = state {
+      if let .OnPath(path_state) = state {
         compare_symlink(link, path_state)
       } else {
         mismatch("symlink")
       }
     }
     model.Package(package) => {
-      if let fact.OnPackage(package_state) = state {
+      if let .OnPackage(package_state) = state {
         compare_package(package, package_state)
       } else {
         mismatch("package")
@@ -438,14 +438,14 @@ export pure verdict(spec: model.Spec, state: fact.Fact, material: Material?, cha
     }
     model.PackageIndex(_) => Unevaluated("the package index is refreshed only at apply")
     model.GroupAccount(account_group) => {
-      if let fact.OnGroup(group_state) = state {
+      if let .OnGroup(group_state) = state {
         compare_group(account_group, group_state)
       } else {
         mismatch("group")
       }
     }
     model.UserAccount(account) => {
-      if let fact.OnUser(user_state) = state {
+      if let .OnUser(user_state) = state {
         compare_user(account, user_state)
       } else {
         mismatch("user")
@@ -453,7 +453,7 @@ export pure verdict(spec: model.Spec, state: fact.Fact, material: Material?, cha
     }
     model.Exec(command) => compare_command(command, state, changed)
     model.Service(service) => {
-      if let fact.OnService(service_state) = state {
+      if let .OnService(service_state) = state {
         compare_service(service, service_state, changed)
       } else {
         mismatch("service")

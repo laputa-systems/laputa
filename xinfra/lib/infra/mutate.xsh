@@ -121,7 +121,7 @@ proc apply_directory(connection: transport.Connection, spec: model.DirectorySpec
 }
 
 pure existing_info(state: fact.PathState) -> fact.PathInfo? {
-  if let fact.Found(info) = state {
+  if let .Found(info) = state {
     info
   } else {
     null
@@ -319,7 +319,7 @@ proc apply_user(connection: transport.Connection, spec: model.UserSpec, state: f
   }
 
   for member in memberships {
-    let known = if let fact.OnUser(.UserFound(info)) = state {
+    let known = if let .OnUser(.UserFound(info)) = state {
       member in info.memberships or member == (info.group ?? "")
     } else {
       false
@@ -415,7 +415,7 @@ export proc apply(
   match resource.spec {
     model.Directory(spec) => apply_directory(connection, spec, drift)
     model.File(spec) => {
-      if let fact.OnPath(path_state) = state {
+      if let .OnPath(path_state) = state {
         apply_file(connection, spec, path_state, drift, source, expected)
       } else {
         Err(failure(.Apply, "a file was compared with a fact of another kind", false))

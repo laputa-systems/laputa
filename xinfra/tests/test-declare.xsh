@@ -45,7 +45,7 @@ test a_file_needs_exactly_one_content_source {
 
 test secret_content_marks_the_file_sensitive {
   let resource = declare.file(id: "f", at: "/etc/f", secret_env: "TOKEN")?
-  if let model.File(spec) = resource.spec {
+  if let .File(spec) = resource.spec {
     assert spec.sensitive
   } else {
     assert false, "not a file"
@@ -66,7 +66,7 @@ test a_present_symlink_needs_a_target {
 
 test package_versions_follow_apk_syntax {
   let bound = declare.package(id: "p", name: "curl", version: ">=8.0.1-r0")?
-  if let model.Package(spec) = bound.spec {
+  if let .Package(spec) = bound.spec {
     guard let constraint = spec.constraint else {
       assert false, "no constraint"
       return
@@ -107,7 +107,7 @@ test an_xinit_service_declares_no_enablement_or_runlevel {
   assert refused(declare.xinit_service(id: "s", name: "logger"), "declare running")
   assert refused(declare.xinit_service(id: "s", name: "bad name", running: true), "invalid service name")
   let resource = declare.xinit_service(id: "s", name: "logger", running: true, restart_on: ["conf"])?
-  if let model.Service(spec) = resource.spec {
+  if let .Service(spec) = resource.spec {
     assert spec.adapter == .Xinit
     assert spec.enabled == null
     assert spec.running == true

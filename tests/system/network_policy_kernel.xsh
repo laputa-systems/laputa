@@ -392,14 +392,14 @@ test test_reconcile_result_reports_conflicts_instead_of_rolling_back [fs, error]
     result: .NetworkReobserve("observation changed before operation 0"),
   )
   assert conflict.attempts == 0
-  if let policy.NetworkReobserve(reason) = conflict.result {
+  if let .NetworkReobserve(reason) = conflict.result {
     assert reason == "observation changed before operation 0"
   } else {
     assert false
   }
 
   let diverged: kernel.NetworkReconcile = {...conflict, attempts: 1, result: .NetworkReobserve("operation 0 was acknowledged but the observation diverged")}
-  if let policy.NetworkReobserve(reason) = diverged.result {
+  if let .NetworkReobserve(reason) = diverged.result {
     assert reason == "operation 0 was acknowledged but the observation diverged"
   } else {
     assert false
@@ -522,7 +522,7 @@ test test_router_advertisement_defaults_are_foreign_state_outside_the_cohort [er
   assert projected.routes == [{gateway: "fe80::1", metric: 300}]
   let plan = policy.network_plan(intent6(), {ifindex: 7, name: "veth-test", addresses: [{local: "2001:db8:1::2", prefix: 64}], routes: [{gateway: "fe80::1", metric: 300}]}, projected)?
   for operation in plan.operations {
-    if let policy.NetworkRemoveDefaultRoute(route) = operation {
+    if let .NetworkRemoveDefaultRoute(route) = operation {
       assert route.gateway == "fe80::1"
     }
   }
@@ -651,7 +651,7 @@ test test_ipv6_has_no_primary_secondary_rule_so_same_prefix_additions_are_planne
 test test_ipv6_zero_metric_is_never_sent_and_a_zero_metric_removal_is_refused [error] {
   let plan = policy.network_plan(intent6(), empty_ownership(), empty6())?
   let changes = kernel.network_changes(plan)?
-  if let net_state.AddRoute(route) = changes[1] {
+  if let .AddRoute(route) = changes[1] {
     assert route.priority == 1024
   } else {
     assert false, "the default route was not added"
