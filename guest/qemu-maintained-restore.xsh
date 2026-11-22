@@ -360,7 +360,6 @@ proc dispatch() {
     phase_verify()
     return
   }
-  return
 }
 
 proc main() -> Result[Unit, Error] {

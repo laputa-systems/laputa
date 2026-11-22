@@ -168,7 +168,6 @@ proc wait_for_exit(pid: Int, attempts: Int) {
   }
 
   assert false, "guest did not power off"
-  return
 }
 
 proc stop_guest(pid: Int) [process, error] {
