@@ -465,7 +465,7 @@ proc backup_run_hook(hook: BackupHook?, label: Str) {
   let errors = fp"{scratch}/hook-{label}.err"
   out.remove()
   errors.remove()
-  let status = match process.run(process.command_argv(
+  let status = process.run(process.command_argv(
     value.command[0],
     value.command,
     cwd: p"/",
@@ -473,11 +473,8 @@ proc backup_run_hook(hook: BackupHook?, label: Str) {
     stdout: out,
     stderr: errors,
     timeout: time.millis(value.timeout_ms),
-  )) {
-    Ok(result) => result,
-    Err(problem) => {
-      return Err(error.failure(f"{label} hook did not run: {problem.message}"))
-    }
+  )) ?? { |problem|
+    return Err(error.failure(f"{label} hook did not run: {problem.message}"))
   }
   let errors_text = if errors.exists() { errors.read_text()? } else { "" }
   out.remove()
@@ -581,13 +578,10 @@ proc backup_read_config(options: BackupOptions) -> Result[BackupConfig, Error] {
 
 ## Run or initialize one configured backup.
 export proc backup_main(...argv: List[Str]) [fs, process, time, io, env, error] -> Result[Unit, Error] {
-  let parsed = match backup_options(argv) {
-    Ok(value) => value,
-    Err(problem) => {
-      eprint f"laputa-backup: {problem}"
-      eprint $BACKUP_USAGE
-      exit 2
-    }
+  let parsed = backup_options(argv) ?? { |problem|
+    eprint f"laputa-backup: {problem}"
+    eprint $BACKUP_USAGE
+    exit 2
   }
   if parsed.help {
     print $BACKUP_USAGE

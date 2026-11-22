@@ -2225,39 +2225,36 @@ proc control_skipped(request: ControlRequest, name: Str) -> Result[Bool] {
 proc drain_claim(out_units: List[ServiceUnit], processing: FsRoot, path_value: Path, name: Str) -> Result[List[ServiceUnit]] {
   var out = out_units
   let leaf: RelPath = fp"{name}".require()?
-  let observed = match processing.read_regular(leaf, max_bytes: control_request_limit) {
-    Ok(opened) => opened
-    Err(failure) => {
-      let info = fs.stat(path_value, follow_symlinks: false)
-      let uid = if let Ok(value) = info { value.uid } else { -1 }
-      let kind = if let Ok(value) = info { value.kind } else { "" }
-      let oversized = if let Ok(value) = info { value.size > control_request_limit } else { false }
-      let reason = if kind != "" and kind != "file" {
-        "not-a-single-regular-file"
-      } else if oversized {
-        "oversized"
-      } else {
-        failure.message
-      }
-      eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={reason}"
-      if let Ok(value) = info {
-        if value.kind == "dir" {
-          let target = fp"{inbox_dir()?}/{name}"
-          match fs.rename_noreplace(path_value, target) {
-            Ok(_) => {}
-            Err(_) => {
-              let key = bytes.from_text(name).sha256().hex()
-              let refused = fp"{path_value.parent()}/.refused-{key}-{process.current_pid()?}-{time.monotonic()?}"
-              fs.rename_noreplace(path_value, refused)
-            }
-          }
-        } else {
-          processing.remove(leaf)
-        }
-      }
-
-      return out
+  let observed = processing.read_regular(leaf, max_bytes: control_request_limit) ?? { |failure|
+    let info = fs.stat(path_value, follow_symlinks: false)
+    let uid = if let Ok(value) = info { value.uid } else { -1 }
+    let kind = if let Ok(value) = info { value.kind } else { "" }
+    let oversized = if let Ok(value) = info { value.size > control_request_limit } else { false }
+    let reason = if kind != "" and kind != "file" {
+      "not-a-single-regular-file"
+    } else if oversized {
+      "oversized"
+    } else {
+      failure.message
     }
+    eprint --flush f"xinit-control-refused: service={name} uid={uid} reason={reason}"
+    if let Ok(value) = info {
+      if value.kind == "dir" {
+        let target = fp"{inbox_dir()?}/{name}"
+        match fs.rename_noreplace(path_value, target) {
+          Ok(_) => {}
+          Err(_) => {
+            let key = bytes.from_text(name).sha256().hex()
+            let refused = fp"{path_value.parent()}/.refused-{key}-{process.current_pid()?}-{time.monotonic()?}"
+            fs.rename_noreplace(path_value, refused)
+          }
+        }
+      } else {
+        processing.remove(leaf)
+      }
+    }
+
+    return out
   }
 
   let uid = observed.uid

@@ -1256,12 +1256,9 @@ export proc timer_writer_settle(store: TimerWriterStore, name: Str) [fs, process
   let file = timer_writer_file(store, name)
   return Ok("none") unless file.exists()
   let record = timer_writer_from_json(json.read(file)?)?
-  let outcome = match timer_writer_stop(record, store.boot_id) {
-    Ok(result) => result
-    Err(problem) => {
-      timer_log(f"event=writer-error name={name} pid={record.pid} message={problem.message}")
-      "alive"
-    }
+  let outcome = timer_writer_stop(record, store.boot_id) ?? { |problem|
+    timer_log(f"event=writer-error name={name} pid={record.pid} message={problem.message}")
+    "alive"
   }
   if outcome == "alive" {
     timer_log(f"event=writer-unproven name={name} attempt={record.attempt} pid={record.pid}")
@@ -1333,15 +1330,12 @@ export proc timer_quiesce_reconcile(
   for name in names {
     continue when timer_is_running(running, name)
     let tracker = out.get(name) ?? TimerRelease(due_mono_ms: 0, attempts: 0, reported: false)
-    let policy = match timer_release_policy(store, name) {
-      Ok(value) => value
-      Err(problem) => {
-        if ! tracker.reported {
-          timer_log(f"event=quiesce-record-invalid name={name} message={problem.message}")
-          out[name] = TimerRelease(due_mono_ms: tracker.due_mono_ms, attempts: tracker.attempts, reported: true)
-        }
-        continue
+    let policy = timer_release_policy(store, name) ?? { |problem|
+      if ! tracker.reported {
+        timer_log(f"event=quiesce-record-invalid name={name} message={problem.message}")
+        out[name] = TimerRelease(due_mono_ms: tracker.due_mono_ms, attempts: tracker.attempts, reported: true)
       }
+      continue
     }
     let decision = timer_release_due(tracker, now.mono_ms, policy.max_attempts)
     continue when decision == "wait"
@@ -2078,13 +2072,10 @@ proc timers_cancel(config: SchedulerConfig, name: Str, active: Bool) [fs, io, er
 
 ## Run, inspect, cancel, or resume timer jobs.
 export proc timers_main(...argv: List[Str]) [fs, process, time, env, io, error] -> Result[Unit, Error] {
-  let parsed = match timer_options(argv) {
-    Ok(value) => value
-    Err(problem) => {
-      eprint f"laputa-timers: {problem}"
-      eprint $TIMER_USAGE
-      exit 2
-    }
+  let parsed = timer_options(argv) ?? { |problem|
+    eprint f"laputa-timers: {problem}"
+    eprint $TIMER_USAGE
+    exit 2
   }
   if parsed.help {
     print $TIMER_USAGE

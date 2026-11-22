@@ -124,11 +124,8 @@ proc authority(connection: transport.Connection, host: model.Host, capabilities:
 }
 
 proc inspect_host(host: model.Host, lock_path: Str) [fs, env, process, error] -> report.HostReport {
-  let connection = match transport.connect(host) {
-    Ok(opened) => opened
-    Err(error) => {
-      return report.HostReport(host: host.name, ok: false, phase: "connect", detail: report.sanitize(error.message), entries: [])
-    }
+  let connection = transport.connect(host) ?? { |error|
+    return report.HostReport(host: host.name, ok: false, phase: "connect", detail: report.sanitize(error.message), entries: [])
   }
 
   var entries = [check(host.name, "connect", true, f"{host.user}@{host.address}:{host.port}")]

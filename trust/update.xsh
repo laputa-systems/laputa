@@ -537,13 +537,10 @@ proc trust_recover(
       bundle: fp"{committed}/{trust_store.TRUST_BUNDLE_NAME}".read_bytes()?,
       policy: fp"{committed}/{trust_store.TRUST_POLICY_NAME}".read_bytes()?,
     }
-    let verified = match trust_verify_candidate(paths, key, candidate, now_epoch_seconds) {
-      Ok(found) => found,
-      Err(problem) => {
-        trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)
-        trust_store.trust_store_clear_journal(paths)
-        return Err(problem)
-      },
+    let verified = trust_verify_candidate(paths, key, candidate, now_epoch_seconds) ?? { |problem|
+      trust_store.trust_store_remove_owned_staging(paths, journal.staging, journal.token)
+      trust_store.trust_store_clear_journal(paths)
+      return Err(problem)
     }
     trust_store.trust_store_flip_active(paths, journal.generation)
     trust_store.trust_store_persist_accepted(paths, journal.generation)

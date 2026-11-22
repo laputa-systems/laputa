@@ -224,23 +224,14 @@ pure capture_result(captured: Result[Captured, ProcessError]) -> Result[Executio
 }
 
 proc exec_local_xsh(command: Str, stdin: Bytes?, stdin_path: Path?, timeout_ms: Int) [fs, process, error] -> Result[Execution, TransportError] {
-  let interpreter = match process.which("xsh") {
-    Ok(found) => found
-    Err(error) => {
-      return Err(.Refused(f"a local xsh target needs an xsh interpreter on PATH: {error.message}"))
-    }
+  let interpreter = process.which("xsh") ?? { |error|
+    return Err(.Refused(f"a local xsh target needs an xsh interpreter on PATH: {error.message}"))
   }
-  let source = match fs.tempfile() {
-    Ok(found) => found
-    Err(error) => {
-      return Err(.NotSubmitted(error.message), cause: error)
-    }
+  let source = fs.tempfile() ?? { |error|
+    return Err(.NotSubmitted(error.message), cause: error)
   }
-  let root_path = match source.root.host_path() {
-    Ok(found) => found
-    Err(error) => {
-      return Err(.NotSubmitted(error.message), cause: error)
-    }
+  let root_path = source.root.host_path() ?? { |error|
+    return Err(.NotSubmitted(error.message), cause: error)
   }
   let source_path = fp"{root_path}/{source.path.display()}"
   match source_path.write(command) {
@@ -342,11 +333,8 @@ export proc exec(
   stdin_path: Path? = null,
   timeout_ms: Int? = null,
 ) [fs, process, error] -> Result[Execution, TransportError] {
-  let script = match scripts.source(connection.dialect, operation) {
-    Ok(found) => found
-    Err(error) => {
-      return Err(.Refused(error.message), cause: error)
-    }
+  let script = scripts.source(connection.dialect, operation) ?? { |error|
+    return Err(.Refused(error.message), cause: error)
   }
   exec_rendered(connection, script, args, privileged, stdin, stdin_path, timeout_ms)
 }

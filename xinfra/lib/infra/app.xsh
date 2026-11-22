@@ -113,18 +113,12 @@ export proc unlock_command(inventory_file: Path, host_name: Str, token: Str?, lo
   }
 
   let target = lock_path.replace("{host}", with: host_name)
-  let connection = match transport.connect(hosts[0]) {
-    Ok(opened) => opened
-    Err(error) => {
-      fail error.message
-    }
+  let connection = transport.connect(hosts[0]) ?? { |error|
+    fail error.message
   }
 
-  let holder = match lock.inspect(connection, target) {
-    Ok(found) => found
-    Err(error) => {
-      fail error.message
-    }
+  let holder = lock.inspect(connection, target) ?? { |error|
+    fail error.message
   }
 
   if token == null {

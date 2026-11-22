@@ -72,22 +72,16 @@ pure material_for(prepared: workload.Prepared, host: Str, resource: model.Resour
 proc survey_host(mode: Mode, entry: workload.Workload, prepared: workload.Prepared) [fs, env, process, error] -> report.HostReport {
   let name = entry.host.name
   let secrets = prepared.secrets
-  let connection = match transport.connect(entry.host) {
-    Ok(opened) => opened
-    Err(error) => {
-      return report.HostReport(host: name, ok: false, phase: "connect", detail: clean(error.message, secrets), entries: [])
-    }
+  let connection = transport.connect(entry.host) ?? { |error|
+    return report.HostReport(host: name, ok: false, phase: "connect", detail: clean(error.message, secrets), entries: [])
   }
 
   var entries: List[report.Entry] = []
   var planned = []
   for resource in entry.resources {
-    let state = match observe.observe(connection, resource.spec) {
-      Ok(found) => found
-      Err(error) => {
-        let _ = transport.disconnect(connection)
-        return report.HostReport(host: name, ok: false, phase: "observe", detail: clean(f"{resource.id}: {error.message}", secrets), entries:)
-      }
+    let state = observe.observe(connection, resource.spec) ?? { |error|
+      let _ = transport.disconnect(connection)
+      return report.HostReport(host: name, ok: false, phase: "observe", detail: clean(f"{resource.id}: {error.message}", secrets), entries:)
     }
 
     let verdict = compare.verdict(resource.spec, state, material_for(prepared, name, resource), planned)

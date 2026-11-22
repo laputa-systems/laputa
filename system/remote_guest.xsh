@@ -233,12 +233,9 @@ proc reply_error(kind: Str, message: Str) [io, error] {
 }
 
 proc main() [env, fs, io, process, error] {
-  let header = match read_header() {
-    Ok(value) => value,
-    Err(error) => {
-      reply_error("request", error.message)
-      return
-    }
+  let header = read_header() ?? { |error|
+    reply_error("request", error.message)
+    return
   }
   let op = json.get(header, ["op"], "").require(Str)?
   let outcome = match op {

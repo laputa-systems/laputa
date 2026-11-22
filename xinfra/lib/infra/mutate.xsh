@@ -161,19 +161,13 @@ proc stream_content(
   expected: compare.Material,
 ) [fs, env, process, error] -> Result[Unit, outcome.StepError] {
   let streamed = content.streamed_path(source)
-  let data = match content.inline_bytes(source) {
-    Ok(found) => found
-    Err(error) => {
-      return Err(failure(.Stage, error.message, false))
-    }
+  let data = content.inline_bytes(source) ?? { |error|
+    return Err(failure(.Stage, error.message, false))
   }
 
   if streamed != null {
-    let measured = match content.measure(source) {
-      Ok(found) => found
-      Err(error) => {
-        return Err(failure(.Stage, error.message, false))
-      }
+    let measured = content.measure(source) ?? { |error|
+      return Err(failure(.Stage, error.message, false))
     }
 
     if measured.digest != expected.digest {

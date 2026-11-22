@@ -456,13 +456,10 @@ export proc quiesce_acquire(qe: QuiesceEnv, job: Str, attempt: Int, options: Qui
 }
 
 proc quiesce_main(...argv: List[Str]) [fs, process, time, io, error] {
-  let parsed = match quiesce_options(argv) {
-    Ok(value) => value,
-    Err(problem) => {
-      eprint f"backup-quiesce: {problem}"
-      eprint $QUIESCE_USAGE
-      exit 2
-    }
+  let parsed = quiesce_options(argv) ?? { |problem|
+    eprint f"backup-quiesce: {problem}"
+    eprint $QUIESCE_USAGE
+    exit 2
   }
   if parsed.help {
     print $QUIESCE_USAGE
