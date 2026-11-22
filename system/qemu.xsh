@@ -7,6 +7,11 @@ use system.qmp
 use system.text_pixels
 use system.types
 
+## Seconds a qualification guest has to power off after it prints its completion marker.
+export const guest_poweroff_timeout_seconds = 60
+const capture_request_prefix = "LAPUTA_PROOF_SCREENSHOT "
+const capture_name = rx"^[a-z]+(-[a-z]+)*$"
+
 ## The host half of a QEMU invocation, which the profile does not choose: the
 ## guest machine with its hardware accelerator and board options, the CPU
 ## model, the serial console arguments, the root disk transport, and the
@@ -272,9 +277,6 @@ proc qemu_process_live(pid: Int) -> Result[Bool] {
   false
 }
 
-## Seconds a qualification guest has to power off after it prints its completion marker.
-export const guest_poweroff_timeout_seconds = 60
-
 ## Run the disposable qualification guest until it powers off after its completion marker, or the deadline.
 export proc qemu_run_asterinas_reference(
   value: QemuConfig,
@@ -347,7 +349,7 @@ proc qmp_key_step(keys: List[Str], down: Bool) -> Result[qmp.QmpStep, Error] {
     {type: "key", data: {key: {type: "qcode", data: key}, down}}
     for key in keys
   ]
-  qmp.QmpExecute("input-send-event", json.encode({events})?, qmp.QmpMutation)
+  Ok(.QmpExecute("input-send-event", json.encode({events})?, qmp.QmpMutation))
 }
 
 proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
@@ -501,9 +503,6 @@ proc screenshot_has_visual_marker(path_value: Path) -> Result[Bool, Error] {
 pure qemu_output_locations(outputs: build.ProfileOutputs) -> Str {
   f"console={outputs.console_log}; qemu-log={outputs.qemu_log}; screenshot={outputs.screenshot}"
 }
-
-const capture_request_prefix = "LAPUTA_PROOF_SCREENSHOT "
-const capture_name = rx"^[a-z]+(-[a-z]+)*$"
 
 pure requested_captures(console: Str) -> List[Str] {
   [

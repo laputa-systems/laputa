@@ -20,6 +20,8 @@ export type RemoteTarget = {
 
 ## The remote protocol version the guest program speaks.
 export const REMOTE_PROTOCOL = "laputa-remote-1"
+const CONTROL_CHARACTERS = "\u{0}\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\u{b}\u{c}\u{d}\u{e}\u{f}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{1a}\u{1b}\u{1c}\u{1d}\u{1e}\u{1f}\u{7f}"
+
 ## Reads the reviewed remote program from a Laputa checkout.
 export proc remote_program(root: Path) [fs, error] -> Result[Str, Error] {
   fp"{root}/system/remote_guest.xsh".read_text()?
@@ -38,8 +40,6 @@ export type ExecResult = {
   stdout: Bytes,
   stderr: Bytes,
 }
-
-const CONTROL_CHARACTERS = "\u{0}\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\u{b}\u{c}\u{d}\u{e}\u{f}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{1a}\u{1b}\u{1c}\u{1d}\u{1e}\u{1f}\u{7f}"
 
 # Guest-supplied text with its control and escape characters removed, so it is safe to show.
 pure plain(text: Str) -> Str {
@@ -201,5 +201,4 @@ export proc remote_diagnose_afresh(target: RemoteTarget, program: Str) [fs, net,
   with session = remote_connect(target)? {
     return remote_diagnose(session, program)?
   }
-  Err(RemoteError.Malformed("unreachable"))
 }

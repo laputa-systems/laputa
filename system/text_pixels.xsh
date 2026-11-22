@@ -15,12 +15,12 @@ export type Raster = {data: Bytes, offset: Int, width: Int, height: Int}
 ## One maximal column range of ink: where it starts, its width, and its ink and strongly colored pixel counts.
 export type Run = {left: Int, width: Int, chroma: Int, ink: Int}
 
-pure channel(raster: Raster, x: Int, y: Int, index: Int) -> Int {
-  raster.data.byte_at(raster.offset + (y * raster.width + x) * 3 + index) ?? -1
+pure channel(frame: Raster, x: Int, y: Int, index: Int) -> Int {
+  frame.data.byte_at(frame.offset + (y * frame.width + x) * 3 + index) ?? -1
 }
 
-pure pixel(raster: Raster, x: Int, y: Int) -> Int {
-  channel(raster, x, y, 0) * 65536 + channel(raster, x, y, 1) * 256 + channel(raster, x, y, 2)
+pure pixel(frame: Raster, x: Int, y: Int) -> Int {
+  channel(frame, x, y, 0) * 65536 + channel(frame, x, y, 1) * 256 + channel(frame, x, y, 2)
 }
 
 ## The pixel grid of a binary PPM, or an error naming what the header lacks.

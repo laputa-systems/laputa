@@ -12,6 +12,10 @@ export const failure_markers = [
   "QEMU_FATAL",
 ]
 
+## The exact boot marker fields a maintained guest reports. The key set is
+## closed: generation identity and service states only, never secrets.
+export const boot_marker_keys = ["boot_serial", "failed_generation", "format", "generation_id", "profile", "root_digest", "services"]
+
 ## Return the first configured failure marker found in `console`, if any.
 export pure failure_marker(proof: types.ProofMarkers, console: Str) -> Str {
   for marker in failure_markers {
@@ -40,10 +44,6 @@ export proc verify_console(proof: types.ProofMarkers, console: Str) [error] {
     return Err(types.LaputaError.Profile(f"guest proof did not emit {proof.success_marker}"))
   }
 }
-
-## The exact boot marker fields a maintained guest reports. The key set is
-## closed: generation identity and service states only, never secrets.
-export const boot_marker_keys = ["boot_serial", "failed_generation", "format", "generation_id", "profile", "root_digest", "services"]
 
 ## Parse the last boot marker line from a maintained guest console and check
 ## it against the selected boot. A missing marker, a field mismatch, an

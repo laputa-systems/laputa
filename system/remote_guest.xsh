@@ -64,13 +64,12 @@ proc inspect() [fs, error] -> Result[Record, Error] {
 
 proc read_log(file: Path, count: Int) [fs, error] -> Result[Record, Error] {
   return {path: file.display(), readable: true, lines: []} unless file.exists()
-  match file.read_text() {
-    Ok(text) => {
-      let lines = text.lines()
-      let kept = if lines.len() <= count { lines } else { lines[lines.len() - count..] }
-      {path: file.display(), readable: true, lines: kept}
-    }
-    Err(_) => {path: file.display(), readable: false, lines: []}
+  if let Ok(text) = file.read_text() {
+    let lines = text.lines()
+    let kept = if lines.len() <= count { lines } else { lines[lines.len() - count..] }
+    {path: file.display(), readable: true, lines: kept}
+  } else {
+    {path: file.display(), readable: false, lines: []}
   }
 }
 
@@ -186,7 +185,7 @@ proc stage(header: Record) [env, fs, io, error] -> Result[Record, Error] {
   let scratch = fp"{root}/.incoming-{name}"
   scratch.remove()
   var received = 0
-  let created = bytes.write_at(scratch, 0, bytes.zero(0)?, create: true)?
+  let _ = bytes.write_at(scratch, 0, bytes.zero(0)?, create: true)?
   while received < size {
     let want = if size - received < chunk { size - received } else { chunk }
     let data = io.stdin_read(want)?
@@ -246,11 +245,12 @@ proc main() [env, fs, io, process, error] {
   }
   match outcome {
     Ok(result) => reply_ok(result)?,
-    Err(error) => match error {
-      RemoteError.Refused {kind, message} => {
+    Err(error) => {
+      if let RemoteError.Refused {kind, message} = error {
         if kind == "env" or kind == "cwd" { reply_error(kind, message)? } else { reply_error("failed", message)? }
-      },
-      other => reply_error("failed", error.message)?,
+      } else {
+        reply_error("failed", error.message)?
+      }
     },
   }
 }
