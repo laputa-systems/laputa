@@ -42,7 +42,7 @@ proc guest_tool_or_skip(name: Str) [fs, process, error] -> Result[Path, Error] {
 
 proc guest_file_or_skip(path_value: Path, label: Str) {
   guard path_value.exists() else {
-    test.skip(f"guest proof needs {label} at {path_value.display()}")
+    test.skip(f"guest proof needs {label} at {path_value}")
     return
   }
 }
@@ -343,12 +343,12 @@ proc launch_guest(
     "-kernel", kernel.display(),
     "-initrd", initramfs.display(),
     "-append", f"console=ttyS0 earlyprintk=serial devtmpfs.mount=1 init=/init XSH_LINUX_REAL=1 XSH_UNIX_REAL=1 trust_url={url} trust_mode={mode}",
-    "-drive", f"if=none,id=store,format=raw,file={store.display()}",
+    "-drive", f"if=none,id=store,format=raw,file={store}",
     "-device", "virtio-blk-pci,drive=store",
     "-netdev", "user,id=net0",
     "-device", "virtio-net-pci,netdev=net0",
     "-display", "none",
-    "-serial", f"file:{log.display()}",
+    "-serial", f"file:{log}",
   ]
   let spawned = process.spawn(process.command_argv(qemu, argv, dir))?
   {pid: spawned.pid, log}

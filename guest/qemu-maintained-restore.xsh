@@ -50,7 +50,7 @@ proc tool_text(tool: Path, args: List[Str], password: Path) -> Result[Str] {
   )?
   guard status.ok else {
     let tail = err.read_text()?
-    fail f"{tool.display()} {args.join(" ")} failed: {tail[-2000..]}"
+    fail f"{tool} {args.join(" ")} failed: {tail[-2000..]}"
   }
   out.read_text()?
 }
@@ -141,7 +141,7 @@ proc identity_files() -> Result[List[Path]] {
 }
 
 proc hash_manifest(files: List[Path]) -> Result[Str] {
-  [f"{hash.sha256(item)?.hex()}  {item.display()}" for item in files].join("\n") + "\n"
+  [f"{hash.sha256(item)?.hex()}  {item}" for item in files].join("\n") + "\n"
 }
 
 proc steady_state() {

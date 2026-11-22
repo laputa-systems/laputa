@@ -38,7 +38,7 @@ proc path_summary() -> Result[Str] {
       p"/usr/bin/syslogd",
     ] {
       let present = item.exists()?
-      yield f"{item.display()}={present}"
+      yield f"{item}={present}"
     }
   }
   marks.join(" ")

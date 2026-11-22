@@ -2269,7 +2269,7 @@ test test_a_service_that_ignores_term_is_killed_after_the_stop_timeout [fs, proc
 export let service = {{
   name: "stubborn",
   kind: "longrun",
-  command: process.command_argv("sh", ["sh", "-c", "trap '' TERM; printf up > '{marker.display()}'; while :; do sleep 0.1; done"]),
+  command: process.command_argv("sh", ["sh", "-c", "trap '' TERM; printf up > '{marker}'; while :; do sleep 0.1; done"]),
   stop_timeout_ms: 300,
   restart: {{mode: "never", delay_ms: 0, max_delay_ms: 0, stable_after_ms: 1000}},
 }}

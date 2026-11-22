@@ -63,12 +63,12 @@ proc run_client(ctx: TestContext, name: Str, port: Int, root: Str, verify: Str, 
   let output = test.temp_path(ctx, name: f"trust-policy-{name}.log")
   var argv = [
     "docker", "run", "--rm", "--pull=never", "--network", "host",
-    "--mount", f"type=bind,src={binary.display()},dst=/xsh,readonly",
-    "--mount", f"type=bind,src={fixtures.display()},dst=/fixtures,readonly",
-    "--mount", f"type=bind,src={script.display()},dst=/client.xsh,readonly",
+    "--mount", f"type=bind,src={binary},dst=/xsh,readonly",
+    "--mount", f"type=bind,src={fixtures},dst=/fixtures,readonly",
+    "--mount", f"type=bind,src={script},dst=/client.xsh,readonly",
   ]
   if with_policy {
-    argv += ["--mount", f"type=bind,src={policy.display()},dst=/etc/laputa/trust-policy,readonly"]
+    argv += ["--mount", f"type=bind,src={policy},dst=/etc/laputa/trust-policy,readonly"]
   }
   argv += [
     "--entrypoint", "/xsh", "debian:stable-slim", "/client.xsh", "--",

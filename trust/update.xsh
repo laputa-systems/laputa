@@ -79,11 +79,11 @@ proc trust_read_source_file(dir: Path, name: Str, max_bytes: Int) -> Result[Byte
 
 proc trust_read_source_dir(dir: Path) -> Result[TrustReleaseBytes, Error] {
   guard dir.exists() else {
-    return Err(update_fail(f"release directory does not exist: {dir.display()}"))
+    return Err(update_fail(f"release directory does not exist: {dir}"))
   }
 
   guard dir.metadata()?.kind == "dir" else {
-    return Err(update_fail(f"release source is not a directory: {dir.display()}"))
+    return Err(update_fail(f"release source is not a directory: {dir}"))
   }
 
   {

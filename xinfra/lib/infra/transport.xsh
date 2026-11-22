@@ -233,7 +233,7 @@ proc exec_local_xsh(command: Str, stdin: Bytes?, stdin_path: Path?, timeout_ms: 
   let root_path = source.root.host_path() ?? { |error|
     return Err(.NotSubmitted(error.message), cause: error)
   }
-  let source_path = fp"{root_path}/{source.path.display()}"
+  let source_path = fp"{root_path}/{source.path}"
   match source_path.write(command) {
     Ok(_) => {}
     Err(error) => {

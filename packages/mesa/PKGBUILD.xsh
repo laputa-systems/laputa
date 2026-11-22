@@ -650,7 +650,7 @@ proc report_libgallium_link_map(link_map_path: Path, library: Path) -> Result[St
 
   let file_size = fs.stat(library)?.size
   let map_size = fs.stat(link_map_path)?.size
-  f"mesa link map: {link_map_path.display()} {map_size} bytes sha256 {hash.sha256(link_map_path)?.hex()}; libgallium {library.display()} {file_size} bytes; LLVM {llvm_bytes} bytes in {llvm_sections} live input sections; llvm-toolchain libc++/unwind {cxx_bytes} bytes in {cxx_sections} live input sections; all live input sections {included_bytes} bytes"
+  f"mesa link map: {link_map_path} {map_size} bytes sha256 {hash.sha256(link_map_path)?.hex()}; libgallium {library} {file_size} bytes; LLVM {llvm_bytes} bytes in {llvm_sections} live input sections; llvm-toolchain libc++/unwind {cxx_bytes} bytes in {cxx_sections} live input sections; all live input sections {included_bytes} bytes"
 }
 
 ## Package recipe export.

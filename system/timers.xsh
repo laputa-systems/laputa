@@ -930,7 +930,7 @@ export proc timer_load_state(file: Path) [fs, error] -> Result[Map[TimerState], 
   let value = json.read(file)?
   let format = json.get(value, ["format"], "").require(Str)?
   guard format == TIMER_STATE_FORMAT else {
-    return Err(error.failure(f"unsupported timer state format in {file.display()}"))
+    return Err(error.failure(f"unsupported timer state format in {file}"))
   }
   let entries = json.get(value, ["jobs"], []).require(List[Any])?
   for entry in entries {

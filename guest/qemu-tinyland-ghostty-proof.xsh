@@ -75,7 +75,7 @@ proc guest_pci_of_input(event_name: Str, phase: Str) -> Result[Str, Error] {
   let physical = if target.starts_with("/") {
     fp"{target}"
   } else {
-    fp"{link.parent.display()}/{target}".normalize()
+    fp"{link.parent}/{target}".normalize()
   }
 
   for component in physical.display().split("/") {
@@ -245,9 +245,9 @@ proc main() [fs, process, time, error] {
   # catch-all would set root:root 0660 here, which the session cannot use.
   for node in [p"/dev/ptmx", p"/dev/console"] {
     if let Ok(meta) = node.metadata() {
-      guest_console(f"LAPUTA_TINYLAND_NODE {node.display()} mode={meta.mode % 4096}")
+      guest_console(f"LAPUTA_TINYLAND_NODE {node} mode={meta.mode % 4096}")
     } else {
-      guest_fail("device-nodes", f"missing {node.display()}")
+      guest_fail("device-nodes", f"missing {node}")
     }
   }
   if let Ok(meta) = p"/run/seatd.sock".metadata() {
@@ -287,7 +287,7 @@ proc main() [fs, process, time, error] {
 
   let virtio_event = guest_find_input("QEMU Virtio Keyboard", "device-loss")?
   let virtio_pci = guest_pci_of_input(virtio_event.name, "device-loss")?
-  guest_console(f"LAPUTA_TINYLAND_UNPLUG target={virtio_event.display()} pci={virtio_pci}")
+  guest_console(f"LAPUTA_TINYLAND_UNPLUG target={virtio_event} pci={virtio_pci}")
   fp"/sys/bus/pci/devices/{virtio_pci}/remove".write("1")
   guest_wait_for_removed(virtio_event, "device-loss", 60)
   guest_tick("unplugged")
