@@ -117,13 +117,14 @@ export proc connect(host: model.Host) [error] -> Result[Connection, TransportErr
 ## order. The sessions belong to the calling scope. A host that stalls or fails
 ## fails only itself.
 export proc connect_all(hosts: List[model.Host], jobs: Int) [error] -> List[Result[Connection, TransportError]] {
-  var targets: List[Record] = []
   var refusals: Map[Str, TransportError] = {}
-  for host in hosts {
-    if host.transport == .Ssh {
-      match ssh_target(host) {
-        Ok(options) => targets += [options]
-        Err(error) => refusals[host.name] = error
+  let targets: List[Record] = collect {
+    for host in hosts {
+      if host.transport == .Ssh {
+        match ssh_target(host) {
+          Ok(options) => yield options
+          Err(error) => refusals[host.name] = error
+        }
       }
     }
   }
@@ -136,24 +137,25 @@ export proc connect_all(hosts: List[model.Host], jobs: Int) [error] -> List[Resu
     }
   }
 
-  var results: List[Result[Connection, TransportError]] = []
   var next = 0
-  for host in hosts {
-    if host.transport == .Local {
-      results += [Ok(local_connection(host))]
-      continue
-    }
+  let results: List[Result[Connection, TransportError]] = collect {
+    for host in hosts {
+      if host.transport == .Local {
+        yield Ok(local_connection(host))
+        continue
+      }
 
-    if let Ok(refusal) = refusals.get(host.name) {
-      results += [Err(refusal)]
-      continue
-    }
+      if let Ok(refusal) = refusals.get(host.name) {
+        yield Err(refusal)
+        continue
+      }
 
-    match opened[next] {
-      Ok(session) => results += [Ok(ssh_connection(host, session))]
-      Err(error) => results += [Err(.Unreachable(f"{host.name}: {error.message}"))]
+      match opened[next] {
+        Ok(session) => yield Ok(ssh_connection(host, session))
+        Err(error) => yield Err(.Unreachable(f"{host.name}: {error.message}"))
+      }
+      next += 1
     }
-    next += 1
   }
 
   results

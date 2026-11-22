@@ -56,31 +56,33 @@ proc check_dialect(host: model.Host, resources: List[model.Resource]) {
 }
 
 proc secret_values(host: Str, resource: model.Resource) -> Result[List[Str], Error] {
-  var names = []
-  match resource.spec {
-    model.File(spec) => {
-      if let source = spec.content {
-        if let model.SecretEnv(name) = source {
-          names += [name]
+  let names = collect {
+    match resource.spec {
+      model.File(spec) => {
+        if let source = spec.content {
+          if let model.SecretEnv(name) = source {
+            yield name
+          }
         }
       }
-    }
-    model.Exec(spec) => {
-      if spec.stdin_env != null {
-        names += [spec.stdin_env]
+      model.Exec(spec) => {
+        if spec.stdin_env != null {
+          yield spec.stdin_env
+        }
       }
+      else => {}
     }
-    else => {}
   }
 
-  var values = []
-  for name in names {
-    let value = ctx f"{host}: {resource.id}" { env.get(name)? }
-    guard value.byte_len() >= minimum_secret_bytes else {
-      fail f"{host}: {resource.id}: secret {name} is shorter than {minimum_secret_bytes} bytes and cannot be redacted reliably"
-    }
+  let values = collect {
+    for name in names {
+      let value = ctx f"{host}: {resource.id}" { env.get(name)? }
+      guard value.byte_len() >= minimum_secret_bytes else {
+        fail f"{host}: {resource.id}: secret {name} is shorter than {minimum_secret_bytes} bytes and cannot be redacted reliably"
+      }
 
-    values += [value]
+      yield value
+    }
   }
 
   Ok(values)

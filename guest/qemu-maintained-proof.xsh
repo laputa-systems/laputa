@@ -13,24 +13,33 @@ proc service_state(name: Str) -> Result[Str] {
 }
 
 proc unit_summary() -> Result[Str] {
-  var parts = []
-  for item in g"/run/xinit/*.json" {
-    let value = json.read(item)?
-    let name = json.get(value, ["name"], "").require(Str)?
-    if name != "" {
-      let state = json.get(value, ["state"], "").require(Str)?
-      let restarts = json.get(value, ["restarts"], 0).require(Int)?
-      parts += [f"{name}={state}/{restarts}"]
+  let parts = collect {
+    for item in g"/run/xinit/*.json" {
+      let value = json.read(item)?
+      let name = json.get(value, ["name"], "").require(Str)?
+      if name != "" {
+        let state = json.get(value, ["state"], "").require(Str)?
+        let restarts = json.get(value, ["restarts"], 0).require(Int)?
+        yield f"{name}={state}/{restarts}"
+      }
     }
   }
   parts.join(" ")
 }
 
 proc path_summary() -> Result[Str] {
-  var marks = []
-  for item in [p"/var/lib/dhcpc", p"/run/dhcpc", p"/run/dhcpc/eth0.status", p"/etc/resolv.conf", p"/usr/bin/dhcpc", p"/usr/bin/syslogd"] {
-    let present = item.exists()?
-    marks += [f"{item.display()}={present}"]
+  let marks = collect {
+    for item in [
+      p"/var/lib/dhcpc",
+      p"/run/dhcpc",
+      p"/run/dhcpc/eth0.status",
+      p"/etc/resolv.conf",
+      p"/usr/bin/dhcpc",
+      p"/usr/bin/syslogd",
+    ] {
+      let present = item.exists()?
+      yield f"{item.display()}={present}"
+    }
   }
   marks.join(" ")
 }

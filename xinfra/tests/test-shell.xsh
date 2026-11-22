@@ -50,10 +50,11 @@ type Made = {word: Str, state: Int}
 
 pure random_word(seed: Int, length: Int) -> Made {
   var state = seed
-  var pieces = []
-  for _ in range(length) {
-    state = next_state(state)
-    pieces += [alphabet[state / 65536 % alphabet.len()]]
+  let pieces = collect {
+    for _ in range(length) {
+      state = next_state(state)
+      yield alphabet[state / 65536 % alphabet.len()]
+    }
   }
 
   Made(word: pieces.join(""), state:)
@@ -61,11 +62,12 @@ pure random_word(seed: Int, length: Int) -> Made {
 
 test random_hostile_words_round_trip_through_a_real_shell_as_single_arguments {
   var state = 20261103
-  var words = []
-  for index in range(150) {
-    let made = random_word(state, index % 24)
-    state = made.state
-    words += [made.word]
+  let words = collect {
+    for index in range(150) {
+      let made = random_word(state, index % 24)
+      state = made.state
+      yield made.word
+    }
   }
 
   let script = r"""printf '%s\0' "$@" """

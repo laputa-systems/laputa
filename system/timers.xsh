@@ -1798,9 +1798,10 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
     running = keep
 
     if ! running.is_empty() {
-      var handles = []
-      for entry in running {
-        handles += [entry.handle]
+      let handles = collect {
+        for entry in running {
+          yield entry.handle
+        }
       }
       let finished = process.wait_timeout(handles, 0ms)?
       if let done = finished {
@@ -1842,13 +1843,14 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
         states[entry.name] = state
         runtimes[entry.name] = runtime
         dirty = true
-        var kept: List[TimerRunning] = []
         var position = 0
-        for item in running {
-          if position != done.index {
-            kept += [item]
+        let kept: List[TimerRunning] = collect {
+          for item in running {
+            if position != done.index {
+              yield item
+            }
+            position += 1
           }
-          position += 1
         }
         running = kept
       }
@@ -1864,17 +1866,18 @@ proc timers_run(config: SchedulerConfig) [fs, process, time, env, io, error] {
         var changed = false
         if timer_is_running(running, job.name) {
           runtime.running = false
-          var kept: List[TimerRunning] = []
-          for entry in running {
-            if entry.name == job.name {
-              entry.handle.cancel(signal: "TERM", kill_after: time.millis(TIMER_KILL_GRACE_MS))
-              state = timer_state_finished(state, now.wall_ms, "cancelled", null)
-              state = timer_state_counted(state, 0, 0, 0, 0, 1)
-              timer_log(f"event=job-cancel name={job.name} attempt={entry.attempt}")
-              let _ = timer_writer_settle(store, job.name)?
-              changed = true
-            } else {
-              kept += [entry]
+          let kept: List[TimerRunning] = collect {
+            for entry in running {
+              if entry.name == job.name {
+                entry.handle.cancel(signal: "TERM", kill_after: time.millis(TIMER_KILL_GRACE_MS))
+                state = timer_state_finished(state, now.wall_ms, "cancelled", null)
+                state = timer_state_counted(state, 0, 0, 0, 0, 1)
+                timer_log(f"event=job-cancel name={job.name} attempt={entry.attempt}")
+                let _ = timer_writer_settle(store, job.name)?
+                changed = true
+              } else {
+                yield entry
+              }
             }
           }
           running = kept

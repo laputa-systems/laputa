@@ -516,18 +516,19 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
 
   var aborted = null
   for id in prepared.operations {
-    var steps: List[Step] = []
-    for state in states.values() {
-      continue when state.fatal != null
+    let steps: List[Step] = collect {
+      for state in states.values() {
+        continue when state.fatal != null
 
-      let resource = find_resource(state.workload.resources, id)
-      continue when resource == null
+        let resource = find_resource(state.workload.resources, id)
+        continue when resource == null
 
-      let reason = blocked_reason(state, resource, aborted)
-      if reason == null {
-        steps += [Step(state:, resource:)]
-      } else {
-        states[state.workload.host.name] = blocked_state(state, resource, reason, secrets)
+        let reason = blocked_reason(state, resource, aborted)
+        if reason == null {
+          yield Step(state:, resource:)
+        } else {
+          states[state.workload.host.name] = blocked_state(state, resource, reason, secrets)
+        }
       }
     }
 

@@ -114,16 +114,17 @@ proc pyramid_kernel_graph(
   fp"{source}/.config".write("CONFIG_TEST=y\n")
   let groups = [f"directory{index}" for index in range(group_count)]
   fp"{source}/Kbuild".write("obj-y += " + [f"{directory}/" for directory in groups].join(" ") + "\n")
-  var objects = []
-  for directory in groups {
-    fp"{source}/{directory}".mkdir()
-    let names = [f"unit{index}" for index in range(objects_per_group)]
-    fp"{source}/{directory}/Kbuild".write("obj-y += " + [f"{name}.o" for name in names].join(" ") + "\n")
-    for name in names {
-      let input = fp"{source}/{directory}/{name}.c"
-      input.write(f"int {directory}_{name}(void) {{ return 0; }}\n")
-      fs.set_times(input, mtime_sec: 1)
-      objects += [fp"{directory}/{name}.o"]
+  let objects = collect {
+    for directory in groups {
+      fp"{source}/{directory}".mkdir()
+      let names = [f"unit{index}" for index in range(objects_per_group)]
+      fp"{source}/{directory}/Kbuild".write("obj-y += " + [f"{name}.o" for name in names].join(" ") + "\n")
+      for name in names {
+        let input = fp"{source}/{directory}/{name}.c"
+        input.write(f"int {directory}_{name}(void) {{ return 0; }}\n")
+        fs.set_times(input, mtime_sec: 1)
+        yield fp"{directory}/{name}.o"
+      }
     }
   }
   let discovered = kbuild.discover_plan(source, kbuild.load_config(fp"{source}/.config")?, "x86")?

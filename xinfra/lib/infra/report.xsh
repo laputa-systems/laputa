@@ -160,17 +160,20 @@ export pure json_document(report: Report) -> Result[Str, Error] {
 ## Render a report as JSON Lines: one object per host failure or entry, then a
 ## final summary object.
 export pure json_lines(report: Report) -> Result[Str, Error] {
-  var lines = []
-  for host in report.hosts {
-    if ! host.ok {
-      lines += [json.encode({type: "host", mode: report.mode, host: host.host, ok: false, phase: host.phase, detail: host.detail})?]
+  let lines = collect {
+    for host in report.hosts {
+      if ! host.ok {
+        yield json.encode(
+          {type: "host", mode: report.mode, host: host.host, ok: false, phase: host.phase, detail: host.detail},
+        )?
+      }
+
+      for entry in host.entries {
+        yield json.encode({...entry, type: "entry", mode: report.mode})?
+      }
     }
 
-    for entry in host.entries {
-      lines += [json.encode({...entry, type: "entry", mode: report.mode})?]
-    }
+    yield json.encode({type: "summary", mode: report.mode, hosts: report.hosts.len(), exit: exit_status(report)})?
   }
-
-  lines += [json.encode({type: "summary", mode: report.mode, hosts: report.hosts.len(), exit: exit_status(report)})?]
   Ok(lines.join("\n"))
 }

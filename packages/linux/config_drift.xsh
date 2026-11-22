@@ -29,14 +29,14 @@ export pure linux_config_changes(before: Str, after: Str) -> List[Str] {
     }
   }
 
-  var changes = []
+  let changes = collect {
+    for name in names |> sort-by . {
+      let old_value = original.get(name) ?? "<absent>"
+      let new_value = normalized.get(name) ?? "<absent>"
 
-  for name in names |> sort-by . {
-    let old_value = original.get(name) ?? "<absent>"
-    let new_value = normalized.get(name) ?? "<absent>"
-
-    if old_value != new_value {
-      changes += [f"{name}: {old_value} -> {new_value}"]
+      if old_value != new_value {
+        yield f"{name}: {old_value} -> {new_value}"
+      }
     }
   }
 

@@ -134,9 +134,10 @@ proc main() [fs, process, env, time, net, error] {
   let renamed = fp"{test_dir}/renamed.txt"
   let link = fp"{test_dir}/alias.txt"
   link.symlink(to: p"renamed.txt")
-  var names = []
-  for entry in fs.children(test_dir)? {
-    names += [entry.name]
+  let names = collect {
+    for entry in fs.children(test_dir)? {
+      yield entry.name
+    }
   }
   require("payload.txt" in names and "alias.txt" in names, "directory", "directory traversal missed an entry")
 
@@ -241,20 +242,20 @@ proc main() [fs, process, env, time, net, error] {
     let source_root = p"/usr/lib/asterinas/xsh-source"
     let git_marker = fp"{source_root}/.git"
     git_marker.mkdir()
-    var failed_selections = []
-
-    for test_selection in test_selection_path.read_text()?.lines() {
-      continue when test_selection.trim() == ""
-      eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
-      let test_run = try { stream_xsh_tests(source_root, test_selection)? }
-      match test_run {
-        Ok(passed) => {
-          if ! passed { failed_selections += [test_selection] }
-        },
-        Err(problem) => {
-          eprint --flush f"XSH test selection could not run: {test_selection}: {problem.message}"
-          failed_selections += [test_selection]
-        },
+    let failed_selections = collect {
+      for test_selection in test_selection_path.read_text()?.lines() {
+        continue when test_selection.trim() == ""
+        eprint --flush f"LAPUTA_ASTERINAS_XSH_TEST_START {test_selection}"
+        let test_run = try { stream_xsh_tests(source_root, test_selection)? }
+        match test_run {
+          Ok(passed) => {
+            if ! passed { yield test_selection }
+          },
+          Err(problem) => {
+            eprint --flush f"XSH test selection could not run: {test_selection}: {problem.message}"
+            yield test_selection
+          },
+        }
       }
     }
 

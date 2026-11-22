@@ -58,10 +58,11 @@ export pure render(result: report.Report, options: Options) -> Result[Str, Error
 }
 
 proc declare_all(hosts: List[model.Host], deployed: deployment.Deployment) [fs, env, error] -> Result[List[workload.Workload], Error] {
-  var declared: List[workload.Workload] = []
-  for host in hosts {
-    let resources = ctx f"host {host.name}" { deployed.resources(host)? }
-    declared += [workload.Workload(host:, resources:)]
+  let declared: List[workload.Workload] = collect {
+    for host in hosts {
+      let resources = ctx f"host {host.name}" { deployed.resources(host)? }
+      yield workload.Workload(host:, resources:)
+    }
   }
 
   Ok(declared)

@@ -7,15 +7,23 @@ use pm.store
 use pm.types
 
 proc manual_fixture_entries(contents: Path) -> Result[List[Record], Error] {
-  var entries: List[Record] = []
-  for entry in fs.walk(contents, hidden: true, gitignore: false) |> sort-by .path {
-    let relative = entry.path.strip_prefix(contents)?.display()
-    continue when relative == "."
-    if entry.kind == "dir" {
-      entry.path.chmod(0o755)
+  let entries: List[Record] = collect {
+    for entry in fs.walk(contents, hidden: true, gitignore: false) |> sort-by .path {
+      let relative = entry.path.strip_prefix(contents)?.display()
+      continue when relative == "."
+      if entry.kind == "dir" {
+        entry.path.chmod(0o755)
+      }
+
+      let metadata = entry.path.metadata()?
+      yield {
+        path: relative,
+        kind: if entry.kind == "dir" { "tree" } else { entry.kind },
+        mode: metadata.mode % 4096,
+        sha256: if entry.kind == "file" { hash.sha256(entry.path)?.hex() } else { "" },
+        target: if entry.kind == "symlink" { entry.path.readlink()?.display() } else { "" },
+      }
     }
-    let metadata = entry.path.metadata()?
-    entries += [{path: relative, kind: if entry.kind == "dir" { "tree" } else { entry.kind }, mode: metadata.mode % 4096, sha256: if entry.kind == "file" { hash.sha256(entry.path)?.hex() } else { "" }, target: if entry.kind == "symlink" { entry.path.readlink()?.display() } else { "" }}]
   }
   entries
 }

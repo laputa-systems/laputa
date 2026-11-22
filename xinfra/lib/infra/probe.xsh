@@ -26,13 +26,14 @@ export pure decode_hex(text: Str) -> Result[Str, Error] {
     fail "odd number of hex digits"
   }
 
-  var values = []
   var offset = 0
-  while offset < text.byte_len() {
-    let high = hex_value(text.byte_slice(offset, 1))?
-    let low = hex_value(text.byte_slice(offset + 1, 1))?
-    values += [high * 16 + low]
-    offset += 2
+  let values = collect {
+    while offset < text.byte_len() {
+      let high = hex_value(text.byte_slice(offset, 1))?
+      let low = hex_value(text.byte_slice(offset + 1, 1))?
+      yield high * 16 + low
+      offset += 2
+    }
   }
 
   bytes.from_ints(values)?.utf8()
@@ -209,19 +210,21 @@ export pure accounts(stdout: Str) -> AccountsState {
     return AccountsUnseen(malformed(f"account report has no state: {stdout}"))
   }
 
-  var groups: List[fact.GroupInfo] = []
-  for line in section_lines(stdout, "@@group@@", null) {
-    match group_line(line) {
-      Ok(entry) => groups += [entry]
-      Err(error) => return AccountsUnseen(malformed(error.message))
+  let groups: List[fact.GroupInfo] = collect {
+    for line in section_lines(stdout, "@@group@@", null) {
+      match group_line(line) {
+        Ok(entry) => yield entry
+        Err(error) => return AccountsUnseen(malformed(error.message))
+      }
     }
   }
 
-  var users: List[fact.UserInfo] = []
-  for line in section_lines(stdout, "@@passwd@@", "@@group@@") {
-    match passwd_line(line, groups) {
-      Ok(entry) => users += [entry]
-      Err(error) => return AccountsUnseen(malformed(error.message))
+  let users: List[fact.UserInfo] = collect {
+    for line in section_lines(stdout, "@@passwd@@", "@@group@@") {
+      match passwd_line(line, groups) {
+        Ok(entry) => yield entry
+        Err(error) => return AccountsUnseen(malformed(error.message))
+      }
     }
   }
 

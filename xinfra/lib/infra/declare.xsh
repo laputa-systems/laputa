@@ -79,28 +79,29 @@ pure content_of(
   template_file: Path?,
   template_json: Str?,
 ) -> Result[model.Content?, Error] {
-  var chosen: List[model.Content] = []
-  if text != null {
-    chosen += [.Inline(bytes.from_text(text))]
-  }
+  let chosen: List[model.Content] = collect {
+    if text != null {
+      yield .Inline(bytes.from_text(text))
+    }
 
-  if data != null {
-    chosen += [.Inline(data)]
-  }
+    if data != null {
+      yield .Inline(data)
+    }
 
-  if source != null {
-    chosen += [.FromFile(source)]
-  }
+    if source != null {
+      yield .FromFile(source)
+    }
 
-  if secret_env != null {
-    check.environment_ok(secret_env)
-    chosen += [.SecretEnv(secret_env)]
-  }
+    if secret_env != null {
+      check.environment_ok(secret_env)
+      yield .SecretEnv(secret_env)
+    }
 
-  if template_file != null {
-    let object_text = template_json ?? "{}"
-    let _ = ctx f"file {id}: template_json" { json.decode(object_text)? }
-    chosen += [.Rendered(model.TemplateSource(file: template_file, json: object_text))]
+    if template_file != null {
+      let object_text = template_json ?? "{}"
+      let _ = ctx f"file {id}: template_json" { json.decode(object_text)? }
+      yield .Rendered(model.TemplateSource(file: template_file, json: object_text))
+    }
   }
 
   if presence == .Absent {
@@ -335,27 +336,28 @@ export pure command(
 ) -> Result[model.Resource, Error] {
   require_args("command", id, needs)
   let invocation = ctx f"command {id}" { invocation_of("command", argv, shell)? }
-  var guards: List[model.Guard] = []
-  if creates != null {
-    ctx f"command {id}" { check.path_ok("creates", creates) }
-    guards += [.Creates(creates)]
-  }
+  let guards: List[model.Guard] = collect {
+    if creates != null {
+      ctx f"command {id}" { check.path_ok("creates", creates) }
+      yield .Creates(creates)
+    }
 
-  if skip_if != null or skip_if_shell != null {
-    guards += [.SkipIf(ctx f"command {id}" { invocation_of("skip_if", skip_if, skip_if_shell)? })]
-  }
+    if skip_if != null or skip_if_shell != null {
+      yield .SkipIf(ctx f"command {id}" { invocation_of("skip_if", skip_if, skip_if_shell)? })
+    }
 
-  if only_if != null or only_if_shell != null {
-    guards += [.OnlyIf(ctx f"command {id}" { invocation_of("only_if", only_if, only_if_shell)? })]
-  }
+    if only_if != null or only_if_shell != null {
+      yield .OnlyIf(ctx f"command {id}" { invocation_of("only_if", only_if, only_if_shell)? })
+    }
 
-  if ! run_on.is_empty() {
-    ctx f"command {id}" { check.needs_ok(run_on) }
-    guards += [model.OnChange]
-  }
+    if ! run_on.is_empty() {
+      ctx f"command {id}" { check.needs_ok(run_on) }
+      yield model.OnChange
+    }
 
-  if always {
-    guards += [model.Always]
+    if always {
+      yield model.Always
+    }
   }
 
   guard guards.len() == 1 else {

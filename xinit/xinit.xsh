@@ -2051,11 +2051,12 @@ proc mark_unit_stopped(unit: ServiceUnit) -> Result[ServiceUnit] {
 }
 
 proc shutdown_all(units: List[ServiceUnit]) -> Result[List[ServiceUnit]] {
-  var reversed: List[ServiceUnit] = []
   var children: List[ChildExit] = []
-  for unit in reverse_units(units) {
-    children += kill_unit(unit)?
-    reversed += [mark_unit_stopped(unit)?]
+  let reversed: List[ServiceUnit] = collect {
+    for unit in reverse_units(units) {
+      children += kill_unit(unit)?
+      yield mark_unit_stopped(unit)?
+    }
   }
   reconcile_child_exits(reverse_units(reversed), children, elapsed_now_ms()?)?
 }
@@ -2137,10 +2138,11 @@ proc apply_one(unit: ServiceUnit, name: Str, desired: Str) -> Result[ServiceUnit
 }
 
 proc apply_request(units: List[ServiceUnit], name: Str, desired: Str) -> Result[List[ServiceUnit]] {
-  var children: List[ChildExit] = []
-  for unit in units {
-    if unit.service.name == name and desired in ["down", "restart"] {
-      children += kill_unit(unit)?
+  let children: List[ChildExit] = collect {
+    for unit in units {
+      if unit.service.name == name and desired in ["down", "restart"] {
+        yield @kill_unit(unit)?
+      }
     }
   }
   let updated = [apply_one(unit, name, desired)? for unit in units]

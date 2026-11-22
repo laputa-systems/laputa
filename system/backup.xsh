@@ -237,22 +237,24 @@ export pure backup_snapshot_ids(value: Any) -> Result[List[Str], Error] {
 
 ## The newest policy-count snapshots.
 export pure backup_retention_keep_newest(ids: List[Str], keep_last: Int) -> List[Str] {
-  var kept = []
   var index = 0
-  while index < ids.len() and index < keep_last {
-    kept += [ids[index]]
-    index += 1
+  let kept = collect {
+    while index < ids.len() and index < keep_last {
+      yield ids[index]
+      index += 1
+    }
   }
   kept
 }
 
 ## The snapshots outside the newest policy count.
 export pure backup_retention_forget(ids: List[Str], keep_last: Int) -> List[Str] {
-  var dropped = []
   var index = keep_last
-  while index < ids.len() {
-    dropped += [ids[index]]
-    index += 1
+  let dropped = collect {
+    while index < ids.len() {
+      yield ids[index]
+      index += 1
+    }
   }
   dropped
 }

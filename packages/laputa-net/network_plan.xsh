@@ -98,16 +98,17 @@ export pure network_is_ipv6(value: Str) -> Bool {
 
 pure hex_pieces(text: Str) -> List[Int]? {
   return [] when text.is_empty()
-  var values = []
-  for piece in text.split(":") {
-    return null when piece.is_empty() or piece.byte_len() > 4
-    var value = 0
-    for digit in piece {
-      let position = hex_digits.find(digit)
-      return null when position == null
-      value = value * 16 + position
+  let values = collect {
+    for piece in text.split(":") {
+      return null when piece.is_empty() or piece.byte_len() > 4
+      var value = 0
+      for digit in piece {
+        let position = hex_digits.find(digit)
+        return null when position == null
+        value = value * 16 + position
+      }
+      yield value
     }
-    values += [value]
   }
   values
 }
@@ -288,15 +289,16 @@ export pure network_plan(intent: NetworkIntent, owned: NetworkOwnership, observe
       return Err(NetworkPolicyError.NetworkInvalid("default route metric is occupied; explicit reconciliation required"))
     }
   }
-  var operations: List[NetworkOperation] = []
-  if !observed.up { operations += [NetworkBringLinkUp] }
-  if intent.address not in observed.addresses { operations += [NetworkAddAddress(intent.address)] }
-  if desired_route not in observed.routes { operations += [NetworkAddDefaultRoute(desired_route)] }
-  for route in owned.routes {
-    if route != desired_route and route in observed.routes { operations += [NetworkRemoveDefaultRoute(route)] }
-  }
-  for address in owned.addresses {
-    if address != intent.address and address in observed.addresses { operations += [NetworkRemoveAddress(address)] }
+  let operations: List[NetworkOperation] = collect {
+    if !observed.up { yield NetworkBringLinkUp }
+    if intent.address not in observed.addresses { yield NetworkAddAddress(intent.address) }
+    if desired_route not in observed.routes { yield NetworkAddDefaultRoute(desired_route) }
+    for route in owned.routes {
+      if route != desired_route and route in observed.routes { yield NetworkRemoveDefaultRoute(route) }
+    }
+    for address in owned.addresses {
+      if address != intent.address and address in observed.addresses { yield NetworkRemoveAddress(address) }
+    }
   }
   Ok({intent, owned, before: observed, operations})
 }

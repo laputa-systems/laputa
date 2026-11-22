@@ -152,9 +152,10 @@ cli main build() [process, error] {
 ## Compare pyinfra's results with xsh-infra's for SCENARIO on fixture host HOST.
 cli main diff(scenario = "all", inventory = p".work/fixtures/inventory.toml", host = "fx-2", dir = p".work/pyinfra") [fs, process, time, error] {
   let names = if scenario == "all" { ["files", "packages", "services", "commands", "failures"] } else { [scenario] }
-  var chosen: List[Scenario] = []
-  for name in names {
-    chosen += [scenario_of(name)?]
+  let chosen: List[Scenario] = collect {
+    for name in names {
+      yield scenario_of(name)?
+    }
   }
 
   dir.mkdir()

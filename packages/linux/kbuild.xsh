@@ -754,40 +754,42 @@ pure expand_config_refs(raw: Str, config: Kconfig) -> Str {
 }
 
 pure make_arguments(raw: Str) -> List[Str] {
-  var arguments: List[Str] = []
   var depth = 0
   var start = 0
-  for index in range(raw.byte_len()) {
-    let byte = raw.byte_at(index)
-    if byte == 40 { depth += 1 }
-    if byte == 41 { depth -= 1 }
-    if byte == 44 and depth == 0 {
-      arguments += [raw.byte_slice(start, index - start)]
-      start = index + 1
+  let arguments: List[Str] = collect {
+    for index in range(raw.byte_len()) {
+      let byte = raw.byte_at(index)
+      if byte == 40 { depth += 1 }
+      if byte == 41 { depth -= 1 }
+      if byte == 44 and depth == 0 {
+        yield raw.byte_slice(start, index - start)
+        start = index + 1
+      }
     }
+    yield raw.byte_slice(start)
   }
-  arguments += [raw.byte_slice(start)]
   arguments
 }
 
 pure make_fields(raw: Str) -> List[Str] {
-  var fields: List[Str] = []
   var depth = 0
   var start = -1
-  for index in range(raw.byte_len()) {
-    let byte = raw.byte_at(index)
-    if byte == 40 and (depth > 0 or (index > 0 and raw.byte_at(index - 1) == 36)) { depth += 1 }
-    if byte == 41 and depth > 0 { depth -= 1 }
-    if depth == 0 and (byte == 32 or byte == 9 or byte == 10) {
-      if start >= 0 {
-        fields += [raw.byte_slice(start, index - start)]
-        start = -1
+  let fields: List[Str] = collect {
+    for index in range(raw.byte_len()) {
+      let byte = raw.byte_at(index)
+      if byte == 40 and (depth > 0 or (index > 0 and raw.byte_at(index - 1) == 36)) { depth += 1 }
+      if byte == 41 and depth > 0 { depth -= 1 }
+      if depth == 0 and (byte == 32 or byte == 9 or byte == 10) {
+        if start >= 0 {
+          yield raw.byte_slice(start, index - start)
+          start = -1
+        }
+      } else if start < 0 {
+        start = index
       }
-    } else if start < 0 {
-      start = index
     }
+    if start >= 0 { yield raw.byte_slice(start) }
   }
-  if start >= 0 { fields += [raw.byte_slice(start)] }
   fields
 }
 
@@ -821,11 +823,12 @@ pure expand_make_expression(expression: Str, vars: Map[Str]) -> Str {
     return f"$({expression})" when arguments.len() != 3
     let name = expand_make_vars(arguments[0], vars).trim()
     let words = expand_make_vars(arguments[1], vars).fields()
-    var output: List[Str] = []
-    for word in words {
-      var local = vars
-      local[name] = word
-      output += [expand_make_vars(arguments[2], local)]
+    let output: List[Str] = collect {
+      for word in words {
+        var local = vars
+        local[name] = word
+        yield expand_make_vars(arguments[2], local)
+      }
     }
     return output.join(" ")
   }
@@ -3517,29 +3520,30 @@ pure efi_stub_base_object(obj: Path) -> Path {
 
 proc archive_item_sources(item: ArchiveAnalysisItem, triple: Str) -> Result[PreparedArchiveItem] {
   var source = ""
-  var members: List[Str] = []
   var output_exists = false
-  if item.composite != "" {
-    for member in item.member_objects {
-      if let Ok(found) = source_for_object(fp"{member}") {
-        members += [path_key(found)]
-      } else {
-        members += [""]
+  let members: List[Str] = collect {
+    if item.composite != "" {
+      for member in item.member_objects {
+        if let Ok(found) = source_for_object(fp"{member}") {
+          yield path_key(found)
+        } else {
+          yield ""
+        }
       }
-    }
-  } else if item.pi {
-    let found = pi_source(fp"{item.object}")
-    source = path_key(found) when found.exists()
-  } else if is_x86_efi_stub(fp"{item.object}", item.library, triple) {
-    if let Ok(found) = source_for_object(efi_stub_base_object(fp"{item.object}")) {
+    } else if item.pi {
+      let found = pi_source(fp"{item.object}")
+      source = path_key(found) when found.exists()
+    } else if is_x86_efi_stub(fp"{item.object}", item.library, triple) {
+      if let Ok(found) = source_for_object(efi_stub_base_object(fp"{item.object}")) {
+        source = path_key(found)
+      } else {
+        output_exists = obj_out_path(fp"{item.object}").exists()?
+      }
+    } else if let Ok(found) = source_for_object(fp"{item.object}") {
       source = path_key(found)
     } else {
       output_exists = obj_out_path(fp"{item.object}").exists()?
     }
-  } else if let Ok(found) = source_for_object(fp"{item.object}") {
-    source = path_key(found)
-  } else {
-    output_exists = obj_out_path(fp"{item.object}").exists()?
   }
   {...item, source: source, member_sources: members, output_exists: output_exists}
 }
@@ -6459,17 +6463,19 @@ proc probe_compiler_options(
 }
 
 pure resolve_compile_flags(object: Str, flags: List[Str], verdicts: Map[Str]) -> Result[List[Str]] {
-  var resolved: List[Str] = []
+  let resolved: List[Str] = collect {
+    for flag in flags {
+      let words = if flag in verdicts { (verdicts.get(flag) ?? "").fields() } else { [flag] }
 
-  for flag in flags {
-    let words = if flag in verdicts { (verdicts.get(flag) ?? "").fields() } else { [flag] }
+      for word in words {
+        if "$(" in word {
+          return Err(
+            ScriptError.Failed(kind: "kbuild-unexpanded-flag", message: f"{object}: compile argument {word} was not expanded"),
+          )
+        }
 
-    for word in words {
-      if "$(" in word {
-        return Err(ScriptError.Failed(kind: "kbuild-unexpanded-flag", message: f"{object}: compile argument {word} was not expanded"))
+        yield word
       }
-
-      resolved += [word]
     }
   }
 

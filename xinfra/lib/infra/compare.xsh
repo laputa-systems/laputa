@@ -72,34 +72,36 @@ pure principal_matches(wanted: Str, name: Str, id: Int) -> Bool {
 }
 
 pure attribute_changes(owner: Str?, group_name: Str?, mode: Int?, info: fact.PathInfo) -> List[Change] {
-  var changes: List[Change] = []
-  if mode != null and info.mode != mode {
-    changes += [change("mode", octal(info.mode), octal(mode))]
-  }
+  let changes: List[Change] = collect {
+    if mode != null and info.mode != mode {
+      yield change("mode", octal(info.mode), octal(mode))
+    }
 
-  if owner != null and ! principal_matches(owner, info.owner, info.uid) {
-    changes += [change("owner", info.owner, owner)]
-  }
+    if owner != null and ! principal_matches(owner, info.owner, info.uid) {
+      yield change("owner", info.owner, owner)
+    }
 
-  if group_name != null and ! principal_matches(group_name, info.group, info.gid) {
-    changes += [change("group", info.group, group_name)]
+    if group_name != null and ! principal_matches(group_name, info.group, info.gid) {
+      yield change("group", info.group, group_name)
+    }
   }
 
   changes
 }
 
 pure wanted_attributes(owner: Str?, group_name: Str?, mode: Int?) -> List[Change] {
-  var changes: List[Change] = []
-  if mode != null {
-    changes += [change("mode", "(none)", octal(mode))]
-  }
+  let changes: List[Change] = collect {
+    if mode != null {
+      yield change("mode", "(none)", octal(mode))
+    }
 
-  if owner != null {
-    changes += [change("owner", "(none)", owner)]
-  }
+    if owner != null {
+      yield change("owner", "(none)", owner)
+    }
 
-  if group_name != null {
-    changes += [change("group", "(none)", group_name)]
+    if group_name != null {
+      yield change("group", "(none)", group_name)
+    }
   }
 
   changes
@@ -166,12 +168,13 @@ pure compare_file(spec: model.FileSpec, material: Material?, state: fact.PathSta
       } else if info.digest == null {
         Uncertain(reading(.Denied, f"cannot read the content of {spec.path} to compare it"))
       } else {
-        var changes: List[Change] = []
         let wanted = material?.digest ?? ""
-        if info.digest != wanted {
-          let from = if spec.sensitive { redacted } else { short(info.digest ?? "") }
-          let to = if spec.sensitive { redacted } else { short(wanted) }
-          changes += [change("content", from, to)]
+        let changes: List[Change] = collect {
+          if info.digest != wanted {
+            let from = if spec.sensitive { redacted } else { short(info.digest ?? "") }
+            let to = if spec.sensitive { redacted } else { short(wanted) }
+            yield change("content", from, to)
+          }
         }
 
         let all = changes + attribute_changes(spec.owner, spec.group, spec.mode, info)
@@ -276,23 +279,24 @@ pure compare_user(spec: model.UserSpec, state: fact.UserState) -> Verdict {
       } else if spec.uid != null and info.uid != spec.uid {
         Conflicting(f"user {spec.name} has uid {info.uid}, not {spec.uid}; uids are never changed")
       } else {
-        var changes: List[Change] = []
-        if spec.group != null and info.group != spec.group {
-          changes += [change("group", info.group ?? f"{info.gid}", spec.group)]
-        }
-
-        for member in spec.groups {
-          if member not in info.memberships and member != info.group {
-            changes += [change("membership", "not a member", member)]
+        let changes: List[Change] = collect {
+          if spec.group != null and info.group != spec.group {
+            yield change("group", info.group ?? f"{info.gid}", spec.group)
           }
-        }
 
-        if spec.home != null and info.home != spec.home {
-          changes += [change("home", info.home, spec.home)]
-        }
+          for member in spec.groups {
+            if member not in info.memberships and member != info.group {
+              yield change("membership", "not a member", member)
+            }
+          }
 
-        if spec.shell != null and info.shell != spec.shell {
-          changes += [change("shell", info.shell, spec.shell)]
+          if spec.home != null and info.home != spec.home {
+            yield change("home", info.home, spec.home)
+          }
+
+          if spec.shell != null and info.shell != spec.shell {
+            yield change("shell", info.shell, spec.shell)
+          }
         }
 
         if changes.is_empty() { Satisfied } else { drift(.Update, changes) }

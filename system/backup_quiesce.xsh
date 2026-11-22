@@ -330,11 +330,12 @@ export proc quiesce_plan(
   wall_ms: Int,
   options: QuiesceOptions,
 ) [fs, error] -> Result[QuiesceRecord, Error] {
-  var planned: List[QuiesceService] = []
-  for name in services {
-    let status = quiesce_status(qe, name)?
-    let desired = if status == null { "down" } else { json.get(status, ["desired"], "down").require(Str) ?? "down" }
-    planned += [QuiesceService(name: name, prior_desired: desired, acquired: desired == "up")]
+  let planned: List[QuiesceService] = collect {
+    for name in services {
+      let status = quiesce_status(qe, name)?
+      let desired = if status == null { "down" } else { json.get(status, ["desired"], "down").require(Str) ?? "down" }
+      yield QuiesceService(name: name, prior_desired: desired, acquired: desired == "up")
+    }
   }
   Ok({
     job: job,

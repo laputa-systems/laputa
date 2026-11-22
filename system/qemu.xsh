@@ -355,27 +355,43 @@ proc qmp_steps(operation: QmpOperation) -> Result[List[qmp.QmpStep], Error] {
     QmpReady => Ok([]),
     QmpScreenshot(output) => Ok([.QmpExecute("screendump", json.encode({filename: output.display()})?, qmp.QmpReadOnly)]),
     QmpInput => {
-      var steps: List[qmp.QmpStep] = []
-      for key in ["l", "a", "p", "u", "t", "a", "ret"] {
-        steps += [qmp_key_step([key], true)?, .QmpDelay(40), qmp_key_step([key], false)?, .QmpDelay(40)]
-      }
-      for pair in [{key: "ctrl", down: true}, {key: "d", down: true}, {key: "d", down: false}, {key: "ctrl", down: false}] {
-        steps += [qmp_key_step([pair.key], pair.down)?]
+      let steps: List[qmp.QmpStep] = collect {
+        for key in ["l", "a", "p", "u", "t", "a", "ret"] {
+          yield @[qmp_key_step([key], true)?, .QmpDelay(40), qmp_key_step([key], false)?, .QmpDelay(40)]
+        }
+
+        for pair in [
+          {key: "ctrl", down: true},
+          {key: "d", down: true},
+          {key: "d", down: false},
+          {key: "ctrl", down: false},
+        ] {
+          yield qmp_key_step([pair.key], pair.down)?
+        }
       }
       Ok(steps)
     },
     QmpInputModified => {
-      var steps: List[qmp.QmpStep] = []
-      for key in ["caps_lock", "l", "a", "p", "u", "t", "a", "caps_lock"] {
-        steps += [qmp_key_step([key], true)?, .QmpDelay(40), qmp_key_step([key], false)?, .QmpDelay(40)]
+      let steps: List[qmp.QmpStep] = collect {
+        for key in ["caps_lock", "l", "a", "p", "u", "t", "a", "caps_lock"] {
+          yield @[qmp_key_step([key], true)?, .QmpDelay(40), qmp_key_step([key], false)?, .QmpDelay(40)]
+        }
+
+        for pair in [
+          {key: "shift", down: true},
+          {key: "1", down: true},
+          {key: "1", down: false},
+          {key: "shift", down: false},
+        ] {
+          yield @[qmp_key_step([pair.key], pair.down)?, .QmpDelay(40)]
+        }
+
+        for pair in [{key: "shift", down: true}, {key: "shift", down: false}] {
+          yield @[qmp_key_step([pair.key], pair.down)?, .QmpDelay(40)]
+        }
+
+        yield @[qmp_key_step(["ret"], true)?, .QmpDelay(40), qmp_key_step(["ret"], false)?]
       }
-      for pair in [{key: "shift", down: true}, {key: "1", down: true}, {key: "1", down: false}, {key: "shift", down: false}] {
-        steps += [qmp_key_step([pair.key], pair.down)?, .QmpDelay(40)]
-      }
-      for pair in [{key: "shift", down: true}, {key: "shift", down: false}] {
-        steps += [qmp_key_step([pair.key], pair.down)?, .QmpDelay(40)]
-      }
-      steps += [qmp_key_step(["ret"], true)?, .QmpDelay(40), qmp_key_step(["ret"], false)?]
       Ok(steps)
     },
   }

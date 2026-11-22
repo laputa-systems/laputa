@@ -101,12 +101,18 @@ test uv_accepts_control_and_blocked_intermediate_but_rejects_omitted_root [fs, p
   let python = python_or_skip()?
   let uv = uv_or_skip()?
   let bundle = root_bundle(ctx)?
-  var outcomes = []
-
-  for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
-    let server = serve_chain(ctx, f"uv-server-{entry[0]}", python, fixture(f"tls/chain-{entry[0]}.pem").display(), fixture(f"tls/{entry[1]}.key").display())?
-    defer stop_server(server)
-    outcomes += [uv_reaches_http(ctx, uv, bundle, server.port, entry[0])?]
+  let outcomes = collect {
+    for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
+      let server = serve_chain(
+        ctx,
+        f"uv-server-{entry[0]}",
+        python,
+        fixture(f"tls/chain-{entry[0]}.pem").display(),
+        fixture(f"tls/{entry[1]}.key").display(),
+      )?
+      defer stop_server(server)
+      yield uv_reaches_http(ctx, uv, bundle, server.port, entry[0])?
+    }
   }
 
   assert outcomes == [true, true, false]
@@ -148,12 +154,18 @@ test cargo_accepts_control_and_blocked_intermediate_but_rejects_omitted_root [fs
   let python = python_or_skip()?
   let cargo = cargo_or_skip()?
   let bundle = root_bundle(ctx)?
-  var outcomes = []
-
-  for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
-    let server = serve_chain(ctx, f"cargo-server-{entry[0]}", python, fixture(f"tls/chain-{entry[0]}.pem").display(), fixture(f"tls/{entry[1]}.key").display())?
-    defer stop_server(server)
-    outcomes += [cargo_reaches_registry(ctx, cargo, bundle, server.port, entry[0])?]
+  let outcomes = collect {
+    for entry in [["control", "ee-control"], ["cross-r1", "ee-cross"], ["cross-r2", "ee-cross"]] {
+      let server = serve_chain(
+        ctx,
+        f"cargo-server-{entry[0]}",
+        python,
+        fixture(f"tls/chain-{entry[0]}.pem").display(),
+        fixture(f"tls/{entry[1]}.key").display(),
+      )?
+      defer stop_server(server)
+      yield cargo_reaches_registry(ctx, cargo, bundle, server.port, entry[0])?
+    }
   }
 
   assert outcomes == [true, true, false]

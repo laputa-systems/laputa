@@ -714,9 +714,10 @@ test trust_update_rotates_keys_package_only [fs, process, env, time, error] { |c
   let _ = trust_update.trust_update_from_dir(root, release_c)?
   assert trust_store.trust_store_read_active(trust_store.trust_store_paths(root))? == "3"
 
-  var names = []
-  for entry in fs.children(fixture("release-d"))? {
-    names += [entry.name]
+  let names = collect {
+    for entry in fs.children(fixture("release-d"))? {
+      yield entry.name
+    }
   }
 
   assert names.len() == 4

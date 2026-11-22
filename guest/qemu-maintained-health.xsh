@@ -60,11 +60,12 @@ proc main() {
   let serial = serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "").trim().parse_int()?
   wait until ready() within 30s every 100ms
   let receipt = json.read(p"/run/laputa-running-generation.json")?
-  var services: List[Record] = []
-  for item in g"/run/xinit/*.json" {
-    let value = json.read(item)?
-    let name = json.get(value, ["name"], "").require(Str)?
-    if name != "" { services += [{name: name, state: json.get(value, ["state"], "").require(Str)?}] }
+  let services: List[Record] = collect {
+    for item in g"/run/xinit/*.json" {
+      let value = json.read(item)?
+      let name = json.get(value, ["name"], "").require(Str)?
+      if name != "" { yield {name: name, state: json.get(value, ["state"], "").require(Str)?} }
+    }
   }
   let report = {
     format: "laputa-guest-health-1",
@@ -83,10 +84,11 @@ proc main() {
   if p"/var/log/boot-markers.log".exists() {
     pre_lines = p"/var/log/boot-markers.log".read_text()?.lines() |> where .trim() != "" |> collect
   }
-  var laputa_files = []
-  if p"/var/lib/laputa".exists() {
-    for entry in fs.children(p"/var/lib/laputa")? {
-      laputa_files += [entry.name]
+  let laputa_files = collect {
+    if p"/var/lib/laputa".exists() {
+      for entry in fs.children(p"/var/lib/laputa")? {
+        yield entry.name
+      }
     }
   }
   p"/dev/console".write(f"LAPUTA_BOOT_STATE markers_before={pre_lines.len()} laputa_dir={laputa_files.join(",")}\n")

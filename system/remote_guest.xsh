@@ -36,12 +36,17 @@ proc maybe_json(file: Path) [fs, error] -> Result[Any, Error] {
 type ServiceState = {name: Str, state: Str, restarts: Int}
 
 proc services() [fs, error] -> Result[List[ServiceState], Error] {
-  var found: List[ServiceState] = []
-  for item in g"/run/xinit/*.json" {
-    let value = json.read(item)?
-    let name = json.get(value, ["name"], "").require(Str)?
-    if name != "" {
-      found += [{name: name, state: json.get(value, ["state"], "").require(Str)?, restarts: json.get(value, ["restarts"], 0).require(Int)?}]
+  let found: List[ServiceState] = collect {
+    for item in g"/run/xinit/*.json" {
+      let value = json.read(item)?
+      let name = json.get(value, ["name"], "").require(Str)?
+      if name != "" {
+        yield {
+          name: name,
+          state: json.get(value, ["state"], "").require(Str)?,
+          restarts: json.get(value, ["restarts"], 0).require(Int)?,
+        }
+      }
     }
   }
   found |> sort-by .name |> collect
@@ -150,10 +155,11 @@ proc validated_name(header: Record) [error] -> Result[Str, Error] {
 
 proc incoming_names(root: Path) [fs, error] -> Result[List[Str], Error] {
   return [] unless root.exists()
-  var names = []
-  for entry in fs.children(root)? {
-    if entry.name.starts_with(".incoming-") {
-      names += [entry.name]
+  let names = collect {
+    for entry in fs.children(root)? {
+      if entry.name.starts_with(".incoming-") {
+        yield entry.name
+      }
     }
   }
   names

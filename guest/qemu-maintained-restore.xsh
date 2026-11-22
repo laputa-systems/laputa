@@ -102,10 +102,11 @@ proc password(name: Str) -> Result[Path] {
 
 proc snapshot_ids(text: Str) -> Result[List[Str]] {
   let groups = json.decode(text)?.require(List[Record])?
-  var ids = []
-  for grp in groups {
-    for snap in grp.get("snapshots")?.require(List[Record])? {
-      ids += [snap.get("id")?.require(Str)?]
+  let ids = collect {
+    for grp in groups {
+      for snap in grp.get("snapshots")?.require(List[Record])? {
+        yield snap.get("id")?.require(Str)?
+      }
     }
   }
   ids
@@ -213,16 +214,17 @@ proc phase_restore() {
   let _ = rustic(["restore", "latest", blank_mount.display()], pw2)?
   let before = fp"{backup_mount}/hashes-before.txt".read_text()?.lines() |> where .trim() != "" |> collect
   guard before.len() > 0 else { fail "hash manifest is empty" }
-  var bare = []
-  for entry in before {
-    let fields = entry.split("  ")
-    guard fields.len() == 2 else { fail f"unparseable manifest line: {entry}" }
-    let restored = fp"{blank_mount}{fields[1]}"
-    guard restored.exists() else { fail f"restore is missing {fields[1]}" }
-    guard hash.sha256(restored)?.hex() == fields[0] else {
-      fail f"restored {fields[1]} does not match the pre-loss hash"
+  let bare = collect {
+    for entry in before {
+      let fields = entry.split("  ")
+      guard fields.len() == 2 else { fail f"unparseable manifest line: {entry}" }
+      let restored = fp"{blank_mount}{fields[1]}"
+      guard restored.exists() else { fail f"restore is missing {fields[1]}" }
+      guard hash.sha256(restored)?.hex() == fields[0] else {
+        fail f"restored {fields[1]} does not match the pre-loss hash"
+      }
+      yield fields[0]
     }
-    bare += [fields[0]]
   }
   ## Seed the maintained proof baseline the verify boot checks: the pre-loss
   ## identity hashes plus the deterministic supervised-services line.
@@ -253,21 +255,22 @@ pure expected_additions() -> List[Str] {
 }
 
 proc diff_paths(text: Str) -> Result[List[Str]] {
-  var changed = []
-  for line in text.lines() {
-    let trimmed = line.trim()
-    if trimmed == "" or trimmed.starts_with("Files") or trimmed.starts_with("Dirs") {
-      continue
-    }
-    let first = trimmed[..1]
-    if first == "+" or first == "-" or first == "M" or first == "U" {
-      let parts = trimmed.split("\"")
-      guard parts.len() >= 3 else { fail f"unparseable diff line: {trimmed}" }
-      var changed_path = parts[1]
-      if changed_path.starts_with("/") {
-        changed_path = changed_path[1..]
+  let changed = collect {
+    for line in text.lines() {
+      let trimmed = line.trim()
+      if trimmed == "" or trimmed.starts_with("Files") or trimmed.starts_with("Dirs") {
+        continue
       }
-      changed += [changed_path]
+      let first = trimmed[..1]
+      if first == "+" or first == "-" or first == "M" or first == "U" {
+        let parts = trimmed.split("\"")
+        guard parts.len() >= 3 else { fail f"unparseable diff line: {trimmed}" }
+        var changed_path = parts[1]
+        if changed_path.starts_with("/") {
+          changed_path = changed_path[1..]
+        }
+        yield changed_path
+      }
     }
   }
   changed

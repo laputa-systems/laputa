@@ -577,28 +577,29 @@ proc stage_vendored_outputs() {
 
 proc add_libgallium_link_map() -> Result[Str, Error] {
   let ninja = p"build/build.ninja"
-  var output = []
   var in_edge = false
   var library = ""
 
-  for line in ninja.read_text()?.split("\n") {
-    if line.starts_with("build ") {
-      let head = line.split(": ")[0]
-      in_edge = head.ends_with(f"/libgallium-{ver}.so")
+  let output = collect {
+    for line in ninja.read_text()?.split("\n") {
+      if line.starts_with("build ") {
+        let head = line.split(": ")[0]
+        in_edge = head.ends_with(f"/libgallium-{ver}.so")
 
-      if in_edge {
-        library = head.byte_slice(6)
+        if in_edge {
+          library = head.byte_slice(6)
+        }
       }
-    }
 
-    if in_edge and line.starts_with("  LINK_ARGS = ") {
-      let args = line.byte_slice(14)
-      output += [f"  LINK_ARGS = -Wl,-Map={libgallium_link_map} {args}"]
-      in_edge = false
-      continue
-    }
+      if in_edge and line.starts_with("  LINK_ARGS = ") {
+        let args = line.byte_slice(14)
+        yield f"  LINK_ARGS = -Wl,-Map={libgallium_link_map} {args}"
+        in_edge = false
+        continue
+      }
 
-    output += [line]
+      yield line
+    }
   }
 
   if library == "" {

@@ -337,11 +337,12 @@ proc reject_routes() {
 }
 
 pure syslog_record(line: Str) -> Str {
-  var fields = []
-  for field in rx" header_time=\x22[^\x22]*\x22".replace(line, with: "").split(" ") {
-    let name = field.split("=")[0]
-    guard !(name in ["seq", "boot", "boottime_ns", "kseq", "ktime_us", "tag_pid"]) else { continue }
-    if name == "pid" and field != "pid=-" { fields += ["pid=N"] } else { fields += [field] }
+  let fields = collect {
+    for field in rx" header_time=\x22[^\x22]*\x22".replace(line, with: "").split(" ") {
+      let name = field.split("=")[0]
+      guard !(name in ["seq", "boot", "boottime_ns", "kseq", "ktime_us", "tag_pid"]) else { continue }
+      if name == "pid" and field != "pid=-" { yield "pid=N" } else { yield field }
+    }
   }
   fields.join(" ")
 }

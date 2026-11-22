@@ -285,10 +285,11 @@ test trust_update_killed_mid_transaction_recovers_cleanly [fs, process, env, tim
 }
 
 proc store_snapshot(root: Path) -> Result[Str, Error] {
-  var entries = []
-  for entry in fs.walk(fp"{root}/var/lib/laputa/trust", hidden: true)? {
-    let rel = entry.path.strip_prefix(root)?
-    entries += [f"{rel.display()} {entry.kind} {entry.size}"]
+  let entries = collect {
+    for entry in fs.walk(fp"{root}/var/lib/laputa/trust", hidden: true)? {
+      let rel = entry.path.strip_prefix(root)?
+      yield f"{rel.display()} {entry.kind} {entry.size}"
+    }
   }
 
   entries.join("\n")

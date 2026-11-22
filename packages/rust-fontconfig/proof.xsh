@@ -2,13 +2,13 @@ use pm.proof
 use pm.util as pm_util
 
 proc defined_exports(readelf: Path, library: Path) [fs, process, env, error] -> Result[List[Str], Error] {
-  var names = []
+  let names = collect {
+    for line in (run.text $readelf "--dyn-syms" "-W" $library).lines() {
+      let fields = line.fields()
 
-  for line in (run.text $readelf "--dyn-syms" "-W" $library).lines() {
-    let fields = line.fields()
-
-    if fields.len() == 8 and fields[4] == "GLOBAL" and fields[6] != "UND" {
-      names += [fields[7].split("@")[0]]
+      if fields.len() == 8 and fields[4] == "GLOBAL" and fields[6] != "UND" {
+        yield fields[7].split("@")[0]
+      }
     }
   }
 

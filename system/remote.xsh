@@ -95,25 +95,27 @@ export type RemoteLog = {path: Str, readable: Bool, lines: List[Str]}
 export type RemoteDiagnosis = {services: List[RemoteService], unhealthy: List[RemoteService], logs: List[RemoteLog]}
 
 proc services_of(value: Any) -> Result[List[RemoteService], Error] {
-  var found: List[RemoteService] = []
-  for item in value.require(List[Record])? {
-    found += [{
-      name: json.get(item, ["name"], "").require(Str)?,
-      state: json.get(item, ["state"], "").require(Str)?,
-      restarts: json.get(item, ["restarts"], 0).require(Int)?,
-    }]
+  let found: List[RemoteService] = collect {
+    for item in value.require(List[Record])? {
+      yield {
+        name: json.get(item, ["name"], "").require(Str)?,
+        state: json.get(item, ["state"], "").require(Str)?,
+        restarts: json.get(item, ["restarts"], 0).require(Int)?,
+      }
+    }
   }
   found
 }
 
 proc logs_of(value: Any) -> Result[List[RemoteLog], Error] {
-  var found: List[RemoteLog] = []
-  for item in value.require(List[Record])? {
-    found += [{
-      path: json.get(item, ["path"], "").require(Str)?,
-      readable: json.get(item, ["readable"], false).require(Bool)?,
-      lines: json.get(item, ["lines"], []).require(List[Str])?,
-    }]
+  let found: List[RemoteLog] = collect {
+    for item in value.require(List[Record])? {
+      yield {
+        path: json.get(item, ["path"], "").require(Str)?,
+        readable: json.get(item, ["readable"], false).require(Bool)?,
+        lines: json.get(item, ["lines"], []).require(List[Str])?,
+      }
+    }
   }
   found
 }
