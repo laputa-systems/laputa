@@ -113,7 +113,7 @@ pure kind_name(kind: fact.PathKind) -> Str {
 pure compare_directory(spec: model.DirectorySpec, state: fact.PathState) -> Verdict {
   match state {
     fact.Unseen(unreadable) => Uncertain(unreadable)
-    fact.Blocked(unreadable) => {
+    fact.Blocked(_) => {
       if spec.presence == .Absent { Satisfied } else { Conflicting(f"a parent of {spec.path} is not a directory") }
     }
     fact.Missing => {
@@ -143,7 +143,7 @@ pure short(digest: Str) -> Str {
 pure compare_file(spec: model.FileSpec, material: Material?, state: fact.PathState) -> Verdict {
   match state {
     fact.Unseen(unreadable) => Uncertain(unreadable)
-    fact.Blocked(unreadable) => {
+    fact.Blocked(_) => {
       if spec.presence == .Absent { Satisfied } else { Conflicting(f"a parent of {spec.path} is not a directory") }
     }
     fact.Missing => {
@@ -181,7 +181,7 @@ pure compare_file(spec: model.FileSpec, material: Material?, state: fact.PathSta
 pure compare_symlink(spec: model.SymlinkSpec, state: fact.PathState) -> Verdict {
   match state {
     fact.Unseen(unreadable) => Uncertain(unreadable)
-    fact.Blocked(unreadable) => {
+    fact.Blocked(_) => {
       if spec.presence == .Absent { Satisfied } else { Conflicting(f"a parent of {spec.path} is not a directory") }
     }
     fact.Missing => {

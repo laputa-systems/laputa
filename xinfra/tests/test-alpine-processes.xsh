@@ -119,7 +119,7 @@ test a_transfer_that_outlives_its_timeout_leaves_the_destination_and_reports_an_
     return
   }
 
-  let host: model.Host = {...found, transfer_timeout_ms: 150}
+  let host = {...found, transfer_timeout_ms: 150}
   let dir = test.temp_dir(ctx)?
   let base = f"/var/tmp/{testing.scratch_name(dir)}"
   let blob = fp"{dir}/big.bin"

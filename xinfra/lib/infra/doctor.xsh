@@ -21,12 +21,11 @@ const resource_tools = [
 ]
 
 const openrc_tools = ["rc-service", "rc-update"]
+const hostile = ["plain", "", "-x", "it's", "a b", "line\nbreak", "$HOME", "$(echo injected)", "`id`", "; id", "\\", "caf\u{e9}"]
 
 pure all_present(absent: List[Str], tools: List[Str]) -> Bool {
   tools |> all { |tool| tool not in absent }
 }
-
-const hostile = ["plain", "", "-x", "it's", "a b", "line\nbreak", "$HOME", "$(echo injected)", "`id`", "; id", "\\", "caf\u{e9}"]
 
 pure check(host: Str, id: Str, ok: Bool, detail: Str) -> report.Entry {
   report.Entry(

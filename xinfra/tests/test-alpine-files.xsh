@@ -172,7 +172,7 @@ test a_wrong_host_key_fails_that_host_and_leaves_the_others_running { |ctx|
 
   let dir = test.temp_dir(ctx)?
   let base = f"/var/tmp/{testing.scratch_name(dir)}"
-  let tampered: model.Host = {...other, host_key: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+  let tampered = {...other, host_key: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
   let resources = [declare.directory(id: "base", at: base, parents: true)?]
   let hosts = [
     workload.Workload(host: good, resources:),
@@ -196,10 +196,10 @@ test unreadable_facts_are_uncertain_and_escalated_reads_make_them_readable { |ct
   let dir = test.temp_dir(ctx)?
   let base = f"/root/{testing.scratch_name(dir)}"
   let resources = [declare.directory(id: "sealed", at: base)?]
-  let unprivileged: model.Host = {...host, escalate_reads: false}
+  let unprivileged = {...host, escalate_reads: false}
   let planned = engine.survey(.Plan, prepare(unprivileged, resources)?, settings(dir))
   assert testing.status_of(planned, host.name, "sealed") == "uncertain"
-  let escalated: model.Host = {...host, escalate_reads: true}
+  let escalated = {...host, escalate_reads: true}
   let again = engine.survey(.Plan, prepare(escalated, resources)?, settings(dir))
   assert testing.status_of(again, host.name, "sealed") == "drift"
 }

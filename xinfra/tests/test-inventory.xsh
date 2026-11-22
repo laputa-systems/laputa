@@ -2,18 +2,6 @@ use infra.inventory
 use infra.model
 
 const pin = "SHA256:aBQj3QAmCCdKKRQpB/xpoi4aeSOjR5GkDQiWxZCPq6U"
-
-pure names(hosts: List[model.Host]) -> List[Str] {
-  hosts |> map .name |> collect()
-}
-
-pure refused(result: Result[inventory.Inventory, Error], needle: Str) -> Bool {
-  match result {
-    Ok(_) => false
-    Err(error) => needle in error.message
-  }
-}
-
 const complete = """
 [defaults]
 user = "deploy"
@@ -46,6 +34,17 @@ key = "/abs/key"
 host_key = "SHA256:aBQj3QAmCCdKKRQpB/xpoi4aeSOjR5GkDQiWxZCPq6U"
 escalate_reads = true
 """
+
+pure names(hosts: List[model.Host]) -> List[Str] {
+  hosts |> map .name |> collect()
+}
+
+pure refused(result: Result[inventory.Inventory, Error], needle: Str) -> Bool {
+  match result {
+    Ok(_) => false
+    Err(error) => needle in error.message
+  }
+}
 
 test hosts_inherit_defaults_and_override_them {
   let loaded = inventory.parse(complete, p"/etc/xinfra")?

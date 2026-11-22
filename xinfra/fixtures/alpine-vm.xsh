@@ -329,7 +329,7 @@ cli main up(count = 2, first = 1, dir = p".work/fixtures/vm") [fs, net, process,
     ]
   }
 
-  fp"{root}/inventory.toml".write(lines.join("\n") + "\n")
+  fp"{root}/inventory.toml".write_lines(lines)
   json.write(record, {vms: vms})
   print f"started {vms.len()} VM(s) on Alpine {base_version}; inventory at {root}/inventory.toml"
 }

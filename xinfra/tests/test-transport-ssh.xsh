@@ -46,7 +46,7 @@ test a_wrong_host_key_pin_fails_before_any_command {
     return
   }
 
-  let wrong: model.Host = {...host, host_key: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+  let wrong = {...host, host_key: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
   if let Err(transport.TransportError.Unreachable {message}) = transport.connect(wrong) {
     assert "mismatch" in message
   } else {
@@ -113,7 +113,7 @@ test connect_all_opens_reachable_hosts_in_parallel_and_fails_only_the_unreachabl
     return
   }
 
-  let unreachable: model.Host = {...first, name: "nowhere", address: "127.0.0.1", port: 1, timeout_ms: 2000}
+  let unreachable = {...first, name: "nowhere", address: "127.0.0.1", port: 1, timeout_ms: 2000}
   let opened = transport.connect_all([first, unreachable, second], 3)
   assert opened.len() == 3
   assert opened[0] is Ok(_)

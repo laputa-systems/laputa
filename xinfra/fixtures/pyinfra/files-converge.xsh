@@ -4,7 +4,7 @@ use infra.declare
 use infra.model
 
 ## The resources one host should have.
-export proc resources(host: model.Host) [fs, error] -> Result[List[model.Resource], Error] {
+export proc resources(_: model.Host) [fs, error] -> Result[List[model.Resource], Error] {
   [
     declare.directory(id: "dir", at: "/var/tmp/pi/dir", mode: 0o750, owner: "root", group_name: "wheel", parents: true)?,
     declare.file(id: "file", at: "/var/tmp/pi/dir/motd", text: "hello\n", mode: 0o640, owner: "root", group_name: "wheel", needs: ["dir"])?,

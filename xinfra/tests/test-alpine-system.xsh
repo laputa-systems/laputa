@@ -5,6 +5,8 @@ use infra.report
 use infra.testing
 use infra.workload
 
+const default_service_name = "xinfratest"
+
 proc settings(dir: Path) -> engine.Settings {
   engine.Settings(4, .Host, f"/var/tmp/{testing.scratch_name(dir)}.lock")
 }
@@ -120,8 +122,6 @@ reload() {
   echo reload >> /var/tmp/${RC_SVCNAME}.events
 }
 """
-
-const default_service_name = "xinfratest"
 
 pure service_resources(marker: Str, enabled: Bool, running: Bool, service_name: Str = default_service_name) -> Result[List[model.Resource], Error] {
   [

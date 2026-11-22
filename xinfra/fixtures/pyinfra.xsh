@@ -123,7 +123,7 @@ proc compare_scenario(scenario: Scenario, inventory: Path, host: Str, work: Path
   Ok(agreed)
 }
 
-proc compare_unreachable(inventory: Path, host: Str, work: Path, target: Str, address: Str) -> Result[Bool] {
+proc compare_unreachable(work: Path, address: Str) -> Result[Bool] {
   let stranger = fp"{work}/stranger"
   stranger.remove()
   fp"{work}/stranger.pub".remove()
@@ -191,7 +191,7 @@ cli main diff(scenario = "all", inventory = p".work/fixtures/inventory.toml", ho
       agreed = false
     }
 
-    if item.name == "failures" and ! compare_unreachable(inventory, host, work, target, address) {
+    if item.name == "failures" and ! compare_unreachable(work, address) {
       agreed = false
     }
   }

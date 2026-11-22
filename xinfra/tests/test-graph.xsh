@@ -95,7 +95,7 @@ test the_merged_sequence_respects_every_hosts_order_for_many_generated_inputs {
   var state = 7
   for round in range(60) {
     var lists = []
-    for host in range(3) {
+    for _ in range(3) {
       let picked = collect {
         for id in universe {
           state = (state * 1103515245 + 12345) % 2147483648

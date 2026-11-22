@@ -59,7 +59,7 @@ type Invocation = {status: Status, stdout: Str, stderr: Str}
 
 proc xinfra(...args: List[Str]) [process, error] -> Result[Invocation, Error] {
   let out = run.capture --text xsh bin/xinfra.xsh @args
-  Ok(Invocation(status: out.status, stdout: out.stdout, stderr: out.stderr))
+  Ok(Invocation(...out))
 }
 
 test a_plan_changes_nothing_and_check_exits_one_on_drift { |ctx|

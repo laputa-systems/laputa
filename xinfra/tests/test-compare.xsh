@@ -3,6 +3,8 @@ use infra.declare
 use infra.fact
 use infra.model
 
+const none: List[Str] = []
+
 pure info(
   kind: fact.PathKind,
   mode = 0o644,
@@ -25,8 +27,6 @@ pure gone() -> fact.Fact {
 pure denied() -> fact.Fact {
   .OnPath(.Unseen(fact.Unreadable(.Denied, "no")))
 }
-
-const none: List[Str] = []
 
 pure fields(verdict: compare.Verdict) -> List[Str] {
   if let .Drifted(drift) = verdict {

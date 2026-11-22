@@ -43,19 +43,6 @@ export enum Outcome {
   OutcomeUnknown(Failure),
 }
 
-## The outcome name reports use.
-export pure name(outcome: Outcome) -> Str {
-  match outcome {
-    Unchanged => "unchanged"
-    Changed(_) => "changed"
-    Skipped(_) => "skipped"
-    Blocked(_) => "blocked"
-    Failed(_) => "failed"
-    PartiallyApplied(_) => "partial"
-    OutcomeUnknown(_) => "unknown"
-  }
-}
-
 ## Whether later work that needs this resource may proceed.
 export pure settled(outcome: Outcome) -> Bool {
   match outcome {

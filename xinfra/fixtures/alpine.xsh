@@ -97,7 +97,7 @@ cli main up(count: UInt = 3, dir = p".work/fixtures") [fs, process, time, error]
     ]
   }
 
-  fp"{dir}/inventory.toml".write(lines.join("\n") + "\n")
+  fp"{dir}/inventory.toml".write_lines(lines)
   json.write(fp"{dir}/containers.json", {containers: ids})
   print f"started {ids.len()} host(s); inventory at {dir}/inventory.toml"
 }

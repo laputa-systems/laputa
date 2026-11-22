@@ -2,6 +2,7 @@
 
 const single_quote = "'"
 const nul = "\0"
+const hex_digits = "0123456789abcdef"
 
 ## Quote one value as a single POSIX shell word. A value with a NUL byte has no
 ## shell representation and is refused instead of truncated.
@@ -35,8 +36,6 @@ export pure command(script: Str, args: List[Str]) -> Result[Str, Error] {
 export pure escalated_command(script: Str, args: List[Str]) -> Result[Str, Error] {
   Ok(f"doas -n {command(script, args)?}")
 }
-
-const hex_digits = "0123456789abcdef"
 
 pure xsh_hex_byte(byte: Int) -> Str {
   f"\\x{hex_digits.byte_slice(byte / 16, 1)}{hex_digits.byte_slice(byte % 16, 1)}"

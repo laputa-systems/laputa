@@ -409,7 +409,7 @@ proc settle_lock(state: HostState, secrets: List[Str]) [fs, env, process, error]
   {...state, held: null, fatal: clean(note, secrets), fatal_phase: "release"}
 }
 
-pure host_report(state: HostState, secrets: List[Str]) -> report.HostReport {
+pure host_report(state: HostState) -> report.HostReport {
   report.HostReport(
     host: state.workload.host.name,
     ok: state.fatal == null,
@@ -542,7 +542,7 @@ export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, pro
     states[name] = settle_lock(states.get(name) ?? initial_state(prepared.workloads[0]), secrets)
   }
 
-  let hosts = prepared.workloads |> map host_report(states.get(.host.name) ?? initial_state(.), secrets) |> collect()
+  let hosts = prepared.workloads |> map host_report(states.get(.host.name) ?? initial_state(.)) |> collect()
   completed = true
   report.Report(mode: "apply", hosts:)
 }

@@ -293,7 +293,7 @@ export pure xinit_service_fact(stdout: Str) -> fact.ServiceState {
         return .ServiceUnseen(malformed("xinit status report has no readiness"))
       }
 
-      fact.ServiceFound(fact.ServiceInfo(enabled: null, running:, ready: readiness == "true"))
+      .ServiceFound(fact.ServiceInfo(enabled: null, running:, ready: readiness == "true"))
     }
     else => .ServiceUnseen(malformed(f"xinit service report has no state: {stdout}"))
   }

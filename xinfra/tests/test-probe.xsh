@@ -2,6 +2,7 @@ use infra.fact
 use infra.probe
 
 const regular = "state found\nkind file\nmode 644\nuid 0\ngid 0\nsize 784\nmtime 1793678100\nowner 726f6f74\ngroup 726f6f74\ndigest a17d\n"
+const accounts_report = "state ok\n@@passwd@@\nroot:x:0:0:root:/root:/bin/sh\ndeploy:x:1000:1000:Linux User,,,:/home/deploy:/bin/ash\n@@group@@\nroot:x:0:root\nwheel:x:10:root,deploy\ndeploy:x:1000:\nempty:x:2000:\n"
 
 test decode_hex_round_trips_text_and_rejects_garbage {
   assert probe.decode_hex("")? == ""
@@ -97,8 +98,6 @@ test package_reports_map_to_installed_absent_and_unavailable {
     assert false, "unorderable version was accepted"
   }
 }
-
-const accounts_report = "state ok\n@@passwd@@\nroot:x:0:0:root:/root:/bin/sh\ndeploy:x:1000:1000:Linux User,,,:/home/deploy:/bin/ash\n@@group@@\nroot:x:0:root\nwheel:x:10:root,deploy\ndeploy:x:1000:\nempty:x:2000:\n"
 
 pure found_accounts(report: Str) -> probe.Accounts? {
   if let .AccountsFound(accounts) = probe.accounts(report) {

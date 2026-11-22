@@ -29,7 +29,7 @@ test an_unreachable_host_is_a_connect_failure_in_every_mode_and_never_a_success 
 
   let dir = test.temp_dir(ctx)?
   let base = f"/var/tmp/{testing.scratch_name(dir)}"
-  let nowhere: model.Host = {...host, name: "nowhere", address: "127.0.0.1", port: 1, timeout_ms: 2000}
+  let nowhere = {...host, name: "nowhere", address: "127.0.0.1", port: 1, timeout_ms: 2000}
   let resources = [declare.directory(id: "base", at: base, parents: true)?]
   let prepared = workload.prepare([workload.Workload(host: nowhere, resources:)])?
   for result in [engine.survey(.Plan, prepared, settings(dir)), engine.survey(.Check, prepared, settings(dir)), engine.apply(prepared, settings(dir))] {
@@ -51,7 +51,7 @@ test an_authentication_failure_is_a_connect_failure_before_any_mutation { |ctx|
   let stranger = fp"{dir}/stranger"
   run ssh-keygen -q -t ed25519 -N "" -f $stranger
   let base = f"/var/tmp/{testing.scratch_name(dir)}"
-  let denied: model.Host = {...host, name: "denied", key: stranger}
+  let denied = {...host, name: "denied", key: stranger}
   let resources = [declare.directory(id: "base", at: base, parents: true)?]
   let prepared = workload.prepare([workload.Workload(host: denied, resources:)])?
   let result = engine.apply(prepared, settings(dir))
