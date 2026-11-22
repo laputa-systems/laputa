@@ -35,23 +35,22 @@ export let service = {
 export proc status() [fs, process, env, error] -> Result[Str, Error] {
   let snapshot = fp"/run/laputa-timers/status.json"
   return Ok("jobs=unknown") unless snapshot.exists()
-  match json.read(snapshot) {
-    Ok(value) => {
-      let jobs = json.get(value, ["jobs"], []).require(List[Any]) ?? []
-      let invalid = json.get(value, ["invalid"], []).require(List[Any]) ?? []
-      var due = 0
-      var running = 0
-      for job in jobs {
-        let state = json.get(job, ["state"], "").require(Str) ?? ""
-        if state == "due" {
-          due += 1
-        }
-        if state == "running" {
-          running += 1
-        }
+  if let Ok(value) = json.read(snapshot) {
+    let jobs = json.get(value, ["jobs"], []).require(List[Any]) ?? []
+    let invalid = json.get(value, ["invalid"], []).require(List[Any]) ?? []
+    var due = 0
+    var running = 0
+    for job in jobs {
+      let state = json.get(job, ["state"], "").require(Str) ?? ""
+      if state == "due" {
+        due += 1
       }
-      Ok(f"jobs={jobs.len()} due={due} running={running} invalid={invalid.len()}")
+      if state == "running" {
+        running += 1
+      }
     }
-    Err(_) => Ok("jobs=unknown"),
+    Ok(f"jobs={jobs.len()} due={due} running={running} invalid={invalid.len()}")
+  } else {
+    Ok("jobs=unknown")
   }
 }

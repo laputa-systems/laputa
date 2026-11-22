@@ -1,6 +1,6 @@
 use pm.proof
 
-test test_relocated_independent_builds_preserve_identical_elf_and_assertion_sources [fs, process, env, error] { |ctx|
+test test_relocated_independent_builds_preserve_identical_elf_and_assertion_sources [fs, process, env, error] {
   let first = env.path("LAPUTA_FONTCONFIG_REPRO_FIRST_ROOT")?
   let second = env.path("LAPUTA_FONTCONFIG_REPRO_SECOND_ROOT")?
   let relative = "usr/lib/libfontconfig.so.1.17.0"

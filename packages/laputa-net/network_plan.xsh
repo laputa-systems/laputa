@@ -53,6 +53,8 @@ export const network_input_limit = 65536
 
 const network_resource_limit = 64
 const network_replay_limit = network_resource_limit * 2 + 5
+const ipv6_default_metric = 1024
+const hex_digits = "0123456789abcdef"
 
 ## Read only the selected input's bounded bytes, rejecting truncation before UTF-8 decoding.
 export proc network_read_input(input: Path) [fs, error] -> Result[Str, Error] {
@@ -70,9 +72,6 @@ export proc network_read_input(input: Path) [fs, error] -> Result[Str, Error] {
   let data = snapshot.data
   data.utf8()
 }
-
-const ipv6_default_metric = 1024
-const hex_digits = "0123456789abcdef"
 
 pure ipv4(value: Str) -> Bool {
   let octets = value.split(".")
@@ -175,8 +174,8 @@ pure ipv6_unicast(value: Str, link_local: Bool) -> Bool {
   guard let groups = ipv6_groups(value) else { return false }
   return false when ipv6_render(groups) != value
   var leading_zero = true
-  for value in groups[0..5] {
-    if value != 0 { leading_zero = false }
+  for segment in groups[0..5] {
+    if segment != 0 { leading_zero = false }
   }
   return false when leading_zero and (groups[5] == 0 or groups[5] == 65535)
   return false when groups[0] / 256 == 255

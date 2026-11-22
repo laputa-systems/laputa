@@ -2,11 +2,6 @@
 use pm.proof
 use pm.util as pm_util
 
-type Compiled = {
-  magic: Int,
-  names: Str,
-}
-
 pure u16(data: Bytes, at: Int) -> Int {
   (data.byte_at(at) ?? 0) + (data.byte_at(at + 1) ?? 0) * 256
 }

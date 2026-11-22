@@ -1542,8 +1542,8 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
         let reused = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert reused.task_count == repaired.task_count
       }
-      for report in [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"] {
-        let summary = kbuild.archive_plan_summary_path(report)
+      for report_path in [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"] {
+        let summary = kbuild.archive_plan_summary_path(report_path)
         let stored = json.read(summary)?.require(ArchiveSummaryReport)?
         json.write(summary, {...stored, task_count: repaired.task_count + 1})
       }
@@ -1552,14 +1552,14 @@ test test_kbuild_archive_plan_cache_invalidates_when_source_appears [fs, process
         assert repaired_summary.task_count == repaired.task_count
       }
       let reports = [p".xsh-kbuild-archive-plan.json", fp"{cache}/linux-x86.archive-plan.json"]
-      for report in reports { report.chmod(0o000) }
+      for report_path in reports { report_path.chmod(0o000) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count
       }
-      for report in reports { report.chmod(0o644) }
-      let report_texts = [report.read_text()? for report in reports]
-      for report in reports { report.remove(missing_ok: false) }
+      for report_path in reports { report_path.chmod(0o644) }
+      let report_texts = [report_path.read_text()? for report_path in reports]
+      for report_path in reports { report_path.remove(missing_ok: false) }
       env ({XSH_LINUX_KBUILD_STOP_AFTER: "plan", XSH_PM_RECIPE_DIR: fp"{root}/missing-recipe".display()}) {
         let summary_only = linux_shared.cached_archive_plan(plan, p"/usr/bin/false", "x86", "x86_64-linux-gnu", [], [])?
         assert summary_only.task_count == repaired.task_count

@@ -84,15 +84,6 @@ export proc parser_generators() [env, error] -> Result[List[ParserGen], Error] {
   ]
 }
 
-## Exported declaration `parser_generator`.
-export proc parser_generator(name: Str) [env, error] -> Result[ParserGen, Error] {
-  for spec in parser_generators()? {
-    return spec when spec.name == name
-  }
-
-  Err(ParserGenError.Failed(kind: "linux-parser-generator", message: f"unknown parser generator '{name}'"))
-}
-
 ## Exported declaration `remove_outputs`.
 export proc remove_outputs(spec: ParserGen) [fs, error] {
   for out in spec.outputs {
@@ -131,29 +122,6 @@ export proc run_generator(spec: ParserGen) [fs, process, error] {
       return Err(ParserGenError.Failed(kind: "linux-parser-generator", message: f"{spec.name} did not write {out}"))
     }
   }
-}
-
-## Exported declaration `generate_parser`.
-export proc generate_parser(name: Str, clean = true) [fs, process, env, error] {
-  let spec = parser_generator(name)?
-
-  if clean {
-    remove_outputs(spec)
-  }
-
-  run_generator(spec)
-}
-
-## Exported declaration `generate_kconfig_parsers`.
-export proc generate_kconfig_parsers(clean = true) [fs, process, env, error] {
-  generate_parser("bison-kconfig", clean)
-  generate_parser("flex-kconfig", clean)
-}
-
-## Exported declaration `generate_dtc_parsers`.
-export proc generate_dtc_parsers(clean = true) [fs, process, env, error] {
-  generate_parser("bison-dtc", clean)
-  generate_parser("flex-dtc", clean)
 }
 
 ## Exported declaration `generate_linux_parsers`.

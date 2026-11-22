@@ -67,17 +67,17 @@ proc main(root = p"/rootfs") [fs, process, env, error] {
     let source = fp"{tmp}/jit.c"
     let object = fp"{tmp}/jit.o"
     let library = fp"{tmp}/libjit.so"
-    let main = fp"{tmp}/main.c"
+    let main_source_path = fp"{tmp}/main.c"
     let binary = fp"{tmp}/jit"
     source.write(jit_source)
-    main.write(main_source)
+    main_source_path.write(main_source)
     let cc = process.which("cc")?
     run $cc "-c" "-fPIC" f"-I{root}/usr/lib/llvm-static/include" $source "-o" $object
     run $cxx "-shared" $object @libs "-o" $library
     for needed in elf.inspect(library)?.needed {
       proof.ensure(! needed.starts_with("libLLVM") and ! needed.starts_with("libc++"), "llvm-static-link", f"the JIT library links {needed}")
     }
-    run $cc $main f"-L{tmp}" "-ljit" "-o" $binary
+    run $cc $main_source_path f"-L{tmp}" "-ljit" "-o" $binary
     let out = env ({LD_LIBRARY_PATH: f"{tmp}:{root}/usr/lib"}) {
       run.text $binary
     }?

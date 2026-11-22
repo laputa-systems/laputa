@@ -2,27 +2,6 @@
 use pm.env as pm_env
 use pm.meson as pm_meson
 
-# Desktop GL ships headers and a pkg-config file but no libGL: there is no
-# GLX (no X11 in Laputa), and desktop contexts are created through EGL,
-# which is also how the Ghostty renderer consumes them. Meson writes gl.pc
-# only when GLX is enabled.
-proc write_gl_pkg_config(dest: Path) {
-  fp"{dest}/usr/lib/pkgconfig/gl.pc".write(
-    f"""prefix=/usr
-includedir=\${{prefix}}/include
-libdir=\${{prefix}}/lib
-
-Name: gl
-Description: Mesa OpenGL library
-Version: {ver}
-Requires.private: libdrm >= 2.4.75
-Libs: -L\${{libdir}} -lGL
-Libs.private: -lpthread -pthread -lm
-Cflags: -I\${{includedir}}
-""",
-  )
-}
-
 ## Package recipe export.
 export const name = "mesa"
 
@@ -288,6 +267,27 @@ const mesa_options = [
 
 const vendored_generator = "build-support/laputa-vendored-output.xsh"
 const libgallium_link_map = "libgallium-link.map"
+
+# Desktop GL ships headers and a pkg-config file but no libGL: there is no
+# GLX (no X11 in Laputa), and desktop contexts are created through EGL,
+# which is also how the Ghostty renderer consumes them. Meson writes gl.pc
+# only when GLX is enabled.
+proc write_gl_pkg_config(dest: Path) {
+  fp"{dest}/usr/lib/pkgconfig/gl.pc".write(
+    f"""prefix=/usr
+includedir=\${{prefix}}/include
+libdir=\${{prefix}}/lib
+
+Name: gl
+Description: Mesa OpenGL library
+Version: {ver}
+Requires.private: libdrm >= 2.4.75
+Libs: -L\${{libdir}} -lGL
+Libs.private: -lpthread -pthread -lm
+Cflags: -I\${{includedir}}
+""",
+  )
+}
 
 error MesaBuildError = Failed(kind: Str, message: Str)
 

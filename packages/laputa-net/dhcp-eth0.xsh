@@ -19,6 +19,8 @@
 ##! the observed IPv6 cohort so an empty IPv6 state is never silent.
 
 const interface = "eth0"
+const ipv6_policy = p"/usr/lib/sysctl.d/20-ipv6.conf"
+const ipv6_sysctl = p"/proc/sys/net/ipv6/conf/all/disable_ipv6"
 
 ## The exact dhcpc invocation for the maintained profile. Lease state persists
 ## in /var/lib/dhcpc on the state disk, run state lives in /run/dhcpc, and
@@ -87,9 +89,6 @@ export proc status() [fs, process, env, error] -> Result[Str, Error] {
 
   Ok(f"{summary} {ipv6}")
 }
-
-const ipv6_policy = p"/usr/lib/sysctl.d/20-ipv6.conf"
-const ipv6_sysctl = p"/proc/sys/net/ipv6/conf/all/disable_ipv6"
 
 # `unsupported` requires the installed drop-in, the applied kernel switch, a
 # complete network observation, and no IPv6 address or route on any interface.

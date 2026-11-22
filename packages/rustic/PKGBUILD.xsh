@@ -97,7 +97,6 @@ export proc build(dest: Path) [fs, process, env, error] {
 
   let build_target = pm_target.build_target()?
   let triple = pm_target.rust_triple(target)?
-  let host_triple = pm_target.rust_triple(build_target)?
   let host_cc = if fp"{build_root}/usr/bin/cc".exists() { fp"{build_root}/usr/bin/cc" } else { cc }
   let host_libdir = fp"{build_root}/usr/lib"
   let target_rustlib = fp"{root}/rust-std/rust-std-{triple}/lib/rustlib/{triple}"

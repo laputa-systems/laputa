@@ -2,11 +2,7 @@
 use lib.net_state
 use network_plan as policy
 
-const IFA_F_NODAD = 2
-const IFA_F_OPTIMISTIC = 4
 const IFA_F_DADFAILED = 8
-const IFA_F_DEPRECATED = 32
-const IFA_F_TENTATIVE = 64
 const IFA_F_PERMANENT = 128
 const IFA_F_IPV6_COHORT = 238
 const RT_SCOPE_LINK = 253
@@ -74,10 +70,6 @@ pure selected_default_route(route: net_state.Route, family: net_state.Family) ->
 
 pure intent_family(intent: policy.NetworkIntent) -> net_state.Family {
   if policy.network_is_ipv6(intent.address.local) { .Inet6 } else { .Inet }
-}
-
-pure family_name(family: net_state.Family) -> Str {
-  if family == .Inet6 { "IPv6" } else { "IPv4" }
 }
 
 pure project_inet6_addresses(selected: List[net_state.Address]) -> Result[List[net_state.Address], Error] {
@@ -369,7 +361,7 @@ export pure network_outcome(index: Int, result: Result[Unit, net_state.ChangeFai
 
 ## The replay event for drained notifications that say the last observation can no longer be trusted, if any.
 export pure network_lost_events(notices: net_state.Notices) -> policy.NetworkReplayEvent? {
-  if let .Lost(reason) = notices {
+  if let .Lost(_) = notices {
     policy.NetworkLostEvents
   } else {
     null

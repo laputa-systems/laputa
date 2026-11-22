@@ -186,8 +186,6 @@ type CompileFlagsForDir = {flags: Map[List[Str]], input_line: Str}
 type CompileFlagsForDirs = {flags: Map[Map[List[Str]]], input_lines: List[Str]}
 enum KbuildInputMode { GeneralVariables, DiscoveryInputs, CompileFlagInputs }
 
-type ActiveDirObjects = {dir: Path, objects: List[Path]}
-
 type ArchiveInputs = {objs: List[Path], deps: List[Str]}
 
 type CompositeScan = {dir: Path, composites: List[CompositeObject]}
@@ -198,6 +196,8 @@ export type JumpLabelPatchResult = {scanned: Int, objects: Int, patches: Int}
 type ParsedAssignment = {lhs: Str, op: Str, rhs: Str}
 
 type ItemResult = {plan: KbuildPlan, dirs: List[Path], entries: List[Path]}
+
+const LOCAL_RECORD_FORMAT = "linux-local-records-v4"
 
 pure regex_captures(text: Str, pattern: Str) -> Result[List[Str]] {
   let re = regex.compile(pattern)?
@@ -1169,9 +1169,9 @@ proc vars_and_inputs_for_dir(root: Path, dir: Path, config: Kconfig, srcarch: St
 
     if line.starts_with("include ") {
       if let included = included_kbuild_file(root, line, vars, config, srcarch)? {
-        let body = included.read_text()?
-        inputs += [input_record(root, included, body)?]
-        lines = [@lines |> take(line_index), @logical_lines(body), @lines |> drop(line_index)]
+        let included_body = included.read_text()?
+        inputs += [input_record(root, included, included_body)?]
+        lines = [@lines |> take(line_index), @logical_lines(included_body), @lines |> drop(line_index)]
       }
       continue
     }
@@ -1257,9 +1257,9 @@ proc kbuild_compile_flags_for_dir(root: Path, dir: Path, config: Kconfig, srcarc
 
     if line.starts_with("include ") {
       if let included = included_kbuild_file(root, line, vars, config, srcarch)? {
-        let body = included.read_text()?
-        inputs += [input_record(root, included, body)?]
-        lines = [@lines |> take(line_index), @logical_lines(body), @lines |> drop(line_index)]
+        let included_body = included.read_text()?
+        inputs += [input_record(root, included, included_body)?]
+        lines = [@lines |> take(line_index), @logical_lines(included_body), @lines |> drop(line_index)]
       }
       continue
     }
@@ -1551,33 +1551,6 @@ export proc augment_missing_composites(
   }
 
   {...plan, composites: composites}
-}
-
-## Exported declaration `prune_inactive_objects`.
-export proc prune_inactive_objects(
-  root: Path,
-  config: Kconfig,
-  plan: KbuildPlan,
-  srcarch = "arm64",
-) [fs, error] -> Result[KbuildPlan, Error] {
-  var active: Map[Bool] = {}
-
-  let dir_objects: List[ActiveDirObjects] = plan.dirs
-    |> par-map(jobs: planner_jobs()) { |dir|
-      let vars = vars_for_dir(root, dir, config, srcarch)?
-      {dir: dir, objects: active_objects_for_dir(dir, vars).collect()}
-    }
-
-  for row in dir_objects {
-    for obj in row.objects {
-      active[path_key(obj)] = true
-    }
-  }
-
-  var objects = [obj for obj in plan.objects if active.get(path_key(obj)) ?? false]
-  var composites = [composite for composite in plan.composites if active.get(path_key(composite.object)) ?? false]
-  var lib_objects = [obj for obj in plan.lib_objects if active.get(path_key(obj)) ?? false]
-  {...plan, objects: objects, lib_objects: lib_objects, composites: composites}
 }
 
 ## Exported declaration `refresh_plan_dirs`.
@@ -1922,57 +1895,6 @@ export proc refresh_x86_kernel_config_objects(
   }
 
   next
-}
-
-## Exported declaration `refresh_plan_composite_members`.
-export proc refresh_plan_composite_members(
-  root: Path,
-  config: Kconfig,
-  plan: KbuildPlan,
-  srcarch: Str,
-  objects: List[Path],
-) [fs, error] -> Result[KbuildPlan, Error] {
-  var refreshed: Map[CompositeObject] = {}
-  var member_paths: Map[Bool] = {}
-
-  for obj in objects {
-    let dir = object_dir(obj)
-    let vars = vars_for_dir(root, dir, config, srcarch)?
-    let members = composite_members(dir, obj.name, vars)
-
-    if ! members.is_empty() {
-      refreshed[path_key(obj)] = {object: obj, members: members}
-
-      for member in members {
-        member_paths[path_key(member)] = true
-      }
-    }
-  }
-
-  var composites: List[CompositeObject] = []
-  var seen: Map[Bool] = {}
-
-  for composite in plan.composites {
-    let key = path_key(composite.object)
-
-    if key in refreshed {
-      composites += [refreshed.get(key)?]
-      seen[key] = true
-    } else {
-      composites += [composite]
-    }
-  }
-
-  for obj in objects {
-    let key = path_key(obj)
-
-    if key in refreshed and ! (seen.get(key) ?? false) {
-      composites += [refreshed.get(key)?]
-    }
-  }
-
-  var top_objects = [obj for obj in plan.objects if ! (member_paths.get(path_key(obj)) ?? false)]
-  normalize_plan({...plan, objects: top_objects, composites: composites})
 }
 
 ## Exported declaration `add_plan_objects`.
@@ -2331,9 +2253,9 @@ proc scan_discover_dir(
 
     if line.starts_with("include ") {
       if let included = included_kbuild_file(root, line, vars, config, srcarch)? {
-        let body = included.read_text()?
-        inputs += [input_record(root, included, body)?]
-        lines = [@lines |> take(line_index), @logical_lines(body), @lines |> drop(line_index)]
+        let included_body = included.read_text()?
+        inputs += [input_record(root, included, included_body)?]
+        lines = [@lines |> take(line_index), @logical_lines(included_body), @lines |> drop(line_index)]
       }
       continue
     }
@@ -2655,8 +2577,6 @@ proc discover_local_record_graph(
 
   {records: scans.records, barriers: barriers, plan: scans.plan}
 }
-
-const LOCAL_RECORD_FORMAT = "linux-local-records-v4"
 
 pure local_record_cache_path(root: Path) -> Path {
   fp"{root}/.xsh-kbuild-local-records.json"
@@ -3223,11 +3143,6 @@ proc archive_plan_summary_text(archive_plan: BuiltinArchivePlan) -> Result[Str] 
   summary
 }
 
-## Exported declaration `write_archive_plan_summary`.
-export proc write_archive_plan_summary(archive_plan: BuiltinArchivePlan, out: Path) [fs, env, time, error] {
-  write_text_if_changed(out, archive_plan_summary_text(archive_plan)?)
-}
-
 ## Serialize the report and summary for an archive plan.
 export proc archive_plan_payloads(archive_plan: BuiltinArchivePlan) [env, time, error] -> Result[ArchivePlanPayloads, Error] {
   let records_start = archive_plan_timing_start("report-task-records")
@@ -3329,23 +3244,6 @@ export proc read_archive_plan_report(path_value: Path) [fs, error] -> Result[Bui
   parse_archive_plan_report(path_value.read_text()?)
 }
 
-## Exported declaration `read_archive_plan_summary`.
-export proc read_archive_plan_summary(path_value: Path) [fs, error] -> Result[BuiltinArchivePlan, Error] {
-  parse_archive_plan_summary(path_value.read_text()?)
-}
-
-## Exported declaration `read_archive_plan_object_outputs`.
-export proc read_archive_plan_object_outputs(path_value: Path) [fs, error] -> Result[List[Path], Error] {
-  let stored = archive_plan_record(path_value.read_text()?, "archive plan cache has stale format")?
-  var outputs: List[Path] = [
-    path_from_string(item)?
-    for row in stored.require(ArchivePlanTasksFile)?.tasks
-    for item in row.outputs
-    if item.ends_with(".o")
-  ]
-  outputs
-}
-
 pure task_has_output(task: make.MakeTask, output: Path) -> Bool {
   let key = path_key(output)
 
@@ -3404,15 +3302,6 @@ export proc run_archive_tasks_output(
   jobs_count = 1,
 ) [fs, process, env, error] {
   make.run_tasks(select_archive_tasks_outputs(tasks, [output])?, jobs_count)
-}
-
-## Exported declaration `run_archive_tasks_outputs`.
-export proc run_archive_tasks_outputs(
-  tasks: List[make.MakeTask],
-  outputs: List[Path],
-  jobs_count = 1,
-) [fs, process, env, error] {
-  make.run_tasks(select_archive_tasks_outputs(tasks, outputs)?, jobs_count)
 }
 
 ## Exported declaration `run_archive_plan_output`.
@@ -4762,11 +4651,6 @@ proc x86_vmlinux_strip_argv_task(
   }
 }
 
-## Exported declaration `write_image`.
-export proc write_image(objcopy: Path, vmlinux: Path, image: Path) [fs, process, env, error] {
-  make.run_tasks([image_task(objcopy, vmlinux, image)], 1)
-}
-
 proc generate_vmlinux_lds(cc: Path, out: Path) [fs, process, error] {
   let depfile = fp"{out}.d"
   let src = p"arch/arm64/kernel/vmlinux.lds.S"
@@ -5970,77 +5854,6 @@ export proc build_scratch_arm64_final(
   make.run_tasks(tasks, jobs_count)
 }
 
-## Exported declaration `relink_existing_arm64`.
-export proc relink_existing_arm64(ar: Path, ld: Path, objcopy: Path, jobs_count = 1) [fs, process, env, error] {
-  relink_existing_arm64_argv([ar.display()], [ld.display()], [objcopy.display()], jobs_count)
-}
-
-## Exported declaration `relink_existing_arm64_llvm`.
-export proc relink_existing_arm64_llvm(jobs_count = 1) [fs, process, env, error] {
-  relink_existing_arm64_argv(["llvm-ar"], ["ld.lld"], ["llvm-objcopy"], jobs_count)
-}
-
-## Exported declaration `relink_existing_arm64_argv`.
-export proc relink_existing_arm64_argv(
-  ar_argv: List[Str],
-  ld_argv: List[Str],
-  objcopy_argv: List[Str],
-  jobs_count = 1,
-) [fs, process, env, error] {
-  let vmlinux_a = p"vmlinux.a"
-  let vmlinux_o = p"vmlinux.o"
-  let unstripped = p"vmlinux.unstripped"
-  let vmlinux = p"vmlinux"
-  let image = p"arch/arm64/boot/Image"
-  let efi_lib = p"drivers/firmware/efi/libstub/lib.a"
-  let kbuild_ldflags = ["-EL", "-maarch64elf", "-z", "norelro", "-z", "noexecstack"]
-  let ldflags_vmlinux = arm64_vmlinux_ldflags(load_config(p".config")?)
-  vmlinux_a.remove()
-  vmlinux_o.remove()
-  unstripped.remove()
-  vmlinux.remove()
-  image.remove()
-
-  let archive_task = vmlinux_archive_argv_task(
-    ar_argv,
-    [p"built-in.a", p"arch/arm64/lib/lib.a", p"lib/lib.a"],
-    vmlinux_a,
-  )
-
-  let reloc_task = vmlinux_o_argv_task(ld_argv, kbuild_ldflags, vmlinux_a, [efi_lib], vmlinux_o, [archive_task.name])
-
-  let linked_task = vmlinux_unstripped_argv_task(
-    ld_argv,
-    kbuild_ldflags,
-    ldflags_vmlinux,
-    p"arch/arm64/kernel/vmlinux.lds",
-    vmlinux_a,
-    [efi_lib],
-    p".vmlinux.export.o",
-    p"init/version-timestamp.o",
-    unstripped,
-    [archive_task.name],
-  )
-
-  let strip_task = vmlinux_strip_argv_task(objcopy_argv, unstripped, vmlinux, [linked_task.name])
-  let img_task = image_argv_task(objcopy_argv, vmlinux, image, [strip_task.name])
-  make.run_tasks([archive_task, reloc_task, linked_task, strip_task, img_task], jobs_count)
-}
-
-## Exported declaration `build_builtin_archives`.
-export proc build_builtin_archives(
-  plan: KbuildPlan,
-  cc: Path,
-  triple: Str,
-  cflags: List[Str],
-  defs: List[Str],
-  includes: List[Str],
-  jobs_count: Int,
-) [fs, process, env, time, error] -> Result[List[Path], Error] {
-  let archive_plan = plan_builtin_archives(plan, cc, triple, cflags, defs, includes)?
-  run_builtin_archive_plan(archive_plan, jobs_count)
-}
-
 ## Exported declaration `run_builtin_archive_plan`.
 export proc run_builtin_archive_plan(
   archive_plan: BuiltinArchivePlan,
@@ -6696,19 +6509,6 @@ export proc analyze_archive_items(items: List[Record]) [fs, process, error] -> R
   let typed_items = [archive_analysis_item_from_record(item)? for item in items]
   let prepared = [archive_item_sources(item, "")? for item in typed_items]
   analyze_archive_items_impl(prepared, p".", "", [], [], [], false)?
-}
-
-## Exported declaration `analyze_archive_items_with_task_specs`.
-export proc analyze_archive_items_with_task_specs(
-  items: List[ArchiveAnalysisItem],
-  cc: Path,
-  triple: Str,
-  cflags: List[Str],
-  defs: List[Str],
-  includes: List[Str],
-) [fs, process, error] -> Result[List[ArchiveAnalysisResult], Error] {
-  let prepared = [archive_item_sources(item, triple)? for item in items]
-  analyze_archive_items_impl(prepared, cc, triple, cflags, defs, includes, true)?
 }
 
 ## Analyze archive inputs whose source selections have already been captured.
