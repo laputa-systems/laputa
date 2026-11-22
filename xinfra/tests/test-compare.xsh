@@ -45,7 +45,7 @@ pure act(verdict: compare.Verdict) -> compare.Act? {
 }
 
 pure sha(character: Str) -> Str {
-  [character, character, character, character, character, character, character, character, character, character, character, character, character, character].join("")
+  character + character + character + character + character + character + character + character + character + character + character + character + character + character
 }
 
 test a_matching_directory_is_satisfied {
