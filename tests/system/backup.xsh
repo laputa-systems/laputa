@@ -18,10 +18,7 @@ pure raw_config(fields: Record) -> Result[Any, Error] {
     retention: {keep_last: 3},
     rustic: "/usr/bin/rustic",
   }
-  var merged: Map[Any] = {}
-  for key in base.keys() {
-    merged[key] = base[key]
-  }
+  var merged: Map[Any] = {key: base[key] for key in base.keys()}
   for key in fields.keys() {
     merged[key] = fields[key]
   }
@@ -38,10 +35,7 @@ pure raw_receipt(fields: Record) -> Result[Any, Error] {
     kept_snapshot_ids: [ID_A, ID_B],
     check: {ok: true, wall_ms: BASE + 1},
   }
-  var merged: Map[Any] = {}
-  for key in base.keys() {
-    merged[key] = base[key]
-  }
+  var merged: Map[Any] = {key: base[key] for key in base.keys()}
   for key in fields.keys() {
     merged[key] = fields[key]
   }

@@ -472,11 +472,7 @@ pure cancelled_report(states: Map[Str, HostState], secrets: List[Str]) -> report
 ## are released however the run ends.
 export proc apply(prepared: workload.Prepared, settings: Settings) [fs, env, process, time, io, error] -> report.Report {
   let secrets = prepared.secrets
-  var states: Map[Str, HostState] = {}
-  for entry in prepared.workloads {
-    states[entry.host.name] = initial_state(entry)
-  }
-
+  var states: Map[Str, HostState] = {entry.host.name: initial_state(entry) for entry in prepared.workloads}
   var completed = false
   defer {
     release_all(states)

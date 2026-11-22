@@ -55,10 +55,7 @@ pure raw_job(fields: Record) -> Result[Any, Error] {
     missed: "coalesce",
     retries: {max: 0, delay_ms: 0},
   }
-  var merged: Map[Any] = {}
-  for key in base.keys() {
-    merged[key] = base[key]
-  }
+  var merged: Map[Any] = {key: base[key] for key in base.keys()}
   for key in fields.keys() {
     merged[key] = fields[key]
   }

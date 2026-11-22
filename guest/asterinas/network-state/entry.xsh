@@ -9,8 +9,7 @@ pure attribute_text(attributes: List[Attribute]) -> Str {
 
 proc report(label: Str, only_device: Str, link_state: Bool) [fs, process, env, time, net, error] {
   let dump = linux.network_dump()?
-  var names: Map[Int, Str] = {}
-  for link in dump.links { names[link.ifindex] = link.name ?? "-" }
+  var names: Map[Int, Str] = {link.ifindex: link.name ?? "-" for link in dump.links}
   let links = dump.links |> where .name != "sit0"
   for link in links |> where only_device == "" or .name == only_device {
     let state = if link_state { f" flags={link.flags} oper={link.operstate ?? 0}" } else { "" }
@@ -218,8 +217,7 @@ pure describe_event(message: Bytes, names: Map[Int, Str]) -> Result[Str, Error] 
 }
 
 proc drain_events(label: Str, listener: Int) [fs, process, env, time, net, error] {
-  var names: Map[Int, Str] = {}
-  for link in linux.network_dump()?.links { names[link.ifindex] = link.name ?? "-" }
+  var names: Map[Int, Str] = {link.ifindex: link.name ?? "-" for link in linux.network_dump()?.links}
   while unix.poll_fd(listener, ["readable"], 300)? == ["readable"] {
     match unix.read_fd(listener, 65536) {
       Ok(message) => {
