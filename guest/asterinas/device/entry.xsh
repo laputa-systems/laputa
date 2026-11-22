@@ -1,5 +1,4 @@
 #!/bin/xsh --
-const probe = p"/usr/lib/asterinas/case/device-probe"
 const disk_group = 9
 const disk_mode = 0o660
 const memory_mode = 0o666

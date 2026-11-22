@@ -16,7 +16,7 @@ proc journal_present(paths: trust_store.TrustStorePaths) -> Result[Bool, Error] 
   journal.present
 }
 
-proc run_phase_zero(paths: trust_store.TrustStorePaths) {
+proc run_phase_zero() {
   let before = trust_update.trust_status(p"/")?
   guard before.initialized.require(Bool)? == false else {
     guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, "FAIL phase0 expected an uninitialized store on first boot")
@@ -43,7 +43,6 @@ proc run_phase_zero(paths: trust_store.TrustStorePaths) {
 proc run_phase_one(
   paths: trust_store.TrustStorePaths,
   url: Str,
-  mode: Str,
 ) {
   let active = trust_store.trust_store_read_active(paths)?
   guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, f"ENTRY phase=1 active={active} journal={journal_present(paths)?}")
@@ -163,7 +162,7 @@ proc main() [fs, process, time, net, error, io] {
   guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, f"BOOT phase={phase} mode={mode}")
 
   if phase == "0" {
-    run_phase_zero(paths)
+    run_phase_zero()
     guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, "REBOOTING")
     linux.reboot()
     return
@@ -177,7 +176,7 @@ proc main() [fs, process, time, net, error, io] {
       return
     }
 
-    run_phase_one(paths, url, mode)
+    run_phase_one(paths, url)
     if mode == "replay" {
       guest_bootstrap.guest_bootstrap_say(GUEST_CONTEXT, "REBOOTING")
       linux.reboot()

@@ -142,7 +142,7 @@ export proc guest_bootstrap_write_phase(ctx: GuestBootstrap, value: Str) [fs, er
 }
 
 ## guest bootstrap cmdline value.
-export proc guest_bootstrap_cmdline_value(ctx: GuestBootstrap, key: Str) [fs, error] -> Result[Str, Error] {
+export proc guest_bootstrap_cmdline_value(_: GuestBootstrap, key: Str) [fs, error] -> Result[Str, Error] {
   for field in p"/proc/cmdline".read_text()?.split(" ") {
     guard field.starts_with(f"{key}=") else {
       continue

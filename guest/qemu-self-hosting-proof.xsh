@@ -30,7 +30,7 @@ proc run_guest_proof() {
     assert ids.len() == 1 and serials.len() == 1
     print "LAPUTA_SELF_HOSTING_ACTIVATION" json.encode({
       generation_id: ids[0].replace("LAPUTA_GENERATION_ID=", with: ""),
-      boot_serial: serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "").parse_int()?,
+      boot_serial: serials[0].replace("LAPUTA_BOOT_SERIAL=", with: "") as Int,
       root_digest: receipt.generation_sha256,
     })?
   }

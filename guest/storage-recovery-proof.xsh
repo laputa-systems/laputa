@@ -5,7 +5,7 @@ proc main() {
   let writing = "LAPUTA_STORAGE_WRITE=1" in cmdline
   let full = "LAPUTA_STORAGE_FULL=1" in cmdline
   var block = "x"
-  for index in range(16) { block += block }
+  for _ in range(16) { block += block }
   p"/run/data".mkdir()
   if writing {
     linux.mount(b"/dev/vdb", p"/run/data", fstype: "ext4")

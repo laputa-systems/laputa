@@ -12,8 +12,6 @@
 ##! LAPUTA_RESTORE_VERIFY=1  check the repo (rustic and restic), re-back up,
 ##!   and require the re-backup diff to touch volatile paths only.
 
-const drill = p"/etc/laputa/drill"
-
 ## All drill temp files live on the backup disk, which every phase mounts.
 ## The restored state disk never carries drill scaffolding.
 const backup_mount = p"/mnt/backup"
@@ -25,12 +23,12 @@ proc console(text: Str) {
   p"/dev/console".write(text + "\n")
 }
 
-proc tool_env(password: Path) -> Result[Record] {
+proc tool_env(password_file: Path) -> Result[Record] {
   let home = fp"{backup_mount}/home"
   home.mkdir(true)
   Ok({
     RUSTIC_REPOSITORY: fp"{backup_mount}/repo".display(),
-    RUSTIC_PASSWORD_FILE: password.display(),
+    RUSTIC_PASSWORD_FILE: password_file.display(),
     RUSTIC_NO_CACHE: "true",
     LD_LIBRARY_PATH: fp"{backup_mount}/tools/lib".display(),
     HOME: home.display(),
@@ -40,13 +38,13 @@ proc tool_env(password: Path) -> Result[Record] {
 ## Run a tool, capturing stdout and stderr separately. Returns stdout on
 ## success and fails with the stderr tail otherwise, so log noise never
 ## reaches the JSON parser.
-proc tool_text(tool: Path, args: List[Str], password: Path) -> Result[Str] {
+proc tool_text(tool: Path, args: List[Str], password_file: Path) -> Result[Str] {
   let out = fp"{backup_mount}/tool.out"
   out.write("")
   let err = fp"{backup_mount}/tool.err"
   err.write("")
   let status = process.run(
-    process.command_argv(tool, args, p"/", tool_env(password)?, b"", out, err),
+    process.command_argv(tool, args, p"/", tool_env(password_file)?, b"", out, err),
   )?
   guard status.ok else {
     let tail = err.read_text()?
@@ -55,15 +53,15 @@ proc tool_text(tool: Path, args: List[Str], password: Path) -> Result[Str] {
   out.read_text()?
 }
 
-proc rustic(args: List[Str], password: Path) -> Result[Str] {
+proc rustic(args: List[Str], password_file: Path) -> Result[Str] {
   let argv = ["rustic", "--no-cache"].extend(args)
-  tool_text(fp"{backup_mount}/tools/rustic", argv, password)?
+  tool_text(fp"{backup_mount}/tools/rustic", argv, password_file)?
 }
 
-proc restic(args: List[Str], password: Path) -> Result[Str] {
+proc restic(args: List[Str], password_file: Path) -> Result[Str] {
   let environ = {
     RESTIC_REPOSITORY: fp"{backup_mount}/repo".display(),
-    RESTIC_PASSWORD_FILE: password.display(),
+    RESTIC_PASSWORD_FILE: password_file.display(),
     LD_LIBRARY_PATH: fp"{backup_mount}/tools/lib".display(),
     HOME: fp"{backup_mount}/home".display(),
   }

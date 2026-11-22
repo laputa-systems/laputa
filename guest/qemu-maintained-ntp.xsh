@@ -117,7 +117,7 @@ proc sync_phase() {
   require_operators(sources)
   console(f"LAPUTA_NTP_DRILL_SYNCHRONIZED stratum={level} operators={operators.join(",")}")
   process.kill(first, signal: "KILL")
-  let second = service_pid(first)?
+  let _ = service_pid(first)?
   let again = wait_synchronized()?
   console(f"LAPUTA_NTP_DRILL_RESTARTED stratum={again}")
   p"/var/lib/laputa/ntp-drill".write("synchronized\n")

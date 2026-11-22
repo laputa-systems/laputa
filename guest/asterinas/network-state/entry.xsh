@@ -4,7 +4,7 @@ error NetworkStateError = Failed
 type Attribute = {data: Bytes, kind: Int}
 
 pure attribute_text(attributes: List[Attribute]) -> Str {
-  [f"{attribute.kind}:{attribute.data.base64()}" for attribute in attributes].join(",")
+  [f"{entry.kind}:{entry.data.base64()}" for entry in attributes].join(",")
 }
 
 proc report(label: Str, only_device: Str, link_state: Bool) [fs, process, env, time, net, error] {
@@ -171,7 +171,7 @@ pure attributes_of(payload: Bytes, start: Int) -> List[Attribute] {
 }
 
 pure attribute_of(attributes: List[Attribute], kind: Int) -> Bytes? {
-  for attribute in attributes { return attribute.data when attribute.kind == kind }
+  for entry in attributes { return entry.data when entry.kind == kind }
   null
 }
 
@@ -371,7 +371,7 @@ proc main() [fs, process, env, time, net, error] {
       let c = linux.net_constants()
       let address: Address = Address(local: "192.0.2.10", prefix: 24, broadcast: null)
       let default: Route = Route(destination: "0.0.0.0", prefix: 0, gateway: "192.0.2.1", priority: 100, protocol: c.RTPROT_DHCP)
-      let slower: Route = {...default, priority: 200}
+      let slower = {...default, priority: 200}
       let network: Route = Route(destination: "10.20.0.0", prefix: 16, gateway: "192.0.2.1", priority: 0, protocol: c.RTPROT_STATIC)
       let direct: Route = Route(destination: "192.168.50.0", prefix: 24, gateway: null, priority: 0, protocol: c.RTPROT_STATIC)
       step("up", "eth0", true, 6)
