@@ -112,7 +112,7 @@ check: need-xsh
 	$(HOST_XSH_ENV) $(XSHT) check $(XSH_SHEBANG_SCRIPTS)
 
 lint: need-xsh
-	$(HOST_XSH_ENV) $(XSHT) lint pm.xsh pm system installer xinit
+	$(HOST_XSH_ENV) $(XSHT) lint
 
 test: test-pm test-system test-xinit test-linux
 

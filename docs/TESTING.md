@@ -5,7 +5,7 @@ The examples below use its `XSHT` environment variable.
 
 ```bash
 make check         # xsht check over the tree, plus shebang-only XSH scripts
-make lint          # production PM, system, installer, and xinit modules
+make lint          # the workspace configured in xsht-config.ini
 $XSHT lint         # the full configured tree, including recipes and tests
 make test-pm
 make test-system   # tests/system, then tests/integration

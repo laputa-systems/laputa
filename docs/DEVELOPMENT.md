@@ -229,7 +229,8 @@ run the tests: `make host-xsh fetch seed test`. On a fresh Ubuntu 24.04
 container with 8 CPUs (2026-11-22), `make host-xsh` took 11 to 20 minutes,
 `make fetch` 1 to 9 minutes for about 1 GB of sources and 931 crates, `make
 seed` under a minute and `make test` about 3 minutes; it passes as root and as
-an unprivileged user with umask 002. `make lint` does not pass yet (LAP-84).
+an unprivileged user with umask 002. `make lint` runs the full workspace lint;
+its remaining package-recipe findings are tracked in LAP-84.
 
 PM has no default remote; these make targets use the loopback mirror.
 
@@ -485,7 +486,7 @@ below carry behavior not stated elsewhere in this guide.
 |---|---|
 | `make host-xsh` | static musl `xsh`/`xshi`/`xsht` for the host arch in `.out/host/<arch>/`, built in XSH's `xsh-test` image with plain Docker; shares the seed's cargo target |
 | `make check` | `xsht check` over the tree, plus XSH scripts without a `.xsh` name, found by their `#!/bin/xsh` shebang |
-| `make lint` | `xsht lint` over PM, system, installer, and xinit (report only; never `--fix`) |
+| `make lint` | `xsht lint` over the workspace configured in `xsht-config.ini` (report only; never `--fix`) |
 | `make fetch` | pinned sources into `.cache/sources/sha256/` (`pm sources fetch`), XSH's crates, the `xsh-test` image, and the published build images |
 | `make fetch-mirror` | fetch the mirror's locked crates into the shared Cargo registry using the local `xsh-test` image |
 | `make seed-asterinas-shell` | opt-in xshi integration seed; the pinned Asterinas backend builds its own seed |
