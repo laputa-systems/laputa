@@ -465,13 +465,14 @@ The unrecovered `refs/stash` object is `92dc314a6198cf00e3aec1f05d72537e81a3a6da
 | `.out/world/<arch>/` | the last plan and the `make root` tree | `make clean` |
 | `.out/cache/linux-kbuild/` | the kernel recipe's Kbuild plan cache | `make clean` |
 | `.out/asterinas-firecracker/` | immutable Asterinas + Laputa bundles, writable run disks, and logs | `make asterinas-clean` |
-| `.out/mirror/` | local mirror data | `make clean` |
+| `.out/mirror/` | local mirror data | retained |
 | `target/` | profile (`target/laputa/`) and installer outputs | `make clean` |
 
-`make clean` removes all derived state, including the `laputa-*` Docker
-images. `make distclean` also removes `.cache/`, after which `make fetch` has
-to download everything again. Both targets leave the `xsh-test` images in
-place. Laputa tags its build image `xsh-test:<digest>`, the first 16 hex digits
+`make clean` removes checkout build outputs and preserves mirror data,
+Asterinas run disks, installed mirror dependencies, and shared Docker state.
+`make distclean` also removes `.cache/`, the `laputa-*` build images, and the
+legacy Laputa Docker volumes. `make fetch` restores the fetched inputs.
+Both targets preserve the `xsh-test` images. Laputa tags its build image `xsh-test:<digest>`, the first 16 hex digits
 of the SHA-256 of `XSH_ROOT`'s `Dockerfile.test`. Each Dockerfile pins its own
 nightly and the builds run offline, so an older XSH checkout keeps its own
 toolchain image. XSH's tooling builds `xsh-test:latest` separately.

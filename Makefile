@@ -66,7 +66,7 @@ PM_TESTS := $(sort $(wildcard tests/pm/*.xsh))
 UPDATE_CHECKSUM_JOBS ?= 8
 XSH_NATIVE_BIN_DIR ?= $(XSH_ROOT_ABS)/target/debug
 
-# Docker state Laputa creates; `make clean` removes exactly these.
+# Docker state removed by `make distclean`.
 LAPUTA_IMAGE_REPOSITORIES := laputa-host-tools laputa-package-tools
 # Legacy named volumes from before the artifact store moved under .out/.
 LEGACY_LAPUTA_VOLUMES := laputa-artifacts-aarch64-v2 laputa-sources-aarch64-v2
@@ -158,18 +158,22 @@ STORE_GC_PLANS = $(wildcard .out/world/$(ARCH)/plan.json target/laputa/*/build-p
 store-gc: need-xsh
 	$(HOST_XSH_ENV) $(XSH) pm.xsh -- store gc --store .out/artifacts/$(ARCH) $(foreach plan,$(STORE_GC_PLANS),--keep $(plan))
 
-# All derived state: .out/ (seed, artifact store, cargo target, image
-# contexts), target/ (profile and installer outputs), mirror build outputs,
-# and Laputa's Docker images and legacy volumes. Fetched inputs in .cache/
-# survive; `xsh-test` belongs to XSH and survives too.
-clean: mirror-clean
-	$(REMOVE_DERIVED) .out target
-	@images="$$(docker image ls --quiet $(foreach repository,$(LAPUTA_IMAGE_REPOSITORIES),--filter reference=$(repository)) | sort -u)"; \
-	    if [ -n "$$images" ]; then docker image rm --force $$images; fi
-	docker volume rm --force $(LEGACY_LAPUTA_VOLUMES)
+override CLEAN_BUILD_OUTPUTS := ./.out/host ./.out/xsh-target ./.out/mirror-target ./.out/seed ./.out/artifacts ./.out/world ./.out/cache ./.out/verify ./target
+
+clean:
+	@for directory in ./.out $(CLEAN_BUILD_OUTPUTS); do \
+	  if test -L "$$directory" || { test -e "$$directory" && ! test -d "$$directory"; }; then \
+	    printf '%s\n' "make clean: $$directory must be a local build directory" >&2; exit 1; \
+	  fi; \
+	done
+	$(MAKE) mirror-clean
+	$(REMOVE_DERIVED) $(CLEAN_BUILD_OUTPUTS)
 
 distclean: clean
 	$(REMOVE_DERIVED) .cache
+	@images="$$(docker image ls --quiet $(foreach repository,$(LAPUTA_IMAGE_REPOSITORIES),--filter reference=$(repository)) | sort -u)"; \
+	    if [ -n "$$images" ]; then docker image rm --force $$images; fi
+	docker volume rm --force $(LEGACY_LAPUTA_VOLUMES)
 
 # Every target that runs host XSH names this first, so a fresh Linux host
 # learns to run `make host-xsh` instead of failing on a missing binary.
@@ -490,8 +494,18 @@ deploy-mirror-fresh:
 	./infra/mirror/deploy.sh --fresh-start
 
 mirror-clean:
-	rm -rf $(MIRROR)/node_modules $(MIRROR)/target/pnpm $(MIRROR)/target/docker-output
-	rm -f $(MIRROR)/static/js/auth.js $(MIRROR)/static/js/settings.js
+	@for directory in ./mirror ./mirror/target ./mirror/target/docker-output ./mirror/static ./mirror/static/js; do \
+	  if test -L "$$directory" || { test -e "$$directory" && ! test -d "$$directory"; }; then \
+	    printf '%s\n' "make mirror-clean: $$directory must be a local build directory" >&2; exit 1; \
+	  fi; \
+	done
+	@for artifact in ./mirror/static/js/auth.js ./mirror/static/js/settings.js; do \
+	  if test -L "$$artifact" || { test -e "$$artifact" && ! test -f "$$artifact"; }; then \
+	    printf '%s\n' "make mirror-clean: $$artifact must be a local build file" >&2; exit 1; \
+	  fi; \
+	done
+	rm -rf -- ./mirror/target/docker-output
+	rm -f -- ./mirror/static/js/auth.js ./mirror/static/js/settings.js
 
 BENCH_XSH_ROOT ?= $(XSH_ROOT_ABS)
 BENCH_BIN_DIR ?= $(BENCH_XSH_ROOT)/target/$(HOST_TRIPLE)/verification

@@ -86,7 +86,7 @@ qemu-tinyland-ghostty --jobs 4`).
 - `boot` opens QEMU's interactive display with the profile's session. It is a
   diagnostic path, not the acceptance test.
 - `clean` removes only `target/laputa/qemu-tinyland-ghostty`, never the
-  artifact store. `make clean` removes all derived state.
+  artifact store. `make clean` removes checkout-local build outputs.
 
 Each bundle `builds/<system-key>/` contains `build-plan.json`,
 `generation.json`, `disk.img`, `rootfs.ext4`, and `vmlinuz`. `current` is an
