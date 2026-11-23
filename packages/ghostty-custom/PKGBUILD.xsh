@@ -13,7 +13,7 @@ export const package_kind = "payload"
 export const ver = "1.4.1"
 
 ## Package recipe export.
-export const rel = "5"
+export const rel = "6"
 
 ## Runtime link inputs matching the tarball DT_NEEDED: libfreetype,
 ## libharfbuzz, librust_fontconfig, libEGL (mesa), libwayland-client,
@@ -27,14 +27,14 @@ export const runtime_only_deps = ["font-ttf-hack", "xkeyboard-config"]
 export const mkdeps_host = ["tic"]
 
 ## Ghostty Custom Wayland-only musl tarballs from joshuarli/ghostty at the
-## pinned commit c4f036c72; arch-pinned with recorded SHA-256, no SKIP. Built with
+## pinned commit 9438d6d83c; arch-pinned with recorded SHA-256, no SKIP. Built with
 ## `zig build -Dapp-runtime=wayland -Dfont-backend=rust_fontconfig_freetype`
 ## (no GTK/Adwaita/X11); Linux binaries are mostly-static musl with dynamic
 ## libfreetype, libharfbuzz, librust_fontconfig, libEGL, libwayland-client and
-## libxkbcommon only. SHA256SUMS at the release: x86_64 a269c413..., aarch64 8d7b942c....
+## libxkbcommon only. SHA256SUMS at the release: x86_64 abf36898..., aarch64 11e58bae....
 export const upstream_sources = [
   {
-    source: p"https://github.com/joshuarli/ghostty/releases/download/release-c4f036c721c3e48f02568222b5f3dfbc86acd817/ghostty-custom-ARCH-linux-musl.tar.gz => ghostty",
+    source: p"https://github.com/joshuarli/ghostty/releases/download/release-9438d6d83cfbb4bf408f11d38dfba0f0db94d65d/ghostty-custom-ARCH-linux-musl.tar.xz => ghostty",
     kind: "file",
     architectures: [
       "all",
@@ -42,11 +42,11 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "x86_64",
-        sha256: "a269c4133e381bf252c5c2026040dc964549ef9c9062c1c39c337de872efd93b",
+        sha256: "abf3689815025ada335ca2770e81755ab37557b48f43e3aef6597803f39702b8",
       },
       {
         arch: "aarch64",
-        sha256: "8d7b942c188b86c4cbfafe0a45c18f8633d324f61283694cd0b762b96a6e0a8a",
+        sha256: "11e58bae6eac864742c2041b373a4520fcab691681ca0241439da0d006966026",
       },
     ],
   },
@@ -74,13 +74,13 @@ export const filetree = [
 ## Package recipe export.
 export proc build(dest: Path) [fs, process, env, error] {
   let tic = process.which("tic")?
-  let tars = fs.walk(p".", gitignore: false)? |> where .kind == "file" and .ext == "gz"
+  let tars = fs.walk(p".", gitignore: false)? |> where .kind == "file" and .ext == "xz"
   guard tars.len() == 1 else {
     return Err(types.PmError.PackageContract(f"ghostty-custom: expected one tarball, found {tars.len()}"))
   }
 
   tempdir unpacked {
-    archive.extract(tars[0].path, unpacked, .Tar, compression: .Gzip, collision: .Replace)
+    archive.extract(tars[0].path, unpacked, .Tar, compression: .Xz, collision: .Replace)
     let bins = fs.walk(unpacked, gitignore: false)? |> where .kind == "file" and .name == "ghostty"
     guard bins.len() == 1 else {
       return Err(types.PmError.PackageContract(f"ghostty-custom: expected one ghostty binary, found {bins.len()}"))
