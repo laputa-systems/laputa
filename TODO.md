@@ -27,15 +27,6 @@ accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
 
-### LAP-87 · P1 · musl 1.2.6 ships without the regcomp and GB18030 iconv security fixes
-
-- **Area:** Security
-- **Where:** `packages/musl/PKGBUILD.xsh:13` (`ver = "1.2.6"`, the original release archive, no backport patches)
-- **Problem:** Per the 2026-11-23 tech scout (Rich Felker's 2026-10-21 openwall advisory and git.musl-libc.org), musl releases through 1.2.6 contain CVE-2026-107891, integer overflows in `regcomp()` fixed by musl 7813e911, and CVE-2026-6042, pathological GB18030 `iconv()` decoding (a repeated table search, plus several wrong mappings) fixed by musl 67219f01. The recipe builds the unpatched 1.2.6 archive. Exploitation needs a program that compiles an untrusted regex or converts untrusted GB18030 input; no network-reachable Laputa path was established. unproven: the CVE details come from the scout's upstream reading and were not re-checked here.
-- **Recommendation:** Backport both commits as checksum-bound patches in the musl recipe for both musl targets, and add regression cases: a hostile `regcomp()` pattern family that overflowed before the fix, and GB18030 inputs that check mapping correctness and bounded decode time. Do not infer reachability from linkage.
-- **Fix with:** security, os-boundaries
-- **Effort:** M
-
 ### LAP-88 · P1 · C zlib is 1.3.2, without the memory-safety fixes released in 1.4
 
 - **Area:** Security
