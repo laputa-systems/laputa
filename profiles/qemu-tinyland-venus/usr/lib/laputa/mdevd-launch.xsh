@@ -1,0 +1,3 @@
+#!/bin/xsh
+let fd = e"NOTIFY_FD"?
+unix.exec(process.command_argv(p"/usr/bin/mdevd", ["mdevd", "-O", "4", "-f", "/etc/mdev.conf", "-D", fd], env: {PATH: "/usr/local/bin:/usr/bin:/bin"}))

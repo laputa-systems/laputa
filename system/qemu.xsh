@@ -193,6 +193,10 @@ pure gpu_args(profile: types.SystemProfile) -> List[Str] {
       "-device", f"virtio-gpu-pci,{resolution}",
       "-device", f"virtio-gpu-gl-pci,{resolution}",
     ]
+    types.Venus(hostmem_mib) => [
+      "-device", f"virtio-gpu-pci,{resolution}",
+      "-device", f"virtio-gpu-gl-pci,{resolution},venus=on,blob=on,hostmem={hostmem_mib}M",
+    ]
   }
 }
 
@@ -207,6 +211,7 @@ export pure qemu_command_argv(
   let display: List[Str] = match profile.qemu_gpu {
     types.Virtio2d => if mode == .Test { ["-display", "none"] } else { target.interactive_display }
     types.Virgl => if mode == .Test { ["-display", "egl-headless"] } else { target.gl_interactive_display }
+    types.Venus(_) => if mode == .Test { ["-display", "egl-headless"] } else { target.gl_interactive_display }
   }
   let root_drive = ["-drive", f"if=none,id=root,format=raw,file={outputs.disk},snapshot=on", "-device", f"{target.block_device},drive=root"]
   let state_drive = if profile.development { [] } else {

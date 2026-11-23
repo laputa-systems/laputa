@@ -23,7 +23,10 @@ export type ProofMarkers = {
 ## The guest GPU a profile requires. `Virtio2d` is a 2D virtio-gpu scanout.
 ## `Virgl` is virtio-gpu with virgl 3D acceleration, which the host QEMU
 ## renders on a host GPU through virglrenderer and a GL-capable display.
-export enum QemuGpu { Virtio2d, Virgl }
+## `Venus` is virtio-gpu with blob resources and the Venus Vulkan protocol, which
+## forwards the guest's Vulkan calls to the host driver through virglrenderer;
+## its payload is the host-visible blob window in MiB.
+export enum QemuGpu { Virtio2d, Virgl, Venus(Int) }
 
 ## The data-only description of a supported Laputa system profile. The
 ## QEMU machine, CPU, and accelerator belong to the host (`system.qemu`).
@@ -51,6 +54,7 @@ export pure qemu_gpu_text(gpu: QemuGpu) -> Str {
   match gpu {
     Virtio2d => "virtio-2d"
     Virgl => "virgl"
+    Venus(hostmem_mib) => f"venus-{hostmem_mib}m"
   }
 }
 

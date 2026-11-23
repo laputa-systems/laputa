@@ -98,6 +98,21 @@ separate interruption during seed copying can still leave an incomplete trust
 generation. That recovery gap and the development delegation policy prevent
 treating these graphical results as production qualification.
 
+## Venus presentation (experimental)
+
+`qemu-tinyland-venus` runs Play through Mesa's Venus `virtio` Vulkan driver on
+the host GPU instead of lavapipe, with no Ghostty, virgl, lavapipe or LLVM in
+the guest. Its proof passed on 2026-11-23 on Linux x86_64/KVM with the Play
+fixture and the five-line subtitle frame rendered by `Virtio-GPU Venus (AMD ...
+RADV)`, and the host screenshot showing Play's magenta frame. Tinyland has no
+`linux-dmabuf`, so presentation is a CPU copy into `wl_shm`
+(`MESA_VK_WSI_DEBUG=sw`). Measurements, host requirements and the
+virglrenderer 1.3.0 null-pointer crash that the `mesa-venus` recipe patch
+avoids are in [QEMU](QEMU.md#venus-profile-experimental). The base
+`seed/images.lock` was stale, so the builds ran from a scratch copy whose
+`package_key_x86_64` matched `xsh seed/images.xsh -- key --arch x86_64`;
+the lock itself was not repinned.
+
 ## Ghostty stack decisions
 
 - Tinyland's keyboard engine is KBVM. Its native Rust seat client replaces

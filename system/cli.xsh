@@ -36,6 +36,7 @@ export pure usage() -> Str {
 Build and test one reference system natively for this host:
 aarch64 under HVF on macOS, aarch64 or x86_64 under KVM on Linux.
 Profiles: qemu-tinyland-ghostty (canonical kiosk on virgl),
+qemu-tinyland-venus (experimental Play on Venus),
 qemu-maintained (long-lived services), qemu-self-hosting (self-hosting
 compose).
 """

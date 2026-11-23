@@ -147,6 +147,72 @@ Browsers, real hardware, IPv6, and Wi-Fi are outside this proof.
 The test-only clock qualification sends `stop` and `cont` once each with a
 five-second budget. The commands control the disposable VM and are never retried.
 
+## Venus profile (experimental)
+
+`qemu-tinyland-venus` is the LAP-51 Track F experiment: Play presents through
+Mesa's Venus `virtio` Vulkan driver over `virtio-gpu-gl-pci,venus=on,blob=on`,
+and the host GPU executes the work. The control is the unchanged
+`qemu-tinyland-ghostty` profile. It has no Make target:
+
+```bash
+$XSH_HOST laputa.xsh -- test qemu-tinyland-venus
+```
+
+The `QemuGpu.Venus(hostmem_mib)` variant keeps the 2D `virtio-gpu-pci` first,
+then adds `virtio-gpu-gl-pci,...,venus=on,blob=on,hostmem=<n>M`. The 2D device
+stays card0, so the screenshot proof is the same.
+
+Host requirements beyond a virgl profile: a host Vulkan driver for the GPU
+(Mesa's `vulkan-radeon` on AMD; without one virglrenderer finds no driver and
+the guest sees no device), QEMU with `virtio-gpu-gl` and its `venus`, `blob`
+and `hostmem` properties, and `virgl_render_server`. QEMU 11.1.2 with
+virglrenderer 1.3.0 and Mesa 26.3.1 RADV passed.
+
+Guest side, `packages/mesa-venus` builds only the `virtio` Vulkan driver from
+the same Mesa 26.2.4 source: no gallium, OpenGL, EGL, GBM or LLVM, with its own
+vendored generated sources (55 outputs; regeneration is in
+`packages/mesa-venus/files/generated/README.md`). It patches one line of `vn_instance.c`: Mesa's Wayland WSI submits with
+the Vulkan 1.3 `vkQueueSubmit2`, but the renderer instance is created at the
+application's API version, and Play requests less than 1.3. Without the patch,
+virglrenderer 1.3.0 leaves `QueueSubmit2` unresolved and its `vkr-ring` thread
+calls a null pointer on the first presentation (SIGSEGV in
+`virgl_render_server`, the guest then waits on a fence forever).
+
+Tinyland offers only `wl_shm`, and Mesa's Wayland WSI requires
+`linux-dmabuf` for a hardware driver, so the proof runs Play with
+`MESA_VK_WSI_DEBUG=sw`: the GPU renders on the host and the frame returns to a
+shared-memory buffer by CPU copy. Presentation through dmabuf needs a compositor
+change and is not measured here.
+
+The proof (`guest/qemu-tinyland-venus-proof.xsh`) keeps coldplug, the broker
+census, the runtime-directory attack, the granted-device negative control and
+session readiness, then requires the Venus device name and `libvulkan_virtio.so`
+from both the session Play and the fixture Play, rejects any lavapipe or
+llvmpipe name, and captures the `play-text` frame. The session client is Play
+holding a solid magenta frame, which satisfies the host's final screenshot
+marker. It does not repeat the crash, device-loss, broker-loss or scanner
+shutdown cases, and Ghostty is out of scope.
+
+Measured 2026-11-23 on an AMD Ryzen 9 9950X host (RADV RAPHAEL_MENDOCINO),
+KVM, both profiles on the same host and QEMU:
+
+| | control (virgl, lavapipe) | Venus |
+|---|---|---|
+| `laputa test` | ok | ok |
+| Vulkan device Play used | `llvmpipe (LLVM 23.1.5, 256 bits)`, `libvulkan_lvp.so` | `Virtio-GPU Venus (AMD Ryzen 9 9950X ... (RADV RAPHAEL_MENDOCINO))`, `libvulkan_virtio.so` |
+| guest installed bytes (ext4 used blocks) | 381,743,104 | 203,976,704 |
+| `rootfs.ext4` image | 527,433,728 | 308,281,344 |
+| Mesa payload | 145,216,566 | 1,907,734 |
+| `proof start` to `session-ready`, guest uptime | 7.71 s to 10.00 s | 7.45 s to 9.52 s |
+| RSS: tinyland, client | 11,316 kB, Ghostty 78,724 kB | 11,320 kB, Play 67,380 kB |
+
+The Venus root also omits Ghostty (27,214,962 bytes), libxkbcommon and the
+control's `llvm-static` build input, so the installed-byte difference is not
+Mesa alone. The existing proof exposes no frame timing, so none is reported;
+CPU and host cost were not measured. A QEMU stop at the end of a run still
+segfaults in the GL teardown on this host; judge the run by the guest marker
+and the screenshot, not the QEMU exit status.
+
 ## QMP replacement baseline
 
 At `55b9f68`, before the native Linux client, QMP has the following boundary.
