@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 91
+Next: 92
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -26,6 +26,15 @@ Timing measurements require quiet-host readiness checks before and after each
 accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
+
+### LAP-91 · P2 · musl regcomp overflows the C stack on long literal patterns
+
+- **Area:** Security
+- **Where:** `packages/musl/PKGBUILD.xsh` (musl 1.2.6 `src/regex/regcomp.c`, TRE's recursive parse and position passes)
+- **Problem:** `regcomp()` on a pattern of 200,000 literal `a` characters (`REG_EXTENDED|REG_NOSUB`) segfaults under an 8 MiB stack with unpatched musl 1.2.6; 100,000 and 150,000 compile, and 300,000 returns `REG_ESPACE`. Upstream commit 7813e911 (the LAP-87 regcomp overflow fix) raises the stack limit, so with it 300,000 also segfaults. A program that compiles an untrusted regex can be crashed rather than handed an error. Reproduced on 2026-11-23 with static test programs linked against both builds; the recursing function was not identified, and both cases compile under `ulimit -s unlimited`.
+- **Recommendation:** Find the recursing pass, bound its depth so oversized patterns fail with `REG_ESPACE`, and carry it as a checksum-bound patch in a `laputa-systems` musl fork with an upstream draft. Keep a child-process regression for each length above.
+- **Fix with:** security, os-boundaries
+- **Effort:** M
 
 ### LAP-87 · P1 · musl 1.2.6 ships without the regcomp and GB18030 iconv security fixes
 
