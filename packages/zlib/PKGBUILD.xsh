@@ -9,10 +9,10 @@ export const name = "zlib"
 export const package_kind = "payload"
 
 ## Package recipe export.
-export const ver = "1.3.2"
+export const ver = "1.4"
 
 ## Package recipe export.
-export const rel = "13"
+export const rel = "1"
 
 ## Package recipe export.
 export const deps = ["musl"]
@@ -31,7 +31,7 @@ export const upstream_sources = [
     checksums: [
       {
         arch: "all",
-        sha256: "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16",
+        sha256: "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584",
       },
     ],
   },
@@ -84,7 +84,7 @@ export const filetree = [
     kind: "symlink",
   },
   {
-    path: p"usr/lib/libz.so.1.3.2",
+    path: p"usr/lib/libz.so.1.4",
     kind: "binary",
   },
   {
