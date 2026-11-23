@@ -442,56 +442,140 @@ key set to the current one, and the local package-tools image digest unchanged.
   hidden.
 - ABI. `z_stream` and `gz_header` offsets and sizes, the integer type sizes,
   and 61 constants are identical between the two `zlib.h` files.
-- Differential, C zlib 1.3.2 as oracle: 15 groups, 56,501 checks, 0 failures.
-  Every level (-1 to 9) and strategy on nine inputs, each stream decoded by
-  both libraries; window bits, memLevel, raw, zlib and gzip wrappers;
-  `compress`, `compress2`, `uncompress`, `uncompress2`, `compressBound`;
-  streaming with input and output buffers from 1 to 4,096 bytes; every flush
-  mode; `deflateParams`, dictionaries, priming, copy, reset and tuning;
-  `gz_header` round trip; `inflateBack`; `gzopen` write and read at every mode,
-  seek, rewind, `gzdirect`, append, `gzdopen`, `gzsetparams`; `crc32`,
-  `adler32` and their combines with split, unaligned and overflow inputs;
-  truncation at every prefix length, single-byte corruption at every position
-  of small zlib, raw and gzip streams, and random junk, each requiring the same
-  return code from both; invalid arguments and version checks; `inflateSync`;
-  allocator hooks with the allocation failing at every index (no leak, same
-  `Z_MEM_ERROR` class); a 256 MiB zeros bomb inflated in full and capped at
-  16 MiB. Controls: the oracle against itself gives 0 failures and 0
-  divergences; swapping the roles fails.
+- Differential, C zlib 1.4 as oracle (moved from 1.3.2 by LAP-88; the 1.3.2
+  run was 15 groups, 56,501 checks, 0 failures): 16 groups, 56,540 checks, 0
+  failures, 13 recorded divergences. Every level (-1 to 9) and strategy on nine
+  inputs, each stream decoded by both libraries; window bits, memLevel, raw,
+  zlib and gzip wrappers; `compress`, `compress2`, `uncompress`, `uncompress2`,
+  `compressBound`; streaming with input and output buffers from 1 to 4,096
+  bytes; every flush mode; `deflateParams`, dictionaries, priming, copy, reset
+  and tuning; `gz_header` round trip; `inflateBack`; `gzopen` write and read
+  at every mode, seek, rewind, `gzdirect`, append, `gzdopen`, `gzsetparams`;
+  `crc32`, `adler32` and their combines with split, unaligned and overflow
+  inputs; truncation at every prefix length, single-byte corruption at every
+  position of small zlib, raw and gzip streams, and random junk, each requiring
+  the same return code from both; invalid arguments and version checks;
+  `inflateSync`; allocator hooks with the allocation failing at every index (no
+  leak, same `Z_MEM_ERROR` class); a 256 MiB zeros bomb inflated in full and
+  capped at 16 MiB. Controls: the oracle against itself gives 0 failures and
+  0 divergences; swapping the roles fails.
+- The "zlib 1.4 fixed paths" group (39 checks) is new. It runs inputs for the
+  1.4 ChangeLog fixes, each library in its own forked child so that a crash is
+  an outcome: `inflateGetDictionary` after an invalid window size and a reset
+  (with a 32 KiB buffer and guard bytes), across window modes and for NULL
+  arguments; `inflateReset` across `windowBits` 0 streams; `inflateSync` after
+  a header error; whole-byte `inflatePrime` into the `inflate_fast` path;
+  repeated `deflatePrime` until the pending buffer is full; `inflateBack` on
+  600 random and 600 mutated streams with two different window fills (an
+  output that differs between the fills read uninitialized window bytes);
+  `gzseek` as the first write and repeated `gzseek`; `gzwrite` of large and
+  small writes, and with flushes, into a full nonblocking pipe, retrying the
+  unconsumed part with a freed caller buffer; length limits; bad CRC, bad
+  length, cut and trailing-byte gzip trailers; `deflateSetDictionary` and
+  `inflateSetDictionary` misuse; `total_in` after `Z_NEED_DICT`; `inflateCopy`
+  of an invalid source; `deflateResetKeep` mid-stream; `gzopen` with `x`; and
+  `gzseek` past the end. As a control the same inputs run with zlib 1.3.2 built
+  under AddressSanitizer as oracle and 1.4 as candidate: 1.3.2 faults
+  (heap-buffer-overflow in `inflateGetDictionary`, `deflatePrime` and
+  `inflate_fast` after priming, use-after-free in `gzwrite` on a stalled
+  write, a NULL read in `inflateSetDictionary`) or gives different results on
+  the `windowBits` 0 reset, `inflateSync`, `inflateBack`, `gzseek`, trailer,
+  `total_in`, `inflateCopy` and `deflateResetKeep` inputs. The
+  `inflateSync` input with an automatic window is the only one of the
+  `inflateSync` inputs that separates 1.3.2 from 1.4.
 - Consumer imports. From the 2026-11-20 census root, FreeType imports
   `inflateInit2_`, `inflate`, `inflateEnd`, `inflateReset`; libpng imports
   those plus `crc32`, `deflate`, `deflateInit2_`, `deflateEnd`,
   `deflateReset` and `inflateReset2@ZLIB_1.2.3.4`; Play imports `compress2`.
-  All are exported with the same versions.
+  All are exported with the same versions. Against the zlib 1.4 build,
+  mandoc 1.14.6 additionally imports `gzdopen`, `gzread`, `gzerror`, `gzclose`
+  and `zError`.
 
-**Known divergences (the candidate follows zlib 1.3.0 behavior; the oracle is
-1.3.2).** `check.xsh` reports each and exits 0; they are open until accepted or
-fixed in the fork.
+**Differences between zlib-rs and zlib 1.4.** `check.xsh` reports each as a
+`KNOWN DIVERGENCE`, matched against the exact recorded outcome of both
+libraries, and exits 0; they stay open until accepted or fixed in the fork. A
+run of the same inputs with 1.3.2 as oracle gives the second column. "1.4
+change" means 1.4 differs from 1.3.2 on purpose and the candidate still
+behaves like 1.3.2; "candidate defect" means the candidate differs from both,
+or fails in a way neither 1.3.2 nor 1.4 does.
 
-- `uncompress` and `uncompress2` into a zero-length output buffer return
-  `Z_DATA_ERROR` in the candidate and `Z_BUF_ERROR` in 1.3.2, and `uncompress2`
-  reports one more input byte consumed. This is an oversized-input error-class
-  difference in the core API.
-- The gz file layer was reworked in 1.3.2 and the candidate does not follow it:
-  `gzgets` read to end of file leaves `Z_BUF_ERROR` in the oracle and none in
-  the candidate; a file truncated inside the stream returns the same bytes but
-  the oracle reports no error and the candidate `Z_BUF_ERROR`; a file shorter
-  than four bytes is a transparent read in the oracle and `Z_BUF_ERROR` with no
-  data in the candidate; a damaged gzip header or first block is read
-  transparently or silently ended by the oracle and rejected by the candidate.
-  Whenever the oracle reports an error the candidate reports the same one.
+| Input | 1.3.2 | 1.4 | zlib-rs | Class |
+|---|---|---|---|---|
+| `uncompress`, `uncompress2` into a zero-length buffer | `Z_BUF_ERROR` | same | `Z_DATA_ERROR`, `uncompress2` reports one more input byte | candidate defect, error class |
+| gz file under four bytes | transparent read | same | `Z_BUF_ERROR`, no data | candidate defect |
+| gz file with a damaged header or first block | read transparently or ended silently (194 samples) | 8 samples | error | candidate defect, narrowed by 1.4 |
+| gz file with a bad CRC or length, or damaged data | partial data, then the error | all inflated bytes, then the error | fewer or no bytes, same error | 1.4 change (deliver all gzip data before the error); the candidate is stricter, not unsafe |
+| `inflateGetDictionary` with `windowBits` 9 | at most 512 bytes | same | up to 32,768 bytes, correct contents | candidate defect, no memory effect |
+| `inflateReset` of a `windowBits` 0 stream, then a larger window | `Z_DATA_ERROR` "invalid window size" | inflates | `Z_DATA_ERROR` | 1.4 change; candidate lags |
+| `deflateResetKeep` mid-stream, then a raw stream | does not decode | decodes | does not decode | 1.4 change; candidate lags |
+| `inflateSetDictionary` with a NULL dictionary | segmentation fault | `Z_STREAM_ERROR` | `Z_OK`, no read | 1.4 hardening; candidate lags, no fault |
+| `inflateCopy` of an invalid source | leaves `dest->state` | sets it NULL | leaves it | 1.4 hardening; candidate lags |
+| `deflatePrime` repeated with memLevel 1 | heap overflow | `Z_BUF_ERROR` after 256 calls | panics and aborts the process | candidate defect: an abort where 1.4 returns an error |
+| `inflateBack` on corrupt streams | output depends on the window fill | `Z_DATA_ERROR`, never reads the window | accepts the streams, output depends on the window fill (23 of 600 random, 216 of 600 mutated) | 1.4 change; candidate lags and still reads stale window bytes |
+| `gzwrite` of a large buffer into a full nonblocking pipe (the CVE-2026-85091 path) | use-after-free of the caller's buffer | consumes the accepted bytes and recovers | segmentation fault | 1.4 change; candidate lags and is not safe |
+| `gzwrite` into a stalling nonblocking pipe, small writes | accepts everything | same | stops accepting after the first stall; the file holds 112 bytes more than it reported accepted | candidate defect |
+| the same with `gzflush` | segmentation fault | accepts everything | stops after 60,000 bytes; the file holds 80,000 | candidate defect |
+
+Inputs where the candidate already matches 1.4 and 1.3.2 does not:
+`inflateGetDictionary` after an invalid window size and a reset (32,768 bytes,
+guard bytes intact), `inflateSync` with an automatic window, whole-byte
+`inflatePrime` before `inflate_fast`, `gzseek` as the first write and repeated
+`gzseek` zero fill, `total_in` after `Z_NEED_DICT`, and `deflateSetDictionary`
+misuse. Inputs that do not separate 1.3.2 from 1.4, and so say nothing about
+those fixes: the `inflateSync` inputs with a zlib, raw or gzip window, and the
+repeated `inflatePrime` return-code sequence. The `inflateBack` fix for
+distances before the start of output and the `gzwrite` fix are the two that
+matter if zlib-rs ever replaces `libz.so.1`; neither is in the candidate.
+
+**Exposure of the installed consumers to the 1.4 fixes** (source greps of the
+cached FreeType 2.15.0, libpng 1.6.59 and mandoc 1.14.6 sources, and the
+dynamic imports of their installed binaries and of Play 0.43.2; linkage alone
+was not used):
+
+| 1.4 fix | FreeType | libpng | mandoc | Play | build-essential-native members |
+|---|---|---|---|---|---|
+| `gzwrite` buffer overflow (CVE-2026-85091) | no `gz*` | no `gz*` | reads only (`gzdopen`, `gzread`, `gzerror`, `gzclose`) | no | none imports `libz.so.1` |
+| `inflateGetDictionary`, `inflateSync`, `inflatePrime`, `inflateBack`, `inflateCopy` | no | no | no | no | none |
+| `deflatePrime`, `deflateSetDictionary`, `inflateSetDictionary` | no | no | no | no | none |
+| `gzseek`, `gzread` pending skip, zero fill | no | no | no `gzseek` | no | none |
+| `gzread` truncated stream and deliver-all-data | no | no | yes, `gzread` at `read.c:508` of a `.gz` page | no | none |
+| `deflateResetKeep` mid-stream | no | `deflateReset` (which runs it) before each new chunk stream (`pngwutil.c:430`); mid-stream only after a failed write | no | no | none |
+| `inflateReset` and `windowBits` 0 | no, uses -15 and 47 | yes: `inflateInit2` and `inflateReset2` with 0 and `inflateReset` after `Z_STREAM_END` on the same stream, which keeps the same window | no, `gzdopen` uses 47 | no | none |
+| `Z_NEED_DICT` `total_in` | treats `Z_NEED_DICT` as an error (`ftgzip.c:766`), never reads `total_in` | the same (`png.c:1021`) | no | no | none |
+| `inflate_fast` entry (`bits < 8`) | all `inflate` callers pass through it; no priming, so unchanged | same | same | no `inflate` | none |
+| `compress2` | no | no | no | `compress2` for screenshots; not in the ChangeLog | none |
+
+FreeType also carries its own zlib copy in `src/gzip`, which the installed
+`libfreetype.so.6.20.7` does not use: it imports `inflate`, `inflateEnd`,
+`inflateInit2_` and `inflateReset` from `libz.so.1`. Play's source was read from
+the working copy at `/home/josh/repos/play` (commit `26e63f8`, no v0.43.2 tag
+there), because the package installs a prebuilt release; the installed
+`player` imports `compress2` and no other zlib symbol. The `build-essential-native`
+members (`ca-certificates`, `musl`, `zlib`, `llvm-toolchain`, `pkgconf`,
+`gluon`, `cmake`, `m4`, `flex`, `bison`, `linux-headers`) and the `cargo` and
+`xsh` packages that its plan also builds have no ELF with `libz.so.1` in
+`DT_NEEDED` or an undefined zlib symbol. `cmake`, `cargo`, `xsh`, `ffmpeg` and
+several `llvm-toolchain` binaries contain zlib strings, which this scan cannot
+attribute to a bundled copy; such a copy is outside this package.
+
+Qualification on the zlib 1.4 build (`make build JOBS=1`, x86_64): `zlib` (`zlib
+ok`), `libpng` (`libpng ok: PNG RGBA round trip`), `freetype` (`freetype ok`),
+`mandoc` (`mandoc ok`), `play` and `build-essential-native` all build and pass
+their proofs. The installed `player` also runs `--version` and plays a
+half-second WAV headlessly against `libz.so.1.4`, printing `duration=0.5`. The
+aarch64 build of zlib 1.4 is unverified: cross-architecture builds are
+unsupported on this x86_64 host.
 
 Other observations. `compressBound` differs from the oracle but never falls
 below the size of a real compression; the candidate's `zlibVersion()` is
 `1.3.0-zlib-rs-0.6.8` while its header says `1.3.2.zlib-rs-0.6.8`. Over the
 test corpus at level 6 the candidate's streams total 621,141 bytes against
-572,036 for the oracle; byte equality is not a gate. Installed size is 471,544
-bytes against 104,552 for `libz.so.1.3.2`.
+572,036 for the oracle; byte equality is not a gate. Installed size is 471,512
+bytes against 106,224 for `libz.so.1.4`.
 
-**Not run.** Consumer qualification through the real consumers: Play
-screenshots through `compress2` and the font stack's libpng and FreeType,
-including the PCF gzip path. The aarch64 build and run. The fuzz corpus run.
-The interleaved performance gate. The closure gate with an installed root, so
-`census.xsh` is unchanged and unique installed bytes before and after are not
-measured. Acceptance of the divergences above. No gate is closed and no default
-changes.
+**Not run.** Play screenshots through `compress2` and the font stack's libpng
+and FreeType in the guest, including the PCF gzip path. The aarch64 build and
+run of zlib 1.4 and of zlib-rs. The fuzz corpus run. The interleaved
+performance gate. The closure gate with an installed root, so `census.xsh` is
+unchanged and unique installed bytes before and after are not measured.
+Acceptance of the divergences above. No gate is closed and no default changes.

@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 92
+Next: 93
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -27,6 +27,15 @@ accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
 
+### LAP-92 · P2 · zlib-rs crashes or corrupts output on four paths zlib 1.4 handles safely
+
+- **Area:** Security
+- **Where:** `packages/zlib-rs/PKGBUILD.xsh`; `qualification/zlib-rs/differential.c` (known-divergence table); `docs/NATIVE-CENSUS.md` (zlib-rs differential); LAP-51 Track C
+- **Problem:** Against the zlib 1.4 oracle, zlib-rs segfaults when `gzwrite` writes a large buffer into a full nonblocking pipe (the CVE-2026-85091 path), aborts on repeated `deflatePrime` with memLevel 1, returns stale window bytes from `inflateBack` on corrupt streams (23 of 600 random and 216 of 600 mutated inputs), and, after a stalled `gzwrite`, stops writing or leaves more bytes in the file than it accepted (80,000 bytes after accepting 60,000 with flushes). The differential records each as a known divergence, so it passes. No shipped profile links zlib-rs today, so this blocks Track C's replacement of C zlib rather than exposing a running system. Found 2026-11-23 by the LAP-88 qualification on x86_64.
+- **Recommendation:** Fix each in a `laputa-systems` zlib-rs fork with an upstream draft, add the reproducing input to the differential as a required match, and remove its known-divergence entry. Track C must not ship zlib-rs while any of the four remain.
+- **Fix with:** security
+- **Effort:** M
+
 ### LAP-91 · P2 · musl regcomp overflows the C stack on long literal patterns
 
 - **Area:** Security
@@ -44,24 +53,14 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Recommendation:** On the aarch64 host, run `make seed` and `make build PKGS=musl` and record the proof result here before closing.
 - **Effort:** S
 
-### LAP-88 · P1 · C zlib is 1.3.2, without the memory-safety fixes released in 1.4
+### LAP-88 · P3 · zlib 1.4 is unverified on aarch64
 
 - **Area:** Security
-- **Where:** `packages/zlib/PKGBUILD.xsh:12,87` (`ver = "1.3.2"`, `libz.so.1.3.2`); `docs/NATIVE-CENSUS.md` (zlib gate evidence, whose differential oracle is this library)
-- **Problem:** Per the 2026-11-23 tech scout, zlib 1.4 (2026-11-04) fixes CVE-2026-85091 in nonblocking `gzwrite()`, `inflateGetDictionary()` buffer handling, and other specialized operations. Laputa builds 1.3.2. The fixes matter only where a consumer reaches the affected API, which linkage alone does not show. LAP-51 Track C's zlib-rs differential uses this 1.3.2 build as its oracle, so it cannot establish compatibility with 1.4's corrected failure behavior. unproven: the release details come from the scout and were not re-checked here.
-- **Recommendation:** Upgrade the C reference to 1.4, qualify its changed failure-path behavior against the installed consumers (FreeType, libpng, Play), then move the zlib-rs differential's oracle to 1.4 and add 1.4's security-relevant inputs, separating intended behavior changes from regressions.
+- **Where:** `packages/zlib/PKGBUILD.xsh` (`ver = "1.4"`, architecture-neutral CMake build); `docs/NATIVE-CENSUS.md` (zlib gate evidence)
+- **Problem:** The C zlib reference is 1.4 and the x86_64 consumers (FreeType, libpng, mandoc, Play, `build-essential-native`) build and pass their proofs against it; the zlib-rs differential now uses it as oracle. The aarch64 build and proof of zlib 1.4 and of its consumers have not run: the host is x86_64 and `docs/DEVELOPMENT.md` says cross-architecture builds are unsupported. unproven: the aarch64 build, `zlib ok`, and `xsh qualification/zlib-rs/run.xsh -- aarch64`.
+- **Recommendation:** When an aarch64 build is supported, build and prove `zlib`, `libpng`, `freetype` and `mandoc` on aarch64 and run the zlib-rs gate there, then delete this item.
 - **Fix with:** security
-- **Effort:** M
-
-### LAP-79 · P2 · Installer marks interpreted su and passwd setuid
-
-- **Area:** Security
-- **Where:** `installer/setup-laputa.xsh:127-135`, `packages/xsh/PKGBUILD.xsh:102,125,199-204`, XSH `core/su.xsh:61`, XSH `core/lib/auth.xsh:120-205`
-- **Problem:** The installer runs `chmod 0o4755` on `/usr/bin/su` and `/usr/bin/passwd`. Both are symlinks to interpreted XSH applets under `/usr/lib/xsh/core/`, so the chmod sets setuid on the script files. Linux ignores setuid on interpreted scripts, so a non-root user's `su` and `passwd` cannot gain the privilege they need; the feature is silently broken. The bits are also a latent escalation: the applets read account files chosen by `XSH_PASSWD_FILE` and `XSH_SHADOW_FILE` (XSH-145), so any kernel or wrapper that honors the bit lets a caller authenticate against a file they wrote. unproven: whether the pinned Asterinas kernel honors setuid on interpreted files was not checked.
-- **Recommendation:** Stop setting setuid on interpreted applets. Provide privileged password change and user switching through `doas` (already setuid and audited) or a small compiled helper, and add a profile check that no setuid file in the root starts with `#!`.
-- **Fix with:** security, os-boundaries
-- **Effort:** M
-- **Deferred:** Wireless and physical-device enablement are out of scope. Any separately selected virtio-audio proof must remain VM-only and must not enable physical drivers or firmware as a side effect. This item is not permission to widen hardware scope.
+- **Effort:** S
 
 ### LAP-89 · P2 · A readiness timeout satisfies a required dependency
 
