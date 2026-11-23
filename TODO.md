@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 87
+Next: 91
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -27,6 +27,24 @@ accepted window. macOS remains out of scope. Native aarch64 runtime
 qualification remains open; manual cross-build evidence is bounded in
 [the font contract](docs/FONT-STACK.md).
 
+### LAP-87 · P1 · musl 1.2.6 ships without the regcomp and GB18030 iconv security fixes
+
+- **Area:** Security
+- **Where:** `packages/musl/PKGBUILD.xsh:13` (`ver = "1.2.6"`, the original release archive, no backport patches)
+- **Problem:** Per the 2026-11-23 tech scout (Rich Felker's 2026-10-21 openwall advisory and git.musl-libc.org), musl releases through 1.2.6 contain CVE-2026-107891, integer overflows in `regcomp()` fixed by musl 7813e911, and CVE-2026-6042, pathological GB18030 `iconv()` decoding (a repeated table search, plus several wrong mappings) fixed by musl 67219f01. The recipe builds the unpatched 1.2.6 archive. Exploitation needs a program that compiles an untrusted regex or converts untrusted GB18030 input; no network-reachable Laputa path was established. unproven: the CVE details come from the scout's upstream reading and were not re-checked here.
+- **Recommendation:** Backport both commits as checksum-bound patches in the musl recipe for both musl targets, and add regression cases: a hostile `regcomp()` pattern family that overflowed before the fix, and GB18030 inputs that check mapping correctness and bounded decode time. Do not infer reachability from linkage.
+- **Fix with:** security, os-boundaries
+- **Effort:** M
+
+### LAP-88 · P1 · C zlib is 1.3.2, without the memory-safety fixes released in 1.4
+
+- **Area:** Security
+- **Where:** `packages/zlib/PKGBUILD.xsh:12,87` (`ver = "1.3.2"`, `libz.so.1.3.2`); `docs/NATIVE-CENSUS.md` (zlib gate evidence, whose differential oracle is this library)
+- **Problem:** Per the 2026-11-23 tech scout, zlib 1.4 (2026-11-04) fixes CVE-2026-85091 in nonblocking `gzwrite()`, `inflateGetDictionary()` buffer handling, and other specialized operations. Laputa builds 1.3.2. The fixes matter only where a consumer reaches the affected API, which linkage alone does not show. LAP-51 Track C's zlib-rs differential uses this 1.3.2 build as its oracle, so it cannot establish compatibility with 1.4's corrected failure behavior. unproven: the release details come from the scout and were not re-checked here.
+- **Recommendation:** Upgrade the C reference to 1.4, qualify its changed failure-path behavior against the installed consumers (FreeType, libpng, Play), then move the zlib-rs differential's oracle to 1.4 and add 1.4's security-relevant inputs, separating intended behavior changes from regressions.
+- **Fix with:** security
+- **Effort:** M
+
 ### LAP-79 · P2 · Installer marks interpreted su and passwd setuid
 
 - **Area:** Security
@@ -36,6 +54,15 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** security, os-boundaries
 - **Effort:** M
 - **Deferred:** Wireless and physical-device enablement are out of scope. Any separately selected virtio-audio proof must remain VM-only and must not enable physical drivers or firmware as a side effect. This item is not permission to widen hardware scope.
+
+### LAP-89 · P2 · A readiness timeout satisfies a required dependency
+
+- **Area:** Supervision
+- **Where:** `xinit/xinit.xsh:1834-1847` (`gate_satisfied`), `xinit/docs/INIT.md:245-252`, `xinit/docs/SUPERVISION.md:56`
+- **Problem:** When a unit's `ready()` hook or notify byte does not arrive within `ready_timeout_ms`, the unit becomes `running` with `ready` false. `gate_satisfied` checks only `state == "running"` for `dependencies.need`, so a service that never became ready releases its dependents, which then start against a service that has said it cannot serve. The docs describe the promotion but not that it satisfies `need`. unproven: whether `need` is meant to require readiness is an owner decision.
+- **Recommendation:** Decide the contract. Either make `need` wait for `ready` and report a timed-out dependency as blocking, or state in INIT.md that `need` gates only on the process running and add a separate readiness-gated dependency kind. Add a lifecycle test where a needed service times out unready.
+- **Fix with:** lifecycle-concurrency, error-model
+- **Effort:** S
 
 ### LAP-80 · P2 · xinit's non-PID1 test opt-in changes control-plane authorization
 
@@ -88,6 +115,15 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** architect, reference-parity, benchmark-checklist
 - **Effort:** L
 - **Design:** [Shared upstream rust-fontconfig](docs/rfc/LAP-52-rust-fontconfig.md)
+
+### LAP-90 · P3 · laputa-net always depends on wpa_supplicant
+
+- **Area:** Closure
+- **Where:** `packages/laputa-net/PKGBUILD.xsh:24-25` (`runtime_only_deps = ["wpa_supplicant", "xinit", "xsh"]`)
+- **Problem:** Every root that installs laputa-net also installs wpa_supplicant, including `qemu-maintained`, whose virtio networking never associates with Wi-Fi. Wireless is outside the maintained VM scope (LAP-16), so the dependency adds closure, attack surface and build cost with no consumer in those profiles.
+- **Recommendation:** Make wpa_supplicant a profile-selected dependency of the wireless path only, and check that the maintained QEMU roots no longer contain it while a wireless-enabled profile still does.
+- **Fix with:** api-surface-and-module-boundaries
+- **Effort:** S
 
 ### LAP-81 · P3 · The rescue decision module has no production caller
 

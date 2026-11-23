@@ -298,6 +298,19 @@ no `linux-dmabuf`, so the proof presents through Mesa's shared-memory WSI
 acceptance is not yet met: keyboard and compositor recovery under Venus, CPU,
 frame latency and host cost are unmeasured, and zero-copy presentation needs
 `linux-dmabuf` in Tinyland.
+The next Track F steps, from the 2026-11-23 tech scout: a small experimental
+`linux-dmabuf` import path in Tinyland, using Smithay 0.7's capability lists,
+import validation and recoverable buffer-creation failures as a design
+reference rather than an import, accepted when Play submits a dma-buf-backed
+frame that Tinyland validates (formats, modifiers, ownership), imports and
+presents, rejects malformed buffers without losing the session, and falls back
+to `wl_shm` when unsupported; then frame latency, CPU time, memory and host
+cost measured against the software path as control. The Vulkan 1.3 renderer
+instance version is a workaround for this Mesa and virglrenderer pair until a
+second host driver shows the contract holds. Track C's zlib-rs differential
+uses C zlib 1.3.2 as its oracle and must move to 1.4 first (LAP-88); zlib-rs
+also lacks `gzprintf` and `gzvprintf`, so it is not yet an interchangeable
+`libz.so.1`.
 
 Parked while Ghostty is out of scope: libxkbcommon, whose only production
 consumer is Ghostty, and Ghostty's OpenGL qualification on Track F.
