@@ -195,6 +195,19 @@ that mapping. Tags accept an optional `v` and dotted numeric components within
 signed integer range. HTTP, network, JSON, draft, prerelease, and unsupported
 version failures are errors. The command changes no recipe or source pin.
 
+For build repositories that publish commit-tagged prereleases, the standalone
+`xsh refresh-prereleases.xsh PACKAGE...` wrapper discovers the newest
+`release-*` tag through the repository's public `releases.atom` feed and
+proposes the pin edits. It reads the recipe through `pm.recipe`, expands the
+pinned asset names through `pm.util`, takes per-architecture checksums from the
+release `SHA256SUMS`, and bumps `rel`. It also rewrites the common XSH archive
+tokens when the asset format changes (for example `.tar.gz` to `.tar.xz`). A
+dry run prints a unified diff and writes nothing; `--apply` writes the recipe.
+`--verify` stages the proposed recipe in a temporary catalog and checks the new
+assets with `pm sources fetch`. A release missing a pinned asset, or publishing
+two assets with the same stem, is an error rather than a guess. This tool is
+not a `pm` subcommand and does not select the upstream repository for a package.
+
 ## Sources
 
 URL sources are content-addressed. `pm sources fetch` (`make fetch`, with
