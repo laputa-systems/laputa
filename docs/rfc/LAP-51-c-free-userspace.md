@@ -282,6 +282,23 @@ are zlib-rs as a candidate `libz.so.1` (Track C), a HarfRust/Skrifa
 differential against Play's overlay text (Track D), and a Venus profile for
 Play's Vulkan presentation (Track F); none changes a production default.
 
+The Venus pilot (Track F) runs: the experimental `qemu-tinyland-venus`
+profile builds `mesa-venus`, Mesa's `virtio` Vulkan driver alone, and Play
+presents through it on the host's RADV, with `LAPUTA_TINYLAND_VENUS_PROOF_OK`
+and no software Vulkan driver selected; the virgl/lavapipe control still
+passes unchanged. On the development host the guest's installed bytes fall
+from 381.7 MB to 204.0 MB and its Mesa payload from 145.2 MB to 1.9 MB
+(the Venus root also omits Ghostty and libxkbcommon), with startup and RSS
+comparable; [QEMU](../QEMU.md) records the run. Two findings shape the next
+step. `mesa-venus` creates the renderer instance at Vulkan 1.3 or higher,
+because virglrenderer 1.3.0 crashes when Mesa's Wayland WSI calls
+`vkQueueSubmit2` on an instance created at an older API version. Tinyland has
+no `linux-dmabuf`, so the proof presents through Mesa's shared-memory WSI
+(`MESA_VK_WSI_DEBUG=sw`), and every frame is copied by the CPU. Track F's
+acceptance is not yet met: keyboard and compositor recovery under Venus, CPU,
+frame latency and host cost are unmeasured, and zero-copy presentation needs
+`linux-dmabuf` in Tinyland.
+
 Parked while Ghostty is out of scope: libxkbcommon, whose only production
 consumer is Ghostty, and Ghostty's OpenGL qualification on Track F.
 
