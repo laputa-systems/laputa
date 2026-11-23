@@ -23,7 +23,15 @@ offline package-tools container. It exits 0 only when `check.xsh` does.
   justified list in `check.xsh`.
 - `differential.c` loads both libraries into one process and runs every case
   through each. It exits 1 on any unexplained difference.
+- The "zlib 1.4 fixed paths" group runs inputs for the memory-safety and
+  failure-path fixes in zlib 1.4 (invalid windows with `inflateGetDictionary`,
+  `inflateSync`, repeated priming, `inflateBack` on corrupt data, `gzseek` as
+  the first write, `gzwrite` into a full nonblocking pipe, dictionary misuse,
+  `deflateResetKeep`). Each case runs once per library in a forked child, so a
+  crash in either library is an outcome rather than the end of the run.
 - A `KNOWN DIVERGENCE` line is a behavior where the candidate is known to
-  differ from the oracle; each is matched against a narrow pattern, so a
-  different outcome fails instead of being absorbed. Five are recorded, and
-  the exit status does not say whether they are acceptable.
+  differ from the oracle; each is matched against the exact recorded outcome of
+  both libraries, so a different outcome fails instead of being absorbed.
+  Thirteen are recorded, and the exit status does not say whether they are
+  acceptable. The classification of each is in
+  [Native census](../../docs/NATIVE-CENSUS.md#zlib-gate-evidence-zlib-rs).

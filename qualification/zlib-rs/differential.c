@@ -7,7 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include "zlib.h"
 
@@ -24,7 +26,8 @@
   X(gzopen) X(gzdopen) X(gzbuffer) X(gzsetparams) X(gzread) X(gzfread) X(gzwrite) \
   X(gzfwrite) X(gzputs) X(gzputc) X(gzgetc) X(gzungetc) X(gzgets) X(gzflush) \
   X(gzseek) X(gzrewind) X(gztell) X(gzoffset) X(gzeof) X(gzdirect) X(gzclose) \
-  X(gzclose_r) X(gzclose_w) X(gzerror) X(gzclearerr)
+  X(gzclose_r) X(gzclose_w) X(gzerror) X(gzclearerr) \
+  X(deflateResetKeep) X(inflateResetKeep)
 
 typedef struct Api {
   const char *name;
@@ -59,14 +62,26 @@ static int g_fail, g_checks, g_gfail, g_gchecks, g_groups, g_failed_groups;
 static const char *g_name = "";
 static const char *g_tmp = ".";
 
-enum { KD_UNCOMPRESS_ZERO, KD_GZGETS_EOF, KD_GZ_TRUNCATED, KD_GZ_SHORT_HEADER, KD_GZ_TOLERANT, KD_COUNT };
+enum {
+  KD_UNCOMPRESS_ZERO, KD_GZ_SHORT_HEADER, KD_GZ_TOLERANT, KD_GZ_DELIVER_ALL,
+  KD_GETDICT_SMALL_WINDOW, KD_RESET_AUTO_WINDOW, KD_RESET_KEEP, KD_DEFLATE_PRIME, KD_INFLATE_BACK,
+  KD_GZWRITE_LARGE, KD_GZWRITE_ACCOUNT, KD_INFLATE_NULL_DICT, KD_INFLATE_COPY_STATE, KD_COUNT
+};
 static int kd_count[KD_COUNT];
 static const char *kd_text[KD_COUNT] = {
-  "uncompress and uncompress2 into a zero-length output buffer: zlib 1.3.2 returns Z_BUF_ERROR, the candidate returns Z_DATA_ERROR (and uncompress2 reports one more input byte consumed)",
-  "gzgets reading to end of file: zlib 1.3.2 leaves Z_BUF_ERROR in gzerror and gzclose_r, the candidate reports no error",
-  "gz file truncated inside the stream: both return the same bytes, zlib 1.3.2 reports no error, the candidate reports Z_BUF_ERROR",
-  "gz file of fewer than four bytes: zlib 1.3.2 returns them as a transparent read, the candidate reports Z_BUF_ERROR and returns none",
-  "gz file with a damaged header or damaged first block: zlib 1.3.2 reads it transparently or ends silently and reports no error, the candidate reports an error",
+  "uncompress and uncompress2 into a zero-length output buffer: zlib 1.4 returns Z_BUF_ERROR, the candidate returns Z_DATA_ERROR (and uncompress2 reports one more input byte consumed). Unchanged since 1.3.2: candidate defect, error class only",
+  "gz file of fewer than four bytes: zlib 1.4 returns them as a transparent read, the candidate reports Z_BUF_ERROR and returns none. Unchanged since 1.3.2: candidate defect",
+  "gz file with a damaged header or damaged first block: zlib 1.4 reads it transparently or ends silently and reports no error, the candidate reports an error. Candidate defect; 1.4 narrowed it, so fewer damaged files now differ",
+  "gz file with a bad trailer or damaged data: zlib 1.4 returns every byte it inflated before reporting the error, the candidate returns fewer or none; both report the same error. Intended 1.4 change (deliver all gzip data before reporting error) that the candidate lags",
+  "inflateGetDictionary with windowBits below 15: zlib 1.4 returns at most the 2^windowBits window, the candidate returns all history up to 32768 bytes with correct contents. Unchanged since 1.3.2: candidate defect, no memory effect",
+  "inflateReset on a windowBits=0 stream: zlib 1.4 restores the automatic window so a second stream with a larger window inflates, the candidate keeps the first stream's window and returns Z_DATA_ERROR (invalid window size). Intended 1.4 change that the candidate lags",
+  "deflateResetKeep in the middle of a stream, then a new raw stream: zlib 1.4 output decodes standalone, the candidate output fails Z_DATA_ERROR. Intended 1.4 change (read outside window after deflateResetKeep; 1.3.2 also fails here) that the candidate lags",
+  "repeated deflatePrime with memLevel 1: zlib 1.4 returns Z_BUF_ERROR once the pending buffer is full, the candidate panics and aborts the process (SIGABRT). Intended 1.4 change (write past pending buffer; 1.3.2 overflows the heap); the candidate aborts instead of returning an error: candidate defect",
+  "inflateBack on corrupt streams: zlib 1.4 returns Z_DATA_ERROR for distances before the start of output and never reads the caller's window, the candidate copies stale window bytes and accepts the stream, so its output depends on the window contents. Intended 1.4 change (uninitialized memory copy by inflateBack) that the candidate lags: candidate defect",
+  "gzwrite of a large buffer to a full nonblocking descriptor: zlib 1.4 returns the bytes consumed and recovers, the candidate dies with SIGSEGV. This is the CVE-2026-85091 path; the candidate lags the 1.4 fix and is not safe here: candidate defect",
+  "gzwrite to a nonblocking descriptor that stalls: zlib 1.4 returns the bytes consumed and the file holds exactly the accepted bytes, the candidate stops accepting after the first stall and its file holds more bytes than it reported accepted. The candidate has no nonblocking write support: candidate defect",
+  "inflateSetDictionary with a NULL dictionary and nonzero length: zlib 1.4 returns Z_STREAM_ERROR, the candidate returns Z_OK without reading it. 1.4 hardening (1.3.2 faults here) that the candidate lags",
+  "inflateCopy with an invalid source: zlib 1.4 sets dest->state to NULL, the candidate leaves it untouched. 1.4 hardening that the candidate lags",
 };
 
 #define CK(c, ...) do { g_gchecks++; if (!(c)) { g_gfail++; if (g_gfail <= 10) { printf("  FAIL %s: ", g_name); printf(__VA_ARGS__); printf("\n"); } } } while (0)
@@ -884,11 +899,7 @@ static void gzip_files(void) {
               if (d == 1) { Buf o0; gz_read(P[0], path, rs, &o0, &last_en, &last_rc); free(o0.p); }
               gz_read(P[d], path, rs, &o, &en, &rc);
               CK(o.n == c->n && (c->n == 0 || memcmp(o.p, c->p, c->n) == 0), "%s->%s %s mode=%s write-style=%d read-style=%d: n=%zu/%zu", P[e]->name, P[d]->name, c->name, modes[mi], style, rs, o.n, c->n);
-              if (d == 1 && rs == 2 && (en != last_en || rc != last_rc)) {
-                CK(last_en == Z_BUF_ERROR && last_rc == Z_BUF_ERROR && en == 0 && rc == 0, "%s %s mode=%s gzgets: oracle err=%d close=%d candidate err=%d close=%d", P[e]->name, c->name, modes[mi], last_en, last_rc, en, rc);
-                kd_count[KD_GZGETS_EOF]++;
-              }
-              else if (d == 1) CK(en == last_en && rc == last_rc, "%s %s mode=%s read-style=%d: gzerror %d close %d, oracle reader gave %d and %d", P[e]->name, c->name, modes[mi], rs, en, rc, last_en, last_rc);
+              if (d == 1) CK(en == last_en && rc == last_rc, "%s %s mode=%s read-style=%d: gzerror %d close %d, oracle reader gave %d and %d", P[e]->name, c->name, modes[mi], rs, en, rc, last_en, last_rc);
               last_en = en; last_rc = rc;
               free(o.p);
             }
@@ -988,9 +999,6 @@ static void gzip_files(void) {
       if (!same && cut < 4 && o[0].n == cut && memcmp(o[0].p, z, cut) == 0 && o[1].n == 0 && en[0] == 0 && rc[0] == 0 && en[1] == Z_BUF_ERROR && rc[1] == Z_BUF_ERROR) {
         kd_count[KD_GZ_SHORT_HEADER]++;
         same = 1;
-      } else if (!same && o[0].n == o[1].n && (o[0].n == 0 || memcmp(o[0].p, o[1].p, o[0].n) == 0) && en[0] == 0 && rc[0] == 0 && en[1] == Z_BUF_ERROR && rc[1] == Z_BUF_ERROR) {
-        kd_count[KD_GZ_TRUNCATED]++;
-        same = 1;
       }
       CK(same, "%s file truncated at %zu/%zu: oracle read=%zu err=%d close=%d candidate read=%zu err=%d close=%d", P[e]->name, cut, zn, o[0].n, en[0], rc[0], o[1].n, en[1], rc[1]);
       free(o[0].p); free(o[1].p);
@@ -1005,7 +1013,9 @@ static void gzip_files(void) {
         int oracle_exact = o[0].n == 2000 && memcmp(o[0].p, corpus[2].p, 2000) == 0 && en[0] == 0 && rc[0] == 0;
         int cand_prefix = o[1].n <= 2000 && memcmp(o[1].p, corpus[2].p, o[1].n) == 0;
         if (en[0] != 0 || rc[0] != 0) {
-          CK(en[1] == en[0] && rc[1] == rc[0] && cand_prefix, "%s file corrupt at %zu^%02x: oracle read=%zu err=%d close=%d candidate read=%zu err=%d close=%d prefix=%d", P[e]->name, pos, mask, o[0].n, en[0], rc[0], o[1].n, en[1], rc[1], cand_prefix);
+          int same_bytes = o[1].n == o[0].n && (o[0].n == 0 || memcmp(o[0].p, o[1].p, o[0].n) == 0);
+          CK(en[1] == en[0] && rc[1] == rc[0] && (cand_prefix || same_bytes), "%s file corrupt at %zu^%02x: oracle read=%zu err=%d close=%d candidate read=%zu err=%d close=%d prefix=%d", P[e]->name, pos, mask, o[0].n, en[0], rc[0], o[1].n, en[1], rc[1], cand_prefix);
+          if (!same_bytes) kd_count[KD_GZ_DELIVER_ALL]++;
         } else if (oracle_exact) {
           CK(o[1].n == 2000 && cand_prefix && en[1] == 0 && rc[1] == 0, "%s file corrupt at %zu^%02x: benign for the oracle, candidate read=%zu err=%d close=%d", P[e]->name, pos, mask, o[1].n, en[1], rc[1]);
         } else {
@@ -1429,6 +1439,783 @@ static void inflate_sync(void) {
   group_end();
 }
 
+#define ADD(...) do { size_t l_ = strlen(out); if (l_ < cap) snprintf(out + l_, cap - l_, __VA_ARGS__); } while (0)
+
+typedef void (*CaseFn)(Api *A, char *out, size_t cap);
+
+static uint64_t fnv(const u8 *p, size_t n, uint64_t h) {
+  for (size_t i = 0; i < n; i++) { h ^= p[i]; h *= 0x100000001b3ull; }
+  return h;
+}
+
+static const uint64_t FNV0 = 0xcbf29ce484222325ull;
+
+static uint64_t local_rnd(uint64_t *s) {
+  *s ^= *s << 13;
+  *s ^= *s >> 7;
+  *s ^= *s << 17;
+  return *s;
+}
+
+static void run_one(CaseFn fn, Api *A, char *out, size_t cap) {
+  int fds[2];
+  if (pipe(fds) != 0) exit(2);
+  fflush(stdout);
+  pid_t pid = fork();
+  if (pid < 0) exit(2);
+  if (pid == 0) {
+    close(fds[0]);
+    alarm(120);
+    char text[2048];
+    text[0] = 0;
+    fn(A, text, sizeof(text));
+    size_t len = strlen(text);
+    size_t off = 0;
+    while (off < len) {
+      ssize_t w = write(fds[1], text + off, len - off);
+      if (w <= 0) break;
+      off += (size_t)w;
+    }
+    _exit(0);
+  }
+  close(fds[1]);
+  size_t got = 0;
+  ssize_t n;
+  while (got + 1 < cap && (n = read(fds[0], out + got, cap - 1 - got)) > 0) got += (size_t)n;
+  out[got] = 0;
+  close(fds[0]);
+  int status = 0;
+  waitpid(pid, &status, 0);
+  if (WIFSIGNALED(status)) ADD(" CRASH signal %d", WTERMSIG(status));
+  else if (WEXITSTATUS(status) != 0) ADD(" EXIT %d", WEXITSTATUS(status));
+}
+
+#define NO_KD (-1)
+
+static void run_case(const char *id, CaseFn fn, int kd, const char *oracle, const char *candidate) {
+  char o[2][2048];
+  for (int d = 0; d < 2; d++) { o[d][0] = 0; run_one(fn, P[d], o[d], sizeof(o[d])); }
+  if (strcmp(o[0], o[1]) == 0) {
+    if (kd >= 0) {
+      printf("  info %s: the recorded divergence no longer occurs\n", id);
+      CK(1, "%s", id);
+      return;
+    }
+    CK(oracle == NULL || strstr(o[0], oracle) != NULL, "%s: the oracle no longer shows [%s]; it gave [%s]", id, oracle, o[0]);
+    printf("  same %s: %.200s\n", id, o[0]);
+    return;
+  }
+  if (kd >= 0 && oracle && candidate && strcmp(o[0], oracle) == 0 && strcmp(o[1], candidate) == 0) {
+    kd_count[kd]++;
+    CK(1, "%s", id);
+    return;
+  }
+  printf("  difference %s: oracle [%s] candidate [%s]\n", id, o[0], o[1]);
+  CK(0, "%s: unexplained difference", id);
+}
+
+static int tail_matches(const u8 *dict, uInt len, const u8 *data, size_t n) {
+  return len <= n && memcmp(dict, data + n - len, len) == 0;
+}
+
+static void case_getdict_after_bad_window(Api *A, char *out, size_t cap) {
+  static const u8 bad[2] = {0x88, 0x1c};
+  Buf z = {0};
+  enc(P[0], corpus[4].p, 100000, 6, 15, 8, 0, &z);
+  z_stream s;
+  memset(&s, 0, sizeof(s));
+  int r = Z(inflateInit2_)(&s, 0, ZLIB_VERSION, (int)sizeof(s));
+  ADD("init=%s ", rname(r));
+  u8 junk[16];
+  s.next_in = (Bytef *)bad; s.avail_in = 2; s.next_out = junk; s.avail_out = sizeof(junk);
+  r = Z(inflate)(&s, Z_NO_FLUSH);
+  ADD("bad-header=%s ", rname(r));
+  r = Z(inflateReset)(&s);
+  ADD("reset=%s ", rname(r));
+  u8 *dst = xmalloc(100000);
+  s.next_in = z.p; s.avail_in = (uInt)(z.n - 8); s.next_out = dst; s.avail_out = 100000;
+  do { r = Z(inflate)(&s, Z_NO_FLUSH); } while (r == Z_OK);
+  ADD("inflate=%s out=%lu ", rname(r), s.total_out);
+  enum { GUARD = 8192 };
+  u8 *dict = xmalloc(32768 + GUARD);
+  memset(dict, 0xcd, 32768 + GUARD);
+  uInt len = 0xffffffffu;
+  r = Z(inflateGetDictionary)(&s, dict, &len);
+  int guard = 1;
+  for (size_t i = 32768; i < 32768 + GUARD; i++) if (dict[i] != 0xcd) { guard = 0; break; }
+  ADD("getdict=%s len=%u guard-intact=%d tail-match=%d", rname(r), len, guard, len <= 32768 && tail_matches(dict, len, dst, s.total_out));
+  Z(inflateEnd)(&s);
+  free(dst); free(dict); free(z.p);
+}
+
+static void getdict_modes(Api *A, char *out, size_t cap, const int (*modes)[2], int count) {
+  enum { GUARD = 4096, N = 50000 };
+  for (int m = 0; m < count; m++) {
+    Buf z = {0};
+    enc(P[0], corpus[2].p, N, 6, modes[m][1], 8, 0, &z);
+    z_stream s;
+    memset(&s, 0, sizeof(s));
+    Z(inflateInit2_)(&s, modes[m][0], ZLIB_VERSION, (int)sizeof(s));
+    u8 *dst = xmalloc(N);
+    u8 *dict = xmalloc(32768 + GUARD);
+    uInt len = 77;
+    memset(dict, 0xcd, 32768 + GUARD);
+    int r0 = Z(inflateGetDictionary)(&s, dict, &len);
+    uInt fresh = len;
+    s.next_in = z.p; s.avail_in = (uInt)(z.n / 2); s.next_out = dst; s.avail_out = N;
+    int rh = Z(inflate)(&s, Z_NO_FLUSH);
+    len = 0;
+    int r1 = Z(inflateGetDictionary)(&s, dict, &len);
+    uInt half = len;
+    int half_ok = len <= 32768 && tail_matches(dict, len, dst, s.total_out);
+    s.next_in = z.p + z.n / 2; s.avail_in = (uInt)(z.n - z.n / 2);
+    do { r1 = Z(inflate)(&s, Z_NO_FLUSH); } while (r1 == Z_OK);
+    memset(dict, 0xcd, 32768 + GUARD);
+    len = 0;
+    int r2 = Z(inflateGetDictionary)(&s, dict, &len);
+    int guard = 1;
+    for (size_t i = 32768; i < 32768 + GUARD; i++) if (dict[i] != 0xcd) { guard = 0; break; }
+    int tail = len <= 32768 && tail_matches(dict, len, dst, s.total_out);
+    uInt only_len = 0;
+    int r3 = Z(inflateGetDictionary)(&s, NULL, &only_len);
+    int r4 = Z(inflateGetDictionary)(&s, dict, NULL);
+    int r5 = Z(inflateGetDictionary)(&s, NULL, NULL);
+    ADD("[wbits=%d fresh=%s/%u half=%s/%u/%d end=%s full=%s/%u/guard%d/tail%d len-only=%s/%u dict-only=%s none=%s] ", modes[m][0], rname(r0), fresh, rname(rh), half, half_ok, rname(r1), rname(r2), len, guard, tail, rname(r3), only_len, rname(r4), rname(r5));
+    Z(inflateEnd)(&s);
+    free(dst); free(dict); free(z.p);
+  }
+}
+
+static void case_getdict_full_window(Api *A, char *out, size_t cap) {
+  static const int modes[][2] = {{15, 15}, {0, 15}, {-15, -15}, {31, 31}, {47, 31}};
+  getdict_modes(A, out, cap, modes, 5);
+}
+
+static void case_getdict_small_window(Api *A, char *out, size_t cap) {
+  static const int modes[][2] = {{9, 9}, {-9, -9}};
+  getdict_modes(A, out, cap, modes, 2);
+}
+
+static void case_window_reuse(Api *A, char *out, size_t cap) {
+  Buf small = {0}, big = {0};
+  enc(P[0], corpus[2].p, 3000, 6, 9, 8, 0, &small);
+  enc(P[0], corpus[4].p, 80000, 6, 15, 8, 0, &big);
+  z_stream s;
+  memset(&s, 0, sizeof(s));
+  Z(inflateInit2_)(&s, 0, ZLIB_VERSION, (int)sizeof(s));
+  u8 *dst = xmalloc(100000);
+  int r;
+  s.next_in = small.p; s.avail_in = (uInt)small.n; s.next_out = dst; s.avail_out = 100000;
+  do { r = Z(inflate)(&s, Z_NO_FLUSH); } while (r == Z_OK);
+  ADD("small=%s/%lu ", rname(r), s.total_out);
+  ADD("reset=%s ", rname(Z(inflateReset)(&s)));
+  s.next_in = big.p; s.avail_in = (uInt)big.n; s.next_out = dst; s.avail_out = 100000;
+  do { r = Z(inflate)(&s, Z_NO_FLUSH); } while (r == Z_OK);
+  ADD("big=%s/%lu match=%d ", rname(r), s.total_out, s.total_out == 80000 && memcmp(dst, corpus[4].p, 80000) == 0);
+  ADD("msg=%s ", s.msg ? s.msg : "none");
+  Z(inflateEnd)(&s);
+  memset(&s, 0, sizeof(s));
+  Z(inflateInit2_)(&s, 0, ZLIB_VERSION, (int)sizeof(s));
+  s.next_in = big.p; s.avail_in = (uInt)big.n; s.next_out = dst; s.avail_out = 100000;
+  do { r = Z(inflate)(&s, Z_NO_FLUSH); } while (r == Z_OK);
+  ADD("big-first=%s/%lu ", rname(r), s.total_out);
+  ADD("reset-keep=%s ", rname(Z(inflateResetKeep)(&s)));
+  s.next_in = small.p; s.avail_in = (uInt)small.n; s.next_out = dst; s.avail_out = 100000;
+  do { r = Z(inflate)(&s, Z_NO_FLUSH); } while (r == Z_OK);
+  ADD("small-after=%s/%lu", rname(r), s.total_out);
+  Z(inflateEnd)(&s);
+  free(dst); free(small.p); free(big.p);
+}
+
+static void sync_after_error(Api *A, char *out, size_t cap, int wbits, int enc_wbits, int flush_mode, int skip_header, int damage) {
+  Buf z = {0};
+  Pace pace = {2000, 4096, 1, flush_mode};
+  enc_stream(P[0], corpus[2].p, 20000, 6, enc_wbits, pace, &z);
+  if (damage) for (int i = 300; i < 340; i++) z.p[i] ^= 0xa5;
+  z_stream s;
+  memset(&s, 0, sizeof(s));
+  int r = Z(inflateInit2_)(&s, wbits, ZLIB_VERSION, (int)sizeof(s));
+  ADD("init=%s ", rname(r));
+  enum { CAP = 20001, GUARD = 64 };
+  u8 *dst = xmalloc(CAP + GUARD);
+  memset(dst, 0xcd, CAP + GUARD);
+  s.next_in = z.p + (skip_header ? 2 : 0); s.avail_in = (uInt)(z.n - (skip_header ? 2 : 0));
+  s.next_out = dst; s.avail_out = CAP;
+  r = Z(inflate)(&s, Z_NO_FLUSH);
+  ADD("first=%s ", rname(r));
+  r = Z(inflateSync)(&s);
+  ADD("sync=%s ", rname(r));
+  size_t before = CAP - s.avail_out;
+  size_t got = before;
+  do {
+    s.next_out = dst + got;
+    s.avail_out = (uInt)(CAP - got < 64 ? CAP - got : 64);
+    uInt offered = s.avail_out;
+    r = Z(inflate)(&s, Z_NO_FLUSH);
+    got += offered - s.avail_out;
+  } while (r == Z_OK && got < CAP);
+  int guard = 1;
+  for (size_t i = CAP; i < CAP + GUARD; i++) if (dst[i] != 0xcd) { guard = 0; break; }
+  ADD("after=%s recovered=%zu hash=%016llx guard-intact=%d", rname(r), got - before, (unsigned long long)fnv(dst + before, got - before, FNV0), guard);
+  Z(inflateEnd)(&s);
+  free(dst); free(z.p);
+}
+
+static void case_sync_auto_window_full(Api *A, char *out, size_t cap) { sync_after_error(A, out, cap, 0, 15, Z_FULL_FLUSH, 1, 0); }
+static void case_sync_auto_window_sync(Api *A, char *out, size_t cap) { sync_after_error(A, out, cap, 0, 15, Z_SYNC_FLUSH, 1, 0); }
+static void case_sync_zlib_window(Api *A, char *out, size_t cap) { sync_after_error(A, out, cap, 15, 15, Z_FULL_FLUSH, 1, 0); }
+static void case_sync_raw_window(Api *A, char *out, size_t cap) { sync_after_error(A, out, cap, -15, -15, Z_FULL_FLUSH, 0, 1); }
+static void case_sync_gzip_auto(Api *A, char *out, size_t cap) { sync_after_error(A, out, cap, 47, 31, Z_FULL_FLUSH, 1, 0); }
+
+static void case_inflate_prime(Api *A, char *out, size_t cap) {
+  Buf z = {0};
+  enc(P[0], corpus[2].p, 5000, 6, -15, 8, 0, &z);
+  z_stream s;
+  memset(&s, 0, sizeof(s));
+  Z(inflateInit2_)(&s, -15, ZLIB_VERSION, (int)sizeof(s));
+  int a = Z(inflatePrime)(&s, 4, z.p[0] & 15);
+  int b = Z(inflatePrime)(&s, 4, z.p[0] >> 4);
+  u8 *dst = xmalloc(5001);
+  s.next_in = z.p + 1; s.avail_in = (uInt)(z.n - 1); s.next_out = dst; s.avail_out = 5001;
+  int r;
+  do { r = Z(inflate)(&s, Z_NO_FLUSH); } while (r == Z_OK);
+  ADD("split-prime=%s,%s inflate=%s match=%d ", rname(a), rname(b), rname(r), s.total_out == 5000 && memcmp(dst, corpus[2].p, 5000) == 0);
+  Z(inflateEnd)(&s);
+  memset(&s, 0, sizeof(s));
+  Z(inflateInit2_)(&s, -15, ZLIB_VERSION, (int)sizeof(s));
+  ADD("sequence:");
+  for (int i = 0; i < 6; i++) ADD(" %s", rname(Z(inflatePrime)(&s, 16, 0xbeef)));
+  ADD(" 32=%s 17=%s 0=%s -1=%s ", rname(Z(inflatePrime)(&s, 32, 1)), rname(Z(inflatePrime)(&s, 17, 1)), rname(Z(inflatePrime)(&s, 0, 0)), rname(Z(inflatePrime)(&s, -1, 0)));
+  Z(inflateEnd)(&s);
+  uint64_t seed = 0x1234567ull;
+  int ok = 0, data = 0, other = 0, buf = 0, end = 0, prime_err = 0;
+  uint64_t h = FNV0;
+  for (int t = 0; t < 300; t++) {
+    memset(&s, 0, sizeof(s));
+    Z(inflateInit2_)(&s, -15, ZLIB_VERSION, (int)sizeof(s));
+    int n = (int)(local_rnd(&seed) % 5);
+    for (int i = 0; i < n; i++) {
+      int bits = (int)(local_rnd(&seed) % 17);
+      int pr = Z(inflatePrime)(&s, bits, (int)(local_rnd(&seed) & 0xffff));
+      if (pr != Z_OK) prime_err++;
+      h = h * 31 + (uint64_t)(pr + 10);
+    }
+    size_t off = (size_t)(local_rnd(&seed) % 3);
+    s.next_in = z.p + off; s.avail_in = (uInt)(z.n - off); s.next_out = dst; s.avail_out = 5001;
+    do { r = Z(inflate)(&s, Z_NO_FLUSH); } while (r == Z_OK);
+    h = fnv(dst, 5001 - s.avail_out, h * 31 + (uint64_t)(r + 10));
+    if (r == Z_STREAM_END) end++; else if (r == Z_DATA_ERROR) data++; else if (r == Z_BUF_ERROR) buf++; else other++;
+    (void)ok;
+    Z(inflateEnd)(&s);
+  }
+  ADD("random-prime end=%d data=%d buf=%d other=%d prime-errors=%d hash=%016llx", end, data, buf, other, prime_err, (unsigned long long)h);
+  free(dst); free(z.p);
+}
+
+static void deflate_prime_loop(Api *A, char *out, size_t cap, int wbits, int mem) {
+  z_stream s;
+  memset(&s, 0, sizeof(s));
+  int r = Z(deflateInit2_)(&s, 6, Z_DEFLATED, wbits, mem, Z_DEFAULT_STRATEGY, ZLIB_VERSION, (int)sizeof(s));
+  if (r != Z_OK) { ADD("[wbits=%d mem=%d init=%s] ", wbits, mem, rname(r)); return; }
+  int first_fail = -1, fail_ret = Z_OK;
+  for (int i = 0; i < 6000; i++) {
+    r = Z(deflatePrime)(&s, 16, 0x5a5a);
+    if (r != Z_OK) { first_fail = i; fail_ret = r; break; }
+  }
+  unsigned pending = 0;
+  int bits = 0;
+  Z(deflatePending)(&s, &pending, &bits);
+  u8 buf[512];
+  s.next_in = corpus[2].p; s.avail_in = 1000; s.next_out = buf; s.avail_out = sizeof(buf);
+  r = Z(deflate)(&s, Z_FINISH);
+  ADD("[wbits=%d mem=%d first-fail=%d/%s pending=%u/%d then-deflate=%s] ", wbits, mem, first_fail, rname(fail_ret), pending, bits, rname(r));
+  Z(deflateEnd)(&s);
+}
+
+static void case_inflate_prime_fast_path(Api *A, char *out, size_t cap) {
+  Buf z = {0};
+  enc(P[0], corpus[2].p, 8000, 6, -15, 8, Z_FIXED, &z);
+  u8 *dst = xmalloc(8400);
+  for (int bytes = 1; bytes <= 4; bytes++) {
+    z_stream s;
+    memset(&s, 0, sizeof(s));
+    Z(inflateInit2_)(&s, -15, ZLIB_VERSION, (int)sizeof(s));
+    int pr = Z_OK;
+    for (int done = 0; done < bytes; done += 2) {
+      int take = bytes - done >= 2 ? 2 : 1;
+      int value = z.p[done] | (take == 2 ? z.p[done + 1] << 8 : 0);
+      pr |= Z(inflatePrime)(&s, take * 8, value);
+    }
+    size_t rest = z.n - (size_t)bytes;
+    u8 *input = xmalloc(rest);
+    memcpy(input, z.p + bytes, rest);
+    s.next_in = input; s.avail_in = (uInt)rest;
+    int r;
+    do {
+      s.next_out = dst + s.total_out; s.avail_out = 258;
+      r = Z(inflate)(&s, Z_NO_FLUSH);
+    } while (r == Z_OK);
+    ADD("[primed-bytes=%d prime=%d inflate=%s out=%lu match=%d] ", bytes, pr, rname(r), s.total_out, s.total_out == 8000 && memcmp(dst, corpus[2].p, 8000) == 0);
+    Z(inflateEnd)(&s);
+    free(input);
+  }
+  free(dst); free(z.p);
+}
+
+#define PRIME_CASE(name, w, m) static void name(Api *A, char *out, size_t cap) { deflate_prime_loop(A, out, cap, w, m); }
+PRIME_CASE(case_deflate_prime_raw8, -15, 8)
+PRIME_CASE(case_deflate_prime_raw1, -15, 1)
+PRIME_CASE(case_deflate_prime_raw9bit1, -9, 1)
+PRIME_CASE(case_deflate_prime_zlib8, 15, 8)
+PRIME_CASE(case_deflate_prime_gzip8, 31, 8)
+PRIME_CASE(case_deflate_prime_raw9, -15, 9)
+
+static int back_run(Api *A, const u8 *input, size_t n, size_t chunk, u8 poison, Buf *result) {
+  z_stream s;
+  memset(&s, 0, sizeof(s));
+  u8 window[32768];
+  memset(window, poison, sizeof(window));
+  Z(inflateBackInit_)(&s, 15, window, ZLIB_VERSION, (int)sizeof(s));
+  BackCtx ctx = {input, n, 0, chunk, {0}, 0};
+  int r = Z(inflateBack)(&s, back_in, &ctx, back_out, &ctx);
+  Z(inflateBackEnd)(&s);
+  *result = ctx.out;
+  return r;
+}
+
+static void back_fuzz(Api *A, char *out, size_t cap, int mutate) {
+  Buf z = {0};
+  enc(P[0], corpus[2].p, 3000, 6, -15, 8, 0, &z);
+  uint64_t seed = 0x9e3779b9ull;
+  int counts[4] = {0, 0, 0, 0};
+  int window_dependent = 0;
+  uint64_t h = FNV0;
+  for (int t = 0; t < 600; t++) {
+    u8 input[3200];
+    size_t n;
+    if (!mutate) {
+      n = 1 + local_rnd(&seed) % 80;
+      for (size_t i = 0; i < n; i++) input[i] = (u8)local_rnd(&seed);
+    } else {
+      n = z.n < sizeof(input) ? z.n : sizeof(input);
+      memcpy(input, z.p, n);
+      int edits = 1 + (int)(local_rnd(&seed) % 4);
+      for (int e = 0; e < edits; e++) input[local_rnd(&seed) % n] ^= (u8)(1 + local_rnd(&seed) % 255);
+    }
+    size_t chunk = 1 + local_rnd(&seed) % 300;
+    Buf a = {0}, b = {0};
+    int ra = back_run(A, input, n, chunk, 0xaa, &a);
+    int rb = back_run(A, input, n, chunk, 0x55, &b);
+    if (ra != rb || a.n != b.n || (a.n && memcmp(a.p, b.p, a.n) != 0)) window_dependent++;
+    h = fnv(a.p ? a.p : (const u8 *)"", a.n, h * 31 + (uint64_t)(ra + 10));
+    counts[ra == Z_STREAM_END ? 0 : ra == Z_DATA_ERROR ? 1 : ra == Z_BUF_ERROR ? 2 : 3]++;
+    free(a.p); free(b.p);
+  }
+  ADD("end=%d data=%d buf=%d other=%d window-dependent=%d hash=%016llx", counts[0], counts[1], counts[2], counts[3], window_dependent, (unsigned long long)h);
+  free(z.p);
+}
+
+static void case_inflate_back_random(Api *A, char *out, size_t cap) { back_fuzz(A, out, cap, 0); }
+static void case_inflate_back_mutated(Api *A, char *out, size_t cap) { back_fuzz(A, out, cap, 1); }
+
+static void case_inflate_back_far_distance(Api *A, char *out, size_t cap) {
+  enum { DICT = 32768 };
+  u8 *dict = xmalloc(DICT);
+  for (size_t i = 0; i < DICT; i++) dict[i] = (u8)("0123456789abcdefghijklmnopqrstuvwxyz"[i % 36]);
+  z_stream d;
+  memset(&d, 0, sizeof(d));
+  Z(deflateInit2_)(&d, 6, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION, (int)sizeof(d));
+  Z(deflateSetDictionary)(&d, dict, DICT);
+  u8 raw[4096];
+  d.next_in = dict + 100; d.avail_in = 2000; d.next_out = raw; d.avail_out = sizeof(raw);
+  Z(deflate)(&d, Z_FINISH);
+  size_t rn = sizeof(raw) - d.avail_out;
+  Z(deflateEnd)(&d);
+
+  z_stream s;
+  memset(&s, 0, sizeof(s));
+  u8 window[32768];
+  memset(window, 0xaa, sizeof(window));
+  Z(inflateBackInit_)(&s, 15, window, ZLIB_VERSION, (int)sizeof(s));
+  BackCtx ctx = {raw, rn, 0, rn, {0}, 0};
+  int r = Z(inflateBack)(&s, back_in, &ctx, back_out, &ctx);
+  size_t poison = 0;
+  for (size_t i = 0; i < ctx.out.n; i++) if (ctx.out.p && ctx.out.p[i] == 0xaa) poison++;
+  ADD("inflateBack=%s delivered=%zu poison=%zu ", rname(r), ctx.out.n, poison);
+  Z(inflateBackEnd)(&s);
+  free(ctx.out.p);
+
+  memset(&s, 0, sizeof(s));
+  Z(inflateInit2_)(&s, -15, ZLIB_VERSION, (int)sizeof(s));
+  u8 dst[4096];
+  s.next_in = raw; s.avail_in = (uInt)rn; s.next_out = dst; s.avail_out = sizeof(dst);
+  r = Z(inflate)(&s, Z_NO_FLUSH);
+  ADD("inflate-no-dict=%s out=%lu ", rname(r), s.total_out);
+  Z(inflateEnd)(&s);
+
+  memset(&s, 0, sizeof(s));
+  Z(inflateInit2_)(&s, -15, ZLIB_VERSION, (int)sizeof(s));
+  r = Z(inflateSetDictionary)(&s, dict, DICT);
+  s.next_in = raw; s.avail_in = (uInt)rn; s.next_out = dst; s.avail_out = sizeof(dst);
+  int r2 = Z(inflate)(&s, Z_FINISH);
+  ADD("set-dict=%s inflate-with-dict=%s match=%d", rname(r), rname(r2), s.total_out == 2000 && memcmp(dst, dict + 100, 2000) == 0);
+  Z(inflateEnd)(&s);
+  free(dict);
+}
+
+static void gz_seek_variant(Api *A, char *out, size_t cap, int v) {
+  char path[512];
+  snprintf(path, sizeof(path), "%s/fix-seek-%d.gz", g_tmp, (int)getpid());
+  gzFile f = Z(gzopen)(path, "wb6");
+  long long sk = 0;
+  int w = 0, w2 = 0;
+  switch (v) {
+    case 0: sk = Z(gzseek)(f, 5000, SEEK_CUR); w = Z(gzwrite)(f, "TAIL", 4); break;
+    case 1: Z(gzseek)(f, 100, SEEK_CUR); Z(gzseek)(f, 200, SEEK_CUR); sk = Z(gzseek)(f, 300, SEEK_CUR); w = Z(gzwrite)(f, "TAIL", 4); break;
+    case 2: w = Z(gzwrite)(f, "HEAD", 4); Z(gzseek)(f, 40000, SEEK_CUR); w2 = Z(gzwrite)(f, "TAIL", 4); sk = Z(gzseek)(f, 30, SEEK_CUR); break;
+    case 3: sk = Z(gzseek)(f, 70000, SEEK_SET); break;
+    case 4: sk = Z(gzseek)(f, -1, SEEK_CUR); w = Z(gzwrite)(f, "TAIL", 4); break;
+    case 5: Z(gzseek)(f, 100000, SEEK_CUR); w = Z(gzwrite)(f, "X", 1); sk = Z(gzseek)(f, 5, SEEK_CUR); w2 = Z(gzwrite)(f, "Y", 1); break;
+    case 6: sk = Z(gzseek)(f, 20000, SEEK_CUR); Z(gzflush)(f, Z_SYNC_FLUSH); w = Z(gzwrite)(f, "TAIL", 4); break;
+    case 7: sk = Z(gzseek)(f, 300, SEEK_CUR); w = Z(gzputc)(f, 'Z'); w2 = Z(gzputs)(f, "tail"); break;
+  }
+  int close = Z(gzclose_w)(f);
+  Buf o = {0};
+  int en = 0, rc = 0;
+  gz_read(P[0], path, 0, &o, &en, &rc);
+  size_t zeros = 0;
+  while (zeros < o.n && o.p[zeros] == 0) zeros++;
+  ADD("[v=%d seek=%lld w=%d,%d close=%d -> n=%zu leading-zeros=%zu hash=%016llx err=%d] ", v, sk, w, w2, close, o.n, zeros, (unsigned long long)fnv(o.p ? o.p : (const u8 *)"", o.n, FNV0), en);
+  free(o.p);
+  unlink(path);
+}
+
+static void case_gzseek_write(Api *A, char *out, size_t cap) {
+  for (int v = 0; v < 8; v++) gz_seek_variant(A, out, cap, v);
+}
+
+static void nonblocking_write(Api *A, char *out, size_t cap, size_t chunk_limit, int flush_mid) {
+  enum { TOTAL = 400000 };
+  u8 *data = xmalloc(TOTAL);
+  uint64_t seed = 0xfeedfaceull;
+  for (size_t i = 0; i < TOTAL; i++) data[i] = (u8)local_rnd(&seed);
+  int fds[2];
+  if (pipe2(fds, O_NONBLOCK) != 0) exit(2);
+  gzFile f = Z(gzdopen)(fds[1], "wb");
+  Z(gzbuffer)(f, 8192);
+  Buf coll = {0};
+  size_t ccap = 0, off = 0;
+  int stalls = 0, idle = 0, first_en = 0;
+  for (int it = 0; it < 4000 && off < TOTAL && idle < 100; it++) {
+    size_t len = TOTAL - off;
+    if (len > chunk_limit) len = chunk_limit;
+    u8 *tmp = xmalloc(len);
+    memcpy(tmp, data + off, len);
+    int r = Z(gzwrite)(f, tmp, (unsigned)len);
+    memset(tmp, 0xee, len);
+    free(tmp);
+    if (r > 0) { off += (size_t)r; idle = 0; }
+    if ((size_t)r != len) {
+      int en = 0;
+      Z(gzerror)(f, &en);
+      if (!stalls) first_en = en;
+      stalls++;
+      u8 buf[4096];
+      ssize_t n, drained = 0;
+      while ((n = read(fds[0], buf, sizeof(buf))) > 0) { buf_append(&coll, buf, (size_t)n, &ccap); drained += n; }
+      if (r <= 0 && drained == 0) idle++;
+    }
+    if (flush_mid && it % 3 == 2) Z(gzflush)(f, Z_SYNC_FLUSH);
+  }
+  u8 buf[4096];
+  ssize_t n;
+  while ((n = read(fds[0], buf, sizeof(buf))) > 0) buf_append(&coll, buf, (size_t)n, &ccap);
+  int close = Z(gzclose_w)(f);
+  while ((n = read(fds[0], buf, sizeof(buf))) > 0) buf_append(&coll, buf, (size_t)n, &ccap);
+  u8 *back = xmalloc(TOTAL + 64);
+  size_t got = 0;
+  int r = dec(P[0], coll.p ? coll.p : (const u8 *)"", coll.n, 31, back, TOTAL + 64, &got, NULL);
+  ADD("accepted=%zu stalled=%d first-error=%d close=%d decode=%s decoded=%zu match=%d", off, stalls > 0, first_en, close, rname(r), got, got == off && memcmp(back, data, off) == 0);
+  free(back); free(coll.p); free(data);
+}
+
+static void case_gzwrite_nonblocking_large(Api *A, char *out, size_t cap) { nonblocking_write(A, out, cap, 150000, 0); }
+static void case_gzwrite_nonblocking_small(Api *A, char *out, size_t cap) { nonblocking_write(A, out, cap, 3000, 0); }
+static void case_gzwrite_nonblocking_flush(Api *A, char *out, size_t cap) { nonblocking_write(A, out, cap, 20000, 1); }
+
+static void case_gzwrite_invalid_lengths(Api *A, char *out, size_t cap) {
+  char path[512];
+  snprintf(path, sizeof(path), "%s/fix-len-%d.gz", g_tmp, (int)getpid());
+  gzFile f = Z(gzopen)(path, "wb");
+  u8 small[16] = "0123456789abcde";
+  int a = Z(gzwrite)(f, small, 0x80000000u);
+  int b = Z(gzwrite)(f, small, 0xffffffffu);
+  int c = Z(gzwrite)(f, small, 0);
+  size_t d = Z(gzfwrite)(small, (size_t)1 << 63, 3, f);
+  size_t e = Z(gzfwrite)(small, 0, 5, f);
+  int en = 0;
+  Z(gzerror)(f, &en);
+  int g = Z(gzwrite)(f, small, 8);
+  ADD("huge=%d max=%d zero=%d fwrite-overflow=%zu fwrite-zero=%zu err-after=%d later-write=%d ", a, b, c, d, e, en, g);
+  ADD("close=%d ", Z(gzclose_w)(f));
+  f = Z(gzopen)(path, "rb");
+  u8 buf[32];
+  int h = Z(gzread)(f, buf, 0x80000000u);
+  Z(gzerror)(f, &en);
+  ADD("read-huge=%d err=%d ", h, en);
+  ADD("close=%d", Z(gzclose_r)(f));
+  unlink(path);
+}
+
+static void trailer_variant(Api *A, char *out, size_t cap, int v) {
+  char path[512];
+  snprintf(path, sizeof(path), "%s/fix-trailer-%d.gz", g_tmp, (int)getpid());
+  Buf z = {0};
+  enc(P[0], corpus[2].p, 2000, 6, 31, 8, 0, &z);
+  u8 *w = xmalloc(z.n + 8);
+  size_t n = z.n;
+  memcpy(w, z.p, n);
+  switch (v) {
+    case 0: w[n - 8] ^= 1; break;
+    case 1: w[n - 1] ^= 1; break;
+    case 2: n -= 4; break;
+    case 3: n -= 9; break;
+    case 4: memcpy(w + n, "junk!", 5); n += 5; break;
+    case 5: memcpy(w + n, "ab", 2); n += 2; break;
+    case 6: memcpy(w + n, "\x1f\x8b\x08\x00\x00", 5); n += 5; break;
+  }
+  write_file(path, w, n);
+  free(w);
+  for (int style = 0; style < 4; style += (style == 0 ? 2 : 1)) {
+    Buf o = {0};
+    int en = 0, rc = 0;
+    gz_read(A, path, style, &o, &en, &rc);
+    ADD("[style=%d n=%zu intact=%d err=%d close=%d] ", style, o.n, o.n <= 2000 && memcmp(o.p, corpus[2].p, o.n) == 0, en, rc);
+    free(o.p);
+  }
+  free(z.p);
+  unlink(path);
+}
+
+#define TRAILER_CASE(k) static void case_gz_trailer_##k(Api *A, char *out, size_t cap) { trailer_variant(A, out, cap, k); }
+TRAILER_CASE(0)
+TRAILER_CASE(1)
+TRAILER_CASE(2)
+TRAILER_CASE(3)
+TRAILER_CASE(4)
+TRAILER_CASE(5)
+TRAILER_CASE(6)
+
+static void case_deflate_set_dictionary_misuse(Api *A, char *out, size_t cap) {
+  static const int wraps[] = {15, 31, -15};
+  u8 dict[200];
+  for (size_t i = 0; i < sizeof(dict); i++) dict[i] = (u8)("dictionary "[i % 11]);
+  for (int w = 0; w < 3; w++) {
+    z_stream s;
+    memset(&s, 0, sizeof(s));
+    Z(deflateInit2_)(&s, 6, Z_DEFLATED, wraps[w], 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION, (int)sizeof(s));
+    int fresh = Z(deflateSetDictionary)(&s, dict, sizeof(dict));
+    int again = Z(deflateSetDictionary)(&s, dict, sizeof(dict));
+    int null_dict = Z(deflateSetDictionary)(&s, NULL, 10);
+    int zero_len = Z(deflateSetDictionary)(&s, dict, 0);
+    u8 buf[512];
+    s.next_in = dict; s.avail_in = 10; s.next_out = buf; s.avail_out = sizeof(buf);
+    Z(deflate)(&s, Z_NO_FLUSH);
+    int after_data = Z(deflateSetDictionary)(&s, dict, sizeof(dict));
+    Z(deflate)(&s, Z_SYNC_FLUSH);
+    int after_flush = Z(deflateSetDictionary)(&s, dict, sizeof(dict));
+    Z(deflate)(&s, Z_FINISH);
+    int after_finish = Z(deflateSetDictionary)(&s, dict, sizeof(dict));
+    ADD("[wbits=%d fresh=%s again=%s null=%s zero=%s after-data=%s after-flush=%s after-finish=%s] ", wraps[w], rname(fresh), rname(again), rname(null_dict), rname(zero_len), rname(after_data), rname(after_flush), rname(after_finish));
+    Z(deflateEnd)(&s);
+  }
+}
+
+static void case_inflate_set_dictionary_null(Api *A, char *out, size_t cap) {
+  u8 dict[200] = {0};
+  z_stream s;
+  memset(&s, 0, sizeof(s));
+  Z(inflateInit2_)(&s, -15, ZLIB_VERSION, (int)sizeof(s));
+  ADD("null-dict=%s ", rname(Z(inflateSetDictionary)(&s, NULL, 10)));
+  ADD("zero-len=%s", rname(Z(inflateSetDictionary)(&s, dict, 0)));
+  Z(inflateEnd)(&s);
+}
+
+static void case_need_dict_total_in(Api *A, char *out, size_t cap) {
+  u8 dict[300];
+  for (size_t i = 0; i < sizeof(dict); i++) dict[i] = (u8)("zlib dictionary text "[i % 21]);
+  z_stream d;
+  memset(&d, 0, sizeof(d));
+  Z(deflateInit2_)(&d, 6, Z_DEFLATED, 15, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION, (int)sizeof(d));
+  Z(deflateSetDictionary)(&d, dict, sizeof(dict));
+  u8 zbuf[1024];
+  d.next_in = dict; d.avail_in = 250; d.next_out = zbuf; d.avail_out = sizeof(zbuf);
+  Z(deflate)(&d, Z_FINISH);
+  size_t zn = sizeof(zbuf) - d.avail_out;
+  Z(deflateEnd)(&d);
+  for (int pass = 0; pass < 2; pass++) {
+    z_stream s;
+    memset(&s, 0, sizeof(s));
+    Z(inflateInit2_)(&s, 15, ZLIB_VERSION, (int)sizeof(s));
+    u8 dst[512];
+    s.next_out = dst; s.avail_out = sizeof(dst);
+    size_t fed = 0;
+    int r = Z_OK;
+    while (r == Z_OK && fed < zn) {
+      size_t step = pass ? 1 : zn;
+      s.next_in = zbuf + fed - s.avail_in; s.avail_in += (uInt)step;
+      fed += step;
+      r = Z(inflate)(&s, Z_NO_FLUSH);
+    }
+    size_t consumed = fed - s.avail_in;
+    ADD("[chunk=%s first=%s total_in=%lu consumed=%zu ", pass ? "1" : "all", rname(r), s.total_in, consumed);
+    if (r == Z_NEED_DICT) {
+      int sd = Z(inflateSetDictionary)(&s, dict, sizeof(dict));
+      s.next_in = zbuf + consumed; s.avail_in = (uInt)(zn - consumed);
+      do { r = Z(inflate)(&s, Z_NO_FLUSH); } while (r == Z_OK);
+      ADD("setdict=%s finish=%s out=%lu final_total_in=%lu match=%d", rname(sd), rname(r), s.total_out, s.total_in, s.total_out == 250 && memcmp(dst, dict, 250) == 0);
+    }
+    ADD("] ");
+    Z(inflateEnd)(&s);
+  }
+}
+
+static void case_inflate_copy_invalid(Api *A, char *out, size_t cap) {
+  z_stream src, dst;
+  memset(&src, 0, sizeof(src));
+  memset(&dst, 0, sizeof(dst));
+  dst.state = (struct internal_state *)(uintptr_t)1;
+  int r = Z(inflateCopy)(&dst, &src);
+  ADD("invalid-source=%s dest-state-null=%d ", rname(r), dst.state == NULL);
+  memset(&src, 0, sizeof(src));
+  Z(inflateInit2_)(&src, 15, ZLIB_VERSION, (int)sizeof(src));
+  dst.state = (struct internal_state *)(uintptr_t)1;
+  r = Z(inflateCopy)(NULL, &src);
+  ADD("null-dest=%s ", rname(r));
+  Z(inflateEnd)(&src);
+}
+
+static void case_reset_keep_mid_stream(Api *A, char *out, size_t cap) {
+  static const int levels[] = {1, 4, 6, 9};
+  for (int li = 0; li < 4; li++) {
+    z_stream s;
+    memset(&s, 0, sizeof(s));
+    Z(deflateInit2_)(&s, levels[li], Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY, ZLIB_VERSION, (int)sizeof(s));
+    u8 sink[2048];
+    s.next_in = corpus[2].p; s.avail_in = 60000; s.next_out = sink; s.avail_out = sizeof(sink);
+    int first = Z(deflate)(&s, Z_NO_FLUSH);
+    int rk = Z(deflateResetKeep)(&s);
+    Buf z = {0};
+    size_t zcap = 0;
+    u8 chunk[1000];
+    s.next_in = corpus[5].p; s.avail_in = 40000;
+    int r;
+    do {
+      s.next_out = chunk; s.avail_out = sizeof(chunk);
+      r = Z(deflate)(&s, Z_FINISH);
+      buf_append(&z, chunk, sizeof(chunk) - s.avail_out, &zcap);
+    } while (r == Z_OK);
+    u8 *back = xmalloc(40001);
+    size_t got = 0;
+    int dr = dec(P[0], z.p, z.n, -15, back, 40001, &got, NULL);
+    ADD("[level=%d first=%s reset-keep=%s finish=%s decode=%s match=%d] ", levels[li], rname(first), rname(rk), rname(r), rname(dr), got == 40000 && memcmp(back, corpus[5].p, 40000) == 0);
+    free(back); free(z.p);
+    Z(deflateEnd)(&s);
+  }
+}
+
+static void case_gzopen_exclusive(Api *A, char *out, size_t cap) {
+  char path[512];
+  snprintf(path, sizeof(path), "%s/fix-excl-%d.gz", g_tmp, (int)getpid());
+  unlink(path);
+  gzFile a = Z(gzopen)(path, "wbx");
+  int ra = a != NULL;
+  if (a) Z(gzclose)(a);
+  errno = 0;
+  gzFile b = Z(gzopen)(path, "wbx");
+  int eb = errno;
+  ADD("first-create=%d second-create=%d errno=%d", ra, b != NULL, eb);
+  if (b) Z(gzclose)(b);
+  unlink(path);
+}
+
+static void case_gzseek_read_past_end(Api *A, char *out, size_t cap) {
+  char path[512];
+  snprintf(path, sizeof(path), "%s/fix-past-%d.gz", g_tmp, (int)getpid());
+  int wr, cr;
+  gz_write(P[0], path, "wb6", corpus[2].p, 100000, 0, &wr, &cr);
+  for (int v = 0; v < 5; v++) {
+    gzFile f = Z(gzopen)(path, "rb");
+    u8 buf[100];
+    long long sk;
+    int r = 0;
+    switch (v) {
+      case 0: sk = Z(gzseek)(f, 500000, SEEK_SET); r = Z(gzread)(f, buf, sizeof(buf)); break;
+      case 1: sk = Z(gzseek)(f, 99990, SEEK_SET); r = Z(gzread)(f, buf, sizeof(buf)); break;
+      case 2: sk = Z(gzseek)(f, 50000, SEEK_CUR); Z(gzseek)(f, 20000, SEEK_CUR); r = Z(gzread)(f, buf, sizeof(buf)); break;
+      case 3: sk = Z(gzseek)(f, 70000, SEEK_SET); r = Z(gzgetc)(f); Z(gzungetc)(r, f); r = Z(gzread)(f, buf, 10) * 1000 + (int)Z(gztell)(f) % 1000; break;
+      default: sk = Z(gzseek)(f, 30000, SEEK_SET); r = Z(gzread)(f, buf, 50); sk = sk * 1000 + Z(gzseek)(f, -20, SEEK_CUR); r = r * 1000 + Z(gzread)(f, buf, 40); break;
+    }
+    int en = 0;
+    Z(gzerror)(f, &en);
+    long long tell = (long long)Z(gztell)(f);
+    int eof = Z(gzeof)(f);
+    int closed = Z(gzclose_r)(f);
+    ADD("[v=%d seek=%lld read=%d tell=%lld eof=%d err=%d close=%d hash=%016llx] ", v, sk, r, tell, eof, en, closed, (unsigned long long)fnv(buf, sizeof(buf), FNV0));
+  }
+  unlink(path);
+}
+
+static void fixed_paths(void) {
+  group_begin("zlib 1.4 fixed paths: invalid windows, sync, priming, dictionaries, gzseek, nonblocking gzwrite");
+  run_case("inflateGetDictionary after invalid window size and reset", case_getdict_after_bad_window, NO_KD, "bad-header=Z_DATA_ERROR reset=Z_OK inflate=Z_BUF_ERROR out=99996 getdict=Z_OK len=32768 guard-intact=1 tail-match=1", NULL);
+  run_case("inflateGetDictionary with full-size windows", case_getdict_full_window, NO_KD, "[wbits=15 fresh=Z_OK/0", NULL);
+  run_case("inflateGetDictionary with 512-byte windows", case_getdict_small_window, KD_GETDICT_SMALL_WINDOW,
+    "[wbits=9 fresh=Z_OK/0 half=Z_OK/512/1 end=Z_STREAM_END full=Z_OK/512/guard1/tail0 len-only=Z_OK/512 dict-only=Z_OK none=Z_OK] [wbits=-9 fresh=Z_OK/0 half=Z_OK/512/1 end=Z_STREAM_END full=Z_OK/512/guard1/tail1 len-only=Z_OK/512 dict-only=Z_OK none=Z_OK] ",
+    "[wbits=9 fresh=Z_OK/0 half=Z_OK/25004/1 end=Z_STREAM_END full=Z_OK/25004/guard1/tail0 len-only=Z_OK/25004 dict-only=Z_OK none=Z_OK] [wbits=-9 fresh=Z_OK/0 half=Z_OK/25004/1 end=Z_STREAM_END full=Z_OK/32768/guard1/tail1 len-only=Z_OK/32768 dict-only=Z_OK none=Z_OK] ");
+  run_case("inflateReset with an auto window across streams", case_window_reuse, KD_RESET_AUTO_WINDOW,
+    "small=Z_STREAM_END/3000 reset=Z_OK big=Z_STREAM_END/80000 match=1 msg=none big-first=Z_STREAM_END/80000 reset-keep=Z_OK small-after=Z_STREAM_END/3000",
+    "small=Z_STREAM_END/3000 reset=Z_OK big=Z_DATA_ERROR/0 match=0 msg=invalid window size big-first=Z_STREAM_END/80000 reset-keep=Z_OK small-after=Z_STREAM_END/3000");
+  run_case("inflateSync after a header error, auto window, full flush", case_sync_auto_window_full, NO_KD, "sync=Z_OK", NULL);
+  run_case("inflateSync after a header error, auto window, sync flush", case_sync_auto_window_sync, NO_KD, "sync=Z_OK", NULL);
+  run_case("inflateSync after a header error, zlib window", case_sync_zlib_window, NO_KD, "sync=Z_OK", NULL);
+  run_case("inflateSync after a header error, raw window", case_sync_raw_window, NO_KD, "first=Z_DATA_ERROR sync=Z_OK", NULL);
+  run_case("inflateSync after a header error, gzip auto window", case_sync_gzip_auto, NO_KD, "sync=Z_OK", NULL);
+  run_case("repeated inflatePrime", case_inflate_prime, NO_KD, "split-prime=Z_OK,Z_OK inflate=Z_STREAM_END match=1", NULL);
+  run_case("inflatePrime with whole bytes before the inflate_fast path", case_inflate_prime_fast_path, NO_KD, "[primed-bytes=1 prime=0 inflate=Z_STREAM_END out=8000 match=1] [primed-bytes=2 prime=0 inflate=Z_STREAM_END out=8000 match=1] [primed-bytes=3 prime=0 inflate=Z_STREAM_END out=8000 match=1] [primed-bytes=4 prime=0 inflate=Z_STREAM_END out=8000 match=1] ", NULL);
+  run_case("repeated deflatePrime, raw, memLevel 8", case_deflate_prime_raw8, NO_KD, "first-fail=", NULL);
+  run_case("repeated deflatePrime, raw, memLevel 1", case_deflate_prime_raw1, KD_DEFLATE_PRIME, "[wbits=-15 mem=1 first-fail=256/Z_BUF_ERROR pending=512/0 then-deflate=Z_OK] ", " CRASH signal 6");
+  run_case("repeated deflatePrime, raw 9-bit window, memLevel 1", case_deflate_prime_raw9bit1, KD_DEFLATE_PRIME, "[wbits=-9 mem=1 first-fail=256/Z_BUF_ERROR pending=512/0 then-deflate=Z_OK] ", " CRASH signal 6");
+  run_case("repeated deflatePrime, zlib, memLevel 8", case_deflate_prime_zlib8, NO_KD, "first-fail=", NULL);
+  run_case("repeated deflatePrime, gzip, memLevel 8", case_deflate_prime_gzip8, NO_KD, "first-fail=", NULL);
+  run_case("repeated deflatePrime, raw, memLevel 9", case_deflate_prime_raw9, NO_KD, "first-fail=", NULL);
+  run_case("inflateBack on random garbage", case_inflate_back_random, KD_INFLATE_BACK, "end=2 data=560 buf=38 other=0 window-dependent=0 hash=9dd19bbf7601b27b", "end=2 data=540 buf=58 other=0 window-dependent=23 hash=4525a1151a545c55");
+  run_case("inflateBack on mutated valid streams", case_inflate_back_mutated, KD_INFLATE_BACK, "end=142 data=449 buf=9 other=0 window-dependent=0 hash=a1463d1e71c39c69", "end=319 data=265 buf=16 other=0 window-dependent=216 hash=79930244ffc1653d");
+  run_case("inflateBack on a stream that needs a dictionary", case_inflate_back_far_distance, NO_KD, "inflateBack=Z_DATA_ERROR", NULL);
+  run_case("gzseek as the first write action and repeated gzseek", case_gzseek_write, NO_KD, "[v=0 seek=5000 w=4,0 close=0 -> n=5004 leading-zeros=5000", NULL);
+  run_case("gzwrite into a full nonblocking pipe, large writes", case_gzwrite_nonblocking_large, KD_GZWRITE_LARGE, "accepted=400000 stalled=1 first-error=-1 close=0 decode=Z_STREAM_END decoded=400000 match=1", " CRASH signal 11");
+  run_case("gzwrite into a full nonblocking pipe, small writes", case_gzwrite_nonblocking_small, KD_GZWRITE_ACCOUNT, "accepted=400000 stalled=1 first-error=-1 close=0 decode=Z_STREAM_END decoded=400000 match=1", "accepted=90000 stalled=1 first-error=-1 close=0 decode=Z_STREAM_END decoded=90112 match=0");
+  run_case("gzwrite into a full nonblocking pipe, with flushes", case_gzwrite_nonblocking_flush, KD_GZWRITE_ACCOUNT, "accepted=400000 stalled=1 first-error=-1 close=0 decode=Z_STREAM_END decoded=400000 match=1", "accepted=60000 stalled=1 first-error=-1 close=0 decode=Z_STREAM_END decoded=80000 match=0");
+  run_case("gzwrite and gzfwrite length limits", case_gzwrite_invalid_lengths, NO_KD, NULL, NULL);
+  run_case("gzread, bad CRC", case_gz_trailer_0, KD_GZ_DELIVER_ALL, "[style=0 n=2000 intact=1 err=-3 close=0] [style=2 n=2000 intact=1 err=-3 close=0] [style=3 n=2000 intact=1 err=-3 close=0] ", "[style=0 n=0 intact=1 err=-3 close=0] [style=2 n=0 intact=1 err=-3 close=0] [style=3 n=0 intact=1 err=-3 close=0] ");
+  run_case("gzread, bad length", case_gz_trailer_1, KD_GZ_DELIVER_ALL, "[style=0 n=2000 intact=1 err=-3 close=0] [style=2 n=2000 intact=1 err=-3 close=0] [style=3 n=2000 intact=1 err=-3 close=0] ", "[style=0 n=0 intact=1 err=-3 close=0] [style=2 n=0 intact=1 err=-3 close=0] [style=3 n=0 intact=1 err=-3 close=0] ");
+  run_case("gzread, trailer cut to four bytes", case_gz_trailer_2, NO_KD, NULL, NULL);
+  run_case("gzread, trailer cut to no bytes", case_gz_trailer_3, NO_KD, NULL, NULL);
+  run_case("gzread, five bytes of trailing junk", case_gz_trailer_4, NO_KD, NULL, NULL);
+  run_case("gzread, two bytes of trailing junk", case_gz_trailer_5, NO_KD, NULL, NULL);
+  run_case("gzread, trailing partial gzip header", case_gz_trailer_6, NO_KD, NULL, NULL);
+  run_case("deflateSetDictionary misuse", case_deflate_set_dictionary_misuse, NO_KD, "after-data=Z_STREAM_ERROR", NULL);
+  run_case("inflateSetDictionary with a null dictionary", case_inflate_set_dictionary_null, KD_INFLATE_NULL_DICT, "null-dict=Z_STREAM_ERROR zero-len=Z_OK", "null-dict=Z_OK zero-len=Z_OK");
+  run_case("total_in when inflate returns Z_NEED_DICT", case_need_dict_total_in, NO_KD, "[chunk=all first=Z_NEED_DICT total_in=6", NULL);
+  run_case("inflateCopy with an invalid source", case_inflate_copy_invalid, KD_INFLATE_COPY_STATE, "invalid-source=Z_STREAM_ERROR dest-state-null=1 null-dest=Z_STREAM_ERROR ", "invalid-source=Z_STREAM_ERROR dest-state-null=0 null-dest=Z_STREAM_ERROR ");
+  run_case("deflateResetKeep in the middle of a stream", case_reset_keep_mid_stream, KD_RESET_KEEP,
+    "[level=1 first=Z_OK reset-keep=Z_OK finish=Z_STREAM_END decode=Z_STREAM_END match=1] [level=4 first=Z_OK reset-keep=Z_OK finish=Z_STREAM_END decode=Z_STREAM_END match=1] [level=6 first=Z_OK reset-keep=Z_OK finish=Z_STREAM_END decode=Z_STREAM_END match=1] [level=9 first=Z_OK reset-keep=Z_OK finish=Z_STREAM_END decode=Z_STREAM_END match=1] ",
+    "[level=1 first=Z_OK reset-keep=Z_OK finish=Z_STREAM_END decode=Z_DATA_ERROR match=0] [level=4 first=Z_OK reset-keep=Z_OK finish=Z_STREAM_END decode=Z_DATA_ERROR match=0] [level=6 first=Z_OK reset-keep=Z_OK finish=Z_STREAM_END decode=Z_DATA_ERROR match=0] [level=9 first=Z_OK reset-keep=Z_OK finish=Z_STREAM_END decode=Z_DATA_ERROR match=0] ");
+  run_case("gzopen with the x mode on an existing file", case_gzopen_exclusive, NO_KD, NULL, NULL);
+  run_case("gzseek and gzread past the end of a gzip file", case_gzseek_read_past_end, NO_KD, NULL, NULL);
+  group_end();
+}
+
 int main(int argc, char **argv) {
   if (argc < 3) {
     fprintf(stderr, "usage: %s ORACLE.so CANDIDATE.so [TMPDIR] [group...]\n", argv[0]);
@@ -1454,6 +2241,7 @@ int main(int argc, char **argv) {
   hostile_inputs();
   invalid_arguments();
   inflate_sync();
+  fixed_paths();
   allocators();
   bombs();
   int known = 0;
