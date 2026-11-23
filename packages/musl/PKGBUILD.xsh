@@ -13,7 +13,7 @@ export const package_kind = "payload"
 export const ver = "1.2.6"
 
 ## Package release revision.
-export const rel = "16"
+export const rel = "17"
 
 ## Runtime package dependencies.
 export let deps = []
@@ -43,6 +43,32 @@ export const upstream_sources = [
       {
         arch: "x86_64",
         sha256: "d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a",
+      },
+    ],
+  },
+  {
+    source: p"patches/musl-regcomp-int-overflow.patch",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "dd487e58214013aabd6a07d3a9df85213068e0526752f33ead1f4d65693266ab",
+      },
+    ],
+  },
+  {
+    source: p"patches/musl-gb18030-iconv-decoder.patch",
+    kind: "auto",
+    architectures: [
+      "all",
+    ],
+    checksums: [
+      {
+        arch: "all",
+        sha256: "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99",
       },
     ],
   },
@@ -157,6 +183,10 @@ export proc build(dest: Path) [fs, process, env, error] {
   let package_target = pm_target.recipe_target()?
   let arch = types.pm_target_arch(package_target)
   let triple = f"{arch}-linux-musl"
+
+  for patch_file in [p"musl-regcomp-int-overflow.patch", p"musl-gb18030-iconv-decoder.patch"] {
+    let _ = patch.apply(p".", patch_file.read_text()?, 1)?
+  }
 
   p"include/bits".mkdir()
 

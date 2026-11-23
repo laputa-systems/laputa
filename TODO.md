@@ -36,14 +36,13 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** security, os-boundaries
 - **Effort:** M
 
-### LAP-87 · P1 · musl 1.2.6 ships without the regcomp and GB18030 iconv security fixes
+### LAP-87 · P2 · The musl regcomp and GB18030 backports are unproven on aarch64
 
 - **Area:** Security
-- **Where:** `packages/musl/PKGBUILD.xsh:13` (`ver = "1.2.6"`, the original release archive, no backport patches)
-- **Problem:** Per the 2026-11-23 tech scout (Rich Felker's 2026-10-21 openwall advisory and git.musl-libc.org), musl releases through 1.2.6 contain CVE-2026-107891, integer overflows in `regcomp()` fixed by musl 7813e911, and CVE-2026-6042, pathological GB18030 `iconv()` decoding (a repeated table search, plus several wrong mappings) fixed by musl 67219f01. The recipe builds the unpatched 1.2.6 archive. Exploitation needs a program that compiles an untrusted regex or converts untrusted GB18030 input; no network-reachable Laputa path was established. unproven: the CVE details come from the scout's upstream reading and were not re-checked here.
-- **Recommendation:** Backport both commits as checksum-bound patches in the musl recipe for both musl targets, and add regression cases: a hostile `regcomp()` pattern family that overflowed before the fix, and GB18030 inputs that check mapping correctness and bounded decode time. Do not infer reachability from linkage.
-- **Fix with:** security, os-boundaries
-- **Effort:** M
+- **Where:** `packages/musl/PKGBUILD.xsh` (patches `musl-regcomp-int-overflow.patch` from musl 7813e911 and `musl-gb18030-iconv-decoder.patch` from 67219f01, `rel = "17"`); `packages/musl/proof.xsh`
+- **Problem:** Both CVE backports (CVE-2026-107891, CVE-2026-6042) are applied for every architecture and proven on x86_64: the GB18030 regression programs fail on unpatched 1.2.6 and pass patched, and the regcomp family passes patched. The regcomp overflow itself was not triggered, since it needs about 2^31 positions. The aarch64 musl build and the cross-compile of the proof programs have not run, because the x86_64 host has no aarch64 seed.
+- **Recommendation:** On the aarch64 host, run `make seed` and `make build PKGS=musl` and record the proof result here before closing.
+- **Effort:** S
 
 ### LAP-88 · P1 · C zlib is 1.3.2, without the memory-safety fixes released in 1.4
 
