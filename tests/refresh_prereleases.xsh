@@ -155,7 +155,7 @@ test test_build_refresh_interpolated_tag_constant [fs, env, error] { |ctx|
 test test_all_skips_non_github_recipe_but_explicit_selection_errors [fs, process, env, error] { |ctx|
   let root = test.temp_dir(ctx, name: "refresh-catalog")?
   let dir = fp"{root}/packages/refresh-fixture"
-  dir.mkdir(parents: true)
+  dir.mkdir()
   let fixture = RECIPE.replace("https://github.com/o/r/releases/download/", with: "https://example.com/download/")
   fp"{dir}/PKGBUILD.xsh".write(fixture)
   fp"{dir}/proof.xsh".write("export proc main(root: Path) [fs, error] {\n}\n")
