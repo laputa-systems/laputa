@@ -15,8 +15,8 @@ the new checksums.
 
 Release discovery uses the repository's public releases.atom feed; checksums
 come from that release's SHA256SUMS. Recipes whose newest prerelease is already
-pinned are reported as current. A recipe without exactly one GitHub release
-pin, or a release missing any of its pinned assets, is an error. Run from the
+pinned are reported as current. An explicitly named recipe without a GitHub
+release pin, conflicting pins, or a release missing pinned assets is an error. Run from the
 repository root; --repo selects an alternative recipe tree.
 
 options:
@@ -24,7 +24,7 @@ options:
   --apply            write the refreshed recipe instead of printing a diff
   --verify           run pm sources fetch against the proposed recipe
   --prefix PREFIX    prerelease tag prefix (default: release-)
-  --all              refresh every recipe in the repository
+  --all              refresh recipes with GitHub release sources; report skipped recipes
   -h, --help         print this help
 
 examples:
@@ -54,6 +54,13 @@ cli main(repo: Path = p".", apply = false, verify = false, prefix = "release-", 
       for name in names {
         let dir = fp"{repo_root}/packages/{name}"
         let pkg = recipe.load_package_for_target(dir, types.X86_64LinuxMusl)?
+        if all {
+          let release_sources = [source for source in pkg.upstream_sources if prereleases.parse_pin_text(source.source.display()) is Ok(_)]
+          if release_sources.is_empty() {
+            print f"{name}: skipped (no GitHub release source)"
+            continue
+          }
+        }
         let pin = prereleases.current_pin(pkg)?
         let feed = prereleases.fetch_text(f"https://github.com/{pin.owner}/{pin.repository}/releases.atom")?
         let tag = prereleases.latest_tag(feed, prefix)

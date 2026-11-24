@@ -192,6 +192,7 @@ export proc build_refresh(pkg: types.Package, pin: Pin, new_tag: Str, sums: Map[
   var checksum_changes: List[ChecksumChange] = []
   var old_ext = ""
   var new_ext = ""
+  var tag_edit_added = false
 
   for source in pkg.upstream_sources {
     if let Ok(found) = parse_pin_text(source.source.display()) {
@@ -217,7 +218,17 @@ export proc build_refresh(pkg: types.Package, pin: Pin, new_tag: Str, sums: Map[
       if old_ext != "" and old_ext != new_ext {
         new_url = new_url.replace(old_ext, with: new_ext)
       }
-      edits += [{old: found.url, new: new_url}]
+      if found.url in before {
+        edits += [{old: found.url, new: new_url}]
+      } else {
+        guard old_ext == new_ext else {
+          return Err(types.PmError.PackageContract(f"{pkg.name}: cannot rewrite archive format in interpolated release URL"))
+        }
+        if ! tag_edit_added {
+          edits += [{old: f"\"{found.tag}\"", new: f"\"{new_tag}\""}]
+          tag_edit_added = true
+        }
+      }
     }
   }
 

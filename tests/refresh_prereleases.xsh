@@ -133,3 +133,38 @@ test test_build_refresh_rewrites_pin_checksums_rel_and_build_hook [fs, env, erro
   let missing = prereleases.sums_map("")
   assert prereleases.build_refresh(pkg, pin, new_tag, missing) is Err(_)
 }
+
+test test_build_refresh_interpolated_tag_constant [fs, env, error] { |ctx|
+  let dir = test.temp_dir(ctx, name: "refresh-interpolated")?
+  let old_tag = "release-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  let new_tag = "release-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  let fixture = RECIPE.replace("use pm.types", with: f"use pm.types\nconst release_tag = \"{old_tag}\"").replace(f"p\"https://github.com/o/r/releases/download/{old_tag}/", with: "fp\"https://github.com/o/r/releases/download/{release_tag}/").replace(".tar.gz", with: ".tar.xz")
+  fp"{dir}/PKGBUILD.xsh".write(fixture)
+  fp"{dir}/proof.xsh".write("export proc main(root: Path) [fs, error] {\n}\n")
+  let pkg = recipe.load_package(dir)?
+  let plan = prereleases.build_refresh(pkg, prereleases.current_pin(pkg)?, new_tag, prereleases.sums_map(SUMS))?
+  assert f"const release_tag = \"{new_tag}\"" in plan.after
+  assert "download/{release_tag}/pkg-ARCH-linux-musl.tar.xz" in plan.after
+  assert repeated("1", 64) in plan.after
+  assert repeated("2", 64) in plan.after
+  assert plan.new_rel == "6"
+  let changed_sums = prereleases.sums_map(SUMS.replace(".tar.xz", with: ".tar.gz"))
+  assert prereleases.build_refresh(pkg, prereleases.current_pin(pkg)?, new_tag, changed_sums) is Err(_)
+}
+
+test test_all_skips_non_github_recipe_but_explicit_selection_errors [fs, process, env, error] { |ctx|
+  let root = test.temp_dir(ctx, name: "refresh-catalog")?
+  let dir = fp"{root}/packages/refresh-fixture"
+  dir.mkdir(parents: true)
+  let fixture = RECIPE.replace("https://github.com/o/r/releases/download/", with: "https://example.com/download/")
+  fp"{dir}/PKGBUILD.xsh".write(fixture)
+  fp"{dir}/proof.xsh".write("export proc main(root: Path) [fs, error] {\n}\n")
+  let xsh = process.which("xsh")?
+  let modules = path.absolute(p".")?
+  let all_result = run.capture --text XSH_MODULE_PATH=$modules $xsh refresh-prereleases.xsh -- --repo $root --all
+  assert all_result.status.exited_with(0)
+  assert "refresh-fixture: skipped (no GitHub release source)" in all_result.stdout
+  let named = run.capture --text XSH_MODULE_PATH=$modules $xsh refresh-prereleases.xsh -- --repo $root refresh-fixture
+  assert ! named.status.exited_with(0)
+  assert "refresh-fixture: no GitHub release source to refresh" in named.stderr
+}
