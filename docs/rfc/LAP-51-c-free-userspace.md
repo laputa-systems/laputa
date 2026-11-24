@@ -264,78 +264,11 @@ attribution. Each admitted replacement must establish maintenance, licenses,
 ABI coverage, musl behavior, quality, and costs. No candidate is qualified by
 this document, and no FFmpeg build qualification is claimed.
 
-## Status of the tracks
-
-The owner started this campaign on 2026-11-22: a Rust/XSH/Zig-owned desktop
-above an explicitly retained native GPU and media substrate, with Chromium as
-the last major application stack that keeps native C and C++ ownership.
-Ghostty work is out of scope for now, as are Chromium, FFmpeg and Mesa.
-
-Integrated, with guest evidence in [Tinyland](../TINYLAND.md) and the
-[font contract](../FONT-STACK.md): the Rust compositor, the Rust seatd daemon
-and Tinyland's native seat client (the C `libseat.so.1` client no longer
-ships), KBVM inside Tinyland, mdevd-rs, and shared rust-fontconfig discovery
-for Ghostty and Play.
-
-Not yet executed: every replacement gate in the table above. The first pilots
-are zlib-rs as a candidate `libz.so.1` (Track C), a HarfRust/Skrifa
-differential against Play's overlay text (Track D), and a Venus profile for
-Play's Vulkan presentation (Track F); none changes a production default.
-
-The Venus pilot (Track F) runs: the experimental `qemu-tinyland-venus`
-profile builds `mesa-venus`, Mesa's `virtio` Vulkan driver alone, and Play
-presents through it on the host's RADV, with `LAPUTA_TINYLAND_VENUS_PROOF_OK`
-and no software Vulkan driver selected; the virgl/lavapipe control still
-passes unchanged. On the development host the guest's installed bytes fall
-from 381.7 MB to 204.0 MB and its Mesa payload from 145.2 MB to 1.9 MB
-(the Venus root also omits Ghostty and libxkbcommon), with startup and RSS
-comparable; [QEMU](../QEMU.md) records the run. Two findings shape the next
-step. `mesa-venus` creates the renderer instance at Vulkan 1.3 or higher,
-because virglrenderer 1.3.0 crashes when Mesa's Wayland WSI calls
-`vkQueueSubmit2` on an instance created at an older API version. Tinyland has
-no `linux-dmabuf`, so the proof presents through Mesa's shared-memory WSI
-(`MESA_VK_WSI_DEBUG=sw`), and every frame is copied by the CPU. Track F's
-acceptance is not yet met: keyboard and compositor recovery under Venus, CPU,
-frame latency and host cost are unmeasured, and zero-copy presentation needs
-`linux-dmabuf` in Tinyland.
-The next Track F steps, from the 2026-11-23 tech scout: a small experimental
-`linux-dmabuf` import path in Tinyland, using Smithay 0.7's capability lists,
-import validation and recoverable buffer-creation failures as a design
-reference rather than an import, accepted when Play submits a dma-buf-backed
-frame that Tinyland validates (formats, modifiers, ownership), imports and
-presents, rejects malformed buffers without losing the session, and falls back
-to `wl_shm` when unsupported; then frame latency, CPU time, memory and host
-cost measured against the software path as control. The Vulkan 1.3 renderer
-instance version is a workaround for this Mesa and virglrenderer pair until a
-second host driver shows the contract holds. Track C's zlib-rs differential
-now uses C zlib 1.4 as its oracle (LAP-88) and records thirteen differences,
-classified in [Native census](../NATIVE-CENSUS.md#zlib-gate-evidence-zlib-rs).
-Four of them are defects in the candidate that 1.4 does not have: a process
-abort in repeated `deflatePrime`, a segmentation fault in `gzwrite` into a full
-nonblocking pipe (the CVE-2026-85091 path), `inflateBack` reading stale window
-bytes, and a stalled nonblocking `gzwrite` whose file holds more bytes than it
-reported accepted. zlib-rs also lacks `gzprintf` and `gzvprintf`, so it is not yet an
-interchangeable `libz.so.1`.
-
-Parked while Ghostty is out of scope: libxkbcommon, whose only production
-consumer is Ghostty, and Ghostty's OpenGL qualification on Track F.
-
-Play's text follows the one-distribution-library rule: once the differential
-qualifies HarfRust and Skrifa/Swash on Play's workload, they ship as one
-shared distribution provider that Play consumes first and Ghostty joins when
-it returns to scope, rather than a private copy linked into Play.
-
-Retained substrate: `libwayland-client.so.0` stays while Mesa's Wayland
-platform does. Mesa's EGL and Vulkan WSI import it (`packages/mesa` depends on
-`wayland-libs-client`), and Play hands its native `wl_display` to Vulkan,
-which is why its `wayland-client` dependency enables `system`. Replacing the
-protocol engine in a client removes neither dependency.
-
 ## Decision
 
 Apply the owner's 2026-11-04 corrections. Prioritize existing text and desktop
 infrastructure, distribution compression, and later text backend qualification.
 Exclude FFmpeg/codec replacement, musl/Linux replacement, crabc, allocator work,
 and GPU-driver rewrites. Keep deferred hardware outside the immediate queue.
-The 2026-11-22 start launches the pilots named above; it does not waive any
-acceptance requirement or change a production default.
+The [roadmap](../roadmap.md#campaign-owned-desktop) owns the campaign's current
+sequence and status. It does not waive acceptance requirements.

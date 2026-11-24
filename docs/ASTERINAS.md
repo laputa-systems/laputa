@@ -149,7 +149,7 @@ the fresh published-input check and every cohort with
 including all ten paired boot, restart and carrier recovery rounds. The Linux
 reference can still fail the clock `pause` case on a loaded host, because its
 QEMU peer then holds the guest for 12 to 13.5 s against a 5 s margin.
-The [roadmap](ROADMAP.md) owns the successor kernel
+The [roadmap](roadmap.md) owns the successor kernel
 slices and the [TODO queue](../TODO.md) owns the remaining compatibility
 obligations.
 

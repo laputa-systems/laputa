@@ -3,7 +3,7 @@ Next: 93
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
-verification gaps are marked unproven. [Roadmap](docs/ROADMAP.md) owns direction
+verification gaps are marked unproven. [Roadmap](docs/roadmap.md) owns direction
 and milestone sequencing; this file owns bounded implementation slices.
 
 Apply the roadmap's design filter: keep policy in ordinary XSH, reuse narrow
@@ -12,20 +12,6 @@ parallel managers or frameworks. [XSH's queue](https://github.com/laputa-systems
 owns shared substrate changes; peer IDs below identify coordination, not authority
 to modify another checkout. Owning topic documents record qualified behavior
 and its remaining limits.
-
-Real-hardware enablement remains out of scope. Existing hardware entries are
-retained but deferred as noted below. aarch64 qualification is deferred
-pending a macOS aarch64 host via Docker; no Linux aarch64 hardware is
-available in this campaign. VM clocks, virtual networking, disposable
-disks and native build hosts remain in scope. Existing paused campaigns are not resumed. The current Laputa campaign covers
-runnable entries using the supplied fixed XSH snapshot. External XSH repairs
-and real-hardware enablement remain outside that scope.
-
-The current owner-directed campaign includes Linux performance qualification.
-Timing measurements require quiet-host readiness checks before and after each
-accepted window. macOS remains out of scope. Native aarch64 runtime
-qualification remains open; manual cross-build evidence is bounded in
-[the font contract](docs/FONT-STACK.md).
 
 ### LAP-92 · P2 · zlib-rs crashes or corrupts output on four paths zlib 1.4 handles safely
 
@@ -101,8 +87,7 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Fix with:** reference-parity
 - **Effort:** M
 - **Acceptance:** Both applications dynamically resolve the same Laputa library. International discovery and cluster-safe fallback pass real rendering and guest proofs. Native Fontconfig and unused Expat leave the canonical graphical closure. Preserve macOS and existing security gates. Report exact upstream and repository revisions, SONAME, features, results, and installed footprint.
-- **Progress:** The package builds the laputa-systems fork tag `v5.0.2-laputa.2`, which adds `fc_chain_candidates_for_text`: fonts covering a whole cluster, ranked by declared OpenType script, with a color flag. Ghostty `c4f036c72` (`-Dfont-backend=rust_fontconfig_freetype`) and Play 0.43.2 both need `librust_fontconfig.so.5.0.2` and not `libfontconfig.so.1`; their package proofs assert it. `rust-fontconfig` owns `/etc/fonts/fonts.conf`, and the `fontconfig` package and Expat no longer belong to the canonical closure. The x86_64/KVM guest proof (`make profile-test`, 2026-11-09) passes keyboard input, presentation, the crash, broker-loss and scanner recoveries, the security gates, and named screenshots of Ghostty and Play whose Arabic, Devanagari, CJK and ZWJ emoji lines are checked for tofu by `system/text_pixels.xsh`; the profile forbids `fontconfig` and `expat`. The aarch64 Ghostty and Play runs are deferred with the rest of the campaign. The stale `qualification/ghostty-shared` candidate recipe is removed; nothing consumed it. The final canonical 11-root x86_64 generation, composed after rebuilding 35 plan nodes that the gluon migration and the LLVM seed move had invalidated, has 31 packages, 1,630 unique regular files, 335,939,380 bytes and 48 ELF files, against 32, 1,548, 336,210,344 and 49 at the `fe1912a` baseline ([Shared font stack](docs/FONT-STACK.md#final-composed-root)). It has no `fontconfig` or `expat` package and no ELF needs `libfontconfig.so.1` or `libexpat.so.1`; the `rust-fontconfig`, `ghostty-custom` and `play` proofs pass. On the six-font package-proof corpus, five readiness-qualified interleaved runs measured in-memory cache build at 1.654 ms (1.559–2.309), process peak RSS at 4,052 KiB (3,844–4,200), and a checked bold Hack lookup at 0.093 ms (0.090–0.184). See [measurement method](docs/FONT-STACK.md#final-composed-root). The aarch64 `rust-fontconfig` and `ghostty-custom` packages build and pass their proofs in the aarch64 world build (m1-max, 2026-11-20). Open: the aarch64 guest runs and the macOS runs (owner-deferred).
-- **Sequencing:** Owner-authorized campaign 3, before LAP-51.
+- **Evidence:** See [shared font stack](docs/FONT-STACK.md#final-composed-root); aarch64 guest and macOS runs remain deferred.
 
 ### LAP-20 · P3 · Fork the Rust toolchain build to retire gnu-stubs
 
@@ -165,7 +150,7 @@ qualification remains open; manual cross-build evidence is bounded in
 - **Where:** `Makefile:110-115`
 - **Problem:** `make lint` runs `xsht lint` only on `pm.xsh pm system installer xinit`, so `guest/`, `seed/`, `trust/`, `xinfra/`, `profiles/`, the top-level scripts and `tests/` are never linted, and `make check` does not run it. Dead private code that xsht already flags (`guest/trust-guest.xsh:27 wait_for`, `guest/asterinas/device/entry.xsh:10 Node`) survived for that reason. Even that subset does not pass: on 2026-11-21 it reported 541 findings with the host xsht built from the pinned XSH and 654 with XSH master `aef945569` (`lint.redundant-propagation`, `unused-export` and `prefer-inferred-variant` lead), so `make lint` exits nonzero on every host, including a fresh newcomer capsule.
 - **Recommendation:** Lint the whole workspace from `xsht-config.ini` (plain `xsht lint`) in `make lint`, and clear its findings. The subset cannot be made to pass honestly: `lint.unused-export` resolves references only within the files it is given, so on the subset it reports exports used by unlinted roots, such as `installer/host.xsh` `installer_env_path`, which `build-installer-common.xsh` imports; the workspace run does not. On 2026-11-22 the workspace run with XSH verification `xsht` reported 3,834 findings and 157 notes in 584 files (lint.redundant-propagation 1,407, prefer-inferred-variant 405, prefer-inferred-private-effects 217, pattern-conditional 185, prefer-guard 134, path-display-sink 133, redundant-default 107, default-param-type 78). Fixing them by hand is a multi-session campaign; `xsht lint --fix --only RULE` makes scoped, rechecked edits for the mechanical rules but is an autofixer, which needs the owner's permission. Acceptance: `make lint` runs the workspace lint and exits 0 on a fresh checkout.
-- **Progress:** On 2026-11-22 the scoped `xsht lint --fix --only RULE` passes (owner-approved) and hand fixes cleared every workspace finding outside `packages/`; `xsht-config.ini` and `xinfra/xsht-config.ini` declare the interfaces and the five per-rule exclusions with their reasons (XSH-176). The 370 findings in `packages/` are fixed on `lane/lint-84-recipes`, held back because recipe edits rebuild the whole world; land that branch with the next planned world rebuild and switch `make lint` to plain `xsht lint` in the same change. On 2026-11-22 the owner approved that rebuild: the recipe fixes landed in `4a5731b9` and `make lint` now runs the workspace lint. The remaining 61 findings and ten shadowing errors were then cleared by hand: dead archive-plan, parser-generator and arm64-relink wrappers and their now-unused types were deleted, constants grouped before the first function, stale locals removed, and four entry-proc return annotations excluded in `xsht-config.ini` because `check.required-return` requires them. The network kernel is declared a public interface because its consumers are excluded system fixtures. Host tools were rebuilt from the approved XSH checkout after clearing stale cargo target artifacts. `make lint` reports 0 findings and 157 notes, and `make check` and `make test` pass; acceptance is met.
+- **Resolution:** The owner-approved changes landed in `4a5731b9`, `519e0c8` and `d23d763`; `make lint` reported 0 findings and 157 notes, and `make check` and `make test` passed.
 - **Fix with:** none
 - **Effort:** S
 

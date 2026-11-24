@@ -8,7 +8,7 @@ stops its jobs. The maintained profile ships a daily backup job; scheduling is
 not an entry fee for restore or inspection, and the manual restore drill
 remains the primary restore proof.
 
-The roadmap entry is [R7](ROADMAP.md#r7-backups-timers-and-persistent-diagnostics).
+The roadmap entry is [R7](roadmap.md#r7-backups-timers-and-persistent-diagnostics).
 
 ## Ownership and paths
 

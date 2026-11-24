@@ -1,5 +1,94 @@
 # Roadmap
 
+This is the single plan for this repository: all current and future work, and the handoff for resuming it. Campaigns are sections below, and their items interleave in **Sequence**. "Resume the roadmap" means continue from **Status**.
+
+## Status
+
+- active: LAP-51 desktop, Tracks C, D and F; Venus needs dma-buf and recovery qualification.
+- Last integrated revision: `300a59cd635f0570972d353f401380f7fc9ab08e`; whole-integration green status is not established by the recorded zlib qualification.
+- Parked: Ghostty's libxkbcommon and OpenGL qualification until Ghostty returns to scope; zlib-rs promotion until LAP-92 and missing ABI are resolved.
+- Next slice: Track F's Tinyland `linux-dmabuf` import, then measure against the software path.
+- aarch64 guest and macOS runs are deferred pending the appropriate environment and scope.
+
+## Charter
+
+Real-hardware enablement and external XSH repairs are outside the current scope.
+Existing paused campaigns are not resumed. Linux performance qualification needs
+quiet-host readiness checks before and after each accepted timing window.
+Native aarch64 runtime qualification remains open; manual cross-build evidence
+is bounded in [the font contract](FONT-STACK.md).
+
+## Sequence
+
+| ID | Campaign | Owned files | Prerequisites | Acceptance command |
+|---|---|---|---|---|
+| LAP-51 F | Owned desktop | Tinyland upstream; `packages/mesa-venus/`, `system/`, `guest/` | Venus pilot; upstream Tinyland change first | `$XSH_HOST laputa.xsh -- test qemu-tinyland-venus`, plus recovery and measured comparison; the new dma-buf gate command is not yet defined. |
+| LAP-92 / LAP-51 C | Owned desktop | zlib-rs fork; `qualification/zlib-rs/`, `packages/zlib-rs/` | Fix four candidate defects and missing ABI before promotion | `xsh qualification/zlib-rs/run.xsh -- x86_64` and aarch64 when available. |
+| LAP-51 D | Owned desktop | Play upstream; shared provider recipes | Qualified shared font baseline | Differential and final-pixel gates in [native census](NATIVE-CENSUS.md#replacement-gates); exact command not yet defined. |
+| R6, R1–R5, R7, R10 | Maintained VM | `system/`, `installer/`, `xinit/`, `pm/`, `tests/` | See track dependencies below | `python3 tests/integration/g2_lifecycle.py --xsh PATH/TO/xsh --bundle target/laputa/qemu-maintained/current`; see [QEMU](QEMU.md) for prerequisites and coverage. |
+
+## Campaign: Owned desktop
+
+### Goal and state
+
+Build a Rust/XSH/Zig-owned desktop on Linux with maintained native media,
+graphics, musl and Linux exceptions. The owner started LAP-51 on 2026-11-22.
+The active pilots are zlib-rs, Play text and Venus; none changes a production default.
+
+### Decisions
+
+Play's text uses one distribution library after the HarfRust and Skrifa/Swash
+differential qualifies; Ghostty joins when back in scope. Keep
+`libwayland-client.so.0` while Mesa's Wayland platform consumes it.
+
+### Baseline
+
+The Rust compositor, Rust seatd daemon and native Tinyland seat client, KBVM,
+mdevd-rs and shared rust-fontconfig discovery are integrated. See [Tinyland](TINYLAND.md)
+and [font stack](FONT-STACK.md). LAP-52 followed the shared native stack and Play
+SRT/native-text work and preceded LAP-51. The x86_64 Venus pilot presents Play
+through host RADV without software Vulkan; the control passes. Its shared-memory
+WSI copies each frame on the CPU. Mesa needs a Vulkan 1.3 renderer instance to
+avoid the virglrenderer 1.3.0 `vkQueueSubmit2` crash; retain this workaround
+until another host driver establishes the contract. See [QEMU](QEMU.md).
+
+The zlib 1.4 oracle reveals thirteen differences, including four candidate
+defects in LAP-92; zlib-rs also lacks `gzprintf` and `gzvprintf`. See the
+[census](NATIVE-CENSUS.md#zlib-gate-evidence-zlib-rs) and [backlog](../TODO.md).
+
+### Acceptance
+
+The next Venus slice validates formats, modifiers and ownership, imports and
+presents Play dma-buf frames, rejects malformed buffers without losing the
+session, and falls back to `wl_shm` when unsupported. Then compare frame latency,
+CPU, memory and host cost against the software path. Keyboard and compositor
+recovery remain unqualified. Candidate replacement gates require differential
+correctness, hostile-input failure parity, closure and readiness-qualified
+performance as specified in [native census](NATIVE-CENSUS.md#replacement-gates).
+Use Smithay 0.7's capability lists, import validation and recoverable buffer
+creation failures as design references, without importing Smithay.
+
+### Needs environment
+
+Use the Linux host and a quiet measurement window. aarch64 guest and macOS
+execution are deferred; a second host driver is needed to assess the Vulkan
+instance workaround.
+
+### Execution boundary and non-goals
+
+Ghostty, Chromium, FFmpeg and GPU-driver rewrites are out of scope. Retain musl,
+Linux and Mesa. Do not resume crabc or allocator work. Shared component changes
+land upstream first. Hardware enablement is deferred.
+
+### Reference
+
+[LAP-51 design](rfc/LAP-51-c-free-userspace.md), [LAP-52 design](rfc/LAP-52-rust-fontconfig.md),
+[native census](NATIVE-CENSUS.md), and [ticket backlog](../TODO.md).
+
+## Campaign: Maintained VM
+
+### Goal and state
+
 Make Laputa a small, reproducible, XSH-managed operating system that can remain
 useful unattended: a VM should survive service crashes, network loss, interrupted
 updates, and virtual-disk damage, with an inspectable recovery path.
@@ -14,7 +103,7 @@ The next investment is lifecycle correctness, not a larger command catalog.
 Preserve the existing PM, typed profiles, xinit, and XSH boundaries rather than
 introducing a second package manager, service manager, or deployment framework.
 
-## Design filter: make complexity unnecessary
+### Decisions: make complexity unnecessary
 
 Laputa is the operational proving ground for XSH, not merely a collection of
 Rust replacements. XSH aims to make systems work as immediate as shell scripting
@@ -63,7 +152,7 @@ R1/R2/R4/R5/R6 remain the operational consumers that give its abstractions
 purpose. No new language feature is justified solely by this roadmap, and no
 paused XSH campaign is resumed by it.
 
-## Authority and scope
+### Execution boundary and non-goals
 
 This document owns direction, sequencing, and acceptance milestones.
 [TODO](../TODO.md) owns bounded defects and follow-ups; the topic documents linked
@@ -108,7 +197,7 @@ Keep D-Bus, systemd, logind/elogind, and polkit out of this direction. Runtime
 identity, supervision, and remote administration use the existing XSH/Laputa
 owners, not a new message bus or resident fleet-management service.
 
-## Baseline: foundations are not missing
+### Baseline: foundations are not missing
 
 | Area | Existing foundation | Remaining boundary |
 |---|---|---|
@@ -117,7 +206,7 @@ owners, not a new message bus or resident fleet-management service.
 | Services | xinit scanning, readiness, restart backoff, control, and rotating stdout/stderr | Keep normal boot, tested recovery, and supervisor ownership aligned. See [init](../xinit/docs/INIT.md) and [supervision](../xinit/docs/SUPERVISION.md). |
 | Remote administration | Packaged OxiSH login server (ssh-build `oxish` archive) and an installer/SSH proof | Typed XSH remote execution, persistent identity, first-boot provisioning, and one inspect/stage/recover workflow remain the next integration milestone. |
 | Storage | Native image/installer filesystem tools | Installer `mkfs.ext4` is journal-less and `fsck.ext4` does not repair. See [installer](INSTALLER.md). |
-| Networking and logging | XSH records supervised DHCPv4 and syslog (XSH-53/54) as implemented; Laputa has network policy, xinit, OxiSH, Tailscale, and firewall (`crabtables`/`nfcrt`) foundations | Adopt matching XSH products, roll out the services, and qualify leases/resolver ownership, time, and persistent logs in the installed image. See [XSH roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md). |
+| Networking and logging | XSH records supervised DHCPv4 and syslog (XSH-53/54) as implemented; Laputa has network policy, xinit, OxiSH, Tailscale, and firewall (`crabtables`/`nfcrt`) foundations | Adopt matching XSH products, roll out the services, and qualify leases/resolver ownership, time, and persistent logs in the installed image. See [XSH roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP%2Emd). |
 | Trust | Signed repository snapshots with mandatory durable acceptance, guest HTTP/reboot proof, signed certificate releases and intermediate distrust in XSH and Tailscale | Provision production repository keys through image/first boot; upstream prebuilt uv lacks intermediate distrust. See [PM](PM.md#snapshot-authentication) and [certificate trust](CERTIFICATE-TRUST.md). |
 | Self-hosting | Bounded in-guest XSH rebuild and A-to-B successor workflow | Turn the existing development proof into the normal installed build/stage/boot path without overstating bootstrap closure or production admission. See [self-hosting](SELF-HOSTING.md). |
 | Verification | Package tests, installer/SSH and graphical QEMU proofs, pinned Asterinas guest tests | Existing smoke proofs do not establish long-lived operation, recovery, or platform parity. See [testing](TESTING.md), [QEMU](QEMU.md), and [Asterinas](ASTERINAS.md). |
@@ -128,7 +217,7 @@ operational capability is complete. XSH-53/54 are outside the frozen XSH G0
 candidate; selecting newer services requires matching binaries/core scripts and
 renewed consumer qualification, not borrowing the older candidate's results.
 
-## Priority and sequence
+### Track dependencies
 
 P0 means required before trusting a long-lived installed VM; P1 strengthens the
 operational and self-hosting foundation; P2 is optional expansion. Priority is not
@@ -239,7 +328,7 @@ lock and gitlink.
 Each subsequent slice passes `qualify.sh all --backend both` and loses no A0 pass
 in a quiet-host accounting run.
 
-## G2: The remotely maintainable VM
+### G2: The remotely maintainable VM
 
 **Status: steps 1-6 pass on Linux x86_64/KVM under the no-root model for one
 prebuilt `qemu-maintained` generation.** `tests/integration/g2_lifecycle.py`
@@ -299,7 +388,7 @@ aarch64, and Asterinas gaps explicitly. Passing this scenario establishes only
 its stated scope, not arbitrary power-loss durability, all hardware, or a fully
 self-hosted world. Detailed state machines remain with the existing topic owners.
 
-## R1: Make xinit the service lifecycle owner
+### R1: Make xinit the service lifecycle owner
 
 Use one long-lived scanner for the selected boot graph, launched and supervised
 by PID 1. Keep early mounts and host-independent setup in boot hooks; move
@@ -356,13 +445,13 @@ uploads objects above 64 MiB in chunks, and a full HTTP publish to a fresh
 `make mirror` succeeds. The image build also needs a seed that includes the locked
 XSH commit (LAP-58).
 
-## R2: Persistent VM networking and time
+### R2: Persistent VM networking and time
 
-### Network lifecycle
+#### Network lifecycle
 
 Roll out the existing XSH-53/54 foreground services, rather than starting another
 DHCP or logging implementation. XSH's
-[roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md)
+[roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP%2Emd)
 records supervised DHCPv4 and local syslog as implemented; the
 [integration RFC](https://github.com/laputa-systems/xsh/blob/master/docs/rfc/XSH-53-supervised-dhcp-and-syslog.md)
 records their consumer contract and rollout steps. Laputa owns package/profile
@@ -437,7 +526,7 @@ test asserts no SLAAC address and no IPv6 route exists and that the status
 reports it. IPv6 support remains out of scope; this only reports the mode as
 unsupported.
 
-### Time discipline and bootstrap
+#### Time discipline and bootstrap
 
 The in-tree `ntpd-rs` has a Graviola/rustcrypto musl package and xinit service.
 It runs as reserved UID/GID 123 with only `CAP_SYS_TIME`; initialization readiness
@@ -510,7 +599,7 @@ a skewed cold boot, and pause/resume produce bounded, observable outcomes.
 Record synchronization state separately from service readiness. Exercise the
 chosen trust/expiry behavior at incorrect initial times as well as after sync.
 
-## R3: Repairable storage and VM rescue
+### R3: Repairable storage and VM rescue
 
 Do not promote the current superblock-only `fsck.ext4` into a recovery guarantee.
 For persistent Linux VM disks, prefer packaging established filesystem tooling
@@ -559,7 +648,7 @@ again with its payload hash and mode intact.
 See the
 [detached rescue proof](INSTALLER.md#detached-rescue-guest-proof).
 
-## R4: Authenticate repository and trust delivery
+### R4: Authenticate repository and trust delivery
 
 The signed repository-snapshot boundary already exists in `pm/repo_snapshot.xsh`
 and the verified remote-index path; [PM snapshot authentication](PM.md#snapshot-authentication)
@@ -613,7 +702,7 @@ the installed maintained-image drill was not rerun, there is no aarch64 or
 Asterinas guest run, and one of four `trust_guest.xsh` runs on a loaded host
 failed without a captured cause.
 
-## R5: Activate installed generations and roll back safely
+### R5: Activate installed generations and roll back safely
 
 This is the centerpiece after the first useful remote-administration slice.
 PM remains the plan/build/compose boundary. Put system selection and lifecycle
@@ -700,7 +789,7 @@ with no automatic migrations. Signed input delivery and TLS consumer distrust
 remain the separate R4 boundaries.
 See [maintained activation](QEMU.md#maintained-vm-activation) for the contracts.
 
-## R6: Separate disposable development from long-lived VM policy
+### R6: Separate disposable development from long-lived VM policy
 
 Start this track alongside R1/R2: a secure, reachable first boot and useful SSH
 administration are the first user-visible increment toward G2. Keep current
@@ -708,7 +797,7 @@ autologin/passwordless-doas conveniences in an explicitly selected development
 profile, not as an implicit policy for unattended reachable VMs. Preserve that
 convenient development profile; do not silently change its intended behavior.
 
-### First-boot identity and access
+#### First-boot identity and access
 
 Use one small typed first-boot input for the selected hostname, operator account,
 authorized public keys, network mode, repository trust provisioning, and optional
@@ -732,9 +821,9 @@ Use least-privilege service execution and explicit doas delegation where needed.
 No shared default passwords, implicit root login, or globally writable session
 state is justified by unattended setup.
 
-### SSH-native XSH administration
+#### SSH-native XSH administration
 
-Coordinate with [XSH's remote-execution roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP.md#next-capability-ssh-native-remote-xsh).
+Coordinate with [XSH's remote-execution roadmap](https://github.com/laputa-systems/xsh/blob/master/docs/ROADMAP%2Emd#next-capability-ssh-native-remote-xsh).
 XSH owns reusable typed execution, stream, host-key, and file-transfer boundaries;
 Laputa owns a small administration library over the existing PM, xinit, network,
 and system-report owners. Do not create a generic Ansible replacement, a second
@@ -812,7 +901,7 @@ Native SSH also passes the interrupted activation-stage recovery drill described
 in [maintained VM activation](QEMU.md#maintained-vm-activation). These checks do
 not qualify macOS or aarch64 clients. XSH-55 owns the SSH client's wider matrix.
 
-## R7: Backups, timers, and persistent diagnostics
+### R7: Backups, timers, and persistent diagnostics
 
 **Backups.** `packages/rustic` pins v0.11.4. The retained manual restore drill
 backs up `/etc /home /var`, reconstructs static state from the maintained image,
@@ -917,7 +1006,7 @@ runs when scheduling is introduced. After a forced reboot, diagnostics identify
 the failed generation and service history, stay within retention bounds, and
 exclude secrets.
 
-## R8: Optional Linux OCI execution
+### R8: Optional Linux OCI execution
 
 After the operational baseline, evaluate `youki` as a Rust OCI runtime candidate.
 First define a Linux guest kernel/userspace capability matrix for namespaces,
@@ -931,7 +1020,7 @@ or become a prerequisite for ordinary Laputa services. Asterinas OCI support is
 not part of this milestone; separately scope any required kernel work under the
 existing no-workaround rule.
 
-## R9: Selectively package existing native tools
+### R9: Selectively package existing native tools
 
 Evaluate `e`, `tm`, `fs`, and `srv` from the Laputa organization where an installed
 VM workflow needs them. Add pinned recipes, runtime closures, behavior proofs,
@@ -946,7 +1035,7 @@ Rust implementations are preferred where they fit, but reliability at storage,
 security, and protocol boundaries outranks avoiding every non-Rust dependency.
 Additional utility ports and desktop features do not hold G2 hostage.
 
-## R10: Close the self-hosting loop
+### R10: Close the self-hosting loop
 
 The [existing self-hosting workflow](SELF-HOSTING.md) already describes a bounded
 Linux x86_64 development proof: rebuild XSH/xsht in guest A, use the replacement
@@ -983,7 +1072,7 @@ remaining bootstrap inputs. Keep local development admission distinct from
 production R4/R5 trust. Linux and Asterinas require separate evidence; Linux
 aarch64 remains deferred pending a macOS aarch64 host via Docker.
 
-## R11: Typed activation and per-user agents
+### R11: Typed activation and per-user agents
 
 Deferred until G2 and G4 pass. Earlier, a single trigger is admitted only when a
 concrete G2 workflow needs it.
@@ -1012,7 +1101,7 @@ connection and then serves it without a lost request; a timer and a device
 trigger fire exactly once per event across an xinit restart; killing a service
 stops all of its descendants; a user agent starts and stops without root.
 
-## R12: A complete Wayland desktop on one reference laptop
+### R12: A complete Wayland desktop on one reference laptop
 
 Deferred until R11 passes. Name one reference laptop; do not target laptops in
 general. Real-hardware enablement stays out of scope until the owner admits
@@ -1034,27 +1123,7 @@ upstream compositor, joins Wi-Fi, suspends and resumes repeatedly without losing
 the session, reports battery and controls backlight, plays audio, runs a
 browser with working portals, and rolls back a bad update through R5.
 
-## Long-term: reduce C and C++ in the userspace
-
-After the active campaign, Play's SRT/Core Text migrations, and
-[shared rust-fontconfig adoption](rfc/LAP-52-rust-fontconfig.md), pursue a
-Rust/XSH/Zig-owned desktop and system layer. Start with a measured census and
-finish existing seatd-client, keyboard, and Wayland interfaces. Qualify the
-distribution compression providers and then HarfRust and Swash/Skrifa/Zeno
-against the working [shared font baseline](FONT-STACK.md). Existing OxiSH,
-KBVM, and XSH Rust compression backends are foundations, not new adoptions.
-
-Keep `ffmpeg-build` as the maintained native media dependency. FFmpeg and codec
-replacement are explicitly out of scope; Play subtitle, typography, OSD, and
-application work remain separate. Retain Mesa, musl, and Linux. Crabc evaluation
-or adoption, allocator work, runtime/kernel replacement, and GPU-driver rewrites
-are excluded. Hardware enablement stays deferred. The
-[follow-on design](rfc/LAP-51-c-free-userspace.md) records these boundaries and
-lower-confidence research. LAP-52 precedes LAP-51's bounded census. The owner
-started LAP-51 on 2026-11-22 with Ghostty out of scope; its status section
-names the running pilots, and it changes no current acceptance gate.
-
-## Delivery gates and evidence
+### Acceptance: delivery gates and evidence
 
 | Gate | Required result |
 |---|---|
@@ -1095,3 +1164,25 @@ of creating parallel queues. Stable artifact keys alone do not prove byte-for-by
 rebuilds. When implementation changes a contract, update its owning topic document
 and retire the corresponding roadmap gap; leave operational detail out of this
 file. Broaden scope only by an explicit owner decision.
+
+### Needs environment
+
+Linux x86_64/KVM is the active guest proof target. Linux aarch64 qualification
+needs a macOS aarch64 host via Docker; Asterinas has independent gates.
+
+### Reference
+
+See the [ticket backlog](../TODO.md), [QEMU](QEMU.md), [testing](TESTING.md),
+and the topic documents linked in each track.
+
+## Later
+
+- LAP-87 and LAP-88: qualify musl and zlib on aarch64 when the host is available.
+- LAP-89 and LAP-80: correct readiness dependency and xinit authorization boundaries.
+- LAP-91: bound musl regular-expression compilation stack use.
+- LAP-86: resolve Asterinas netlink attribute compatibility.
+- LAP-20: retire gnu-stubs when a source-built Rust toolchain is viable.
+- LAP-90: make wireless dependencies profile-selected.
+- LAP-81, LAP-82 and LAP-83: resolve rescue ownership and duplicated host configuration.
+- LAP-85: make Gluon consumer parity fail closed.
+- LAP-16: hardware and wireless enablement remain outside scope.

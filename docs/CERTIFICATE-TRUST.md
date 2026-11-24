@@ -355,7 +355,7 @@ acceptance characterization with enforcement regressions.
 ## R4 acceptance matrix
 
 The rows below cover every clause of
-[ROADMAP R4 acceptance](ROADMAP.md#r4-authenticate-repository-and-trust-delivery).
+[roadmap R4 acceptance](roadmap.md#r4-authenticate-repository-and-trust-delivery).
 Each row cites a test that passed on Linux x86_64; guest rows require KVM.
 "Installed generation intact" means the test asserts the active and accepted
 generations and canonical bytes did not move.
