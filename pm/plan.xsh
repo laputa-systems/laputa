@@ -242,7 +242,7 @@ proc dependency_nodes(
 
 proc with_runtime_only_dependencies(
   nodes: List[types.PlanNode],
-  edges: List[types.DependencyEdge],
+  outgoing: Map[List[types.DependencyEdge]],
   selected: Map[Bool],
   keys: Map[Str],
 ) -> Result[List[types.PlanNode]] {
@@ -251,8 +251,8 @@ proc with_runtime_only_dependencies(
   for node in nodes {
     var dependencies = node.dependencies
 
-    for edge in edges {
-      continue unless edge.from == node.name and edge.kind == .RuntimeOnly and (selected.get(edge.to) ?? false)
+    for edge in outgoing.get(node.name) ?? [] {
+      continue unless edge.kind == .RuntimeOnly and (selected.get(edge.to) ?? false)
       dependencies += [{name: edge.to, kind: edge.kind, artifact_key: keys.get(edge.to)?}]
     }
 
@@ -313,6 +313,12 @@ export proc resolve(
 
   let edges = graph.edges(value, policy)?
   let levels = graph.topological_levels(selected_names, edges)?
+  var outgoing: Map[List[types.DependencyEdge]] = {}
+
+  for edge in edges {
+    outgoing[edge.from] = (outgoing.get(edge.from) ?? []) + [edge]
+  }
+
   let recipe_inputs = recipe_build_inputs(value, policy.target)?
   let repository_digest = repository_fingerprint(policy.target, recipe_inputs)?
   var keys: Map[Str] = {}
@@ -326,7 +332,7 @@ export proc resolve(
         let source_pkg = absolute_recipe_package(value, pkg)?
         let recipe_dir = durable_recipe_dir(value, pkg)?
         let package_id = util.package_id(pkg.name, pkg.ver, pkg.rel)
-        let dependencies = dependency_nodes(name, edges, selected, keys)?
+        let dependencies = dependency_nodes(name, outgoing.get(name) ?? [], selected, keys)?
         let recipe_sha256 = recipe_inputs.get(name)?
         let proof_sha256 = pm_fingerprint.package_proof_input(value.root, source_pkg)?
         let local_artifact_key = artifact_key_for(
@@ -337,7 +343,7 @@ export proc resolve(
           dependencies,
         )?
         let local_proof_key = proof_key_for(package_id, local_artifact_key, proof_sha256, dependencies)?
-        let changed_dependencies = built_dependency_names(name, edges, selected, actions)?
+        let changed_dependencies = built_dependency_names(name, outgoing.get(name) ?? [], selected, actions)?
         let artifact_key = local_artifact_key
         var action: types.PlanAction = types.plan_action_build("new package")
         var remote: types.RemoteRetrieval? = null
@@ -406,7 +412,7 @@ export proc resolve(
     repository_digest,
     remote_index_sha256: snapshot.index_sha256,
     build_epoch: policy.build_epoch,
-    nodes: with_runtime_only_dependencies(nodes, edges, selected, keys)?,
+    nodes: with_runtime_only_dependencies(nodes, outgoing, selected, keys)?,
     plan_sha256: "",
   }
   let plan_sha256 = fingerprint(bare)?
