@@ -15,8 +15,8 @@ the new checksums.
 
 Release discovery uses the repository's public releases.atom feed; checksums
 come from that release's SHA256SUMS. Recipes whose newest prerelease is already
-pinned are reported as current. A recipe without exactly one GitHub release
-pin, or a release missing any of its pinned assets, is an error. Run from the
+pinned are reported as current. An explicitly named recipe without a GitHub
+release pin, conflicting pins, or a release missing pinned assets is an error. Run from the
 repository root; --repo selects an alternative recipe tree.
 
 options:
@@ -24,7 +24,7 @@ options:
   --apply            write the refreshed recipe instead of printing a diff
   --verify           run pm sources fetch against the proposed recipe
   --prefix PREFIX    prerelease tag prefix (default: release-)
-  --all              refresh every recipe in the repository
+  --all              refresh recipes with GitHub prereleases; report skipped recipes
   -h, --help         print this help
 
 examples:
@@ -32,6 +32,38 @@ examples:
   xsh refresh-prereleases.xsh --verify ghostty-custom
   xsh refresh-prereleases.xsh --apply ghostty-custom
 """
+
+## Plan one recipe's refresh: an empty list when it is current or, under
+## --all, has no GitHub prerelease to follow.
+proc plan_recipe(repo_root: Path, name: Str, prefix: Str, all: Bool, verify: Bool) -> Result[List[prereleases.RefreshPlan]] {
+  let dir = fp"{repo_root}/packages/{name}"
+  let pkg = recipe.load_package_for_target(dir, types.X86_64LinuxMusl)?
+  if all {
+    let release_sources = [source for source in pkg.upstream_sources if prereleases.parse_pin_text(source.source.display()) is Ok(_)]
+    if release_sources.is_empty() {
+      print f"{name}: skipped (no GitHub release source)"
+      return Ok([])
+    }
+  }
+  let pin = prereleases.current_pin(pkg)?
+  let feed = prereleases.fetch_text(f"https://github.com/{pin.owner}/{pin.repository}/releases.atom")?
+  let tag = prereleases.latest_tag(feed, prefix)
+  if tag == "" and all {
+    print f"{name}: skipped (no {prefix} prerelease in the feed)"
+    return Ok([])
+  }
+  guard tag != "" else {
+    return Err(types.PmError.RemoteFetch(f"{name}: no {prefix} prerelease in the feed"))
+  }
+  if tag == pin.tag {
+    print f"{name}: current ({tag})"
+    return Ok([])
+  }
+  let sums_body = prereleases.fetch_text(f"https://github.com/{pin.owner}/{pin.repository}/releases/download/{tag}/SHA256SUMS")?
+  let plan = prereleases.build_refresh(pkg, pin, tag, prereleases.sums_map(sums_body))?
+  if verify { prereleases.verify_with_pm(plan.name, plan.after) }
+  Ok([plan])
+}
 
 cli main(repo: Path = p".", apply = false, verify = false, prefix = "release-", all = false, ...packages: List[Str]) with {
   name: "refresh-prereleases",
@@ -50,25 +82,20 @@ cli main(repo: Path = p".", apply = false, verify = false, prefix = "release-", 
   } else {
     let repo_root = path.absolute(repo)?
     let names = if all { prereleases.catalog_names(repo_root)? } else { packages }
-    let plans: List[prereleases.RefreshPlan] = collect {
-      for name in names {
-        let dir = fp"{repo_root}/packages/{name}"
-        let pkg = recipe.load_package_for_target(dir, types.X86_64LinuxMusl)?
-        let pin = prereleases.current_pin(pkg)?
-        let feed = prereleases.fetch_text(f"https://github.com/{pin.owner}/{pin.repository}/releases.atom")?
-        let tag = prereleases.latest_tag(feed, prefix)
-        guard tag != "" else {
-          return Err(types.PmError.RemoteFetch(f"{name}: no {prefix} prerelease in the feed"))
+    var plans: List[prereleases.RefreshPlan] = []
+    var failed = []
+    for name in names {
+      match plan_recipe(repo_root, name, prefix, all, verify) {
+        Ok(planned) => { plans = [@plans, @planned] }
+        Err(error) => {
+          guard all else { return Err(error) }
+          print f"{name}: failed ({error.message})"
+          failed = [@failed, name]
         }
-        if tag == pin.tag {
-          print f"{name}: current ({tag})"
-          continue
-        }
-        let sums_body = prereleases.fetch_text(f"https://github.com/{pin.owner}/{pin.repository}/releases/download/{tag}/SHA256SUMS")?
-        let plan = prereleases.build_refresh(pkg, pin, tag, prereleases.sums_map(sums_body))?
-        if verify { prereleases.verify_with_pm(plan.name, plan.after) }
-        yield plan
       }
+    }
+    guard apply == false or failed.is_empty() else {
+      return Err(types.PmError.PackageContract(f"nothing written; failed recipes: {failed.join(", ")}"))
     }
     for plan in plans {
       if plan.warning != "" { print f"{plan.name}: warning: {plan.warning}" }
@@ -78,6 +105,9 @@ cli main(repo: Path = p".", apply = false, verify = false, prefix = "release-", 
       } else {
         prereleases.show_diff(plan.name, plan.before, plan.after)
       }
+    }
+    guard failed.is_empty() else {
+      return Err(types.PmError.PackageContract(f"failed recipes: {failed.join(", ")}"))
     }
   }
 }
