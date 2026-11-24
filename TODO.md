@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 93
+Next: 94
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -37,6 +37,7 @@ and its remaining limits.
 - **Where:** `packages/musl/PKGBUILD.xsh` (patches `musl-regcomp-int-overflow.patch` from musl 7813e911 and `musl-gb18030-iconv-decoder.patch` from 67219f01, `rel = "17"`); `packages/musl/proof.xsh`
 - **Problem:** Both CVE backports (CVE-2026-107891, CVE-2026-6042) are applied for every architecture and proven on x86_64: the GB18030 regression programs fail on unpatched 1.2.6 and pass patched, and the regcomp family passes patched. The regcomp overflow itself was not triggered, since it needs about 2^31 positions. The aarch64 musl build and the cross-compile of the proof programs have not run, because the x86_64 host has no aarch64 seed.
 - **Recommendation:** On the aarch64 host, run `make seed` and `make build PKGS=musl` and record the proof result here before closing.
+- **Fix with:** none
 - **Effort:** S
 
 ### LAP-88 · P3 · zlib 1.4 is unverified on aarch64
@@ -107,6 +108,15 @@ and its remaining limits.
 - **Fix with:** architect, reference-parity, benchmark-checklist
 - **Effort:** L
 - **Design:** [Shared upstream rust-fontconfig](docs/rfc/LAP-52-rust-fontconfig.md)
+
+### LAP-93 · P3 · PM publication durability is proven only against process kill
+
+- **Area:** Package manager
+- **Where:** `docs/PM.md` (filesystem authority limits, lines 713–731); PM artifact publication and verification entry points; QEMU guest qualification harness
+- **Problem:** The PM contract fsyncs staged files and directories, publishes with a no-replace rename and fsyncs the destination parent, but the evidence is `strace` ordering plus process-kill recovery, which proves atomic visibility, not that the store survives a failed write, a failed flush or lost volatile writes. A missed or misordered sync would pass every current test.
+- **Recommendation:** For one artifact-publication transaction on a disposable ext4 store, inject write and flush failures with QEMU `blkdebug` (`write_aio`, `flush_to_os`, `flush_to_disk`) at each sync and rename boundary, and require that every recovered store holds either the complete verifiable artifact or no admitted artifact, keeps any prior valid artifact and lets interrupted staging be reclaimed. Add a negative control that drops one required sync and is detected. Use Linux `dm-log-writes` replay for ordering only after that, and extend to activation records and the trust floor only after it passes. Both stay host-side; nothing enters the installed generation.
+- **Fix with:** none
+- **Effort:** M
 
 ### LAP-90 · P3 · laputa-net always depends on wpa_supplicant
 
