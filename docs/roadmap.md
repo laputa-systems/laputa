@@ -68,6 +68,34 @@ performance as specified in [native census](NATIVE-CENSUS.md#replacement-gates).
 Use Smithay 0.7's capability lists, import validation and recoverable buffer
 creation failures as design references, without importing Smithay.
 
+Venus import keeps Tinyland's invariant that scanout never references
+client-writable memory: the guest presents through a separate 2D virtio-gpu
+device (`system/qemu.xsh`), so first qualify cross-device dma-buf import into
+the existing compositor-owned double buffers. A successful import does not
+establish zero-copy presentation; evaluate GPU-assisted transfer or another
+scanout design only afterwards. `poll()` on the dma-buf observes implicit
+fences, while `DMA_BUF_IOCTL_SYNC` only maintains CPU cache coherency. Adopt
+`linux-drm-syncobj-v1` only if the tested client and renderer need explicit
+synchronization; its releases need not follow acquire or commit order. The
+single-threaded compositor must never wait synchronously on a client fence.
+The gate adds a delayed producer fence, rapid buffer replacement, client
+disconnect with work outstanding, unsupported modifiers, and a second client
+that keeps receiving service while the first is stalled; WLCS stays the
+protocol oracle but does not cover these cases.
+
+Track D's reference must match the candidate: HarfRust 0.16.1 targets
+HarfBuzz 15.2.0 (2026-11-19), while the package ships 15.0.0 and Play's
+recorded differential used 14.2.1, so upstream shaping corrections can read
+as Rust regressions. Upgrade `packages/harfbuzz/` to 15.2.0 with the existing
+`HB_MINI` reductions, revalidating the hardcoded `libharfbuzz.so.0.61500.0`
+filename and CMake `VERSION` rather than only `ver` and the hash, then rerun
+the differential. Its recorded run covers 10 of 16 shaping runs; the six
+without covering fonts (including Devanagari, Thai and CJK) and the five
+bitmap-strike color-emoji cases stay incomplete until covering fonts and a
+comparable paint path exist. HarfBuzz's own suite run with
+`HB_SHAPER_LIST=harfrust meson test -C build` is a host-side oracle; it shares
+lineage with HarfRust, so keep external fixtures and the final-pixel gate.
+
 ### Needs environment
 
 Use the Linux host and a quiet measurement window. aarch64 guest and macOS
