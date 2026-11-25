@@ -4,7 +4,7 @@
 # reads the channel from it. Bump LLVM_* and RUSTUP_VERSION (plus their
 # checksums) separately.
 FROM alpine:3.24.1
-COPY --from=oci.17166969.xyz/owned-tools@sha256:1a5d1306bb105f21b60c67bbf04677a92048c02a808ae9b29dfdac1a90f2f073 /opt/laputa /opt/laputa
+COPY --from=oci.17166969.xyz/owned-tools@sha256:aaec19e7a44cbc53b40db2d22093600ee888689b89be94da90e5398ed02f1883 /opt/laputa /opt/laputa
 ENV PATH=$PATH:/opt/laputa/bin
 
 ARG TARGETARCH
