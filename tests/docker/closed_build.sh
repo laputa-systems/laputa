@@ -40,7 +40,8 @@ for name in kache mold; do
   tool_source=$(command -v "$name")
   cp -L -- "$tool_source" "$work/context/bin/$name"
   chmod 0755 "$work/context/bin/$name"
-  printf 'declared seed tool %s: %s bytes\n' "$name" "$(stat -c '%s' "$work/context/bin/$name")"
+  size=$(wc -c < "$work/context/bin/$name")
+  printf 'declared seed tool %s: %s bytes\n' "$name" "${size##* }"
 done
 # The frozen core tree keeps applets as *.xsh; the installed seed strips the
 # suffix from commands and keeps library modules under lib/.

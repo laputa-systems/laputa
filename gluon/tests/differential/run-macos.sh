@@ -20,7 +20,7 @@ curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --loca
 curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location --retry 3 \
   --output ninja-mac.zip "$ninja_url"
 printf '%s  %s\n' "$(pin MESON_WHEEL_SHA256)" "$wheel" "$(pin NINJA_MAC_SHA256)" ninja-mac.zip |
-  shasum -a 256 -c
+  sha256sum -c
 unzip -q ninja-mac.zip ninja -d bin
 python3 -m venv venv
 venv/bin/python -m pip install --disable-pip-version-check --no-index --no-deps "$wheel"

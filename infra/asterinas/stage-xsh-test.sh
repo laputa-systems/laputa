@@ -9,13 +9,7 @@ fail() {
 }
 
 sha256_file() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
-    elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$1" | awk '{print $1}'
-    else
-        fail 'sha256sum or shasum is required to identify the staged module'
-    fi
+    sha256sum "$1" | awk '{print $1}'
 }
 
 [[ $# == 3 ]] || fail 'usage: stage-xsh-test.sh XSH_SNAPSHOT TEST_SELECTION OUTPUT_DIR'

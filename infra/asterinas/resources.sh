@@ -68,8 +68,12 @@ sample_vmm() {
     done
 }
 
-file_bytes() { stat -L -c %s "$1"; }
-allocated_bytes() { echo $(( $(stat -L -c %b "$1") * $(stat -L -c %B "$1") )); }
+file_bytes() {
+    local size
+    size="$(wc -c < "$1")"
+    printf '%s\n' "${size##* }"
+}
+allocated_bytes() { python3 -c 'import os, sys; print(os.stat(sys.argv[1]).st_blocks * 512)' "$1"; }
 
 deferred=()
 measured=0
