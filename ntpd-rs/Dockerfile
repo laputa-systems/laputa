@@ -18,13 +18,17 @@ RUN apk add --no-cache \
     binutils \
     bash \
     file \
-    gcc \
     make \
     strace \
     musl-dev \
     libgcc \
     tzdata \
     zip
+
+# Rust links host proc-macros against -lgcc_s, which only gcc's package symlinks; the C
+# compiler and linker driver is the owned clang.
+RUN ln -s libgcc_s.so.1 /usr/lib/libgcc_s.so \
+    && ln -s /opt/laputa/bin/clang /usr/local/bin/cc
 
 # rustix requests libutil for Unix PTY support; musl provides those symbols in
 # libc, so an empty archive satisfies the legacy library name without adding a
