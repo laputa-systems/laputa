@@ -39,7 +39,7 @@ tree() {
       elif [ -d "$f" ]; then
         echo "$f/"
       else
-        echo "$f $(stat -c %a "$f")"
+        echo "$f $(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "$f")"
       fi
     done
   )

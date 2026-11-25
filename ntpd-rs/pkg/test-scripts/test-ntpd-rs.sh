@@ -11,7 +11,7 @@ case $1 in
 
       # Ensure daemon and ctl client are present
       # and configuration validates.
-      echo -e "\nNTPD-RS HELP OUTPUT:"
+      printf '\nNTPD-RS HELP OUTPUT:\n'
       /usr/bin/ntp-daemon --help
       /usr/bin/ntp-metrics-exporter --help
       /usr/bin/ntp-ctl validate

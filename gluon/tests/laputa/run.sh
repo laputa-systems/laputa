@@ -29,8 +29,8 @@ tree() {
   ( cd "$1" && fd -H -u . | sort | while read -r f; do
       if [ -L "$f" ]; then echo "$f -> $(readlink "$f")"
       elif [ -d "$f" ]; then echo "$f/"
-      elif [ "$(head -c 4 "$f" | od -An -c | tr -d ' ')" = '177ELF' ]; then echo "$f $(stat -c %a "$f") elf"
-      else echo "$f $(stat -c %a "$f") $(sha256sum < "$f" | cut -c1-16)"; fi
+      elif [ "$(head -c 4 "$f" | od -An -c | tr -d ' ')" = '177ELF' ]; then echo "$f $(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "$f") elf"
+      else echo "$f $(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "$f") $(sha256sum < "$f" | cut -c1-16)"; fi
     done )
 }
 

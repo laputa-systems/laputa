@@ -13,7 +13,7 @@ package_key() {
   for file in .out/artifacts/x86_64/v2/sha256/*/artifact.json; do
     id=$(jaq -r '.package_id' "$file") || continue
     [[ $id =~ ^$name-[0-9] ]] || continue
-    time=$(stat -c %Y "$file")
+    time=$(python3 -c 'import os, sys; print(int(os.stat(sys.argv[1]).st_mtime))' "$file")
     if (( time > best_time )); then best=${file%/artifact.json}; best=${best##*/}; best_time=$time; fi
   done
   [[ -n $best ]] && printf '%s\n' "$best"
@@ -27,6 +27,11 @@ resolve_packages() {
   done
 }
 products=(xsh xshi xsht core.tar.xz)
+file_size() {
+  local size
+  size=$(wc -c < "$1")
+  printf '%s\n' "${size##* }"
+}
 verdict() {
   local ready=$1 value=$2 anchor=$3 tolerance=$4 spread=${5:-0}
   if [[ $ready != 0 ]]; then echo 'inconclusive: host busy'
@@ -224,7 +229,7 @@ case $mode in
       spread=$((sorted[4]-sorted[0]))
       printf 'metric\t%s-ns\t%s\t%s\t%s\n' "$name" "${sorted[2]}" "$spread" "$busy"
     elif [[ $name == artifact-sizes ]]; then
-      for name in "${products[@]}"; do printf 'metric\tseed-%s\t%s\n' "$name" "$(stat -c %s "$seed/$name")"; sha256sum "$seed/$name"; done
+      for name in "${products[@]}"; do printf 'metric\tseed-%s\t%s\n' "$name" "$(file_size "$seed/$name")"; sha256sum "$seed/$name"; done
       resolve_packages
       for key in "${packages[@]}"; do
         dir=.out/artifacts/x86_64/v2/sha256/$key
@@ -233,7 +238,7 @@ case $mode in
         expected=$(jaq -er '.payload_sha256' "$dir/artifact.json") || exit 1
         actual=$(sha256sum "$dir/payload.tar.gz") || exit 1
         [[ ${actual%% *} == "$expected" ]] || exit 1
-        printf 'metric\tpackage-%s\t%s\n' "${id%%-[0-9]*}" "$(stat -c %s "$dir/payload.tar.gz")"; printf '%s\n' "$actual"
+        printf 'metric\tpackage-%s\t%s\n' "${id%%-[0-9]*}" "$(file_size "$dir/payload.tar.gz")"; printf '%s\n' "$actual"
       done
       docker image inspect --format 'image id={{.Id}} layers={{json .RootFS.Layers}}' "$image" || exit 1
       printf 'metric\tpackage-tools-image\t%s\n' "$(docker image inspect --format '{{.Size}}' "$image")"

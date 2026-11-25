@@ -48,7 +48,7 @@ sha256sum "$repository/packages/laputa-net/network_kernel.xsh" "$repository/pack
 git -C "$repository" rev-parse HEAD > "$work/source-revision.txt"
 rg --files -uuu -0 "$work/input" | sort -z | xargs -0 sha256sum > "$work/input-files.sha256"
 sha256sum "$original/disk.img" "$original/rootfs.ext4" "$original/vmlinuz" "$original/generation.json" > "$work/original-root-before.sha256"
-cp --reflink=auto "$original/disk.img" "$original/rootfs.ext4" "$original/vmlinuz" "$original/generation.json" "$work/vm/current/"
+cp "$original/disk.img" "$original/rootfs.ext4" "$original/vmlinuz" "$original/generation.json" "$work/vm/current/"
 truncate -s 256M "$work/vm/inputs.ext4"
 /sbin/mkfs.ext4 -q -F -d "$work/input" "$work/vm/inputs.ext4"
 truncate -s 128M "$work/vm/output.ext4"

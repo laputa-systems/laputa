@@ -4,14 +4,19 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 source "$repo_root/infra/asterinas/inputs.lock"
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/laputa-asterinas-host.XXXXXX")"
-trap 'chmod -R u+w -- "$scratch"; rm -rf -- "$scratch"' EXIT
+trap 'chmod -R u+w "$scratch"; rm -rf -- "$scratch"' EXIT
 
 sha256_file() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$1" | awk '{print $1}'
-    else
-        shasum -a 256 "$1" | awk '{print $1}'
-    fi
+    sha256sum "$1" | awk '{print $1}'
+}
+
+capture_lines() {
+    captured_lines=()
+    local line
+    "$@" > "$scratch/captured-lines" || return
+    while IFS= read -r line; do
+        captured_lines+=("$line")
+    done < "$scratch/captured-lines"
 }
 
 test_root="$scratch/clean-fixture"
@@ -170,13 +175,7 @@ tar -czf "$setup_archive" -C "$scratch/firecracker-archive" \
 setup_archive_hash="$(sha256_file "$setup_archive")"
 printf '%s *%s\n' "$setup_archive_hash" "$setup_archive_name" > "$setup_checksum"
 setup_binary_hash="$(sha256_file "$scratch/fake-firecracker")"
-setup_hash_tool=sha256sum
-if command -v sha256sum >/dev/null 2>&1; then
-    setup_hash_tool_path="$(command -v sha256sum)"
-else
-    setup_hash_tool=shasum
-    setup_hash_tool_path="$(command -v shasum)"
-fi
+setup_hash_tool_path="$(command -v sha256sum)"
 cat > "$setup_fake_bin/docker" <<'DOCKER'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -244,9 +243,7 @@ case "$entrypoint" in
         esac
         ;;
     /usr/bin/sha256sum)
-        hash_args=()
-        [[ "$ASTERINAS_TEST_HASH_TOOL" == shasum ]] && hash_args+=(-a 256)
-        exec "$ASTERINAS_TEST_HASH_TOOL_PATH" "${hash_args[@]}" "$@"
+        exec "$ASTERINAS_TEST_HASH_TOOL_PATH" "$@"
         ;;
     /usr/bin/test)
         [[ "${1:-}" == -d && "${2:-}" == /root/linux_vdso ]] || exit 2
@@ -293,9 +290,7 @@ READELF
 cat > "$setup_fake_bin/sha256sum" <<'SHA256SUM'
 #!/usr/bin/env bash
 set -euo pipefail
-hash_args=()
-[[ "$ASTERINAS_TEST_HASH_TOOL" == shasum ]] && hash_args+=(-a 256)
-exec "$ASTERINAS_TEST_HASH_TOOL_PATH" "${hash_args[@]}" "$@"
+exec "$ASTERINAS_TEST_HASH_TOOL_PATH" "$@"
 SHA256SUM
 chmod 755 "$setup_fake_bin/docker" "$setup_fake_bin/curl" \
     "$setup_fake_bin/uname" "$setup_fake_bin/readelf" "$setup_fake_bin/sha256sum"
@@ -308,7 +303,6 @@ setup_environment=(
     "ASTERINAS_TEST_FIRECRACKER_ARCHIVE_NAME=$setup_archive_name"
     "ASTERINAS_TEST_FIRECRACKER_CHECKSUM=$setup_checksum"
     "ASTERINAS_TEST_FIRECRACKER_MARKER=$setup_marker"
-    "ASTERINAS_TEST_HASH_TOOL=$setup_hash_tool"
     "ASTERINAS_TEST_HASH_TOOL_PATH=$setup_hash_tool_path"
 )
 write_setup_lock() {
@@ -369,10 +363,9 @@ git -C "$xsh_root" config user.email asterinas-test@example.invalid
 git -C "$xsh_root" config user.name Asterinas
 git -C "$xsh_root" add tests docs core dev showcase xsht-config.ini
 git -C "$xsh_root" commit -qm initial
-readarray -t staged_xsh_test < <(
-    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
-        "$xsh_root" tests/xsh/stdlib/fs.xsh "$xsh_output"
-)
+capture_lines bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+    "$xsh_root" tests/xsh/stdlib/fs.xsh "$xsh_output"
+staged_xsh_test=("${captured_lines[@]}")
 [[ ${#staged_xsh_test[@]} == 3 ]]
 [[ "${staged_xsh_test[0]}" == "$xsh_output/xsh-test-overlay" ]]
 [[ "${staged_xsh_test[1]}" == tests/xsh/stdlib/fs.xsh ]]
@@ -386,31 +379,27 @@ grep -Fq 'profile": "asterinas-viability-xsh-test"' "$xsh_output/xsh-test-overla
 printf 'test selected_module { assert 42 == 42 }\n' > "$xsh_root/tests/xsh/stdlib/fs.xsh"
 git -C "$xsh_root" add tests/xsh/stdlib/fs.xsh
 git -C "$xsh_root" commit -qm 'change selected XSH test'
-readarray -t changed_xsh_test < <(
-    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
-        "$xsh_root" tests/xsh/stdlib/fs.xsh "$xsh_output"
-)
+capture_lines bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+    "$xsh_root" tests/xsh/stdlib/fs.xsh "$xsh_output"
+changed_xsh_test=("${captured_lines[@]}")
 [[ ${changed_xsh_test[2]} == "$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum | awk '{print $1}')" ]]
 [[ ${changed_xsh_test[2]} != "$initial_test_sha256" ]]
 cmp "$xsh_root/tests/xsh/stdlib/fs.xsh" \
     "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/tests/xsh/stdlib/fs.xsh"
-readarray -t staged_core_test < <(
-    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
-        "$xsh_root" core/tests/test-core.xsh "$xsh_output"
-)
+capture_lines bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+    "$xsh_root" core/tests/test-core.xsh "$xsh_output"
+staged_core_test=("${captured_lines[@]}")
 [[ "${staged_core_test[1]}" == core/tests/test-core.xsh ]]
 [[ -f "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-source/core/tests/test-core.xsh" ]]
-readarray -t staged_exact_xsh_test < <(
-    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
-        "$xsh_root" core/tests/test-core.xsh::core_suite_fixture "$xsh_output"
-)
+capture_lines bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+    "$xsh_root" core/tests/test-core.xsh::core_suite_fixture "$xsh_output"
+staged_exact_xsh_test=("${captured_lines[@]}")
 [[ "${staged_exact_xsh_test[1]}" == core/tests/test-core.xsh::core_suite_fixture ]]
 [[ "$(cat "$xsh_output/xsh-test.selection")" == core/tests/test-core.xsh::core_suite_fixture ]]
 [[ ! -e "$xsh_output/xsh-test-overlay/usr/lib/asterinas/xsh-test.selection" ]]
-readarray -t staged_batch < <(
-    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
-        "$xsh_root" "core/tests/test-core.xsh  tests/xsh/stdlib/fs.xsh" "$xsh_output"
-)
+capture_lines bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+    "$xsh_root" "core/tests/test-core.xsh  tests/xsh/stdlib/fs.xsh" "$xsh_output"
+staged_batch=("${captured_lines[@]}")
 [[ "${staged_batch[1]}" == 'core/tests/test-core.xsh tests/xsh/stdlib/fs.xsh' ]]
 [[ "$(cat "$xsh_output/xsh-test.selection")" == $'core/tests/test-core.xsh\ntests/xsh/stdlib/fs.xsh' ]]
 
@@ -436,10 +425,9 @@ assert_xsh_test_rejected 'core/tests/test-core.xsh tests/xsh/stdlib/missing.xsh'
 assert_xsh_test_rejected 'all core/tests/test-core.xsh'
 assert_xsh_test_rejected ''
 
-readarray -t staged_full_xsh_suite < <(
-    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
-        "$xsh_root" all "$xsh_output"
-)
+capture_lines bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+    "$xsh_root" all "$xsh_output"
+staged_full_xsh_suite=("${captured_lines[@]}")
 [[ ${#staged_full_xsh_suite[@]} == 3 ]]
 [[ "${staged_full_xsh_suite[1]}" == all ]]
 [[ "${staged_full_xsh_suite[2]}" == "$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum | awk '{print $1}')" ]]
@@ -455,10 +443,9 @@ initial_full_suite_sha256="${staged_full_xsh_suite[2]}"
 printf 'test dev_suite_fixture { assert 42 == 42 }\n' > "$xsh_root/dev/tests/test-dev.xsh"
 git -C "$xsh_root" add dev/tests/test-dev.xsh
 git -C "$xsh_root" commit -qm 'change full XSH suite input'
-readarray -t changed_full_xsh_suite < <(
-    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
-        "$xsh_root" all "$xsh_output"
-)
+capture_lines bash "$repo_root/infra/asterinas/stage-xsh-test.sh" \
+    "$xsh_root" all "$xsh_output"
+changed_full_xsh_suite=("${captured_lines[@]}")
 [[ "${changed_full_xsh_suite[2]}" == "$(git -C "$xsh_root" archive --format=tar HEAD | sha256sum | awk '{print $1}')" ]]
 [[ "${changed_full_xsh_suite[2]}" != "$initial_full_suite_sha256" ]]
 
@@ -619,7 +606,8 @@ mkdir -p "$prepare_root/.cache/asterinas"
 git init --bare -q "$prepare_root/.cache/asterinas/xsh.git"
 git --git-dir="$prepare_root/.cache/asterinas/xsh.git" \
     fetch --quiet --no-tags --depth=1 "$prepare_source" "$prepare_commit"
-readarray -t prepared_xsh < <(bash "$prepare_root/infra/asterinas/prepare-xsh.sh")
+capture_lines bash "$prepare_root/infra/asterinas/prepare-xsh.sh"
+prepared_xsh=("${captured_lines[@]}")
 [[ ${#prepared_xsh[@]} == 2 ]]
 prepared_source="${prepared_xsh[0]}"
 [[ "$(git -C "$prepared_source" rev-parse HEAD)" == "$prepare_commit" ]] || {
@@ -632,9 +620,8 @@ source_tree="$(git -C "$prepare_source" rev-parse 'HEAD^{tree}')"
     printf 'XSH snapshot dropped tracked archive inputs\n' >&2
     exit 1
 }
-readarray -t prepared_overlay < <(
-    bash "$repo_root/infra/asterinas/stage-xsh-test.sh" "$prepared_source" all "$prepare_root/.out"
-)
+capture_lines bash "$repo_root/infra/asterinas/stage-xsh-test.sh" "$prepared_source" all "$prepare_root/.out"
+prepared_overlay=("${captured_lines[@]}")
 [[ ${#prepared_overlay[@]} == 3 ]]
 [[ "$(cat "${prepared_overlay[0]}/usr/lib/asterinas/xsh-source/core/tests/fixtures/util-linux/paths/bind/target/sentinel")" == keep ]]
 
@@ -768,7 +755,7 @@ FAKE_FIRECRACKER_PID_FILE="$vm_test_root/cancel.pid" \
         "$fake_firecracker" "$vm_test_root/config.json" "$vm_test_root/cancel-console.log" \
         "$vm_test_root/cancel-firecracker.log" '' 1500 > "$vm_test_root/cancel-run.log" 2>&1 &
 runner_pid=$!
-for _ in {1..600}; do
+for (( attempt = 0; attempt < 600; attempt++ )); do
     [[ -s "$vm_test_root/cancel.pid" ]] && break
     sleep 0.05
 done
@@ -794,7 +781,7 @@ XSH_MODULE_PATH="$repo_root" xsh "$repo_root/infra/asterinas/run-linux.xsh" -- \
     "$vm_test_root/qemu-cancel-console" "$vm_test_root/qemu-cancel-log" '' 60 1024 \
     > "$vm_test_root/qemu-cancel-run.log" 2>&1 &
 runner_pid=$!
-for _ in {1..600}; do
+for (( attempt = 0; attempt < 600; attempt++ )); do
     [[ -s "$vm_test_root/qemu-cancel.pid" ]] && break
     sleep 0.05
 done

@@ -206,7 +206,7 @@ rollback_transaction() {
     if [ -n "$PREVIOUS_ID" ]; then
         link_tmp=$CURRENT.new.rollback.$$
         ln -s "releases/$PREVIOUS_ID" "$link_tmp"
-        mv -Tf "$link_tmp" "$CURRENT"
+        python3 -c 'import os, sys; os.replace(sys.argv[1], sys.argv[2])' "$link_tmp" "$CURRENT"
     else
         rm -f "$CURRENT"
     fi
@@ -329,7 +329,7 @@ activate_release() {
     link_tmp=$CURRENT.new.$$
     [ ! -e "$link_tmp" ] && [ ! -L "$link_tmp" ] || fail 'current symlink staging path already exists'
     ln -s "$desired_target" "$link_tmp" || fail 'could not stage the current release symlink'
-    mv -Tf "$link_tmp" "$CURRENT" || fail 'could not atomically activate the mirror release'
+    python3 -c 'import os, sys; os.replace(sys.argv[1], sys.argv[2])' "$link_tmp" "$CURRENT" || fail 'could not atomically activate the mirror release'
     say "->  activated $release_id"
     ACTIVATED=yes
 }
@@ -543,7 +543,7 @@ acquire_lock() {
     lock_dir=$(managed_path /run/lock)
     mkdir -p "$lock_dir"
     exec 9>"$lock_path"
-    flock -x 9 || fail 'could not acquire the Laputa mirror deployment lock'
+    python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)' || fail 'could not acquire the Laputa mirror deployment lock'
 }
 
 main() {

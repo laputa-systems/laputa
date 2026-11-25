@@ -59,11 +59,6 @@ fi
 exec /bin/mv "$@"
 SH
 
-cat >"$FAKE_BIN/flock" <<'SH'
-#!/bin/sh
-exit 0
-SH
-
 cat >"$FAKE_BIN/sleep" <<'SH'
 #!/bin/sh
 exit 0
@@ -273,7 +268,6 @@ for command_name in tar install cmp readlink find grep ln; do
 done
 ln -s "$FAKE_BIN/mv" "$REMOTE_BIN/mv"
 ln -s "$FAKE_BIN/curl" "$REMOTE_BIN/curl"
-ln -s "$FAKE_BIN/flock" "$REMOTE_BIN/flock"
 ln -s "$FAKE_BIN/sleep" "$REMOTE_BIN/sleep"
 ln -s "$FAKE_BIN/systemctl" "$REMOTE_BIN/systemctl"
 ln -s "$FAKE_BIN/systemd-analyze" "$REMOTE_BIN/systemd-analyze"
@@ -286,6 +280,14 @@ cat >"$REMOTE_BIN/uname" <<'SH'
 case "${1-}" in -s) printf 'Linux\n' ;; -m) printf 'x86_64\n' ;; *) exit 1 ;; esac
 SH
 chmod 755 "$REMOTE_BIN/id" "$REMOTE_BIN/uname"
+FAKE_PYTHON3=$(command -v python3)
+export FAKE_PYTHON3
+cat >"$FAKE_BIN/python3" <<'SH'
+#!/bin/sh
+case "$*" in *os.replace*) printf 'atomic-replace\n' >>"$FAKE_ATOMIC_LOG" ;; esac
+exec "$FAKE_PYTHON3" "$@"
+SH
+chmod 755 "$FAKE_BIN/python3"
 
 CF_LOG=$TEST_DIR/cf.log
 CF_MUTATIONS=$TEST_DIR/cf-mutations.log

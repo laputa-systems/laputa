@@ -274,7 +274,7 @@ else
     mv "$bundle_stage" "$bundle_dir"
 fi
 ln -sfn "builds/$bundle_key" "$output_dir/current.tmp.$$"
-mv -Tf "$output_dir/current.tmp.$$" "$output_dir/current"
+python3 -c 'import os, sys; os.replace(sys.argv[1], sys.argv[2])' "$output_dir/current.tmp.$$" "$output_dir/current"
 
 kernel_output="$bundle_dir/kernel.elf"
 root_image="$bundle_dir/laputa-root.ext2"

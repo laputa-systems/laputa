@@ -21,4 +21,4 @@ fi
 temporary="$link.tmp.$$"
 trap 'rm -f -- "$temporary"' EXIT
 ln -s "$target" "$temporary"
-mv -Tf "$temporary" "$link"
+python3 -c 'import os, sys; os.replace(sys.argv[1], sys.argv[2])' "$temporary" "$link"
