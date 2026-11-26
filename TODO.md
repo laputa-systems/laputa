@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 94
+Next: 95
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -57,6 +57,15 @@ and its remaining limits.
 - **Recommendation:** Fix each in a `laputa-systems` zlib-rs fork with an upstream draft, add the reproducing input to the differential as a required match, and remove its known-divergence entry. Track C must not ship zlib-rs while any of the four remain.
 - **Fix with:** security
 - **Effort:** M
+
+### LAP-94 · P2 · Seed host-tools still installs build-base instead of the owned clang
+
+- **Area:** Build images / OT7
+- **Where:** `seed/Dockerfile.host-tools:8`; `Dockerfile.package-tools` (the `test -x /usr/bin/cc` gate); `seed/images.lock`; `docs/DEVELOPMENT.md` "Rebuilding and repinning build images"
+- **Problem:** `owned-tool-substitution` flags `build-base` in the host-tools Dockerfile as duplicating laputa-systems/llvm-prebuilt-musl. These are pinned bootstrap inputs: `seed/images.lock` records each published digest plus `dockerfile_sha256`, and package-tools refuses to build without `/usr/bin/cc`, which build-base currently supplies. Removing build-base without providing `cc` breaks the offline package-tools image, and changing the Dockerfile makes the lock stale until both architectures are rebuilt and repinned.
+- **Recommendation:** Copy `/opt/laputa` from the pinned owned-tools image into host-tools (the doas-rs pattern), keep a `cc` symlink to the owned clang, and keep `e2fsprogs`, `util-linux` and the other Alpine tools. For x86_64 and aarch64, build both layouts with `xsh seed/images.xsh -- build --arch ARCH --seed-root PATH --sources PATH`, publish host-tools and package-tools to `oci.17166969.xyz/laputa-host-tools` and `oci.17166969.xyz/laputa-package-tools`, record the published digests and the new `dockerfile_sha256` in `seed/images.lock`, then recompute `package_key_ARCH` with `xsh seed/images.xsh -- key --arch ARCH`. Verify `repomod lint --rule owned-tool-substitution` is clean for laputa and that `make fetch`/`seed-smoke` still pass on both architectures. Publication was approved by the owner on 2026-11-26; the work was deferred then and laputa is out of the Owned-tools-first campaign scope until this ticket is done.
+- **Fix with:** none
+- **Effort:** L
 
 ### LAP-16 · P3 · Exercise sound and wireless device support
 
