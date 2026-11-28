@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 101
+Next: 103
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -66,6 +66,15 @@ and its remaining limits.
 - **Recommendation:** Copy `/opt/laputa` from the pinned owned-tools image into host-tools (the doas-rs pattern), keep a `cc` symlink to the owned clang, and keep `e2fsprogs`, `util-linux` and the other Alpine tools. For x86_64 and aarch64, build both layouts with `xsh seed/images.xsh -- build --arch ARCH --seed-root PATH --sources PATH`, publish host-tools and package-tools to `oci.17166969.xyz/laputa-host-tools` and `oci.17166969.xyz/laputa-package-tools`, record the published digests and the new `dockerfile_sha256` in `seed/images.lock`, then recompute `package_key_ARCH` with `xsh seed/images.xsh -- key --arch ARCH`. Verify `repomod lint --rule owned-tool-substitution` is clean for laputa and that `make fetch`/`seed-smoke` still pass on both architectures. Publication was approved by the owner on 2026-11-26; the work was deferred then and laputa is out of the Owned-tools-first campaign scope until this ticket is done.
 - **Fix with:** none
 - **Effort:** L
+
+### LAP-101 · P2 · musl floatscan writes before its mantissa buffer; merged fix not backported
+
+- **Area:** Security
+- **Where:** `packages/musl/PKGBUILD.xsh` (1.2.6, patch loop applies only `musl-regcomp-int-overflow.patch` and `musl-gb18030-iconv-decoder.patch`); musl 1.2.6 `src/internal/floatscan.c:259` (`decfloat`), `src/network/resolvconf.c`, `src/network/res_msend.c`; upstream commits `dd856098ad76451718161f864158a38157d8b871` (2026-09-22) and `897937236ddbbf07ef41749a88812c594e5f69b4` (2026-09-07)
+- **Problem:** `decfloat` advances its circular mantissa index and stores in one expression; when the index wraps to zero it stores a zero at index -1, one word before the buffer. Upstream confirms triggering inputs for 80-bit (x86_64) and binary128 (aarch64) long double, so both Laputa targets are affected through `strtod`/`strtold`/`scanf`. Separately, `attempts:0` in resolv.conf makes `res_msend` divide by zero. Both fixes are merged upstream and absent from the package. unproven: no deployed Laputa service is shown to parse attacker-controlled floats or to receive `attempts:0`.
+- **Recommendation:** Backport both upstream commits as checksum-bound patches beside the existing two. Add to the musl package proof: the upstream floatscan reproducer under a sanitizer-instrumented reference build, bit-exact results and end pointers for that input and neighbouring rounding boundaries in the packaged libc, and a resolver run with `attempts:0` that fails bounded without terminating while normal retries still work. Qualify x86_64 and aarch64 separately, as for LAP-87.
+- **Fix with:** none
+- **Effort:** S
 
 ### LAP-16 · P3 · Exercise sound and wireless device support
 
@@ -219,6 +228,15 @@ and its remaining limits.
 - **Problem:** Dinit 0.23.0 fixed duplicate-start, shutdown-ordering and restart-after-dependency-failure bugs found by its expanded tests. xinit has no recorded tests for the equivalent races, so the same defects could exist unnoticed: a provider restarting under an operational consumer, a stop request overlapping a scheduled restart, and shutdown while units are starting or in backoff.
 - **Recommendation:** Compare existing xinit coverage, then add lifecycle tests: a provider restart after the consumer is up keeps the no-blanket-cascade policy deterministic; a stop overlapping a scheduled restart leaves no duplicate instance; shutdown with units starting or in backoff reaps every owned process before filesystem shutdown. Keep the notify-byte framing and do not import failure propagation.
 - **Fix with:** lifecycle-concurrency
+- **Effort:** M
+
+### LAP-102 · P3 · libc float parsing has no independent bit-exact corpus
+
+- **Area:** Tests
+- **Where:** `packages/musl/proof.xsh`; external corpus `github.com/nigeltao/parse-number-fxx-test-data` (Apache-2.0)
+- **Problem:** The musl proof and libc-test check selected cases, but nothing compares `strtof`/`strtod` against independent expected bit patterns at scale. The parse-number-fxx corpus (over five million inputs with expected binary16/32/64 bits) is where the musl decfloat out-of-bounds store was found, so it demonstrably finds real libc defects. It has no binary80 or binary128 expectations, and its expected values come from Go's parser.
+- **Recommendation:** Pin a corpus revision and select a subset covering hard decimal representations, subnormals, rounding ties, and overflow and underflow boundaries. A small C test linked against the packaged musl compares resulting bits, not formatted output, and runs in development qualification only. Keep libc-test. Classify any unsupported semantics explicitly.
+- **Fix with:** none
 - **Effort:** M
 
 ### LAP-98 · P4 · pkgconf compiles libpkgconf twice with no known library consumer
