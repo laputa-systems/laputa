@@ -1,5 +1,5 @@
 Prefix: LAP
-Next: 95
+Next: 101
 
 Open work from package-manager development, the local bootstrap, and the
 XSH/Laputa systems-foundation review. Priorities are assumed from impact;
@@ -36,7 +36,7 @@ and its remaining limits.
 - **Area:** Supervision
 - **Where:** `xinit/xinit.xsh:1834-1847` (`gate_satisfied`), `xinit/docs/INIT.md:245-252`, `xinit/docs/SUPERVISION.md:56`
 - **Problem:** When a unit's `ready()` hook or notify byte does not arrive within `ready_timeout_ms`, the unit becomes `running` with `ready` false. `gate_satisfied` checks only `state == "running"` for `dependencies.need`, so a service that never became ready releases its dependents, which then start against a service that has said it cannot serve. The docs describe the promotion but not that it satisfies `need`. unproven: whether `need` is meant to require readiness is an owner decision.
-- **Recommendation:** Decide the contract. Either make `need` wait for `ready` and report a timed-out dependency as blocking, or state in INIT.md that `need` gates only on the process running and add a separate readiness-gated dependency kind. Add a lifecycle test where a needed service times out unready.
+- **Recommendation:** Decide the contract. Either make `need` wait for `ready` and report a timed-out dependency as blocking, or state in INIT.md that `need` gates only on the process running and add a separate readiness-gated dependency kind. Add lifecycle tests where a needed service times out unready, and where a required provider fails while its consumer is starting: the consumer must never be reported initialized.
 - **Fix with:** lifecycle-concurrency, error-model
 - **Effort:** S
 
@@ -175,3 +175,58 @@ and its remaining limits.
 - **Recommendation:** For one artifact-publication transaction on a disposable ext4 store, inject write and flush failures with QEMU `blkdebug` (`write_aio`, `flush_to_os`, `flush_to_disk`) at each sync and rename boundary, and require that every recovered store holds either the complete verifiable artifact or no admitted artifact, keeps any prior valid artifact and lets interrupted staging be reclaimed. `blkdebug` proves error handling only, not ordering under lost volatile writes, so the negative control that drops one required sync must be detected through Linux `dm-log-writes` replay, which follows the error-injection pass. Extend to activation records and the trust floor only after both pass. Both stay host-side; nothing enters the installed generation.
 - **Fix with:** none
 - **Effort:** M
+
+### LAP-95 · P3 · e2fsck 1.47.2 is qualified only by its version banner
+
+- **Area:** System
+- **Where:** `packages/e2fsprogs/PKGBUILD.xsh` (`ver = "1.47.2"`), `packages/e2fsprogs/proof.xsh`, `system/rescue.xsh`; upstream v1.47.4 `tests/f_ea_inode_fast_symlink`, `tests/f_ea_zero_size`, `tests/f_ea_inode_disconnected`
+- **Problem:** The rescue checker is pinned at 1.47.2 and its package proof checks ELF compatibility and `-V` only. 1.47.2 wrongly reports a valid fast symlink with a large external xattr as corrupt, and does not check zero-sized external xattrs; 1.47.4 fixes both. A repair tool that modifies a valid filesystem is itself a recovery risk, and the rescue guest corruption cases do not cover these shapes.
+- **Recommendation:** Bump to 1.47.4, revalidating the vendored generated headers and source inventory. Import the three upstream fixture images and expected outcomes into development qualification, not the rescue image: run the packaged e2fsck on fresh copies, require `f_ea_inode_fast_symlink` to stay clean with status 0 on both passes and the two damaged images to repair (status 1) then check clean. Qualify the production `-f -p` invocation separately from upstream test options. Keep the existing rescue guest proofs.
+- **Fix with:** none
+- **Effort:** M
+
+### LAP-96 · P3 · Three upstream musl correctness fixes are unapplied in 1.2.6
+
+- **Area:** Security
+- **Where:** `packages/musl/PKGBUILD.xsh` (`ver = "1.2.6"`); musl `src/passwd/getspnam_r.c` (`xatol`), `src/stdio/getdelim.c:74`, `src/time/__tz.c:262-322` (`scan_trans`); musl list threads of 2026-11-23 (getdelim), 2026-11-25 (shadow overflow), 2026-11-26 (single-transition TZif)
+- **Problem:** (1) The shadow parser accumulates numeric aging fields into a signed long without overflow checks: undefined behaviour and wrong values on oversized fields. doas-rs reads only `sp_pwdp`, so no authentication impact is shown. (2) `getdelim` compares high-bit delimiters (128-255) wrongly on its unbuffered path where `char` is signed. (3) For TZif files with exactly one transition, `scan_trans` takes the last-transition branch before the pre-transition branch, so timestamps before the transition get the footer rule instead of the initial type (RFC 9636). Real zones have this shape, for example Africa/Abidjan and America/Anguilla. All three patches were still under list review when filed.
+- **Recommendation:** When each patch is final upstream, backport it beside the existing musl backports with a regression in the musl package proof: `fgetspent` on valid, empty, maximal, overflowing and malformed fields; a buffered-versus-unbuffered `getdelim` comparison with a high-bit delimiter; `localtime_r` before, at and after the transition for every single-transition file in the packaged tzdata tree against an independent reference, with multi-transition zones as controls. Qualify on both architectures as for LAP-87.
+- **Fix with:** none
+- **Effort:** M
+
+### LAP-97 · P3 · Builds are not tested against directory enumeration order
+
+- **Area:** Package manager
+- **Where:** `pm/catalog.xsh`, `pm/fingerprint.xsh`, `pm/payload_archive.xsh`, `docs/SELF-HOSTING.md`
+- **Problem:** PM sorts in its catalog and fingerprint paths, but nothing shows that package generators, compiler input inventories or archive construction are independent of filesystem readdir order. A hidden order dependency would make artifacts differ between hosts from identical inputs without any check noticing.
+- **Recommendation:** In the existing independent-rebuild qualification, build one small C package and one XSH-generated package twice from identical pinned inputs under disorderfs, once sorted and once reverse-sorted, with separate output stores. First confirm the enumeration actually differs, then require equal artifact identity, payload digest and archive bytes. Include a deliberately order-dependent generator as a negative control that must be detected. disorderfs stays host-side test tooling only.
+- **Fix with:** none
+- **Effort:** M
+
+### LAP-99 · P3 · A compromised signing key can exhaust the snapshot generation floor
+
+- **Area:** Security
+- **Where:** `pm/repo_snapshot.xsh:154-182`, `docs/PM.md:462-515`, `tests/integration/fixtures/repo-snapshot-publish.xsh`
+- **Problem:** Clients persist the highest accepted generation and key rotation never resets that floor, by design. A holder of a trusted key can publish a valid snapshot at an extreme generation; after revocation clients still hold that floor, so normal publication by the replacement key cannot advance and only out-of-band recovery restores updates. This is a documented trust-model limitation, but no test demonstrates it or pins the operator recovery boundary.
+- **Recommendation:** Add a signed-snapshot fixture test: accept a normal generation, accept an extreme valid generation, revoke the key, show that a normal generation from the replacement key is rejected, and record the exact operator recovery step in PM.md. Do not weaken rollback protection. If in-band recovery becomes a requirement, write an RFC for an authenticated repository epoch.
+- **Fix with:** none
+- **Effort:** S
+
+### LAP-100 · P3 · xinit lacks restart and shutdown race lifecycle tests
+
+- **Area:** Supervision
+- **Where:** `xinit/xinit.xsh`, `xinit/tests/`, `xinit/docs/INIT.md:245-263`, `xinit/docs/SUPERVISION.md`; Dinit v0.23.0 NEWS
+- **Problem:** Dinit 0.23.0 fixed duplicate-start, shutdown-ordering and restart-after-dependency-failure bugs found by its expanded tests. xinit has no recorded tests for the equivalent races, so the same defects could exist unnoticed: a provider restarting under an operational consumer, a stop request overlapping a scheduled restart, and shutdown while units are starting or in backoff.
+- **Recommendation:** Compare existing xinit coverage, then add lifecycle tests: a provider restart after the consumer is up keeps the no-blanket-cascade policy deterministic; a stop overlapping a scheduled restart leaves no duplicate instance; shutdown with units starting or in backoff reaps every owned process before filesystem shutdown. Keep the notify-byte framing and do not import failure propagation.
+- **Fix with:** lifecycle-concurrency
+- **Effort:** M
+
+### LAP-98 · P4 · pkgconf compiles libpkgconf twice with no known library consumer
+
+- **Area:** Build
+- **Where:** `packages/pkgconf/PKGBUILD.xsh:177-310`, `packages/pkgconf/proof.xsh`
+- **Problem:** The recipe builds the 21 libpkgconf sources once shared and once static, installs both libraries plus headers and .pc metadata, and links four tools (pkgconf, bomtool, spdxtool, pccritic). A search of Laputa sources found no direct libpkgconf consumer beyond the recipe and its ABI proof, so the SDK and the duplicate compile may be dead build work. Build time only; the maintained profiles exclude pkgconf.
+- **Recommendation:** Inventory libpkgconf and extra-tool consumers across fetched sources and native dependencies. If there are none, compare a full-featured CLI-only build (not `Makefile.lite`, which changes sysroot and static-link semantics) against the current recipe on compile count, CPU time and output bytes, gated by the existing sysroot, private-dependency and static-link proof plus representative Mesa, Wayland and HarfBuzz builds. Consider importing upstream pkgconf fixture tests into the proof.
+- **Fix with:** none
+- **Effort:** S
+
